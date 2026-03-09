@@ -1,7 +1,5 @@
-import { SlashCommandBuilder } from "discord.js";
-import type { ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
-import { applyFameDelta, getFame } from "../../lib/economy";
+import type { SqliteDatabase } from "../../shared/db";
+import { applyFameDelta, getFame } from "../../shared/economy";
 import {
   awardAchievements,
   getActiveDiceLockout,
@@ -25,56 +23,66 @@ import {
   rollDieWithBans,
   setDiceLevel,
   setLastDiceRollAt,
-} from "../../lib/minigames/dice-game";
+} from "../domain/dice-game";
 import {
   consumeDiceTemporaryEffectsForRoll,
   getRollPassMultiplierFromTemporaryEffects,
-} from "../../lib/minigames/dice-temporary-effects";
+} from "../domain/temporary-effects";
 import {
   buildDiceRollReplyContent,
   formatAchievementText,
   formatRewardText,
-} from "../../lib/minigames/dice-roll-output";
+} from "../presentation/dice-roll-output";
+
+type RunRollDiceUseCaseInput = {
+  db: SqliteDatabase;
+  userId: string;
+  userMention: string;
+  nowMs?: number;
+};
+
+type RollDiceResponse = {
+  content: string;
+  ephemeral: boolean;
+};
 
 const spamWindowMs = 2_000;
 const diceSpamTracker = new Map<string, number>();
 
-export const data = new SlashCommandBuilder().setName("dice").setDescription("Roll your dice.");
-
-export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
-  const db = getDatabase();
-  const userId = interaction.user.id;
-  const now = Date.now();
-  const lockoutUntil = getActiveDiceLockout(db, userId, now);
+export const runRollDiceUseCase = ({
+  db,
+  userId,
+  userMention,
+  nowMs = Date.now(),
+}: RunRollDiceUseCaseInput): RollDiceResponse => {
+  const lockoutUntil = getActiveDiceLockout(db, userId, nowMs);
   if (lockoutUntil) {
-    await interaction.reply({
-      content: `${interaction.user}, you can play again ${formatRelativeTime(lockoutUntil)}.`,
+    return {
+      content: `${userMention}, you can play again ${formatRelativeTime(lockoutUntil)}.`,
       ephemeral: false,
-    });
-    return;
+    };
   }
 
   const lastSpamRollAt = diceSpamTracker.get(userId);
-  diceSpamTracker.set(userId, now);
-  if (lastSpamRollAt !== undefined && now - lastSpamRollAt <= spamWindowMs) {
-    await interaction.reply({
-      content: `${interaction.user} stop spamming!`,
+  diceSpamTracker.set(userId, nowMs);
+  if (lastSpamRollAt !== undefined && nowMs - lastSpamRollAt <= spamWindowMs) {
+    return {
+      content: `${userMention} stop spamming!`,
       ephemeral: false,
-    });
-    return;
+    };
   }
 
   const level = getDiceLevel(db, userId);
   const highestPrestige = getDicePrestige(db, userId);
   const baseDiceCount = Math.max(1, level);
-  const doubleRollUntil = getActiveDoubleRoll(db, userId, now);
+  const doubleRollUntil = getActiveDoubleRoll(db, userId, nowMs);
   const lastDiceRollAt = getLastDiceRollAt(db);
-  const chargeMultiplier = getDiceChargeMultiplier(lastDiceRollAt, now);
+  const chargeMultiplier = getDiceChargeMultiplier(lastDiceRollAt, nowMs);
   const baseRollPassCount = getBaseRollPassCount(highestPrestige);
   const doubleBuffRollPassCount = doubleRollUntil
     ? getDoubleBuffRollPassCount(highestPrestige)
     : baseRollPassCount;
-  const temporaryEffectsRollSummary = getRollPassMultiplierFromTemporaryEffects(db, userId, now);
+  const temporaryEffectsRollSummary = getRollPassMultiplierFromTemporaryEffects(db, userId, nowMs);
   const nonChargeRollPassCount = Math.max(
     1,
     Math.floor(doubleBuffRollPassCount * temporaryEffectsRollSummary.effectiveFactor),
@@ -99,11 +107,12 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
     }),
   );
 
-  const rollPassAchievementIds = rollPasses.map((rolls) => getDiceAchievementsForRoll(rolls, now));
+  const rollPassAchievementIds = rollPasses.map((rolls) =>
+    getDiceAchievementsForRoll(rolls, nowMs),
+  );
   const previouslyEarnedAchievementIds = new Set(getUserDiceAchievements(db, userId));
-  const allSameCount = rollPasses.filter((rolls) =>
-    rolls.every((roll) => roll === rolls[0]),
-  ).length;
+  const allSameCount = rollPasses.filter((rolls) => rolls.every((roll) => roll === rolls[0]))
+    .length;
   const hasLevelUp = allSameCount > 0;
   const levelIncrease = hasLevelUp ? 1 : 0;
   const nearLevelupRollCount = rollPasses.filter((rolls) => isOneOffLevelupRoll(rolls)).length;
@@ -136,10 +145,10 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
         userId,
         commandName: "dice",
         rollsConsumed: 1,
-        nowMs: now,
+        nowMs,
       });
     }
-    setLastDiceRollAt(db, now);
+    setLastDiceRollAt(db, nowMs);
 
     return { newlyEarned, totalReward, levelAfter, fameAfter };
   })();
@@ -153,32 +162,30 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   );
   const unlockedFooter = unlockedBansAfter > unlockedBansBefore ? "New ban slot unlocked." : "";
   const doubleRollFooter =
-    doubleRollUntil && doubleRollUntil > now
-      ? `Double buff remaining: ${formatRemainingTime(doubleRollUntil - now)}.`
+    doubleRollUntil && doubleRollUntil > nowMs
+      ? `Double buff remaining: ${formatRemainingTime(doubleRollUntil - nowMs)}.`
       : "";
   const prestigeFooter =
     result.levelAfter >= getDicePrestigeBaseLevel() && level < getDicePrestigeBaseLevel()
       ? "Prestige is now available. Use /dice-prestige to advance."
       : "";
 
-  const content = buildDiceRollReplyContent({
-    achievementText,
-    unlockedFooter,
-    doubleRollFooter,
-    prestigeFooter,
-    chargeMultiplier,
-    didChargePathWin,
-    rollPasses,
-    rollPassAchievementIds,
-    previouslyEarnedAchievementIds,
-    matchCount: allSameCount,
-    rewardText,
-  });
-
-  await interaction.reply({
-    content,
+  return {
+    content: buildDiceRollReplyContent({
+      achievementText,
+      unlockedFooter,
+      doubleRollFooter,
+      prestigeFooter,
+      chargeMultiplier,
+      didChargePathWin,
+      rollPasses,
+      rollPassAchievementIds,
+      previouslyEarnedAchievementIds,
+      matchCount: allSameCount,
+      rewardText,
+    }),
     ephemeral: false,
-  });
+  };
 };
 
 const formatRelativeTime = (timestampMs: number): string => {
@@ -197,12 +204,12 @@ const formatRemainingTime = (durationMs: number): string => {
   if (minutes > 0) {
     return `${formatUnit(minutes, "minute")} ${formatUnit(seconds, "second")}`;
   }
+
   return formatUnit(seconds, "second");
 };
 
 const formatUnit = (value: number, unit: string): string => {
-  const suffix = value === 1 ? "" : "s";
-  return `${value} ${unit}${suffix}`;
+  return `${value} ${unit}${value === 1 ? "" : "s"}`;
 };
 
 const isOneOffLevelupRoll = (rolls: number[]): boolean => {

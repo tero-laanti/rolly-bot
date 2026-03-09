@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { SqliteDatabase } from "../db";
+import type { SqliteDatabase } from "../../shared/db";
 
 export type DiceTemporaryEffectKind = "positive" | "negative";
 export type DiceTemporaryEffectStackMode = "stack" | "refresh" | "replace" | "no-stack";

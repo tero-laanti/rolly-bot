@@ -1,8 +1,8 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
-import { diceAchievements } from "../../lib/minigames/achievements";
-import { getUserDiceAchievements } from "../../lib/minigames/dice-game";
+import { getDatabase } from "../../shared/db";
+import { diceAchievements } from "../../dice/domain/achievements";
+import { getUserDiceAchievements } from "../../dice/domain/dice-game";
 
 export const data = new SlashCommandBuilder()
   .setName("dice-achievements")

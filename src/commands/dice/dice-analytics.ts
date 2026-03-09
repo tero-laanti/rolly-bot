@@ -1,12 +1,12 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
+import { getDatabase } from "../../shared/db";
 import {
   getActiveDicePrestige,
   getDiceAnalytics,
   getDiceLevel,
   getDicePrestige,
-} from "../../lib/minigames/dice-game";
+} from "../../dice/domain/dice-game";
 
 export const data = new SlashCommandBuilder()
   .setName("dice-analytics")
