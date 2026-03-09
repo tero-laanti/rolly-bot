@@ -1,0 +1,45 @@
+{
+  "prestigeSides": [6, 8, 12, 20],
+  "lowerPrestigeBaseLevel": 5,
+  "banStep": 4,
+  "levelUpReward": 1,
+  "maxRollPassCount": 120,
+  "charge": {
+    "startAfterMinutes": 10,
+    "maxMultiplier": 8
+  },
+  "pvp": {
+    "maxTier": 3,
+    "challengeExpireMinutes": 3,
+    "loserLockoutBaseMinutes": 30,
+    "winnerBuffBaseMinutes": 3
+  },
+  "randomEvents": {
+    "claimWindowDurationMultiplier": 1.5,
+    "variety": {
+      "antiRepeatCooldownTriggers": 2,
+      "rarityChances": {
+        "common": 0.45,
+        "uncommon": 0.28,
+        "rare": 0.17,
+        "epic": 0.08,
+        "legendary": 0.02
+      },
+      "rarityWeightMultipliers": {
+        "common": 1,
+        "uncommon": 1,
+        "rare": 1,
+        "epic": 1,
+        "legendary": 1
+      },
+      "pity": {
+        "enabled": true,
+        "startAfterNonRareTriggers": 5,
+        "rareWeightStep": 0.1,
+        "epicWeightStep": 0.15,
+        "legendaryWeightStep": 0.2,
+        "maxBonusMultiplier": 2
+      }
+    }
+  }
+}
