@@ -12,7 +12,7 @@ import {
   getDicePrestigeBaseLevel,
   getDoubleBuffRollPassCount,
   getUnlockedBanSlotsFromFame,
-} from "../domain/balance";
+} from "../domain/game-rules";
 import { getDiceBans, rollDieWithBans } from "../domain/bans";
 import { getDiceChargeMultiplier, getLastDiceRollAt, setLastDiceRollAt } from "../domain/charge";
 import { recordDiceRollAnalytics, resetDiceLevelAnalyticsProgress } from "../domain/analytics";

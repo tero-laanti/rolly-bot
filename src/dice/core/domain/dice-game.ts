@@ -1,6 +1,6 @@
 export * from "./achievements-store";
 export * from "./analytics";
-export * from "./balance";
+export * from "./game-rules";
 export * from "./bans";
 export * from "./charge";
 export * from "./prestige";

@@ -8,7 +8,7 @@ import {
   getMaxDicePvpTier,
   getUnlockedDicePvpTierFromPrestige,
   normalizeDicePvpTier,
-} from "./balance";
+} from "./game-rules";
 import { getDicePrestige } from "./prestige";
 
 type DicePvpEffectsUpdate = {

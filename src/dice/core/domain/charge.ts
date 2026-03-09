@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import { getDiceChargeMaxMultiplier, getDiceChargeStartMs } from "./balance";
+import { getDiceChargeMaxMultiplier, getDiceChargeStartMs } from "./game-rules";
 
 const minuteMs = 60_000;
 

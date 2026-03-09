@@ -3,7 +3,7 @@ import {
   getDicePrestigeBaseLevel,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
-} from "./balance";
+} from "./game-rules";
 
 type DiceLevelUpdate = {
   userId: string;

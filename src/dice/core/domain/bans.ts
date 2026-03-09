@@ -3,7 +3,7 @@ import { getFame } from "../../../shared/economy";
 import {
   getMaxBansPerDie,
   getUnlockedBanSlotsFromFame,
-} from "./balance";
+} from "./game-rules";
 import { getDiceLevel, getDiceSides } from "./prestige";
 
 type DiceBanUpdate = {
