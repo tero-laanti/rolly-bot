@@ -1,23 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-type TableInfoRow = {
-  name: string;
-};
-
-const ensureBalancesEconomyColumns = (db: SqliteDatabase): void => {
-  const columns = db.prepare("PRAGMA table_info(balances)").all() as TableInfoRow[];
-  const columnNames = new Set(columns.map((column) => column.name));
-
-  if (columnNames.has("balance") && !columnNames.has("fame")) {
-    db.exec("ALTER TABLE balances RENAME COLUMN balance TO fame");
-  }
-
-  if (!columnNames.has("pips")) {
-    db.exec("ALTER TABLE balances ADD COLUMN pips INTEGER NOT NULL DEFAULT 0");
-  }
-};
-
-export const migrateDatabase = (db: SqliteDatabase): void => {
+export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS balances (
       user_id TEXT PRIMARY KEY,
@@ -120,8 +103,4 @@ export const migrateDatabase = (db: SqliteDatabase): void => {
     CREATE INDEX IF NOT EXISTS idx_dice_temporary_effects_user_stack_group
       ON dice_temporary_effects (user_id, stack_group);
   `);
-
-  ensureBalancesEconomyColumns(db);
-
-  db.pragma("user_version = 8");
 };

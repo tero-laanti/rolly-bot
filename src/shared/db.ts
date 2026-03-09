@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { databasePath } from "./config";
-import { migrateDatabase } from "./db/migrations";
+import { initializeDatabaseSchema } from "./db/schema";
 
 export type SqliteDatabase = InstanceType<typeof Database>;
 let database: SqliteDatabase | null = null;
@@ -18,7 +18,7 @@ export const initDatabase = (): SqliteDatabase => {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
-  migrateDatabase(db);
+  initializeDatabaseSchema(db);
 
   database = db;
   return db;
