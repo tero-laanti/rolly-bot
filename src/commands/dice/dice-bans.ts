@@ -5,7 +5,7 @@ import {
   createDiceBansReply,
   diceBansButtonPrefix,
   handleDiceBansAction,
-} from "../../dice/application/manage-dice-bans";
+} from "../../dice/core/application/manage-dice-bans";
 import { applyButtonResult, applyChatInputResult } from "../../bot/interaction-response";
 
 export { diceBansButtonPrefix };

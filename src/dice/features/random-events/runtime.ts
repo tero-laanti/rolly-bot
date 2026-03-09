@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { EmbedBuilder } from "discord.js";
 import type { ButtonInteraction, Client, Message } from "discord.js";
-import { getDatabase } from "../../shared/db";
-import { getDiceBalanceData } from "../../rolly-data/load";
-import { getActiveDiceLockout, setDicePvpEffects } from "../domain/pvp";
-import { applyDiceTemporaryEffect } from "../domain/temporary-effects";
+import { getDatabase } from "../../../shared/db";
+import { getDiceBalanceData } from "../../../rolly-data/load";
+import { getActiveDiceLockout, setDicePvpEffects } from "../../core/domain/pvp";
+import { applyDiceTemporaryEffect } from "../../core/domain/temporary-effects";
 import {
   createRandomEventContentState,
   renderRandomEventScenario,
@@ -26,7 +26,7 @@ import {
   resolveRollChallengeImmediately,
   type RandomEventRollChallengeProgress,
 } from "./roll-challenges";
-import type { RandomEventsFoundationConfig } from "../../shared/config";
+import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { resolveActiveRandomEvent, type RandomEventsState } from "./state";
 import type { TriggerOpportunityResult } from "./scheduler";
 import type { RandomEventRarityTier, RandomEventVarietyState } from "./variety";

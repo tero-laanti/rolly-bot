@@ -116,10 +116,11 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 
 - `src/commands/dice/` contains Discord command adapters for the dice product.
 - `src/commands/system/self-update.ts` contains the owner-only system update command.
-- `src/dice/application/` contains use-case orchestration such as roll, prestige, bans, PvP, and admin flows.
-- `src/dice/domain/` contains focused dice modules for balance, prestige, bans, analytics, charge, PvP, achievements, and temporary effects.
-- `src/dice/presentation/` contains dice-specific output formatting for Discord messages and components.
-- `src/dice/random-events/` contains the random-event scheduler, runtime, state, content selection, and admin wiring.
+- `src/dice/core/application/` contains the core dice use-case orchestration such as roll, prestige, bans, PvP, and admin flows.
+- `src/dice/core/domain/` contains focused dice modules for balance, prestige, bans, analytics, charge, PvP, achievements, and temporary effects.
+- `src/dice/core/presentation/` contains dice-specific output formatting for Discord messages and components.
+- `src/dice/features/` is where larger dice features live as they grow beyond the core loop.
+- `src/dice/features/random-events/` contains the random-event scheduler, runtime, state, content selection, and admin wiring.
 - `src/shared/` contains shared infrastructure such as db, config, env, economy, and self-update helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/bot/` contains the Discord runtime wiring. `src/index.ts` and `src/deploy-commands.ts` stay as thin entry wrappers so npm scripts remain stable.

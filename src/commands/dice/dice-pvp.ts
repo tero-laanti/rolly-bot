@@ -10,7 +10,7 @@ import {
   createDicePvpSetupReply,
   dicePvpButtonPrefix,
   handleDicePvpAction,
-} from "../../dice/application/manage-dice-pvp";
+} from "../../dice/core/application/manage-dice-pvp";
 import { applyButtonResult, applyChatInputResult } from "../../bot/interaction-response";
 
 export { dicePvpButtonPrefix };

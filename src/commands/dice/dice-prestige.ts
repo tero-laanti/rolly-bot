@@ -6,7 +6,7 @@ import {
   createDicePrestigeReply,
   dicePrestigeButtonPrefix,
   handleDicePrestigeAction,
-} from "../../dice/application/manage-dice-prestige";
+} from "../../dice/core/application/manage-dice-prestige";
 
 export { dicePrestigeButtonPrefix };
 
