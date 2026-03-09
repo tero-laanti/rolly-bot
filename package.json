@@ -1,0 +1,46 @@
+{
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "discord.js": "^14.25.1"
+  },
+  "name": "rolly-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "devDependencies": {
+    "@eslint/js": "^9.8.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.1.0",
+    "@typescript-eslint/parser": "^8.1.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.8.0",
+    "globals": "^15.9.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "npm run build && concurrently -k \"tsc --watch\" \"node --watch --env-file=.env dist/index.js\"",
+    "deploy:commands": "npm run build && node --env-file=.env dist/deploy-commands.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "prebuild": "npm run clean",
+    "start": "node --env-file=.env dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tero-laanti/rolly-bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tero-laanti/rolly-bot/issues"
+  },
+  "homepage": "https://github.com/tero-laanti/rolly-bot#readme"
+}
