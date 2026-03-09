@@ -1,6 +1,10 @@
 # Rolly
 
-Discord bot focused on the dice game and local self-update.
+Discord bot focused on rolling dice. The project is mostly written by AI but reviewed by a human.
+
+## What Rolly Is
+
+Rolly is a Discord dice game built around repeated rolls, progression, and small moments of luck. Players roll their current dice set, try to hit matching combinations, unlock achievements, gain Fame, configure bans, prestige into stronger dice, and challenge each other in PvP duels. Random events add extra twists on top of the core roll loop.
 
 ## Requirements
 
