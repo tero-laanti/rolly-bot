@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { RandomEventsFoundationConfig } from "../../shared/config";
+import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import {
   getActiveRandomEventCount,
   registerActiveRandomEvent,

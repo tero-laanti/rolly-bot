@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ActionRowBuilder, ButtonBuilder } from "discord.js";
-import type { SqliteDatabase } from "../../shared/db";
-import type { InteractionResult } from "../../bot/interaction-response";
+import type { SqliteDatabase } from "../../../shared/db";
+import type { InteractionResult } from "../../../bot/interaction-response";
 import {
   buildChallengeActionRow,
   buildChallengeContent,

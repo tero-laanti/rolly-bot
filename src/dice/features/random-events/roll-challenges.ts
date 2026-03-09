@@ -1,6 +1,6 @@
-import type { SqliteDatabase } from "../../shared/db";
-import { getDiceBans, rollDieWithBans } from "../domain/bans";
-import { getDiceSides } from "../domain/prestige";
+import type { SqliteDatabase } from "../../../shared/db";
+import { getDiceBans, rollDieWithBans } from "../../core/domain/bans";
+import { getDiceSides } from "../../core/domain/prestige";
 
 export type RandomEventRollComparator = "gte" | "lte" | "eq";
 

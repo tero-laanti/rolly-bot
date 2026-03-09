@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from "../../shared/db";
+import type { SqliteDatabase } from "../../../shared/db";
 import { getDiceChargeMaxMultiplier, getDiceChargeStartMs } from "./balance";
 
 const minuteMs = 60_000;

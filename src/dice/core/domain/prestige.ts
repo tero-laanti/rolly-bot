@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from "../../shared/db";
+import type { SqliteDatabase } from "../../../shared/db";
 import {
   getDicePrestigeBaseLevel,
   getDiceSidesForPrestige,

@@ -10,7 +10,7 @@ import {
   diceAdminButtonPrefix,
   getDiceAdminOwnerId,
   handleDiceAdminAction,
-} from "../../dice/application/manage-dice-admin";
+} from "../../dice/core/application/manage-dice-admin";
 import { applyButtonResult, applyChatInputResult } from "../../bot/interaction-response";
 
 export { diceAdminButtonPrefix };

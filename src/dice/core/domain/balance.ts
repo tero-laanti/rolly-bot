@@ -1,4 +1,4 @@
-import { getDiceBalanceData } from "../../rolly-data/load";
+import { getDiceBalanceData } from "../../../rolly-data/load";
 
 const minuteMs = 60_000;
 

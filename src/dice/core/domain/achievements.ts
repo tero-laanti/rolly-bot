@@ -1,5 +1,5 @@
-import { getDiceAchievementsData } from "../../rolly-data/load";
-import type { DiceAchievementRule } from "../../rolly-data/types";
+import { getDiceAchievementsData } from "../../../rolly-data/load";
+import type { DiceAchievementRule } from "../../../rolly-data/types";
 
 type DiceAchievementDefinition = {
   id: DiceAchievementId;

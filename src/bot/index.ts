@@ -18,14 +18,14 @@ import { getRollyDataSourceDescription, primeRollyData } from "../rolly-data/loa
 import {
   createRandomEventsLiveRuntime,
   type RandomEventsLiveRuntime,
-} from "../dice/random-events/runtime";
-import { startRandomEventsFoundationScheduler } from "../dice/random-events/scheduler";
-import { randomEventButtonPrefix } from "../dice/random-events/interaction-window";
+} from "../dice/features/random-events/runtime";
+import { startRandomEventsFoundationScheduler } from "../dice/features/random-events/scheduler";
+import { randomEventButtonPrefix } from "../dice/features/random-events/interaction-window";
 import {
   clearRandomEventsAdminController,
   registerRandomEventsAdminController,
-} from "../dice/random-events/admin";
-import { createRandomEventsState } from "../dice/random-events/state";
+} from "../dice/features/random-events/admin";
+import { createRandomEventsState } from "../dice/features/random-events/state";
 
 const token = requireEnv("DISCORD_TOKEN");
 

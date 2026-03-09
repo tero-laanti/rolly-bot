@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import type { SqliteDatabase } from "../../shared/db";
-import type { InteractionResult } from "../../bot/interaction-response";
+import type { SqliteDatabase } from "../../../shared/db";
+import type { InteractionResult } from "../../../bot/interaction-response";
 import { getDiceAchievement, getPrestigeAchievementId } from "../domain/achievements";
 import { awardAchievements } from "../domain/achievements-store";
 import {

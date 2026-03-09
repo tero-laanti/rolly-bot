@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 import { getDatabase } from "../../shared/db";
-import { runRollDiceUseCase } from "../../dice/application/roll-dice";
+import { runRollDiceUseCase } from "../../dice/core/application/roll-dice";
 
 export const data = new SlashCommandBuilder().setName("dice").setDescription("Roll your dice.");
 

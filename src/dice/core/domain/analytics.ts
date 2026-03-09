@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from "../../shared/db";
+import type { SqliteDatabase } from "../../../shared/db";
 import { getActiveDicePrestige } from "./prestige";
 
 type DiceRollAnalyticsUpdate = {
