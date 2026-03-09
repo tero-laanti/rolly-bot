@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
-import { getFame } from "../../lib/economy";
+import { getDatabase } from "../../shared/db";
+import { getFame } from "../../shared/economy";
 import {
   clearSingleDiceBan,
   getDiceBans,
@@ -11,7 +11,7 @@ import {
   getUnlockedBanSlotsFromFame,
   setDiceBan,
   clearDiceBan,
-} from "../../lib/minigames/dice-game";
+} from "../../dice/domain/dice-game";
 
 const numbersPerRow = 5;
 const numberRowsPerPage = 4;

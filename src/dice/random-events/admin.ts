@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
-import type { RandomEventsFoundationConfig } from "../config";
+import type { RandomEventsFoundationConfig } from "../../shared/config";
 import {
   evaluateRandomEventTrigger,
   type RandomEventsFoundationSchedulerController,
   type TriggerOpportunityResult,
-} from "./random-events-foundation";
+} from "./scheduler";
 import type {
   RandomEventsLiveActiveEventSnapshot,
   RandomEventsLiveRuntime,
-} from "./random-events-live-runtime";
+} from "./runtime";
 import {
   getRandomEventsStateSnapshot,
   registerActiveRandomEvent,
@@ -16,7 +16,7 @@ import {
   setLastRandomEventTriggeredAt,
   sweepExpiredActiveRandomEvents,
   type RandomEventsState,
-} from "./random-events-state";
+} from "./state";
 
 type RegisteredRandomEventsAdminController = {
   config: RandomEventsFoundationConfig;

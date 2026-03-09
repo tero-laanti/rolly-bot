@@ -7,17 +7,17 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
+import { getDatabase } from "../../shared/db";
 import {
   getActiveDiceLockout,
   getActiveDoubleRoll,
   setDicePvpEffects,
-} from "../../lib/minigames/dice-game";
-import { getActiveDiceTemporaryEffects } from "../../lib/minigames/dice-temporary-effects";
+} from "../../dice/domain/dice-game";
+import { getActiveDiceTemporaryEffects } from "../../dice/domain/temporary-effects";
 import {
   getRandomEventsAdminStatus,
   triggerRandomEventNow,
-} from "../../lib/minigames/random-events-admin";
+} from "../../dice/random-events/admin";
 
 const ownerEnvName = "DISCORD_OWNER_ID";
 export const diceAdminButtonPrefix = "dice-admin:";

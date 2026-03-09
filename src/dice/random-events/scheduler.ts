@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { RandomEventsFoundationConfig } from "../config";
+import type { RandomEventsFoundationConfig } from "../../shared/config";
 import {
   getActiveRandomEventCount,
   registerActiveRandomEvent,
   type RandomEventsState,
   setLastRandomEventTriggeredAt,
   sweepExpiredActiveRandomEvents,
-} from "./random-events-state";
+} from "./state";
 
 const millisecondsPerDay = 24 * 60 * 60 * 1_000;
 

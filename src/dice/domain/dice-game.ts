@@ -1,6 +1,6 @@
-import type { SqliteDatabase } from "../db";
-import { getFame } from "../economy";
-import { getDiceBalanceData } from "../rolly-data/load";
+import type { SqliteDatabase } from "../../shared/db";
+import { getFame } from "../../shared/economy";
+import { getDiceBalanceData } from "../../rolly-data/load";
 import {
   createRollContext,
   diceAchievements,

@@ -1,8 +1,8 @@
-import type { RandomEventClaimPolicy } from "./random-event-interaction-window";
+import type { RandomEventClaimPolicy } from "./interaction-window";
 import {
   type RandomEventRollChallengeDefinition,
   validateRollChallengeDefinition,
-} from "./random-event-roll-challenges";
+} from "./roll-challenges";
 import {
   createRandomEventVarietyState,
   selectRandomEventTemplateWithVariety,
@@ -10,7 +10,7 @@ import {
   type RandomEventVarietyOptions,
   type RandomEventVarietyState,
   type RandomEventVarietyTemplate,
-} from "./random-event-variety";
+} from "./variety";
 
 export type RandomEventEffect =
   | {

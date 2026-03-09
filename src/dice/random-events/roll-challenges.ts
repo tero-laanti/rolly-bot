@@ -1,5 +1,5 @@
-import type { SqliteDatabase } from "../db";
-import { getDiceBans, getDiceSides, rollDieWithBans } from "./dice-game";
+import type { SqliteDatabase } from "../../shared/db";
+import { getDiceBans, getDiceSides, rollDieWithBans } from "../domain/dice-game";
 
 export type RandomEventRollComparator = "gte" | "lte" | "eq";
 

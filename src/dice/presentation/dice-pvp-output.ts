@@ -6,7 +6,7 @@ import {
   getDuelRewardMs,
   type DicePvpChallenge,
   type DicePvpChallengeCreateResult,
-} from "./dice-game";
+} from "../domain/dice-game";
 
 const tierButtonsPerRow = 4;
 const openChallengeButtonToken = "any";

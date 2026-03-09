@@ -5,7 +5,7 @@ import {
   formatCommandResult,
   runCommandStep,
   truncateCommandOutput,
-} from "../../lib/self-update";
+} from "../../shared/self-update";
 
 const ownerEnvName = "DISCORD_OWNER_ID";
 const outputLimit = 1800;

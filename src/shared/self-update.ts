@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { isGitCheckoutDirectory, resolveRollyDataSource } from "./rolly-data/paths";
+import { isGitCheckoutDirectory, resolveRollyDataSource } from "../rolly-data/paths";
 
 export type CommandStep = {
   label: string;

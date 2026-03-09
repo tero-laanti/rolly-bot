@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
-import { getDiceAchievement, getPrestigeAchievementId } from "../../lib/minigames/achievements";
+import { getDatabase } from "../../shared/db";
+import { getDiceAchievement, getPrestigeAchievementId } from "../../dice/domain/achievements";
 import {
   awardAchievements,
   getActiveDicePrestige,
@@ -15,7 +15,7 @@ import {
   setActiveDicePrestige,
   setDiceLevelForPrestige,
   setDicePrestige,
-} from "../../lib/minigames/dice-game";
+} from "../../dice/domain/dice-game";
 
 const prestigeButtonsPerRow = 5;
 export const dicePrestigeButtonPrefix = "dice-prestige:";

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { getDatabase } from "../../lib/db";
+import { getDatabase } from "../../shared/db";
 import {
   buildChallengeActionRow,
   buildChallengeContent,
@@ -16,7 +16,7 @@ import {
   decodeDicePvpOpponentToken,
   dicePvpButtonPrefix,
   formatRelativeTime,
-} from "../../lib/minigames/dice-pvp-output";
+} from "../../dice/presentation/dice-pvp-output";
 import {
   createDicePvpChallengeIfUsersAvailable,
   dicePvpOpenOpponentId,
@@ -34,7 +34,7 @@ import {
   setDicePvpEffects,
   updateDicePvpStats,
   type DicePvpChallenge,
-} from "../../lib/minigames/dice-game";
+} from "../../dice/domain/dice-game";
 
 export { dicePvpButtonPrefix };
 
