@@ -7,7 +7,7 @@ import {
   getDicePrestigeBaseLevel,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
-} from "../domain/balance";
+} from "../domain/game-rules";
 import {
   resetDiceLevelAnalyticsProgress,
   resetDicePrestigeAnalyticsProgress,

@@ -4,7 +4,11 @@ import {
   type DicePvpChallenge,
   type DicePvpChallengeCreateResult,
 } from "../domain/pvp";
-import { getDicePvpDieLabel, getDuelPunishmentMs, getDuelRewardMs } from "../domain/balance";
+import {
+  getDicePvpDieLabel,
+  getDuelPunishmentMs,
+  getDuelRewardMs,
+} from "../domain/game-rules";
 
 const tierButtonsPerRow = 4;
 const openChallengeButtonToken = "any";
