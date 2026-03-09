@@ -1,0 +1,140 @@
+[
+  {
+    "id": "lantern-cache",
+    "rarity": "common",
+    "title": "Lantern Cache",
+    "prompt": "A supply crate of travel lanterns has been left unlocked. Check it?",
+    "claimLabel": "Open crate",
+    "claimPolicy": "first-click",
+    "claimWindowSeconds": 75,
+    "tags": ["example", "starter"],
+    "outcomes": [
+      {
+        "id": "steady-light",
+        "message": "The crate holds a steady-burning lantern. Your next rolls feel easier to line up.",
+        "effects": [
+          {
+            "type": "temporary-roll-multiplier",
+            "multiplier": 2,
+            "rolls": 2,
+            "stackMode": "no-stack"
+          }
+        ]
+      },
+      {
+        "id": "burnt-wick",
+        "weight": 0.5,
+        "message": "Only burnt wicks remain. You leave with soot on your hands and no real gain.",
+        "effects": []
+      }
+    ],
+    "activityTemplates": {
+      "accepted": [
+        "<@{userId}> opens the lantern crate.",
+        "<@{userId}> checks the cache."
+      ],
+      "alreadyReady": [
+        "<@{userId}> is already checking the cache.",
+        "<@{userId}> is already at the lantern crate."
+      ]
+    }
+  },
+  {
+    "id": "bridge-wager",
+    "rarity": "rare",
+    "title": "Bridge Wager",
+    "prompt": "A ferryman offers a risky shortcut if you can beat a 5+ roll with your current die. Take the wager?",
+    "claimLabel": "Take wager",
+    "claimPolicy": "first-click",
+    "claimWindowSeconds": 90,
+    "tags": ["example", "roll-check"],
+    "rollChallenge": {
+      "id": "ferryman-check",
+      "mode": "single-step",
+      "steps": [
+        {
+          "id": "wager-roll",
+          "label": "Roll 5+ with your current die",
+          "source": {
+            "type": "player-die"
+          },
+          "target": 5,
+          "comparator": "gte"
+        }
+      ],
+      "failOnFirstMiss": true
+    },
+    "challengeOutcomeIds": {
+      "success": ["swift-crossing"],
+      "failure": ["cold-river"]
+    },
+    "outcomes": [
+      {
+        "id": "swift-crossing",
+        "message": "The crossing goes smoothly and the shortcut keeps paying off for a while.",
+        "effects": [
+          {
+            "type": "temporary-roll-multiplier",
+            "multiplier": 4,
+            "rolls": 3,
+            "stackMode": "refresh"
+          }
+        ]
+      },
+      {
+        "id": "cold-river",
+        "message": "You misstep, end up waist-deep in river water, and lose time recovering.",
+        "effects": [
+          {
+            "type": "temporary-lockout",
+            "durationMinutes": 4
+          }
+        ]
+      }
+    ],
+    "activityTemplates": {
+      "accepted": [
+        "<@{userId}> accepts the ferryman's wager.",
+        "<@{userId}> steps onto the bridge."
+      ],
+      "alreadyReady": [
+        "<@{userId}> is already taking the wager.",
+        "<@{userId}> is already on the bridge."
+      ]
+    }
+  },
+  {
+    "id": "market-cheer",
+    "rarity": "uncommon",
+    "title": "Market Cheer",
+    "prompt": "A crowd in the square starts a call-and-response chant. Join in?",
+    "claimLabel": "Join chant",
+    "claimPolicy": "multi-user",
+    "claimWindowSeconds": 110,
+    "tags": ["example", "multi-user"],
+    "outcomes": [
+      {
+        "id": "shared-rhythm",
+        "message": "The crowd's rhythm catches and gives everyone a little extra momentum.",
+        "effects": [
+          {
+            "type": "temporary-roll-multiplier",
+            "multiplier": 2,
+            "rolls": 2,
+            "stackMode": "refresh"
+          }
+        ]
+      }
+    ],
+    "activityTemplates": {
+      "accepted": [
+        "<@{userId}> joins the chant.",
+        "<@{userId}> answers the crowd."
+      ],
+      "alreadyReady": [
+        "<@{userId}> is already in the chant.",
+        "<@{userId}> is already with the crowd."
+      ]
+    }
+  }
+]

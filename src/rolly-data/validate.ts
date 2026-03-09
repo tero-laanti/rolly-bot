@@ -1,0 +1,690 @@
+import type {
+  DiceAchievementData,
+  DiceAchievementManualAward,
+  DiceAchievementRule,
+  DiceBalanceData,
+  DiceBalanceVarietyConfig,
+} from "./types";
+import type {
+  RandomEventClaimActivityTemplates,
+  RandomEventEffect,
+  RandomEventOutcome,
+  RandomEventScenario,
+} from "../dice/features/random-events/content";
+import type {
+  RandomEventRollChallengeDefinition,
+  RandomEventRollChallengeStep,
+  RandomEventRollSource,
+} from "../dice/features/random-events/roll-challenges";
+import type { RandomEventClaimPolicy } from "../dice/features/random-events/interaction-window";
+import type {
+  RandomEventRarityTier,
+  RandomEventVarietyPityConfig,
+} from "../dice/features/random-events/variety";
+
+type UnknownRecord = Record<string, unknown>;
+
+const rarityTiers = ["common", "uncommon", "rare", "epic", "legendary"] as const;
+const claimPolicies = ["first-click", "multi-user"] as const;
+const achievementRuleTypes = [
+  "ordered-sequence",
+  "contains-all-values",
+  "at-least-of-a-kind",
+  "count-at-least-of-a-kind",
+  "count-exact-of-a-kind",
+  "ordered-two-pairs",
+  "ordered-full-house",
+  "contains-value",
+  "exact-time",
+  "all-of",
+  "manual",
+] as const;
+
+const isRecord = (value: unknown): value is UnknownRecord => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const assertRecord = (value: unknown, label: string): UnknownRecord => {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object.`);
+  }
+
+  return value;
+};
+
+const readString = (value: unknown, label: string): string => {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string.`);
+  }
+
+  return value;
+};
+
+const readNonEmptyString = (value: unknown, label: string): string => {
+  const parsed = readString(value, label).trim();
+  if (parsed.length < 1) {
+    throw new Error(`${label} must not be empty.`);
+  }
+
+  return parsed;
+};
+
+const readFiniteNumber = (value: unknown, label: string): number => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number.`);
+  }
+
+  return value;
+};
+
+const readInteger = (value: unknown, label: string, minValue: number = Number.MIN_SAFE_INTEGER): number => {
+  const parsed = readFiniteNumber(value, label);
+  if (!Number.isInteger(parsed) || parsed < minValue) {
+    throw new Error(`${label} must be an integer >= ${minValue}.`);
+  }
+
+  return parsed;
+};
+
+const readOptionalFiniteNumber = (value: unknown, label: string): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return readFiniteNumber(value, label);
+};
+
+const readStringArray = (value: unknown, label: string): string[] => {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array.`);
+  }
+
+  return value.map((entry, index) => readNonEmptyString(entry, `${label}[${index}]`));
+};
+
+const readIntegerArray = (value: unknown, label: string, minValue: number = 1): number[] => {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array.`);
+  }
+
+  return value.map((entry, index) => readInteger(entry, `${label}[${index}]`, minValue));
+};
+
+const readClaimPolicy = (value: unknown, label: string): RandomEventClaimPolicy => {
+  const parsed = readNonEmptyString(value, label);
+  if (!claimPolicies.includes(parsed as RandomEventClaimPolicy)) {
+    throw new Error(`${label} must be one of ${claimPolicies.join(", ")}.`);
+  }
+
+  return parsed as RandomEventClaimPolicy;
+};
+
+const readRarityTier = (value: unknown, label: string): RandomEventRarityTier => {
+  const parsed = readNonEmptyString(value, label);
+  if (!rarityTiers.includes(parsed as RandomEventRarityTier)) {
+    throw new Error(`${label} must be one of ${rarityTiers.join(", ")}.`);
+  }
+
+  return parsed as RandomEventRarityTier;
+};
+
+const readTextVariables = (
+  value: unknown,
+  label: string,
+): Record<string, string[]> | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, label);
+  const parsed: Record<string, string[]> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    const normalizedKey = key.trim();
+    if (normalizedKey.length < 1) {
+      throw new Error(`${label} keys must not be empty.`);
+    }
+
+    parsed[normalizedKey] = readStringArray(entry, `${label}.${normalizedKey}`);
+  }
+
+  return parsed;
+};
+
+const readClaimActivityTemplates = (
+  value: unknown,
+  label: string,
+): RandomEventClaimActivityTemplates | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, label);
+  return {
+    accepted: readStringArray(record.accepted, `${label}.accepted`),
+    alreadyReady: readStringArray(record.alreadyReady, `${label}.alreadyReady`),
+  };
+};
+
+const readRollSource = (value: unknown, label: string): RandomEventRollSource => {
+  const record = assertRecord(value, label);
+  const type = readNonEmptyString(record.type, `${label}.type`);
+  if (type === "player-die") {
+    return {
+      type,
+      dieIndex:
+        record.dieIndex === undefined
+          ? undefined
+          : readInteger(record.dieIndex, `${label}.dieIndex`, 1),
+      useBans:
+        record.useBans === undefined
+          ? undefined
+          : (() => {
+              if (typeof record.useBans !== "boolean") {
+                throw new Error(`${label}.useBans must be a boolean.`);
+              }
+
+              return record.useBans;
+            })(),
+    };
+  }
+
+  if (type === "static-die") {
+    return {
+      type,
+      sides: readInteger(record.sides, `${label}.sides`, 2),
+    };
+  }
+
+  throw new Error(`${label}.type must be "player-die" or "static-die".`);
+};
+
+const readRollChallengeStep = (value: unknown, label: string): RandomEventRollChallengeStep => {
+  const record = assertRecord(value, label);
+  const comparator = readNonEmptyString(record.comparator, `${label}.comparator`);
+  if (comparator !== "gte" && comparator !== "lte" && comparator !== "eq") {
+    throw new Error(`${label}.comparator must be gte, lte, or eq.`);
+  }
+
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    label: readNonEmptyString(record.label, `${label}.label`),
+    source: readRollSource(record.source, `${label}.source`),
+    target: readFiniteNumber(record.target, `${label}.target`),
+    comparator,
+  };
+};
+
+const readRollChallengeDefinition = (
+  value: unknown,
+  label: string,
+): RandomEventRollChallengeDefinition | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, label);
+  const mode = readNonEmptyString(record.mode, `${label}.mode`);
+  if (mode !== "single-step" && mode !== "sequence") {
+    throw new Error(`${label}.mode must be "single-step" or "sequence".`);
+  }
+
+  if (!Array.isArray(record.steps)) {
+    throw new Error(`${label}.steps must be an array.`);
+  }
+
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    mode,
+    steps: record.steps.map((entry, index) => readRollChallengeStep(entry, `${label}.steps[${index}]`)),
+    failOnFirstMiss:
+      record.failOnFirstMiss === undefined
+        ? undefined
+        : (() => {
+            if (typeof record.failOnFirstMiss !== "boolean") {
+              throw new Error(`${label}.failOnFirstMiss must be a boolean.`);
+            }
+
+            return record.failOnFirstMiss;
+          })(),
+  };
+};
+
+const readRandomEventEffect = (value: unknown, label: string): RandomEventEffect => {
+  const record = assertRecord(value, label);
+  const type = readNonEmptyString(record.type, `${label}.type`);
+
+  if (type === "currency") {
+    return {
+      type,
+      minAmount: readInteger(record.minAmount, `${label}.minAmount`, 0),
+      maxAmount: readInteger(record.maxAmount, `${label}.maxAmount`, 0),
+    };
+  }
+
+  if (type === "temporary-roll-multiplier") {
+    const stackMode = readNonEmptyString(record.stackMode, `${label}.stackMode`);
+    if (
+      stackMode !== "stack" &&
+      stackMode !== "refresh" &&
+      stackMode !== "replace" &&
+      stackMode !== "no-stack"
+    ) {
+      throw new Error(`${label}.stackMode is invalid.`);
+    }
+
+    return {
+      type,
+      multiplier: readInteger(record.multiplier, `${label}.multiplier`, 1),
+      rolls: readInteger(record.rolls, `${label}.rolls`, 1),
+      stackMode,
+    };
+  }
+
+  if (type === "temporary-roll-penalty") {
+    const stackMode = readNonEmptyString(record.stackMode, `${label}.stackMode`);
+    if (stackMode !== "refresh" && stackMode !== "replace" && stackMode !== "no-stack") {
+      throw new Error(`${label}.stackMode is invalid.`);
+    }
+
+    return {
+      type,
+      divisor: readInteger(record.divisor, `${label}.divisor`, 1),
+      rolls: readInteger(record.rolls, `${label}.rolls`, 1),
+      stackMode,
+    };
+  }
+
+  if (type === "temporary-lockout") {
+    return {
+      type,
+      durationMinutes: readInteger(record.durationMinutes, `${label}.durationMinutes`, 1),
+    };
+  }
+
+  throw new Error(`${label}.type is invalid.`);
+};
+
+const readRandomEventOutcome = (value: unknown, label: string): RandomEventOutcome => {
+  const record = assertRecord(value, label);
+  if (!Array.isArray(record.effects)) {
+    throw new Error(`${label}.effects must be an array.`);
+  }
+
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
+    message: readNonEmptyString(record.message, `${label}.message`),
+    effects: record.effects.map((entry, index) => readRandomEventEffect(entry, `${label}.effects[${index}]`)),
+    textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
+  };
+};
+
+const readRandomEventScenario = (value: unknown, label: string): RandomEventScenario => {
+  const record = assertRecord(value, label);
+  if (!Array.isArray(record.outcomes)) {
+    throw new Error(`${label}.outcomes must be an array.`);
+  }
+
+  const challengeOutcomeIdsRecord =
+    record.challengeOutcomeIds === undefined
+      ? undefined
+      : assertRecord(record.challengeOutcomeIds, `${label}.challengeOutcomeIds`);
+
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    rarity: readRarityTier(record.rarity, `${label}.rarity`),
+    title: readNonEmptyString(record.title, `${label}.title`),
+    prompt: readNonEmptyString(record.prompt, `${label}.prompt`),
+    claimLabel: readNonEmptyString(record.claimLabel, `${label}.claimLabel`),
+    claimPolicy: readClaimPolicy(record.claimPolicy, `${label}.claimPolicy`),
+    claimWindowSeconds: readInteger(record.claimWindowSeconds, `${label}.claimWindowSeconds`, 1),
+    tags: record.tags === undefined ? undefined : readStringArray(record.tags, `${label}.tags`),
+    weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
+    textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
+    rollChallenge: readRollChallengeDefinition(record.rollChallenge, `${label}.rollChallenge`),
+    challengeOutcomeIds:
+      challengeOutcomeIdsRecord === undefined
+        ? undefined
+        : {
+            success: readStringArray(
+              challengeOutcomeIdsRecord.success,
+              `${label}.challengeOutcomeIds.success`,
+            ),
+            failure: readStringArray(
+              challengeOutcomeIdsRecord.failure,
+              `${label}.challengeOutcomeIds.failure`,
+            ),
+          },
+    outcomes: record.outcomes.map((entry, index) => readRandomEventOutcome(entry, `${label}.outcomes[${index}]`)),
+    activityTemplates: readClaimActivityTemplates(
+      record.activityTemplates,
+      `${label}.activityTemplates`,
+    ),
+  };
+};
+
+const readManualAward = (value: unknown, label: string): DiceAchievementManualAward | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, label);
+  const type = readNonEmptyString(record.type, `${label}.type`);
+  if (type !== "prestige") {
+    throw new Error(`${label}.type must be "prestige".`);
+  }
+
+  return {
+    type,
+    prestige: readInteger(record.prestige, `${label}.prestige`, 1),
+  };
+};
+
+const readAchievementRule = (value: unknown, label: string): DiceAchievementRule => {
+  const record = assertRecord(value, label);
+  const type = readNonEmptyString(record.type, `${label}.type`);
+  if (!achievementRuleTypes.includes(type as (typeof achievementRuleTypes)[number])) {
+    throw new Error(`${label}.type is invalid.`);
+  }
+
+  if (type === "ordered-sequence") {
+    return {
+      type,
+      pattern: readIntegerArray(record.pattern, `${label}.pattern`, 1),
+    };
+  }
+
+  if (type === "contains-all-values") {
+    return {
+      type,
+      values: readIntegerArray(record.values, `${label}.values`, 1),
+    };
+  }
+
+  if (type === "at-least-of-a-kind") {
+    return {
+      type,
+      count: readInteger(record.count, `${label}.count`, 1),
+    };
+  }
+
+  if (type === "count-at-least-of-a-kind" || type === "count-exact-of-a-kind") {
+    return {
+      type,
+      count: readInteger(record.count, `${label}.count`, 1),
+      groups: readInteger(record.groups, `${label}.groups`, 1),
+    };
+  }
+
+  if (type === "ordered-two-pairs" || type === "ordered-full-house" || type === "manual") {
+    return { type };
+  }
+
+  if (type === "contains-value") {
+    return {
+      type,
+      value: readInteger(record.value, `${label}.value`, 1),
+    };
+  }
+
+  if (type === "exact-time") {
+    return {
+      type,
+      hour: readInteger(record.hour, `${label}.hour`, 0),
+      minute: readInteger(record.minute, `${label}.minute`, 0),
+      timezone: readNonEmptyString(record.timezone, `${label}.timezone`),
+    };
+  }
+
+  if (!Array.isArray(record.rules)) {
+    throw new Error(`${label}.rules must be an array.`);
+  }
+
+  return {
+    type: "all-of",
+    rules: record.rules.map((entry, index) => readAchievementRule(entry, `${label}.rules[${index}]`)),
+  };
+};
+
+const readRarityNumberRecord = (
+  value: unknown,
+  label: string,
+): Record<RandomEventRarityTier, number> => {
+  const record = assertRecord(value, label);
+  return {
+    common: readFiniteNumber(record.common, `${label}.common`),
+    uncommon: readFiniteNumber(record.uncommon, `${label}.uncommon`),
+    rare: readFiniteNumber(record.rare, `${label}.rare`),
+    epic: readFiniteNumber(record.epic, `${label}.epic`),
+    legendary: readFiniteNumber(record.legendary, `${label}.legendary`),
+  };
+};
+
+const validateParsedRollChallengeDefinition = (
+  challenge: RandomEventRollChallengeDefinition,
+): void => {
+  if (challenge.id.trim().length < 1) {
+    throw new Error("Roll challenge id cannot be empty.");
+  }
+
+  if (challenge.steps.length < 1) {
+    throw new Error(`Roll challenge ${challenge.id} must include at least one step.`);
+  }
+
+  const ids = new Set<string>();
+  for (const step of challenge.steps) {
+    if (ids.has(step.id)) {
+      throw new Error(`Roll challenge ${challenge.id} has duplicate step id ${step.id}.`);
+    }
+
+    ids.add(step.id);
+  }
+
+  if (challenge.mode === "single-step" && challenge.steps.length !== 1) {
+    throw new Error(`Roll challenge ${challenge.id} single-step mode must define exactly one step.`);
+  }
+};
+
+const validateParsedRandomEventScenario = (scenario: RandomEventScenario): void => {
+  if (scenario.id.trim().length < 1) {
+    throw new Error("Random event scenario id cannot be empty.");
+  }
+
+  if (scenario.title.trim().length < 1) {
+    throw new Error(`Random event scenario ${scenario.id} must have a title.`);
+  }
+
+  if (scenario.prompt.trim().length < 1) {
+    throw new Error(`Random event scenario ${scenario.id} must have a prompt.`);
+  }
+
+  if (scenario.claimWindowSeconds < 10) {
+    throw new Error(`Random event scenario ${scenario.id} must have at least 10s claim window.`);
+  }
+
+  if (scenario.outcomes.length < 1) {
+    throw new Error(`Random event scenario ${scenario.id} must define at least one outcome.`);
+  }
+
+  if (scenario.rollChallenge) {
+    validateParsedRollChallengeDefinition(scenario.rollChallenge);
+  }
+
+  if (scenario.challengeOutcomeIds) {
+    const outcomeIdSet = new Set(scenario.outcomes.map((outcome) => outcome.id));
+    for (const [key, outcomeIds] of Object.entries(scenario.challengeOutcomeIds) as Array<
+      ["success" | "failure", string[]]
+    >) {
+      if (outcomeIds.length < 1) {
+        throw new Error(`Scenario ${scenario.id} challengeOutcomeIds.${key} must have at least one id.`);
+      }
+
+      for (const outcomeId of outcomeIds) {
+        if (!outcomeIdSet.has(outcomeId)) {
+          throw new Error(
+            `Scenario ${scenario.id} challengeOutcomeIds.${key} references missing outcome '${outcomeId}'.`,
+          );
+        }
+      }
+    }
+  }
+};
+
+const validateParsedRandomEventScenarios = (scenarios: RandomEventScenario[]): void => {
+  const ids = new Set<string>();
+  for (const scenario of scenarios) {
+    validateParsedRandomEventScenario(scenario);
+    if (ids.has(scenario.id)) {
+      throw new Error(`Duplicate random event scenario id: ${scenario.id}`);
+    }
+
+    ids.add(scenario.id);
+  }
+};
+
+const readPityConfig = (value: unknown, label: string): RandomEventVarietyPityConfig => {
+  const record = assertRecord(value, label);
+  if (typeof record.enabled !== "boolean") {
+    throw new Error(`${label}.enabled must be a boolean.`);
+  }
+
+  return {
+    enabled: record.enabled,
+    startAfterNonRareTriggers: readInteger(
+      record.startAfterNonRareTriggers,
+      `${label}.startAfterNonRareTriggers`,
+      0,
+    ),
+    rareWeightStep: readFiniteNumber(record.rareWeightStep, `${label}.rareWeightStep`),
+    epicWeightStep: readFiniteNumber(record.epicWeightStep, `${label}.epicWeightStep`),
+    legendaryWeightStep: readFiniteNumber(
+      record.legendaryWeightStep,
+      `${label}.legendaryWeightStep`,
+    ),
+    maxBonusMultiplier: readFiniteNumber(record.maxBonusMultiplier, `${label}.maxBonusMultiplier`),
+  };
+};
+
+const readVarietyConfig = (value: unknown, label: string): DiceBalanceVarietyConfig => {
+  const record = assertRecord(value, label);
+  return {
+    antiRepeatCooldownTriggers: readInteger(
+      record.antiRepeatCooldownTriggers,
+      `${label}.antiRepeatCooldownTriggers`,
+      0,
+    ),
+    rarityChances: readRarityNumberRecord(record.rarityChances, `${label}.rarityChances`),
+    rarityWeightMultipliers: readRarityNumberRecord(
+      record.rarityWeightMultipliers,
+      `${label}.rarityWeightMultipliers`,
+    ),
+    pity: readPityConfig(record.pity, `${label}.pity`),
+  };
+};
+
+export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => {
+  if (!Array.isArray(value)) {
+    throw new Error("Achievements data must be an array.");
+  }
+
+  const parsed = value.map((entry, index) => {
+    const record = assertRecord(entry, `achievements[${index}]`);
+    return {
+      id: readNonEmptyString(record.id, `achievements[${index}].id`),
+      name: readNonEmptyString(record.name, `achievements[${index}].name`),
+      description: readNonEmptyString(record.description, `achievements[${index}].description`),
+      rule: readAchievementRule(record.rule, `achievements[${index}].rule`),
+      manualAward: readManualAward(record.manualAward, `achievements[${index}].manualAward`),
+    };
+  });
+
+  const ids = new Set<string>();
+  const prestigeAwards = new Set<number>();
+  for (const achievement of parsed) {
+    if (ids.has(achievement.id)) {
+      throw new Error(`Duplicate achievement id: ${achievement.id}`);
+    }
+
+    ids.add(achievement.id);
+
+    if (achievement.manualAward?.type === "prestige") {
+      if (prestigeAwards.has(achievement.manualAward.prestige)) {
+        throw new Error(
+          `Duplicate prestige achievement mapping for prestige ${achievement.manualAward.prestige}.`,
+        );
+      }
+
+      prestigeAwards.add(achievement.manualAward.prestige);
+    }
+  }
+
+  return parsed;
+};
+
+export const parseDiceBalance = (value: unknown): DiceBalanceData => {
+  const record = assertRecord(value, "diceBalance");
+  const charge = assertRecord(record.charge, "diceBalance.charge");
+  const pvp = assertRecord(record.pvp, "diceBalance.pvp");
+  const randomEvents = assertRecord(record.randomEvents, "diceBalance.randomEvents");
+
+  const parsed: DiceBalanceData = {
+    prestigeSides: readIntegerArray(record.prestigeSides, "diceBalance.prestigeSides", 2),
+    lowerPrestigeBaseLevel: readInteger(
+      record.lowerPrestigeBaseLevel,
+      "diceBalance.lowerPrestigeBaseLevel",
+      1,
+    ),
+    banStep: readInteger(record.banStep, "diceBalance.banStep", 1),
+    levelUpReward: readInteger(record.levelUpReward, "diceBalance.levelUpReward", 0),
+    maxRollPassCount: readInteger(record.maxRollPassCount, "diceBalance.maxRollPassCount", 1),
+    charge: {
+      startAfterMinutes: readInteger(charge.startAfterMinutes, "diceBalance.charge.startAfterMinutes", 0),
+      maxMultiplier: readInteger(charge.maxMultiplier, "diceBalance.charge.maxMultiplier", 1),
+    },
+    pvp: {
+      maxTier: readInteger(pvp.maxTier, "diceBalance.pvp.maxTier", 1),
+      challengeExpireMinutes: readInteger(
+        pvp.challengeExpireMinutes,
+        "diceBalance.pvp.challengeExpireMinutes",
+        1,
+      ),
+      loserLockoutBaseMinutes: readInteger(
+        pvp.loserLockoutBaseMinutes,
+        "diceBalance.pvp.loserLockoutBaseMinutes",
+        1,
+      ),
+      winnerBuffBaseMinutes: readInteger(
+        pvp.winnerBuffBaseMinutes,
+        "diceBalance.pvp.winnerBuffBaseMinutes",
+        1,
+      ),
+    },
+    randomEvents: {
+      claimWindowDurationMultiplier: readFiniteNumber(
+        randomEvents.claimWindowDurationMultiplier,
+        "diceBalance.randomEvents.claimWindowDurationMultiplier",
+      ),
+      variety: readVarietyConfig(randomEvents.variety, "diceBalance.randomEvents.variety"),
+    },
+  };
+
+  if (parsed.prestigeSides.length < 2) {
+    throw new Error("diceBalance.prestigeSides must include at least two entries.");
+  }
+
+  if (parsed.pvp.maxTier > parsed.prestigeSides.length - 1) {
+    throw new Error("diceBalance.pvp.maxTier must be unlockable from prestigeSides.");
+  }
+
+  return parsed;
+};
+
+export const parseRandomEventScenarios = (value: unknown): RandomEventScenario[] => {
+  if (!Array.isArray(value)) {
+    throw new Error("Random event content must be an array.");
+  }
+
+  const parsed = value.map((entry, index) => readRandomEventScenario(entry, `randomEventsV1[${index}]`));
+  validateParsedRandomEventScenarios(parsed);
+  return parsed;
+};

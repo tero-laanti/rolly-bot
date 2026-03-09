@@ -3,5 +3,5 @@ node_modules/
 dist/
 data/
 *.sqlite
-rolly-data/
+/rolly-data/
 .vscode/

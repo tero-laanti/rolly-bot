@@ -1,0 +1,100 @@
+[
+  {
+    "id": "snake-eyes",
+    "name": "Snake Eyes",
+    "description": "Roll 1, 1 in order.",
+    "rule": {
+      "type": "ordered-sequence",
+      "pattern": [1, 1]
+    }
+  },
+  {
+    "id": "pair",
+    "name": "Pair",
+    "description": "Roll at least one pair.",
+    "rule": {
+      "type": "at-least-of-a-kind",
+      "count": 2
+    }
+  },
+  {
+    "id": "five-ladder",
+    "name": "Five Ladder",
+    "description": "Roll 1 through 5 in any order.",
+    "rule": {
+      "type": "contains-all-values",
+      "values": [1, 2, 3, 4, 5]
+    }
+  },
+  {
+    "id": "time-1337",
+    "name": "13:37",
+    "description": "Roll during 13:37 (Helsinki time).",
+    "rule": {
+      "type": "exact-time",
+      "hour": 13,
+      "minute": 37,
+      "timezone": "Europe/Helsinki"
+    }
+  },
+  {
+    "id": "prestige-1",
+    "name": "Prestige 1",
+    "description": "Reach Prestige 1.",
+    "rule": {
+      "type": "manual"
+    },
+    "manualAward": {
+      "type": "prestige",
+      "prestige": 1
+    }
+  },
+  {
+    "id": "prestige-2",
+    "name": "Prestige 2",
+    "description": "Reach Prestige 2.",
+    "rule": {
+      "type": "manual"
+    },
+    "manualAward": {
+      "type": "prestige",
+      "prestige": 2
+    }
+  },
+  {
+    "id": "prestige-3",
+    "name": "Prestige 3",
+    "description": "Reach Prestige 3.",
+    "rule": {
+      "type": "manual"
+    },
+    "manualAward": {
+      "type": "prestige",
+      "prestige": 3
+    }
+  },
+  {
+    "id": "prestige-4",
+    "name": "Prestige 4",
+    "description": "Reach Prestige 4.",
+    "rule": {
+      "type": "manual"
+    },
+    "manualAward": {
+      "type": "prestige",
+      "prestige": 4
+    }
+  },
+  {
+    "id": "prestige-5",
+    "name": "Prestige 5",
+    "description": "Reach Prestige 5.",
+    "rule": {
+      "type": "manual"
+    },
+    "manualAward": {
+      "type": "prestige",
+      "prestige": 5
+    }
+  }
+]
