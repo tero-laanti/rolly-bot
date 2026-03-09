@@ -1,12 +1,10 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import {
   dicePvpOpenOpponentId,
-  getDicePvpDieLabel,
-  getDuelPunishmentMs,
-  getDuelRewardMs,
   type DicePvpChallenge,
   type DicePvpChallengeCreateResult,
-} from "../domain/dice-game";
+} from "../domain/pvp";
+import { getDicePvpDieLabel, getDuelPunishmentMs, getDuelRewardMs } from "../domain/balance";
 
 const tierButtonsPerRow = 4;
 const openChallengeButtonToken = "any";

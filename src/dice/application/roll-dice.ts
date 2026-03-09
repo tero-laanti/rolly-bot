@@ -2,28 +2,27 @@ import type { SqliteDatabase } from "../../shared/db";
 import { applyFameDelta, getFame } from "../../shared/economy";
 import {
   awardAchievements,
-  getActiveDiceLockout,
-  getActiveDoubleRoll,
-  getBaseRollPassCount,
   getDiceAchievementsForRoll,
-  getDiceBans,
-  getDiceChargeMultiplier,
-  getDiceLevel,
+  getUserDiceAchievements,
+} from "../domain/achievements-store";
+import {
+  getBaseRollPassCount,
   getDiceLevelUpReward,
   getDiceMaxRollPassCount,
   getDicePrestigeBaseLevel,
+  getDoubleBuffRollPassCount,
+  getUnlockedBanSlotsFromFame,
+} from "../domain/balance";
+import { getDiceBans, rollDieWithBans } from "../domain/bans";
+import { getDiceChargeMultiplier, getLastDiceRollAt, setLastDiceRollAt } from "../domain/charge";
+import { recordDiceRollAnalytics, resetDiceLevelAnalyticsProgress } from "../domain/analytics";
+import { getActiveDiceLockout, getActiveDoubleRoll } from "../domain/pvp";
+import {
+  getDiceLevel,
   getDicePrestige,
   getDiceSides,
-  getDoubleBuffRollPassCount,
-  getLastDiceRollAt,
-  getUnlockedBanSlotsFromFame,
-  getUserDiceAchievements,
-  recordDiceRollAnalytics,
-  resetDiceLevelAnalyticsProgress,
-  rollDieWithBans,
   setDiceLevel,
-  setLastDiceRollAt,
-} from "../domain/dice-game";
+} from "../domain/prestige";
 import {
   consumeDiceTemporaryEffectsForRoll,
   getRollPassMultiplierFromTemporaryEffects,

@@ -3,7 +3,7 @@ import { EmbedBuilder } from "discord.js";
 import type { ButtonInteraction, Client, Message } from "discord.js";
 import { getDatabase } from "../../shared/db";
 import { getDiceBalanceData } from "../../rolly-data/load";
-import { getActiveDiceLockout, setDicePvpEffects } from "../domain/dice-game";
+import { getActiveDiceLockout, setDicePvpEffects } from "../domain/pvp";
 import { applyDiceTemporaryEffect } from "../domain/temporary-effects";
 import {
   createRandomEventContentState,

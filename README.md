@@ -112,8 +112,8 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 
 - `src/commands/dice/` contains Discord command adapters for the dice product.
 - `src/commands/system/self-update.ts` contains the owner-only system update command.
-- `src/dice/application/` contains use-case orchestration such as the `/dice` roll flow.
-- `src/dice/domain/` contains dice progression, achievements, PvP, temporary effects, and persistence-heavy game logic.
+- `src/dice/application/` contains use-case orchestration such as roll, prestige, bans, PvP, and admin flows.
+- `src/dice/domain/` contains focused dice modules for balance, prestige, bans, analytics, charge, PvP, achievements, and temporary effects.
 - `src/dice/presentation/` contains dice-specific output formatting for Discord messages and components.
 - `src/dice/random-events/` contains the random-event scheduler, runtime, state, content selection, and admin wiring.
 - `src/shared/` contains shared infrastructure such as db, config, env, economy, and self-update helpers.
