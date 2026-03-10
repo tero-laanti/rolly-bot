@@ -2,15 +2,13 @@ import { randomUUID } from "node:crypto";
 import { EmbedBuilder } from "discord.js";
 import type { ButtonInteraction, Client, Message } from "discord.js";
 import { getDatabase } from "../../../shared/db";
-import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import { getDiceBalanceData } from "../../../rolly-data/load";
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import {
-  createDiceHostileEffectsService,
   type DiceHostileEffectsService,
 } from "../../progression/application/hostile-effects-service";
+import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
-import { createSqlitePvpRepository } from "../../pvp/infrastructure/sqlite/pvp-repository";
 import {
   createRandomEventContentState,
   renderRandomEventScenario,
@@ -288,12 +286,7 @@ export const createRandomEventsLiveRuntime = ({
   const activeEventsById = new Map<string, ActiveRandomEventContext>();
   const db = getDatabase();
   const progression = createSqliteProgressionRepository(db);
-  const pvp = createSqlitePvpRepository(db);
-  const hostileEffects = createDiceHostileEffectsService({
-    progression,
-    pvp,
-    unitOfWork: createSqliteUnitOfWork(db),
-  });
+  const hostileEffects = createSqliteDiceHostileEffectsService(db);
 
   const windowManager = createRandomEventInteractionWindowManager({
     logger,

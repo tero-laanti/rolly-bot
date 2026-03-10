@@ -4,15 +4,14 @@ import { createSqliteEconomyRepository } from "../../../economy/infrastructure/s
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
 import { createDiceInventoryUseCase } from "../../application/manage-inventory/use-case";
 import { createDiceShopUseCase } from "../../application/manage-shop/use-case";
-import { createDiceItemEffectsService } from "../../application/item-effects-service";
 import { createUseDiceItemUseCase } from "../../application/use-item/use-case";
 import { createSqliteInventoryRepository, createDiceShopCatalog } from "./inventory-repository";
-import { createSqliteProgressionRepository } from "../../../progression/infrastructure/sqlite/progression-repository";
+import { createSqliteDiceItemEffectsService } from "./item-effects-service";
 
 export const createSqliteUseDiceItemUseCase = (db: SqliteDatabase) => {
   const unitOfWork = createSqliteUnitOfWork(db);
   const inventory = createSqliteInventoryRepository(db);
-  const itemEffects = createDiceItemEffectsService(createSqliteProgressionRepository(db));
+  const itemEffects = createSqliteDiceItemEffectsService(db);
   const pvp = createSqlitePvpRepository(db);
   const shopCatalog = createDiceShopCatalog();
 
