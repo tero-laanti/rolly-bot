@@ -31,6 +31,7 @@ This file contains repository-specific guidance for future implementers working 
 - `src/dice/<context>/` is the primary architecture. New feature work should land in the owning context.
 - `src/dice/economy/domain/balance.ts` is the source of truth for Fame/Pips balance helpers. Do not add new imports from `src/shared/economy.ts`; that file is compatibility-only.
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
+- `src/dice/random-events/infrastructure/` is the source of truth for random-event runtime wiring, admin control, and scheduler logic. Treat `src/dice/features/random-events/{runtime,admin,scheduler}.ts` as compatibility-only.
 - For interactive Discord flows, prefer this split:
   context `interfaces/discord/buttons/` parses and encodes button ids,
   context `application/` returns pure view models,

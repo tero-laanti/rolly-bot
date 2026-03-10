@@ -1,6 +1,9 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import { triggerRandomEventNow, getRandomEventsAdminStatus } from "../../../features/random-events/admin";
+import {
+  getRandomEventsAdminStatus,
+  triggerRandomEventNow,
+} from "../../../random-events/infrastructure/admin-controller";
 import { getActiveDoubleRoll, getActiveDiceLockout, setDicePvpEffects } from "../../../core/domain/pvp";
 import { getActiveDiceTemporaryEffects } from "../../../core/domain/temporary-effects";
 
