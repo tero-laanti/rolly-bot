@@ -2,14 +2,12 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
-import {
-  createDicePrestigeReply,
-  handleDicePrestigeAction,
-} from "../../../application/manage-prestige/use-case";
+import { createSqliteDicePrestigeUseCase } from "../../../infrastructure/sqlite/services";
 import { dicePrestigeButtonPrefix, parseDicePrestigeAction } from "../buttons/prestige-buttons";
 import { renderDicePrestigeResult } from "../presenters/prestige.presenter";
 
 const handleDicePrestigeButton = async (interaction: ButtonInteraction): Promise<void> => {
+  const prestigeUseCase = createSqliteDicePrestigeUseCase(getDatabase());
   const action = parseDicePrestigeAction(interaction.customId);
   if (!action) {
     await applyButtonResult(interaction, {
@@ -24,7 +22,7 @@ const handleDicePrestigeButton = async (interaction: ButtonInteraction): Promise
 
   await applyButtonResult(
     interaction,
-    renderDicePrestigeResult(handleDicePrestigeAction(getDatabase(), interaction.user.id, action)),
+    renderDicePrestigeResult(prestigeUseCase.handleDicePrestigeAction(interaction.user.id, action)),
   );
 };
 
@@ -33,9 +31,10 @@ export const data = new SlashCommandBuilder()
   .setDescription("Manage your prestige progression and active prestige level.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
+  const prestigeUseCase = createSqliteDicePrestigeUseCase(getDatabase());
   await applyChatInputResult(
     interaction,
-    renderDicePrestigeResult(createDicePrestigeReply(getDatabase(), interaction.user.id)),
+    renderDicePrestigeResult(prestigeUseCase.createDicePrestigeReply(interaction.user.id)),
   );
 };
 

@@ -83,4 +83,38 @@ module.exports = [
       ],
     },
   },
+  {
+    files: [
+      "src/dice/analytics/application/**/*.ts",
+      "src/dice/economy/application/**/*.ts",
+      "src/dice/inventory/application/**/*.ts",
+      "src/dice/progression/application/**/*.ts",
+      "src/dice/pvp/application/**/*.ts",
+      "src/dice/random-events/application/**/*.ts",
+      "src/system/*/application/**/*.ts",
+    ],
+    ignores: ["src/dice/admin/application/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["discord.js"],
+              message: "Discord imports belong in interfaces/discord or app/discord only.",
+            },
+            {
+              group: ["**/app/discord/**", "**/bot/**"],
+              message: "Context application and domain code must not depend on Discord runtime modules.",
+            },
+            {
+              group: ["**/shared/db"],
+              message:
+                "Application code should depend on ports and unit-of-work abstractions, not shared/db directly.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

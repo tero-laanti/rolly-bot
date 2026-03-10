@@ -17,6 +17,7 @@ Active migration plan. The phase-1 foundation was implemented on March 10, 2026:
 - `/dice` and usable inventory items now run from context-first application modules instead of `src/dice/core/application/`.
 - Random-event runtime, admin control, and foundation scheduling now live under `src/dice/random-events/infrastructure/`, with the old feature entrypoints kept only as compatibility re-exports.
 - Progression, inventory, PvP, analytics, and random-event source-of-truth modules now live under their owning `src/dice/<context>/` folders, with `src/dice/core/` and `src/dice/features/` reduced to compatibility shims for legacy imports.
+- Progression, inventory, analytics, and PvP command flows now use explicit application ports plus SQLite adapter builders under `infrastructure/sqlite/services.ts`, instead of passing `SqliteDatabase` directly into application use cases.
 
 The remaining phases in this spec still apply. This spec does not authorize gameplay changes or destructive schema changes by itself.
 
@@ -30,8 +31,8 @@ Rolly already has a partial layered design and now has a phase-1 context-first s
 
 That is directionally correct, but it is not full DDD yet. The main leaks are:
 
-- "Domain" modules still execute SQL and depend on `SqliteDatabase`.
-- Application modules often build `discord.js` components and return Discord-shaped payloads.
+- Some "domain" modules still execute SQL and depend on `SqliteDatabase`.
+- Some application modules still need follow-up migration, but the main command flows now run through port-based application factories rather than direct DB handles.
 - Cross-cutting concepts such as Fame, Pips, temporary effects, and analytics are still coordinated through shared helpers or direct module calls rather than explicit bounded-context contracts.
 - Some runtime-heavy adapters still embed orchestration that should eventually move behind cleaner ports.
 
@@ -43,7 +44,7 @@ Representative examples in the current codebase:
 - `src/dice/random-events/infrastructure/state-store.ts`
 - `src/dice/economy/domain/balance.ts`
 
-The main remaining gap is no longer file layout. It is that many context-first domain modules still combine gameplay rules with persistence concerns, and cross-context coordination still happens through direct helpers instead of explicit ports or events.
+The main remaining gap is now mostly inside the persistence-heavy domain modules and runtime services. The command/application layer has started moving to ports and unit-of-work boundaries, but several context domain files still need their SQL moved fully into infrastructure repositories.
 
 ## Goals
 

@@ -2,14 +2,12 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
-import {
-  createDicePvpSetupReply,
-  handleDicePvpAction,
-} from "../../../application/manage-challenge/use-case";
+import { createSqliteDicePvpUseCase } from "../../../infrastructure/sqlite/services";
 import { dicePvpButtonPrefix, parseDicePvpAction } from "../buttons/pvp-buttons";
 import { renderDicePvpResult, renderDicePvpView } from "../presenters/pvp.presenter";
 
 const handleDicePvpButton = async (interaction: ButtonInteraction): Promise<void> => {
+  const pvpUseCase = createSqliteDicePvpUseCase(getDatabase());
   const action = parseDicePvpAction(interaction.customId);
   if (!action) {
     await applyButtonResult(interaction, {
@@ -34,7 +32,7 @@ const handleDicePvpButton = async (interaction: ButtonInteraction): Promise<void
   await applyButtonResult(
     interaction,
     renderDicePvpResult(
-      await handleDicePvpAction(getDatabase(), interaction.user.id, action, publishChallenge),
+      await pvpUseCase.handleDicePvpAction(interaction.user.id, action, publishChallenge),
     ),
   );
 };
@@ -47,10 +45,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
+  const pvpUseCase = createSqliteDicePvpUseCase(getDatabase());
   const opponent = interaction.options.getUser("opponent");
   await applyChatInputResult(
     interaction,
-    renderDicePvpResult(createDicePvpSetupReply(getDatabase(), interaction.user.id, opponent)),
+    renderDicePvpResult(pvpUseCase.createDicePvpSetupReply(interaction.user.id, opponent)),
   );
 };
 
