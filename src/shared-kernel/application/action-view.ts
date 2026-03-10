@@ -30,7 +30,7 @@ export type ActionResult<TAction> =
           };
     }
   | {
-      kind: "update";
+      kind: "update" | "edit";
       payload:
         | {
             type: "view";

@@ -149,8 +149,8 @@ Current migration note:
 - `src/dice/core/` and `src/dice/features/` still contain legacy internal implementations used by some of the new context-first modules.
 - New feature work should start in the context-first folders.
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
-- Interactive progression flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
-- The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with Discord button-row rendering in [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
+- Interactive button-driven flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
+- The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with shared Discord rendering in [render-action-result.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-result.ts) and [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
 
 ## Project Layout
 
@@ -162,9 +162,9 @@ Current migration note:
 - `src/dice/inventory/interfaces/discord/buttons/` and `src/dice/inventory/interfaces/discord/presenters/` contain the migrated shop and inventory Discord adapters.
 - `src/dice/economy/domain/` contains the current economy source of truth for Fame/Pips access and updates.
 - `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
-- `src/dice/pvp/interfaces/discord/commands/` contains `/dice-pvp`.
+- `src/dice/pvp/interfaces/discord/commands/`, `src/dice/pvp/interfaces/discord/buttons/`, and `src/dice/pvp/interfaces/discord/presenters/` contain the migrated PvP Discord adapters.
 - `src/dice/analytics/interfaces/discord/commands/` contains `/dice-analytics`.
-- `src/dice/admin/interfaces/discord/commands/` contains `/dice-admin`.
+- `src/dice/admin/interfaces/discord/commands/`, `src/dice/admin/interfaces/discord/buttons/`, and `src/dice/admin/interfaces/discord/presenters/` contain the migrated admin Discord adapters.
 - `src/dice/random-events/domain/` contains random-event contract types; `src/dice/random-events/infrastructure/` contains runtime and scheduler adapters.
 - `src/system/self-update/interfaces/discord/commands/` contains the owner-only `/self-update` command.
 - `src/dice/core/` and `src/dice/features/` remain as legacy internals while the context-first migration continues.
