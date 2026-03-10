@@ -21,14 +21,19 @@ This file contains repository-specific guidance for future implementers working 
 
 ## Project Structure
 
+### Runtime and Entrypoints
+
 - Source lives in `src/`; do not edit `dist/` directly.
 - Commands must export `data` and `execute`.
 - Discord command adapters live under `<context>/interfaces/discord/commands/`.
 - `src/app/discord/command-registry.ts` is the source of truth for registered slash commands and button handlers. Do not reintroduce filesystem-based command scanning.
 - `src/index.ts` and `src/deploy-commands.ts` are thin wrappers around `src/app/bootstrap/`.
 - `src/app/` contains the composition root and Discord runtime wiring.
-- `src/shared-kernel/` contains stable shared types and architectural primitives.
+
+### Context-First Architecture
+
 - `src/dice/<context>/` is the primary architecture. New feature work should land in the owning context.
+- Inside a context, use `domain/` for rules and value types, `application/` for use cases and ports, `infrastructure/` for adapters, and `interfaces/discord/` for Discord-specific parsing and rendering.
 - `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract, `src/dice/economy/domain/balance.ts` holds shared economy value types, and `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
 - `src/dice/random-events/infrastructure/` is the source of truth for random-event runtime wiring, admin control, and scheduler logic.
@@ -36,18 +41,35 @@ This file contains repository-specific guidance for future implementers working 
 - For SQLite-backed command flows, prefer the `infrastructure/sqlite/services.ts` builders for each context. Command adapters should build use cases there instead of passing `getDatabase()` into application modules.
 - New application code should depend on context ports plus `UnitOfWork`, not `shared/db`.
 - For interactive Discord flows, prefer this split:
-  context `interfaces/discord/buttons/` parses and encodes button ids,
-  context `application/` returns pure view models,
-  context `interfaces/discord/presenters/` renders `discord.js` components.
+  `interfaces/discord/buttons/` parses and encodes button ids,
+  `application/` returns pure view models,
+  `interfaces/discord/presenters/` renders `discord.js` components.
 - `src/shared-kernel/application/action-view.ts` is the shared model for button-driven application view results, including reply, update, and edit flows.
 - `src/app/discord/render-action-result.ts` is the shared Discord renderer for action-view results.
 - `src/app/discord/render-action-button-rows.ts` is the shared Discord renderer for button-row specs.
-- `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/progression/application/roll-dice/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, `src/dice/inventory/application/manage-inventory/use-case.ts`, `src/dice/inventory/application/use-item/use-case.ts`, `src/dice/pvp/application/manage-challenge/use-case.ts`, and `src/dice/admin/application/manage-admin/use-case.ts` are the reference examples for the current migration patterns.
-- Legacy compatibility paths under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
+
+### Shared and Compatibility Boundaries
+
+- `src/shared-kernel/` contains stable shared types and architectural primitives.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/types/` contains shared types and module augmentation.
+- Legacy compatibility paths under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
+- `src/bot/` still exists as compatibility wrappers for a few top-level runtime imports.
+- `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/progression/application/roll-dice/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, `src/dice/inventory/application/manage-inventory/use-case.ts`, `src/dice/inventory/application/use-item/use-case.ts`, `src/dice/pvp/application/manage-challenge/use-case.ts`, and `src/dice/admin/application/manage-admin/use-case.ts` are the reference examples for the current context-first use-case patterns.
 - `eslint.config.js` contains architecture guardrails for context-first modules. When you add new files under context `application/` or `domain/`, keep them free of Discord runtime imports, and keep new `application/` code free of direct `shared/db` imports.
+
+## Feature Workflow
+
+When implementing a new feature:
+
+1. Pick the owning context under `src/dice/<context>/`.
+2. Put core rules and value types in `domain/`.
+3. Add use cases and ports in `application/`.
+4. Add SQLite, scheduler, or other technical adapters in `infrastructure/`.
+5. Keep Discord parsing and rendering in `interfaces/discord/`.
+6. Register slash commands and button handlers in `src/app/discord/command-registry.ts`.
+7. If env vars, command contracts, or `rolly-data` contracts change, update the matching docs and deployment flow in the same change.
 
 ## Gameplay and Data
 
