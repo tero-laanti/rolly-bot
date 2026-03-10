@@ -1,44 +1,57 @@
-import type { SqliteDatabase } from "../../../../shared/db";
-import { getDiceAnalytics } from "../../../analytics/domain/analytics";
-import {
-  getActiveDicePrestige,
-  getDiceLevel,
-  getDicePrestige,
-} from "../../../progression/domain/prestige";
+import type { DiceAnalyticsRepository } from "../ports";
+import type { DiceProgressionRepository } from "../../../progression/application/ports";
 
 export type DiceAnalyticsView = {
   content: string;
   ephemeral: boolean;
 };
 
-export const queryDiceAnalytics = (
-  db: SqliteDatabase,
-  userId: string,
-  userMention: string,
-  nowMs: number = Date.now(),
-): DiceAnalyticsView => {
-  const analytics = getDiceAnalytics(db, userId);
-  const level = getDiceLevel(db, userId);
-  const highestPrestige = getDicePrestige(db, userId);
-  const activePrestige = getActiveDicePrestige(db, userId);
+type QueryDiceAnalyticsDependencies = {
+  analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics">;
+  progression: Pick<
+    DiceProgressionRepository,
+    "getActiveDicePrestige" | "getDiceLevel" | "getDicePrestige"
+  >;
+};
 
-  const lines = [
-    `Dice analytics for ${userMention}:`,
-    `Current level: ${level}.`,
-    `Time on current level: ${formatElapsed(analytics.levelStartedAt, nowMs)}.`,
-    `Roll sets on current level: ${analytics.rollsCurrentLevel}.`,
-    `One-off level-up roll sets on current level: ${analytics.nearLevelupRollsCurrentLevel}.`,
-    `Active prestige: ${activePrestige}.`,
-    `Highest prestige: ${highestPrestige}.`,
-    `Time on current prestige: ${formatElapsed(analytics.prestigeStartedAt, nowMs)}.`,
-    `Dice rolled on current prestige: ${analytics.diceRolledCurrentPrestige}.`,
-    `Total dice rolled: ${analytics.totalDiceRolled}.`,
-    `PvP stats: ${analytics.pvpWins}W / ${analytics.pvpLosses}L / ${analytics.pvpDraws}D.`,
-  ];
+type QueryDiceAnalyticsInput = {
+  userId: string;
+  userMention: string;
+  nowMs?: number;
+};
 
-  return {
-    content: lines.join("\n"),
-    ephemeral: false,
+export const createQueryDiceAnalyticsUseCase = ({
+  analytics,
+  progression,
+}: QueryDiceAnalyticsDependencies) => {
+  return ({
+    userId,
+    userMention,
+    nowMs = Date.now(),
+  }: QueryDiceAnalyticsInput): DiceAnalyticsView => {
+    const analyticsView = analytics.getDiceAnalytics(userId);
+    const level = progression.getDiceLevel(userId);
+    const highestPrestige = progression.getDicePrestige(userId);
+    const activePrestige = progression.getActiveDicePrestige(userId);
+
+    const lines = [
+      `Dice analytics for ${userMention}:`,
+      `Current level: ${level}.`,
+      `Time on current level: ${formatElapsed(analyticsView.levelStartedAt, nowMs)}.`,
+      `Roll sets on current level: ${analyticsView.rollsCurrentLevel}.`,
+      `One-off level-up roll sets on current level: ${analyticsView.nearLevelupRollsCurrentLevel}.`,
+      `Active prestige: ${activePrestige}.`,
+      `Highest prestige: ${highestPrestige}.`,
+      `Time on current prestige: ${formatElapsed(analyticsView.prestigeStartedAt, nowMs)}.`,
+      `Dice rolled on current prestige: ${analyticsView.diceRolledCurrentPrestige}.`,
+      `Total dice rolled: ${analyticsView.totalDiceRolled}.`,
+      `PvP stats: ${analyticsView.pvpWins}W / ${analyticsView.pvpLosses}L / ${analyticsView.pvpDraws}D.`,
+    ];
+
+    return {
+      content: lines.join("\n"),
+      ephemeral: false,
+    };
   };
 };
 

@@ -1,14 +1,9 @@
-import type { SqliteDatabase } from "../../../../shared/db";
-import { getFame } from "../../../economy/domain/balance";
+import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import {
-  clearDiceBan,
-  clearSingleDiceBan,
-  getDiceBans,
   getMaxBansPerDie,
   getUnlockedBanSlotsFromFame,
-  setDiceBan,
 } from "../../../progression/domain/bans";
-import { getDiceLevel, getDiceSides } from "../../../progression/domain/prestige";
+import type { DiceProgressionRepository } from "../ports";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 
 const numbersPerRow = 5;
@@ -49,169 +44,250 @@ export type DiceBansAction =
 
 export type DiceBansResult = ActionResult<DiceBansAction>;
 
-export const createDiceBansReply = (db: SqliteDatabase, userId: string): DiceBansResult => {
-  const diceLevel = getDiceLevel(db, userId);
-  const dieSides = getDiceSides(db, userId);
-  const fame = getFame(db, userId);
-  const bans = getDiceBans(db, userId);
-  const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceLevel, dieSides);
-  const usedCount = countUsedBans(bans);
-
-  if (unlockedSlots < 1 && usedCount === 0) {
-    return {
-      kind: "reply",
-      payload: {
-        type: "message",
-        content: "You need 3 fame to unlock your first ban slot.",
-        ephemeral: false,
-      },
-    };
-  }
-
-  return {
-    kind: "reply",
-    payload: {
-      type: "view",
-      view: buildDieSelectionView(userId, diceLevel, bans, unlockedSlots),
-      ephemeral: false,
-    },
-  };
+type ManageBansDependencies = {
+  economy: Pick<DiceEconomyRepository, "getFame">;
+  progression: Pick<
+    DiceProgressionRepository,
+    | "clearDiceBan"
+    | "clearSingleDiceBan"
+    | "getDiceBans"
+    | "getDiceLevel"
+    | "getDiceSides"
+    | "setDiceBan"
+  >;
 };
 
-export const handleDiceBansAction = (
-  db: SqliteDatabase,
-  actorId: string,
-  action: DiceBansAction,
-): DiceBansResult => {
-  if (actorId !== action.ownerId) {
-    return {
-      kind: "reply",
-      payload: {
-        type: "message",
-        content: "This ban menu is not assigned to you.",
-        ephemeral: true,
-      },
-    };
-  }
-
-  const diceLevel = getDiceLevel(db, action.ownerId);
-  const dieSides = getDiceSides(db, action.ownerId);
-  const fame = getFame(db, action.ownerId);
-  const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceLevel, dieSides);
-
-  if (action.type === "back") {
-    const bans = getDiceBans(db, action.ownerId);
+export const createDiceBansUseCase = ({
+  economy,
+  progression,
+}: ManageBansDependencies) => {
+  const createDiceBansReply = (userId: string): DiceBansResult => {
+    const diceLevel = progression.getDiceLevel(userId);
+    const dieSides = progression.getDiceSides(userId);
+    const fame = economy.getFame(userId);
+    const bans = progression.getDiceBans(userId);
+    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceLevel, dieSides);
     const usedCount = countUsedBans(bans);
+
     if (unlockedSlots < 1 && usedCount === 0) {
       return {
-        kind: "update",
+        kind: "reply",
         payload: {
           type: "message",
           content: "You need 3 fame to unlock your first ban slot.",
-          clearComponents: true,
+          ephemeral: false,
         },
       };
     }
 
     return {
-      kind: "update",
-      payload: {
-        type: "view",
-        view: buildDieSelectionView(action.ownerId, diceLevel, bans, unlockedSlots),
-      },
-    };
-  }
-
-  if (action.type === "close") {
-    return {
-      kind: "update",
-      payload: {
-        type: "message",
-        content: "Dice ban menu closed.",
-        clearComponents: true,
-      },
-    };
-  }
-
-  if (action.type === "clear-bans") {
-    const bans = getDiceBans(db, action.ownerId);
-    for (const [dieIndex, bannedSides] of bans) {
-      if (bannedSides.size > 0) {
-        clearDiceBan(db, action.ownerId, dieIndex);
-      }
-    }
-
-    const updatedBans = getDiceBans(db, action.ownerId);
-    return {
-      kind: "update",
-      payload: {
-        type: "view",
-        view: buildDieSelectionView(
-          action.ownerId,
-          diceLevel,
-          updatedBans,
-          unlockedSlots,
-          "All bans cleared.",
-        ),
-      },
-    };
-  }
-
-  if (!Number.isInteger(action.dieIndex) || action.dieIndex < 1) {
-    return {
       kind: "reply",
       payload: {
-        type: "message",
-        content: "Invalid die selection.",
-        ephemeral: true,
-      },
-    };
-  }
-
-  const currentBans = getDiceBans(db, action.ownerId);
-  const hasBansOnSelectedDie = (currentBans.get(action.dieIndex)?.size ?? 0) > 0;
-  if (action.dieIndex > diceLevel && !hasBansOnSelectedDie) {
-    return {
-      kind: "reply",
-      payload: {
-        type: "message",
-        content: "You do not have that many dice.",
-        ephemeral: true,
-      },
-    };
-  }
-
-  if (action.type === "die") {
-    const bans = getDiceBans(db, action.ownerId);
-    return {
-      kind: "update",
-      payload: {
         type: "view",
-        view: buildNumberSelectionView({
-          ownerId: action.ownerId,
-          dieIndex: action.dieIndex,
-          bans,
-          unlockedSlots,
-          dieSides,
-          page: 0,
-        }),
+        view: buildDieSelectionView(userId, diceLevel, bans, unlockedSlots),
+        ephemeral: false,
       },
     };
-  }
+  };
 
-  if (action.type === "page") {
-    if (!Number.isInteger(action.page)) {
+  const handleDiceBansAction = (
+    actorId: string,
+    action: DiceBansAction,
+  ): DiceBansResult => {
+    if (actorId !== action.ownerId) {
       return {
         kind: "reply",
         payload: {
           type: "message",
-          content: "Invalid page selection.",
+          content: "This ban menu is not assigned to you.",
           ephemeral: true,
         },
       };
     }
 
-    const bans = getDiceBans(db, action.ownerId);
+    const diceLevel = progression.getDiceLevel(action.ownerId);
+    const dieSides = progression.getDiceSides(action.ownerId);
+    const fame = economy.getFame(action.ownerId);
+    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceLevel, dieSides);
+
+    if (action.type === "back") {
+      const bans = progression.getDiceBans(action.ownerId);
+      const usedCount = countUsedBans(bans);
+      if (unlockedSlots < 1 && usedCount === 0) {
+        return {
+          kind: "update",
+          payload: {
+            type: "message",
+            content: "You need 3 fame to unlock your first ban slot.",
+            clearComponents: true,
+          },
+        };
+      }
+
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildDieSelectionView(action.ownerId, diceLevel, bans, unlockedSlots),
+        },
+      };
+    }
+
+    if (action.type === "close") {
+      return {
+        kind: "update",
+        payload: {
+          type: "message",
+          content: "Dice ban menu closed.",
+          clearComponents: true,
+        },
+      };
+    }
+
+    if (action.type === "clear-bans") {
+      const bans = progression.getDiceBans(action.ownerId);
+      for (const [dieIndex, bannedSides] of bans) {
+        if (bannedSides.size > 0) {
+          progression.clearDiceBan(action.ownerId, dieIndex);
+        }
+      }
+
+      const updatedBans = progression.getDiceBans(action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildDieSelectionView(
+            action.ownerId,
+            diceLevel,
+            updatedBans,
+            unlockedSlots,
+            "All bans cleared.",
+          ),
+        },
+      };
+    }
+
+    if (!Number.isInteger(action.dieIndex) || action.dieIndex < 1) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "Invalid die selection.",
+          ephemeral: true,
+        },
+      };
+    }
+
+    const currentBans = progression.getDiceBans(action.ownerId);
+    const hasBansOnSelectedDie = (currentBans.get(action.dieIndex)?.size ?? 0) > 0;
+    if (action.dieIndex > diceLevel && !hasBansOnSelectedDie) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "You do not have that many dice.",
+          ephemeral: true,
+        },
+      };
+    }
+
+    if (action.type === "die") {
+      const bans = progression.getDiceBans(action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildNumberSelectionView({
+            ownerId: action.ownerId,
+            dieIndex: action.dieIndex,
+            bans,
+            unlockedSlots,
+            dieSides,
+            page: 0,
+          }),
+        },
+      };
+    }
+
+    if (action.type === "page") {
+      if (!Number.isInteger(action.page)) {
+        return {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "Invalid page selection.",
+            ephemeral: true,
+          },
+        };
+      }
+
+      const bans = progression.getDiceBans(action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildNumberSelectionView({
+            ownerId: action.ownerId,
+            dieIndex: action.dieIndex,
+            bans,
+            unlockedSlots,
+            dieSides,
+            page: action.page,
+          }),
+        },
+      };
+    }
+
+    if (!Number.isInteger(action.value) || action.value < 1 || action.value > dieSides) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: `Pick a number between 1 and ${dieSides}.`,
+          ephemeral: true,
+        },
+      };
+    }
+
+    const bansBefore = progression.getDiceBans(action.ownerId);
+    const bannedValuesBefore = bansBefore.get(action.dieIndex) ?? new Set<number>();
+    const isUnban = bannedValuesBefore.has(action.value);
+    const usedCount = countUsedBans(bansBefore);
+
+    if (isUnban) {
+      progression.clearSingleDiceBan(action.ownerId, action.dieIndex, action.value);
+    } else if (usedCount >= unlockedSlots) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "No ban slots are available. Remove a ban first.",
+          ephemeral: true,
+        },
+      };
+    } else if (bannedValuesBefore.size >= getMaxBansPerDie(dieSides)) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "That die is fully locked.",
+          ephemeral: true,
+        },
+      };
+    } else {
+      progression.setDiceBan({
+        userId: action.ownerId,
+        dieIndex: action.dieIndex,
+        bannedValue: action.value,
+      });
+    }
+
+    const bans = progression.getDiceBans(action.ownerId);
+    const confirmation = isUnban
+      ? `Ban removed: ${action.value} from die ${action.dieIndex}.`
+      : `Ban applied: ${action.value} on die ${action.dieIndex}.`;
+
     return {
       kind: "update",
       payload: {
@@ -223,70 +299,15 @@ export const handleDiceBansAction = (
           unlockedSlots,
           dieSides,
           page: action.page,
+          confirmation,
         }),
       },
     };
-  }
-
-  if (!Number.isInteger(action.value) || action.value < 1 || action.value > dieSides) {
-    return {
-      kind: "reply",
-      payload: {
-        type: "message",
-        content: `Pick a number between 1 and ${dieSides}.`,
-        ephemeral: true,
-      },
-    };
-  }
-
-  const bansBefore = getDiceBans(db, action.ownerId);
-  const bannedValuesBefore = bansBefore.get(action.dieIndex) ?? new Set<number>();
-  const isUnban = bannedValuesBefore.has(action.value);
-  const usedCount = countUsedBans(bansBefore);
-
-  if (isUnban) {
-    clearSingleDiceBan(db, action.ownerId, action.dieIndex, action.value);
-  } else if (usedCount >= unlockedSlots) {
-    return {
-      kind: "reply",
-      payload: {
-        type: "message",
-        content: "No ban slots are available. Remove a ban first.",
-        ephemeral: true,
-      },
-    };
-  } else if (bannedValuesBefore.size >= getMaxBansPerDie(dieSides)) {
-    return {
-      kind: "reply",
-      payload: {
-        type: "message",
-        content: "That die is fully locked.",
-        ephemeral: true,
-      },
-    };
-  } else {
-    setDiceBan(db, { userId: action.ownerId, dieIndex: action.dieIndex, bannedValue: action.value });
-  }
-
-  const bans = getDiceBans(db, action.ownerId);
-  const confirmation = isUnban
-    ? `Ban removed: ${action.value} from die ${action.dieIndex}.`
-    : `Ban applied: ${action.value} on die ${action.dieIndex}.`;
+  };
 
   return {
-    kind: "update",
-    payload: {
-      type: "view",
-      view: buildNumberSelectionView({
-        ownerId: action.ownerId,
-        dieIndex: action.dieIndex,
-        bans,
-        unlockedSlots,
-        dieSides,
-        page: action.page,
-        confirmation,
-      }),
-    },
+    createDiceBansReply,
+    handleDiceBansAction,
   };
 };
 

@@ -1,12 +1,8 @@
-import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import { getEconomySnapshot } from "../../../economy/domain/balance";
-import {
-  getDiceShopItems,
-  getInventoryQuantities,
-  purchaseDiceShopItem,
-  type DiceShopItem,
-} from "../../../inventory/domain/shop";
+import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
+import type { DiceEconomyRepository } from "../../../economy/application/ports";
+import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
+import type { DiceShopItem } from "../../../inventory/domain/shop";
 
 export type DiceShopAction =
   | {
@@ -21,92 +17,137 @@ export type DiceShopAction =
 
 export type DiceShopResult = ActionResult<DiceShopAction>;
 
-export const createDiceShopReply = (db: SqliteDatabase, userId: string): DiceShopResult => {
-  return {
-    kind: "reply",
-    payload: {
-      type: "view",
-      view: buildShopView(db, userId),
-      ephemeral: false,
-    },
-  };
+type ManageShopDependencies = {
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getEconomySnapshot" | "getPips">;
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities" | "grantInventoryItem">;
+  shopCatalog: DiceShopCatalog;
+  unitOfWork: UnitOfWork;
 };
 
-export const handleDiceShopAction = (
-  db: SqliteDatabase,
-  actorId: string,
-  action: DiceShopAction,
-): DiceShopResult => {
-  if (actorId !== action.ownerId) {
+export const createDiceShopUseCase = ({
+  economy,
+  inventory,
+  shopCatalog,
+  unitOfWork,
+}: ManageShopDependencies) => {
+  const createDiceShopReply = (userId: string): DiceShopResult => {
     return {
       kind: "reply",
       payload: {
-        type: "message",
-        content: "This shop menu is not assigned to you.",
-        ephemeral: true,
-      },
-    };
-  }
-
-  if (action.type === "refresh") {
-    return {
-      kind: "update",
-      payload: {
         type: "view",
-        view: buildShopView(db, action.ownerId),
+        view: buildShopView(economy, inventory, shopCatalog, userId),
+        ephemeral: false,
       },
     };
-  }
+  };
 
-  const purchase = purchaseDiceShopItem(db, {
-    userId: action.ownerId,
-    itemId: action.itemId,
-  });
-  if (!purchase.ok) {
-    if (purchase.reason === "insufficient-pips") {
+  const handleDiceShopAction = (
+    actorId: string,
+    action: DiceShopAction,
+  ): DiceShopResult => {
+    if (actorId !== action.ownerId) {
       return {
         kind: "reply",
         payload: {
           type: "message",
-          content: `You need ${purchase.requiredPips} pips to buy ${purchase.item.name}. Current balance: ${purchase.currentPips} pips.`,
+          content: "This shop menu is not assigned to you.",
           ephemeral: true,
         },
       };
     }
 
+    if (action.type === "refresh") {
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildShopView(economy, inventory, shopCatalog, action.ownerId),
+        },
+      };
+    }
+
+    const item = shopCatalog.getDiceShopItem(action.itemId);
+    if (!item) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "That shop item does not exist.",
+          ephemeral: true,
+        },
+      };
+    }
+
+    const currentPips = economy.getPips(action.ownerId);
+    if (currentPips < item.pricePips) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: `You need ${item.pricePips} pips to buy ${item.name}. Current balance: ${currentPips} pips.`,
+          ephemeral: true,
+        },
+      };
+    }
+
+    const purchase = unitOfWork.runInTransaction(() => {
+      economy.applyPipsDelta({ userId: action.ownerId, amount: -item.pricePips });
+      const quantity = inventory.grantInventoryItem({
+        userId: action.ownerId,
+        itemId: item.id,
+        quantity: 1,
+      });
+
+      return {
+        item,
+        quantity,
+        remainingPips: economy.getPips(action.ownerId),
+      };
+    });
+
     return {
-      kind: "reply",
+      kind: "update",
       payload: {
-        type: "message",
-        content: "That shop item does not exist.",
-        ephemeral: true,
+        type: "view",
+        view: buildShopView(
+          economy,
+          inventory,
+          shopCatalog,
+          action.ownerId,
+          `Purchased ${purchase.item.name}. Remaining pips: ${purchase.remainingPips}. Owned: ${purchase.quantity}.`,
+        ),
       },
     };
-  }
+  };
 
   return {
-    kind: "update",
-    payload: {
-      type: "view",
-      view: buildShopView(
-        db,
-        action.ownerId,
-        `Purchased ${purchase.item.name}. Remaining pips: ${purchase.remainingPips}. Owned: ${purchase.quantity}.`,
-      ),
-    },
+    createDiceShopReply,
+    handleDiceShopAction,
   };
 };
 
-const buildShopView = (db: SqliteDatabase, userId: string, statusLine?: string): ActionView<DiceShopAction> => {
+const buildShopView = (
+  economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
+  shopCatalog: DiceShopCatalog,
+  userId: string,
+  statusLine?: string,
+): ActionView<DiceShopAction> => {
   return {
-    content: buildShopContent(db, userId, statusLine),
-    components: buildShopComponents(userId),
+    content: buildShopContent(economy, inventory, shopCatalog, userId, statusLine),
+    components: buildShopComponents(shopCatalog, userId),
   };
 };
 
-const buildShopContent = (db: SqliteDatabase, userId: string, statusLine?: string): string => {
-  const economy = getEconomySnapshot(db, userId);
-  const inventoryQuantities = getInventoryQuantities(db, userId);
+const buildShopContent = (
+  economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
+  shopCatalog: DiceShopCatalog,
+  userId: string,
+  statusLine?: string,
+): string => {
+  const economySnapshot = economy.getEconomySnapshot(userId);
+  const inventoryQuantities = inventory.getInventoryQuantities(userId);
   const lines: string[] = [];
 
   if (statusLine) {
@@ -115,12 +156,12 @@ const buildShopContent = (db: SqliteDatabase, userId: string, statusLine?: strin
 
   lines.push(
     `Dice shop for <@${userId}>:`,
-    `Pips: ${economy.pips}.`,
+    `Pips: ${economySnapshot.pips}.`,
     "Spend pips on inventory items.",
     "",
   );
 
-  for (const item of getDiceShopItems()) {
+  for (const item of shopCatalog.getDiceShopItems()) {
     lines.push(...buildItemLines(item, inventoryQuantities.get(item.id) ?? 0), "");
   }
 
@@ -136,8 +177,11 @@ const buildItemLines = (item: DiceShopItem, ownedQuantity: number): string[] => 
   ];
 };
 
-const buildShopComponents = (userId: string): ActionView<DiceShopAction>["components"] => {
-  const purchaseButtons = getDiceShopItems().map((item) => ({
+const buildShopComponents = (
+  shopCatalog: DiceShopCatalog,
+  userId: string,
+): ActionView<DiceShopAction>["components"] => {
+  const purchaseButtons = shopCatalog.getDiceShopItems().map((item) => ({
     action: {
       type: "buy",
       ownerId: userId,

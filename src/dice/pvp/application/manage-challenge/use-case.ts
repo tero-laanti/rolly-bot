@@ -1,29 +1,24 @@
 import { randomUUID } from "node:crypto";
-import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import { updateDicePvpStats } from "../../../analytics/domain/analytics";
+import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
+import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import {
   getDicePvpDieLabel,
   getDuelPunishmentMs,
   getDuelRewardMs,
+  getUnlockedDicePvpTierFromPrestige,
 } from "../../../pvp/domain/game-rules";
-import { applyShieldableNegativeLockout } from "../../../progression/domain/hostile-effects";
+import type { DiceHostileEffectsService } from "../../../progression/application/hostile-effects-service";
+import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import {
-  createDicePvpChallengeIfUsersAvailable,
   dicePvpOpenOpponentId,
-  getActiveDiceLockout,
-  getDicePvpChallenge,
   getDicePvpChallengeExpireMs,
   getDicePvpDieSidesForTier,
-  getDicePvpEffects,
-  getUnlockedDicePvpTier,
   isDicePvpChallengeExpired,
-  setDicePvpChallengeOpponentFromOpen,
-  setDicePvpChallengeStatusFromPending,
-  setDicePvpEffects,
   type DicePvpChallenge,
   type DicePvpChallengeCreateResult,
 } from "../../../pvp/domain/pvp";
+import type { DicePvpRepository } from "../ports";
 
 export type DicePvpAction =
   | {
@@ -45,58 +40,101 @@ export type DicePvpResult = ActionResult<DicePvpAction>;
 
 type PublishChallenge = (view: ActionView<DicePvpAction>) => Promise<{ url: string }>;
 
-export const createDicePvpSetupReply = (
-  db: SqliteDatabase,
-  challengerId: string,
-  opponent: { id: string; bot: boolean } | null,
-  nowMs: number = Date.now(),
-): DicePvpResult => {
-  const lockoutUntil = getActiveDiceLockout(db, challengerId, nowMs);
-  if (lockoutUntil) {
-    return replyMessage(`You can play again ${formatRelativeTime(lockoutUntil)}.`, true);
-  }
+type ManageChallengeDependencies = {
+  analytics: Pick<DiceAnalyticsRepository, "updateDicePvpStats">;
+  hostileEffects: Pick<DiceHostileEffectsService, "applyShieldableNegativeLockout">;
+  progression: Pick<DiceProgressionRepository, "getDicePrestige">;
+  pvp: Pick<
+    DicePvpRepository,
+    | "createDicePvpChallengeIfUsersAvailable"
+    | "getActiveDiceLockout"
+    | "getDicePvpChallenge"
+    | "getDicePvpEffects"
+    | "setDicePvpChallengeOpponentFromOpen"
+    | "setDicePvpChallengeStatusFromPending"
+    | "setDicePvpEffects"
+  >;
+  unitOfWork: UnitOfWork;
+};
 
-  if (opponent) {
-    if (opponent.id === challengerId) {
-      return replyMessage("Select another user. You cannot challenge yourself.", true);
+export const createDicePvpUseCase = ({
+  analytics,
+  hostileEffects,
+  progression,
+  pvp,
+  unitOfWork,
+}: ManageChallengeDependencies) => {
+  const createDicePvpSetupReply = (
+    challengerId: string,
+    opponent: { id: string; bot: boolean } | null,
+    nowMs: number = Date.now(),
+  ): DicePvpResult => {
+    const lockoutUntil = pvp.getActiveDiceLockout(challengerId, nowMs);
+    if (lockoutUntil) {
+      return replyMessage(`You can play again ${formatRelativeTime(lockoutUntil)}.`, true);
     }
 
-    if (opponent.bot) {
-      return replyMessage("You can only challenge human players.", true);
-    }
-  }
+    if (opponent) {
+      if (opponent.id === challengerId) {
+        return replyMessage("Select another user. You cannot challenge yourself.", true);
+      }
 
-  const maxTier = getUnlockedDicePvpTier(db, challengerId);
+      if (opponent.bot) {
+        return replyMessage("You can only challenge human players.", true);
+      }
+    }
+
+    const maxTier = getUnlockedDicePvpTierFromPrestige(progression.getDicePrestige(challengerId));
+    return {
+      kind: "reply",
+      payload: {
+        type: "view",
+        view: buildSetupView(challengerId, opponent?.id ?? null, maxTier),
+        ephemeral: true,
+      },
+    };
+  };
+
+  const handleDicePvpAction = async (
+    actorId: string,
+    action: DicePvpAction,
+    publishChallenge: PublishChallenge | null,
+    nowMs: number = Date.now(),
+  ): Promise<DicePvpResult> => {
+    if (action.type === "pick") {
+      return handleTierPick({
+        analytics,
+        hostileEffects,
+        progression,
+        pvp,
+        unitOfWork,
+      }, actorId, action, publishChallenge, nowMs);
+    }
+
+    if (action.type === "accept") {
+      return handleChallengeAccept({
+        analytics,
+        hostileEffects,
+        progression,
+        pvp,
+        unitOfWork,
+      }, actorId, action.challengeId, nowMs);
+    }
+
+    return handleChallengeDecline({ progression, pvp }, actorId, action.challengeId, nowMs);
+  };
+
   return {
-    kind: "reply",
-    payload: {
-      type: "view",
-      view: buildSetupView(challengerId, opponent?.id ?? null, maxTier),
-      ephemeral: true,
-    },
+    createDicePvpSetupReply,
+    handleDicePvpAction,
   };
 };
 
-export const handleDicePvpAction = async (
-  db: SqliteDatabase,
-  actorId: string,
-  action: DicePvpAction,
-  publishChallenge: PublishChallenge | null,
-  nowMs: number = Date.now(),
-): Promise<DicePvpResult> => {
-  if (action.type === "pick") {
-    return handleTierPick(db, actorId, action, publishChallenge, nowMs);
-  }
-
-  if (action.type === "accept") {
-    return handleChallengeAccept(db, actorId, action.challengeId, nowMs);
-  }
-
-  return handleChallengeDecline(db, actorId, action.challengeId, nowMs);
-};
-
 const handleTierPick = async (
-  db: SqliteDatabase,
+  {
+    progression,
+    pvp,
+  }: Pick<ManageChallengeDependencies, "progression" | "pvp">,
   actorId: string,
   action: Extract<DicePvpAction, { type: "pick" }>,
   publishChallenge: PublishChallenge | null,
@@ -111,13 +149,13 @@ const handleTierPick = async (
   }
 
   const opponentId = action.opponentId ?? dicePvpOpenOpponentId;
-  const lockoutUntil = getActiveDiceLockout(db, action.ownerId, nowMs);
+  const lockoutUntil = pvp.getActiveDiceLockout(action.ownerId, nowMs);
   if (lockoutUntil) {
     return updateMessage(`You can play again ${formatRelativeTime(lockoutUntil)}.`, true);
   }
 
   if (opponentId !== dicePvpOpenOpponentId) {
-    const opponentLockoutUntil = getActiveDiceLockout(db, opponentId, nowMs);
+    const opponentLockoutUntil = pvp.getActiveDiceLockout(opponentId, nowMs);
     if (opponentLockoutUntil) {
       return updateMessage(
         `<@${opponentId}> can play again ${formatRelativeTime(opponentLockoutUntil)}.`,
@@ -126,7 +164,7 @@ const handleTierPick = async (
     }
   }
 
-  const maxTier = getUnlockedDicePvpTier(db, action.ownerId);
+  const maxTier = getUnlockedDicePvpTierFromPrestige(progression.getDicePrestige(action.ownerId));
   if (action.duelTier < 1 || action.duelTier > maxTier) {
     return replyMessage("That duel die is not unlocked yet.", true);
   }
@@ -139,7 +177,7 @@ const handleTierPick = async (
   const expiresAtMs = nowMs + getDicePvpChallengeExpireMs();
   const expiresAtIso = new Date(expiresAtMs).toISOString();
 
-  const createResult = createDicePvpChallengeIfUsersAvailable(db, {
+  const createResult = pvp.createDicePvpChallengeIfUsersAvailable({
     id: challengeId,
     challengerId: action.ownerId,
     opponentId,
@@ -161,18 +199,24 @@ const handleTierPick = async (
 
     return updateMessage(`Challenge created: ${challengeMessage.url}`, true);
   } catch {
-    setDicePvpChallengeStatusFromPending(db, challengeId, "cancelled");
+    pvp.setDicePvpChallengeStatusFromPending(challengeId, "cancelled");
     return updateMessage("Failed to post the challenge in this channel.", true);
   }
 };
 
 const handleChallengeAccept = (
-  db: SqliteDatabase,
+  {
+    analytics,
+    hostileEffects,
+    progression,
+    pvp,
+    unitOfWork,
+  }: ManageChallengeDependencies,
   actorId: string,
   challengeId: string,
   nowMs: number,
 ): DicePvpResult => {
-  const challenge = getDicePvpChallenge(db, challengeId);
+  const challenge = pvp.getDicePvpChallenge(challengeId);
   if (!challenge) {
     return replyMessage("Challenge not found.", true);
   }
@@ -182,7 +226,7 @@ const handleChallengeAccept = (
   }
 
   if (isDicePvpChallengeExpired(challenge, nowMs)) {
-    const markedExpired = setDicePvpChallengeStatusFromPending(db, challenge.id, "expired");
+    const markedExpired = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "expired");
     if (!markedExpired) {
       return alreadyHandledReply();
     }
@@ -202,23 +246,25 @@ const handleChallengeAccept = (
     return replyMessage("Only the challenged user can accept.", true);
   }
 
-  const challengerLockoutUntil = getActiveDiceLockout(db, challenge.challengerId, nowMs);
+  const challengerLockoutUntil = pvp.getActiveDiceLockout(challenge.challengerId, nowMs);
   if (challengerLockoutUntil) {
-    return cancelChallengeForLockout(db, challenge, challenge.challengerId, challengerLockoutUntil);
+    return cancelChallengeForLockout(pvp, challenge, challenge.challengerId, challengerLockoutUntil);
   }
 
-  const opponentLockoutUntil = getActiveDiceLockout(db, opponentIdForDuel, nowMs);
+  const opponentLockoutUntil = pvp.getActiveDiceLockout(opponentIdForDuel, nowMs);
   if (opponentLockoutUntil) {
     if (isOpenChallenge) {
       return replyMessage(`You can play again ${formatRelativeTime(opponentLockoutUntil)}.`, true);
     }
 
-    return cancelChallengeForLockout(db, challenge, opponentIdForDuel, opponentLockoutUntil);
+    return cancelChallengeForLockout(pvp, challenge, opponentIdForDuel, opponentLockoutUntil);
   }
 
-  const challengerTier = getUnlockedDicePvpTier(db, challenge.challengerId);
+  const challengerTier = getUnlockedDicePvpTierFromPrestige(
+    progression.getDicePrestige(challenge.challengerId),
+  );
   if (challengerTier < challenge.duelTier) {
-    const cancelled = setDicePvpChallengeStatusFromPending(db, challenge.id, "cancelled");
+    const cancelled = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "cancelled");
     if (!cancelled) {
       return alreadyHandledReply();
     }
@@ -226,13 +272,15 @@ const handleChallengeAccept = (
     return cancelledByTierUpdate();
   }
 
-  const opponentTier = getUnlockedDicePvpTier(db, opponentIdForDuel);
+  const opponentTier = getUnlockedDicePvpTierFromPrestige(
+    progression.getDicePrestige(opponentIdForDuel),
+  );
   if (opponentTier < challenge.duelTier) {
     if (isOpenChallenge) {
       return replyMessage("You do not have this duel die unlocked yet.", true);
     }
 
-    const cancelled = setDicePvpChallengeStatusFromPending(db, challenge.id, "cancelled");
+    const cancelled = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "cancelled");
     if (!cancelled) {
       return alreadyHandledReply();
     }
@@ -241,7 +289,7 @@ const handleChallengeAccept = (
   }
 
   if (isOpenChallenge) {
-    const claimed = setDicePvpChallengeOpponentFromOpen(db, challenge.id, opponentIdForDuel);
+    const claimed = pvp.setDicePvpChallengeOpponentFromOpen(challenge.id, opponentIdForDuel);
     if (!claimed) {
       return alreadyHandledReply();
     }
@@ -255,14 +303,14 @@ const handleChallengeAccept = (
   const challengerRoll = rollDie(duelDieSides);
   const opponentRoll = rollDie(duelDieSides);
 
-  const outcome = db.transaction(() => {
-    if (!setDicePvpChallengeStatusFromPending(db, challenge.id, "resolved")) {
+  const outcome = unitOfWork.runInTransaction(() => {
+    if (!pvp.setDicePvpChallengeStatusFromPending(challenge.id, "resolved")) {
       return { resolved: false as const };
     }
 
     if (challengerRoll === opponentRoll) {
-      updateDicePvpStats(db, { userId: resolvedChallenge.challengerId, draws: 1 });
-      updateDicePvpStats(db, { userId: resolvedChallenge.opponentId, draws: 1 });
+      analytics.updateDicePvpStats({ userId: resolvedChallenge.challengerId, draws: 1 });
+      analytics.updateDicePvpStats({ userId: resolvedChallenge.opponentId, draws: 1 });
       return {
         resolved: true as const,
         type: "draw" as const,
@@ -278,20 +326,20 @@ const handleChallengeAccept = (
 
     const punishmentMs = getDuelPunishmentMs(challenge.duelTier);
     const rewardMs = getDuelRewardMs(challenge.duelTier);
-    const winnerEffects = getDicePvpEffects(db, winnerId);
+    const winnerEffects = pvp.getDicePvpEffects(winnerId);
     const winnerDoubleRollUntilMs = extendEffect(winnerEffects.doubleRollUntil, rewardMs, nowMs);
-    const loserLockoutResult = applyShieldableNegativeLockout(db, {
+    const loserLockoutResult = hostileEffects.applyShieldableNegativeLockout({
       userId: loserId,
       durationMs: punishmentMs,
       nowMs,
     });
 
-    setDicePvpEffects(db, {
+    pvp.setDicePvpEffects({
       userId: winnerId,
       doubleRollUntil: new Date(winnerDoubleRollUntilMs).toISOString(),
     });
-    updateDicePvpStats(db, { userId: winnerId, wins: 1 });
-    updateDicePvpStats(db, { userId: loserId, losses: 1 });
+    analytics.updateDicePvpStats({ userId: winnerId, wins: 1 });
+    analytics.updateDicePvpStats({ userId: loserId, losses: 1 });
 
     return {
       resolved: true as const,
@@ -332,12 +380,15 @@ const handleChallengeAccept = (
 };
 
 const handleChallengeDecline = (
-  db: SqliteDatabase,
+  {
+    progression,
+    pvp,
+  }: Pick<ManageChallengeDependencies, "progression" | "pvp">,
   actorId: string,
   challengeId: string,
   nowMs: number,
 ): DicePvpResult => {
-  const challenge = getDicePvpChallenge(db, challengeId);
+  const challenge = pvp.getDicePvpChallenge(challengeId);
   if (!challenge) {
     return replyMessage("Challenge not found.", true);
   }
@@ -347,7 +398,7 @@ const handleChallengeDecline = (
   }
 
   if (isDicePvpChallengeExpired(challenge, nowMs)) {
-    const markedExpired = setDicePvpChallengeStatusFromPending(db, challenge.id, "expired");
+    const markedExpired = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "expired");
     if (!markedExpired) {
       return alreadyHandledReply();
     }
@@ -363,19 +414,19 @@ const handleChallengeDecline = (
     return replyMessage("Only the challenged user can decline.", true);
   }
 
-  const challengerLockoutUntil = getActiveDiceLockout(db, challenge.challengerId, nowMs);
+  const challengerLockoutUntil = pvp.getActiveDiceLockout(challenge.challengerId, nowMs);
   if (challengerLockoutUntil) {
-    return cancelChallengeForLockout(db, challenge, challenge.challengerId, challengerLockoutUntil);
+    return cancelChallengeForLockout(pvp, challenge, challenge.challengerId, challengerLockoutUntil);
   }
 
   if (challenge.opponentId !== dicePvpOpenOpponentId) {
-    const opponentLockoutUntil = getActiveDiceLockout(db, challenge.opponentId, nowMs);
+    const opponentLockoutUntil = pvp.getActiveDiceLockout(challenge.opponentId, nowMs);
     if (opponentLockoutUntil) {
-      return cancelChallengeForLockout(db, challenge, challenge.opponentId, opponentLockoutUntil);
+      return cancelChallengeForLockout(pvp, challenge, challenge.opponentId, opponentLockoutUntil);
     }
   }
 
-  const declined = setDicePvpChallengeStatusFromPending(db, challenge.id, "declined");
+  const declined = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "declined");
   if (!declined) {
     return alreadyHandledReply();
   }
@@ -613,12 +664,12 @@ const cancelledByTierUpdate = (): DicePvpResult => {
 };
 
 const cancelChallengeForLockout = (
-  db: SqliteDatabase,
+  pvp: Pick<DicePvpRepository, "setDicePvpChallengeStatusFromPending">,
   challenge: DicePvpChallenge,
   lockedUserId: string,
   lockoutUntil: number,
 ): DicePvpResult => {
-  const cancelled = setDicePvpChallengeStatusFromPending(db, challenge.id, "cancelled");
+  const cancelled = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "cancelled");
   if (!cancelled) {
     return alreadyHandledReply();
   }
