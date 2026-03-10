@@ -152,6 +152,7 @@ Current migration note:
 - Interactive button-driven flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
 - The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with shared Discord rendering in [render-action-result.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-result.ts) and [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
 - `/dice` now runs through the progression context, and usable inventory items now run through the inventory context instead of legacy `src/dice/core/application/` entrypoints.
+- Random-event runtime, admin control, and foundation scheduling now live in `src/dice/random-events/infrastructure/`; the old `src/dice/features/random-events/` entrypoints are compatibility shims.
 
 ## Project Layout
 
@@ -168,7 +169,7 @@ Current migration note:
 - `src/dice/pvp/interfaces/discord/commands/`, `src/dice/pvp/interfaces/discord/buttons/`, and `src/dice/pvp/interfaces/discord/presenters/` contain the migrated PvP Discord adapters.
 - `src/dice/analytics/interfaces/discord/commands/` contains `/dice-analytics`.
 - `src/dice/admin/interfaces/discord/commands/`, `src/dice/admin/interfaces/discord/buttons/`, and `src/dice/admin/interfaces/discord/presenters/` contain the migrated admin Discord adapters.
-- `src/dice/random-events/domain/` contains random-event contract types; `src/dice/random-events/infrastructure/` contains runtime and scheduler adapters.
+- `src/dice/random-events/domain/` contains random-event contract types; `src/dice/random-events/infrastructure/` is now the source of truth for runtime, admin control, and scheduler adapters.
 - `src/system/self-update/interfaces/discord/commands/` contains the owner-only `/self-update` command.
 - `src/dice/core/` and `src/dice/features/` remain as legacy internals while the context-first migration continues.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining compatibility helpers.

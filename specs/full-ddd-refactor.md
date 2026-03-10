@@ -15,6 +15,7 @@ Active migration plan. The phase-1 foundation was implemented on March 10, 2026:
 - Shop and inventory now use the same interaction pattern, and the shared action-view contract now lives in `src/shared-kernel/application/action-view.ts`.
 - PvP and admin now use the same interaction pattern, and shared Discord rendering now lives in `src/app/discord/render-action-result.ts`.
 - `/dice` and usable inventory items now run from context-first application modules instead of `src/dice/core/application/`.
+- Random-event runtime, admin control, and foundation scheduling now live under `src/dice/random-events/infrastructure/`, with the old feature entrypoints kept only as compatibility re-exports.
 
 The remaining phases in this spec still apply. This spec does not authorize gameplay changes or destructive schema changes by itself.
 
@@ -37,7 +38,8 @@ Representative examples in the current codebase:
 
 - `src/dice/core/domain/prestige.ts`
 - `src/dice/core/domain/pvp.ts`
-- `src/dice/features/random-events/runtime.ts`
+- `src/dice/features/random-events/content.ts`
+- `src/dice/features/random-events/state.ts`
 - `src/shared/economy.ts`
 
 The main remaining gap is that many new context-first modules are still thin wrappers over the legacy internals in `src/dice/core/` and `src/dice/features/`.
