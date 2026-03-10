@@ -147,7 +147,7 @@ Rolly is a pragmatic domain-driven modular monolith.
 Current architecture note:
 
 - Progression, inventory, PvP, analytics, economy, and random-event source-of-truth modules now live under their owning `src/dice/<context>/` folders.
-- `src/dice/core/` and `src/dice/features/` are now compatibility shims for legacy imports. Do not use them as the source of truth for new work.
+- Legacy compatibility shims under `src/dice/core/` and `src/dice/features/` have been removed.
 - New feature work should start in the context-first folders.
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
 - Interactive button-driven flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
@@ -155,7 +155,7 @@ Current architecture note:
 - Context `application/` modules now depend on explicit repository ports and shared `UnitOfWork` abstractions rather than `shared/db`.
 - The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with shared Discord rendering in [render-action-result.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-result.ts) and [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
 - `/dice` now runs through the progression context, and usable inventory items now run through the inventory context instead of legacy `src/dice/core/application/` entrypoints.
-- Random-event runtime, admin control, foundation scheduling, content contracts, and state helpers now live in `src/dice/random-events/`; the old `src/dice/features/random-events/` files are compatibility shims.
+- Random-event runtime, admin control, foundation scheduling, content contracts, and state helpers now live in `src/dice/random-events/`.
 
 ## Project Layout
 
@@ -175,8 +175,7 @@ Current architecture note:
 - `src/dice/admin/interfaces/discord/commands/`, `src/dice/admin/interfaces/discord/buttons/`, and `src/dice/admin/interfaces/discord/presenters/` contain the migrated admin Discord adapters.
 - `src/dice/random-events/domain/` contains random-event contracts; `src/dice/random-events/interfaces/discord/` contains event interaction adapters; `src/dice/random-events/infrastructure/` contains runtime, admin control, scheduler, content-pack, and state adapters.
 - `src/system/self-update/interfaces/discord/commands/` contains the owner-only `/self-update` command.
-- `src/dice/core/` and `src/dice/features/` are kept only as compatibility shims for legacy import paths.
-- `src/shared/` contains shared infrastructure such as db, config, env, and remaining compatibility helpers.
+- `src/shared/` contains shared infrastructure such as db, config, env, and cross-cutting helpers.
 - `src/shared-kernel/` contains small shared architecture primitives and types.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/bot/` remains as compatibility wrappers so existing imports keep working during the migration.
