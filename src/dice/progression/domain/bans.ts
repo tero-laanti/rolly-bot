@@ -1,5 +1,4 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import { getFame } from "../../economy/domain/balance";
 import { getDiceSidesForPrestige, getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "./game-rules";
 import {
   getInitialDiceLevelForPrestige,
@@ -19,6 +18,14 @@ export const getUnlockedBanSlots = (db: SqliteDatabase, userId: string): number 
   const level = getDiceLevel(db, userId);
   const dieSides = getDiceSides(db, userId);
   return getUnlockedBanSlotsFromFame(fame, level, dieSides);
+};
+
+const getFame = (db: SqliteDatabase, userId: string): number => {
+  const row = db.prepare("SELECT fame FROM balances WHERE user_id = ?").get(userId) as
+    | { fame: number }
+    | undefined;
+
+  return row?.fame ?? 0;
 };
 
 const getDicePrestige = (db: SqliteDatabase, userId: string): number => {
