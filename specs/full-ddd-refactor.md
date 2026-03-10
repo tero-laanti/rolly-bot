@@ -12,6 +12,7 @@ Active migration plan. The phase-1 foundation was implemented on March 10, 2026:
 - `src/dice/random-events/domain/` now exposes random-event contracts for `rolly-data` and other external consumers.
 - `eslint.config.js` now enforces basic architecture guardrails for the new context-first `application/` and `domain/` modules.
 - Prestige and bans now use the target interaction pattern: interface button parsing, pure application view models, and Discord presenters.
+- Shop and inventory now use the same interaction pattern, and the shared action-view contract now lives in `src/shared-kernel/application/action-view.ts`.
 
 The remaining phases in this spec still apply. This spec does not authorize gameplay changes or destructive schema changes by itself.
 

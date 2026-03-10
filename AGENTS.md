@@ -35,7 +35,9 @@ This file contains repository-specific guidance for future implementers working 
   context `interfaces/discord/buttons/` parses and encodes button ids,
   context `application/` returns pure view models,
   context `interfaces/discord/presenters/` renders `discord.js` components.
-- `src/dice/progression/application/manage-prestige/use-case.ts` and `src/dice/progression/application/manage-bans/use-case.ts` are the reference examples for this pattern.
+- `src/shared-kernel/application/action-view.ts` is the shared model for button-driven application view results.
+- `src/app/discord/render-action-button-rows.ts` is the shared Discord renderer for button-row specs.
+- `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, and `src/dice/inventory/application/manage-inventory/use-case.ts` are the reference examples for this pattern.
 - `src/dice/core/` and `src/dice/features/` are legacy internals that still back some context modules during the migration. Prefer new code in the context-first paths unless you are extending existing legacy logic.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.

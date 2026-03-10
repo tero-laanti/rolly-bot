@@ -1,9 +1,9 @@
 import type { InteractionResult } from "../../../../../app/discord/interaction-response";
 import { renderActionButtonRows } from "../../../../../app/discord/render-action-button-rows";
-import type { DicePrestigeResult } from "../../../application/manage-prestige/use-case";
-import { encodeDicePrestigeAction } from "../buttons/prestige-buttons";
+import type { DiceShopResult } from "../../../application/manage-shop/use-case";
+import { encodeDiceShopAction } from "../buttons/shop-buttons";
 
-export const renderDicePrestigeResult = (result: DicePrestigeResult): InteractionResult => {
+export const renderDiceShopResult = (result: DiceShopResult): InteractionResult => {
   if (result.payload.type === "message") {
     if (result.kind === "reply") {
       return {
@@ -29,10 +29,7 @@ export const renderDicePrestigeResult = (result: DicePrestigeResult): Interactio
       kind: "reply",
       payload: {
         content: result.payload.view.content,
-        components: renderActionButtonRows(
-          result.payload.view.components,
-          encodeDicePrestigeAction,
-        ),
+        components: renderActionButtonRows(result.payload.view.components, encodeDiceShopAction),
         ephemeral: result.payload.ephemeral,
       },
     };
@@ -42,10 +39,7 @@ export const renderDicePrestigeResult = (result: DicePrestigeResult): Interactio
     kind: "update",
     payload: {
       content: result.payload.view.content,
-      components: renderActionButtonRows(
-        result.payload.view.components,
-        encodeDicePrestigeAction,
-      ),
+      components: renderActionButtonRows(result.payload.view.components, encodeDiceShopAction),
     },
   };
 };

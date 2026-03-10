@@ -150,6 +150,7 @@ Current migration note:
 - New feature work should start in the context-first folders.
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
 - Interactive progression flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
+- The shared action-view contract for button-driven use cases now lives in [action-view.ts](src/shared-kernel/application/action-view.ts), with Discord button-row rendering in [render-action-button-rows.ts](src/app/discord/render-action-button-rows.ts).
 
 ## Project Layout
 
@@ -158,6 +159,7 @@ Current migration note:
 - `eslint.config.js` enforces basic architecture guardrails for the new context-first `application/` and `domain/` folders.
 - `src/dice/progression/interfaces/discord/commands/` contains progression-facing Discord commands such as `/dice`, `/dice-prestige`, `/dice-bans`, and `/dice-achievements`.
 - `src/dice/progression/interfaces/discord/buttons/` and `src/dice/progression/interfaces/discord/presenters/` contain the migrated prestige and bans Discord adapters.
+- `src/dice/inventory/interfaces/discord/buttons/` and `src/dice/inventory/interfaces/discord/presenters/` contain the migrated shop and inventory Discord adapters.
 - `src/dice/economy/domain/` contains the current economy source of truth for Fame/Pips access and updates.
 - `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
 - `src/dice/pvp/interfaces/discord/commands/` contains `/dice-pvp`.

@@ -1,5 +1,8 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import type { ActionButtonRowSpec, ButtonStyleSpec } from "../../../application/interaction-model";
+import type {
+  ActionButtonRowSpec,
+  ButtonStyleSpec,
+} from "../../shared-kernel/application/action-view";
 
 const buttonStyleMap: Record<ButtonStyleSpec, ButtonStyle> = {
   primary: ButtonStyle.Primary,

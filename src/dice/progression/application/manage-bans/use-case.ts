@@ -9,7 +9,7 @@ import {
   setDiceBan,
 } from "../../../core/domain/bans";
 import { getDiceLevel, getDiceSides } from "../../../core/domain/prestige";
-import type { ActionResult, ActionView } from "../interaction-model";
+import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 
 const numbersPerRow = 5;
 const numberRowsPerPage = 4;

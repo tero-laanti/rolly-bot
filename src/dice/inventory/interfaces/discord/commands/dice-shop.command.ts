@@ -4,14 +4,27 @@ import { applyButtonResult, applyChatInputResult } from "../../../../../app/disc
 import { getDatabase } from "../../../../../shared/db";
 import {
   createDiceShopReply,
-  diceShopButtonPrefix,
   handleDiceShopAction,
 } from "../../../application/manage-shop/use-case";
+import { diceShopButtonPrefix, parseDiceShopAction } from "../buttons/shop-buttons";
+import { renderDiceShopResult } from "../presenters/shop.presenter";
 
 const handleDiceShopButton = async (interaction: ButtonInteraction): Promise<void> => {
+  const action = parseDiceShopAction(interaction.customId);
+  if (!action) {
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Unknown shop action.",
+        ephemeral: true,
+      },
+    });
+    return;
+  }
+
   await applyButtonResult(
     interaction,
-    handleDiceShopAction(getDatabase(), interaction.user.id, interaction.customId),
+    renderDiceShopResult(handleDiceShopAction(getDatabase(), interaction.user.id, action)),
   );
 };
 
@@ -20,7 +33,10 @@ export const data = new SlashCommandBuilder()
   .setDescription("Spend your pips on shop items.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
-  await applyChatInputResult(interaction, createDiceShopReply(getDatabase(), interaction.user.id));
+  await applyChatInputResult(
+    interaction,
+    renderDiceShopResult(createDiceShopReply(getDatabase(), interaction.user.id)),
+  );
 };
 
 export const buttonHandlers = [
