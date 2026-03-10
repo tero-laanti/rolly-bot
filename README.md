@@ -151,6 +151,7 @@ Current migration note:
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
 - Interactive button-driven flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
 - The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with shared Discord rendering in [render-action-result.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-result.ts) and [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
+- `/dice` now runs through the progression context, and usable inventory items now run through the inventory context instead of legacy `src/dice/core/application/` entrypoints.
 
 ## Project Layout
 
@@ -158,8 +159,10 @@ Current migration note:
 - `src/app/discord/` contains the Discord bot runtime, button router, interaction helpers, and explicit command registry.
 - `eslint.config.js` enforces basic architecture guardrails for the new context-first `application/` and `domain/` folders.
 - `src/dice/progression/interfaces/discord/commands/` contains progression-facing Discord commands such as `/dice`, `/dice-prestige`, `/dice-bans`, and `/dice-achievements`.
-- `src/dice/progression/interfaces/discord/buttons/` and `src/dice/progression/interfaces/discord/presenters/` contain the migrated prestige and bans Discord adapters.
+- `src/dice/progression/application/roll-dice/` contains the migrated `/dice` use case and reply-content builder.
+- `src/dice/progression/interfaces/discord/buttons/` and `src/dice/progression/interfaces/discord/presenters/` contain the migrated progression Discord adapters.
 - `src/dice/inventory/interfaces/discord/buttons/` and `src/dice/inventory/interfaces/discord/presenters/` contain the migrated shop and inventory Discord adapters.
+- `src/dice/inventory/application/use-item/` contains the migrated item-consumption use case used by `/dice-inventory`.
 - `src/dice/economy/domain/` contains the current economy source of truth for Fame/Pips access and updates.
 - `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
 - `src/dice/pvp/interfaces/discord/commands/`, `src/dice/pvp/interfaces/discord/buttons/`, and `src/dice/pvp/interfaces/discord/presenters/` contain the migrated PvP Discord adapters.

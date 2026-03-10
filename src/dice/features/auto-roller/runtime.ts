@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
-import { runRollDiceUseCase } from "../../core/application/roll-dice";
+import { runRollDiceUseCase } from "../../progression/application/roll-dice/use-case";
 
 const progressBarWidth = 20;
 const maxHighlights = 8;
@@ -139,7 +139,7 @@ const runAutoRollTick = async (session: AutoRollSession): Promise<void> => {
     userId: session.reservation.userId,
     userMention: session.userMention,
   });
-  const classification = classifyAutoRollResult(result.content);
+  const classification = result.autoRollClassification;
 
   session.completedRolls = rollIndex;
   if (classification.kind === "blocked") {
@@ -263,60 +263,6 @@ const formatDuration = (totalSeconds: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-type AutoRollClassification =
-  | {
-      kind: "none";
-    }
-  | {
-      kind: "blocked";
-      summary: string;
-    }
-  | {
-      kind: "interesting";
-      summary: string;
-    };
-
-const classifyAutoRollResult = (content: string): AutoRollClassification => {
-  if (content.includes("you can play again") || content.includes("stop spamming")) {
-    return {
-      kind: "blocked",
-      summary: summarizeAutoRollText(content),
-    };
-  }
-
-  const relevantLines = content
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(
-      (line) =>
-        line.length > 0 &&
-        (line.includes("Achievement unlocked:") ||
-          line.includes("Achievements unlocked:") ||
-          line.includes("You receive ") ||
-          line.includes("All dice matched.") ||
-          line.includes("Dice charge!") ||
-          line.includes("New ban slot unlocked.") ||
-          line.includes("Prestige is now available.")),
-    );
-
-  if (relevantLines.length < 1) {
-    return { kind: "none" };
-  }
-
-  return {
-    kind: "interesting",
-    summary: summarizeAutoRollText(relevantLines.join(" | ")),
-  };
-};
-
-const summarizeAutoRollText = (content: string): string => {
-  const singleLine = content.replace(/\s+/g, " ").trim();
-  if (singleLine.length <= 220) {
-    return singleLine;
-  }
-
-  return `${singleLine.slice(0, 217)}...`;
-};
 
 const pushHighlight = (highlights: string[], line: string): void => {
   highlights.push(line);

@@ -1,7 +1,11 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import type { AutoRollSessionReservation } from "../../../features/auto-roller/runtime";
-import { useDiceItem, type ReserveAutoRollSession } from "../../../core/application/use-dice-item";
+import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";
+import {
+  useDiceItem,
+  type ReserveAutoRollSession,
+  type TriggerRandomGroupEvent,
+} from "../use-item/use-case";
 import {
   getOwnedInventoryEntries,
   type DiceInventoryEntry,
@@ -48,7 +52,10 @@ export const handleDiceInventoryAction = async (
   db: SqliteDatabase,
   actorId: string,
   action: DiceInventoryAction,
-  { reserveAutoRollSession }: { reserveAutoRollSession: ReserveAutoRollSession },
+  options: {
+    reserveAutoRollSession: ReserveAutoRollSession;
+    triggerRandomGroupEvent: TriggerRandomGroupEvent;
+  },
 ): Promise<DiceInventoryActionOutcome> => {
   if (actorId !== action.ownerId) {
     return {
@@ -78,7 +85,8 @@ export const handleDiceInventoryAction = async (
   const useResult = await useDiceItem(db, {
     userId: action.ownerId,
     itemId: action.itemId,
-    reserveAutoRollSession,
+    reserveAutoRollSession: options.reserveAutoRollSession,
+    triggerRandomGroupEvent: options.triggerRandomGroupEvent,
   });
   if (!useResult.ok) {
     return {

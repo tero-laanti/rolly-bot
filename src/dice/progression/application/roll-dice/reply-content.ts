@@ -1,4 +1,4 @@
-import { getDiceAchievement, type DiceAchievementId } from "../domain/achievements";
+import { getDiceAchievement, type DiceAchievementId } from "../../../core/domain/achievements";
 
 const compactRollSetThreshold = 35;
 const discordMessageCharacterLimit = 2_000;

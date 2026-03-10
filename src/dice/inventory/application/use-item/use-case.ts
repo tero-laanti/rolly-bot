@@ -1,23 +1,20 @@
-import type { SqliteDatabase } from "../../../shared/db";
-import { triggerRandomGroupEventNow } from "../../features/random-events/admin";
-import {
-  releaseAutoRollSessionReservation,
-  type AutoRollSessionReservation,
-} from "../../features/auto-roller/runtime";
+import { grantInventoryItem } from "../../../core/domain/shop";
+import type { TriggerRandomEventNowResult } from "../../../random-events/infrastructure/admin-controller";
 import {
   clearAllNegativeTemporaryEffects,
   grantDoubleRollDuration,
   grantDoubleRollUses,
   grantNegativeEffectShield,
-} from "../domain/item-effects";
+} from "../../../core/domain/item-effects";
 import {
   consumeInventoryItem,
   getDiceShopItem,
   getInventoryQuantity,
-  grantInventoryItem,
   type DiceShopItem,
-} from "../domain/shop";
-import { getActiveDiceLockout, setDicePvpEffects } from "../domain/pvp";
+} from "../../../core/domain/shop";
+import { getActiveDiceLockout, setDicePvpEffects } from "../../../core/domain/pvp";
+import type { SqliteDatabase } from "../../../../shared/db";
+import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";
 
 export type ReserveAutoRollSession = (input: {
   userId: string;
@@ -25,6 +22,8 @@ export type ReserveAutoRollSession = (input: {
   durationSeconds: number;
   intervalSeconds: number;
 }) => AutoRollSessionReservation | null;
+
+export type TriggerRandomGroupEvent = () => Promise<TriggerRandomEventNowResult>;
 
 export type UseDiceItemResult =
   | {
@@ -45,10 +44,12 @@ export const useDiceItem = async (
     userId,
     itemId,
     reserveAutoRollSession,
+    triggerRandomGroupEvent,
   }: {
     userId: string;
     itemId: string;
     reserveAutoRollSession: ReserveAutoRollSession;
+    triggerRandomGroupEvent: TriggerRandomGroupEvent;
   },
 ): Promise<UseDiceItemResult> => {
   const item = getDiceShopItem(itemId);
@@ -203,7 +204,7 @@ export const useDiceItem = async (
       };
     }
 
-    const triggerResult = await triggerRandomGroupEventNow();
+    const triggerResult = await triggerRandomGroupEvent();
     if (!triggerResult.ok || !triggerResult.result?.created) {
       grantInventoryItem(db, { userId, itemId: item.id, quantity: 1 });
 
@@ -244,7 +245,6 @@ export const useDiceItem = async (
 
   const consumed = consumeInventoryItem(db, { userId, itemId: item.id });
   if (!consumed.ok) {
-    releaseAutoRollSessionReservation(reservation);
     return {
       ok: false,
       message: `You do not have any ${item.name} to use.`,
