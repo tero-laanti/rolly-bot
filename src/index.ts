@@ -1,1 +1,1 @@
-import "./bot/index";
+import "./app/bootstrap/start-bot";

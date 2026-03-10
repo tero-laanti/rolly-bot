@@ -131,18 +131,38 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 - `/dice-admin` exposes owner-only dice admin tools, including random-event status and effect cleanup. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
 - `/self-update` pulls the latest code, optionally runs `npm install`, refreshes `rolly-data` when configured as a git checkout, rebuilds, and redeploys commands. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
 
+## Architecture
+
+Rolly is a pragmatic domain-driven modular monolith.
+
+- `src/app/` contains the composition root and Discord runtime wiring.
+- `src/dice/<context>/` contains context-first modules such as progression, inventory, PvP, analytics, admin, and random-events.
+- `interfaces/discord/` contains Discord command adapters, button handlers, and presentation wiring.
+- `application/` contains use cases and orchestration.
+- `infrastructure/` contains adapters such as SQLite-backed or runtime-backed integrations.
+- `src/shared-kernel/` contains small, stable shared types and architectural primitives.
+
+Current migration note:
+
+- `src/dice/core/` and `src/dice/features/` still contain legacy internal implementations used by some of the new context-first modules.
+- New feature work should start in the context-first folders.
+- Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
+
 ## Project Layout
 
-- `src/commands/dice/` contains Discord command adapters for the dice product.
-- `src/commands/system/self-update.ts` contains the owner-only system update command.
-- `src/dice/core/application/` contains the core dice use-case orchestration such as roll, prestige, bans, PvP, and admin flows.
-- `src/dice/core/domain/` contains focused dice modules for balance, prestige, bans, analytics, charge, PvP, achievements, and temporary effects.
-- `src/dice/core/presentation/` contains dice-specific output formatting for Discord messages and components.
-- `src/dice/features/` is where larger dice features live as they grow beyond the core loop.
-- `src/dice/features/random-events/` contains the random-event scheduler, runtime, state, content selection, and admin wiring.
-- `src/shared/` contains shared infrastructure such as db, config, env, economy, and self-update helpers.
+- `src/app/bootstrap/` contains the startup entrypoints used by [src/index.ts](/Users/tero/workspace/rolly/src/index.ts) and [src/deploy-commands.ts](/Users/tero/workspace/rolly/src/deploy-commands.ts).
+- `src/app/discord/` contains the Discord bot runtime, button router, interaction helpers, and explicit command registry.
+- `src/dice/progression/interfaces/discord/commands/` contains progression-facing Discord commands such as `/dice`, `/dice-prestige`, `/dice-bans`, and `/dice-achievements`.
+- `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
+- `src/dice/pvp/interfaces/discord/commands/` contains `/dice-pvp`.
+- `src/dice/analytics/interfaces/discord/commands/` contains `/dice-analytics`.
+- `src/dice/admin/interfaces/discord/commands/` contains `/dice-admin`.
+- `src/system/self-update/interfaces/discord/commands/` contains the owner-only `/self-update` command.
+- `src/dice/core/` and `src/dice/features/` remain as legacy internals while the context-first migration continues.
+- `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
+- `src/shared-kernel/` contains small shared architecture primitives and types.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
-- `src/bot/` contains the Discord runtime wiring. `src/index.ts` and `src/deploy-commands.ts` stay as thin entry wrappers so npm scripts remain stable.
+- `src/bot/` remains as compatibility wrappers so existing imports keep working during the migration.
 
 ## Development
 
