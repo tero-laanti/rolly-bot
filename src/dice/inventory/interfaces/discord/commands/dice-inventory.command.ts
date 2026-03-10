@@ -7,6 +7,7 @@ import {
   reserveAutoRollSession,
   startReservedAutoRollSession,
 } from "../../../infrastructure/auto-roller-runtime";
+import { triggerRandomGroupEventNow } from "../../../../random-events/infrastructure/admin-controller";
 import { grantInventoryItem } from "../../../../core/domain/shop";
 import {
   createDiceInventoryReply,
@@ -35,6 +36,7 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
 
   const outcome = await handleDiceInventoryAction(db, interaction.user.id, action, {
     reserveAutoRollSession,
+    triggerRandomGroupEvent: triggerRandomGroupEventNow,
   });
 
   if (outcome.autoRollStart) {
