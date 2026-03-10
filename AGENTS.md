@@ -29,10 +29,13 @@ This file contains repository-specific guidance for future implementers working 
 - `src/app/` contains the composition root and Discord runtime wiring.
 - `src/shared-kernel/` contains stable shared types and architectural primitives.
 - `src/dice/<context>/` is the primary architecture. New feature work should land in the owning context.
+- `src/dice/economy/domain/balance.ts` is the source of truth for Fame/Pips balance helpers. Do not add new imports from `src/shared/economy.ts`; that file is compatibility-only.
+- `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
 - `src/dice/core/` and `src/dice/features/` are legacy internals that still back some context modules during the migration. Prefer new code in the context-first paths unless you are extending existing legacy logic.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/types/` contains shared types and module augmentation.
+- `eslint.config.js` contains architecture guardrails for context-first modules. When you add new files under context `application/` or `domain/`, keep them free of Discord runtime imports.
 
 ## Gameplay and Data
 

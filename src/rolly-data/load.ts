@@ -18,7 +18,7 @@ import {
   parseDiceItems,
   parseRandomEventScenarios,
 } from "./validate";
-import type { RandomEventScenario } from "../dice/features/random-events/content";
+import type { RandomEventScenario } from "../dice/random-events/domain/content";
 
 const achievementsFileName = "achievements.json";
 const diceBalanceFileName = "dice-balance.json";

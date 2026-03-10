@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import { getFame } from "../../../shared/economy";
+import { getFame } from "../../economy/domain/balance";
 import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "./game-rules";
 import { getDiceLevel, getDiceSides } from "./prestige";
 

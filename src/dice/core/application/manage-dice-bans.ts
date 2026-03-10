@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
-import { getFame } from "../../../shared/economy";
+import { getFame } from "../../economy/domain/balance";
 import type { InteractionResult } from "../../../bot/interaction-response";
 import {
   clearDiceBan,
