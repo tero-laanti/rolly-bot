@@ -29,7 +29,7 @@ This file contains repository-specific guidance for future implementers working 
 - `src/app/` contains the composition root and Discord runtime wiring.
 - `src/shared-kernel/` contains stable shared types and architectural primitives.
 - `src/dice/<context>/` is the primary architecture. New feature work should land in the owning context.
-- `src/dice/economy/domain/balance.ts` is the source of truth for Fame/Pips balance helpers.
+- `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract, `src/dice/economy/domain/balance.ts` holds shared economy value types, and `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
 - `src/dice/random-events/infrastructure/` is the source of truth for random-event runtime wiring, admin control, and scheduler logic.
 - `src/dice/progression/domain/`, `src/dice/inventory/domain/`, `src/dice/pvp/domain/`, and `src/dice/analytics/domain/` are the source-of-truth gameplay domains.
