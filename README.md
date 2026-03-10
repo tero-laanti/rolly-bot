@@ -4,11 +4,27 @@ Discord bot focused on rolling dice. The project is mostly written by AI but rev
 
 ## What Rolly Is
 
-Rolly is a Discord dice game built around repeated rolls, progression, and small moments of luck. Players roll their current dice set, try to hit matching combinations, unlock achievements, gain Fame, configure bans, prestige into stronger dice, and challenge each other in PvP duels. Random events add extra twists on top of the core roll loop.
+Rolly is a Discord dice game built around repeated rolls, progression, and small moments of luck. Players roll their current dice set trying to hit matching combinations, unlock achievements, gain Fame, configure bans, prestige into stronger dice, challenge others in duels and so on.
+
+## Screenshots
+
+PvP duels can grant temporary roll buffs that feed back into the main `/dice` loop:
+
+<img src="docs/images/pvp.png" alt="PvP duel and follow-up dice roll" width="480" />
+
+Players can also inspect long-term progression with `/dice-analytics`:
+
+<img src="docs/images/analytics.png" alt="Dice analytics command output" width="360" />
+
+Random events appear as live interaction prompts in the server:
+
+<img src="docs/images/event.png" alt="Random event prompt" width="480" />
+
+And much more!
 
 ## Requirements
 
-- Node.js 24.13.0 (see `.node-version` and `.nvmrc`)
+- Node.js 24.13.0 (see `.nvmrc`)
 
 ## Quick Start
 
