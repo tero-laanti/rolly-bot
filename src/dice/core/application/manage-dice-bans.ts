@@ -134,9 +134,10 @@ export const handleDiceBansAction = (
     return {
       kind: "update",
       payload: {
-        content: ["All bans cleared.", buildDieSelectionContent({ bans: updatedBans, unlockedSlots })].join(
-          "\n",
-        ),
+        content: [
+          "All bans cleared.",
+          buildDieSelectionContent({ bans: updatedBans, unlockedSlots }),
+        ].join("\n"),
         components: buildDieSelectionComponents(ownerId, diceLevel, updatedBans),
       },
     };
@@ -311,9 +312,11 @@ export const handleDiceBansAction = (
 const buildDieSelectionContent = ({ bans, unlockedSlots }: DieSelectionContent): string => {
   const usedCount = countUsedBans(bans);
   const summary = formatBansSummary(bans);
-  return [`Bans: ${usedCount}/${unlockedSlots} used.`, summary, "\nSelect a die to configure."].join(
-    "\n",
-  );
+  return [
+    `Bans: ${usedCount}/${unlockedSlots} used.`,
+    summary,
+    "\nSelect a die to configure.",
+  ].join("\n");
 };
 
 const buildNumberSelectionContent = ({

@@ -2,8 +2,12 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
 import type { InteractionResult } from "../../../bot/interaction-response";
 import {
+  buildAutoRollSessionStartingContent,
+  type AutoRollSessionReservation,
+} from "../../features/auto-roller/runtime";
+import { useDiceItem, type ReserveAutoRollSession } from "./use-dice-item";
+import {
   getOwnedInventoryEntries,
-  useDiceInventoryItem,
   type DiceInventoryEntry,
   type DiceShopItemId,
 } from "../domain/shop";
@@ -26,10 +30,17 @@ type DiceInventoryButtonId =
       ownerId: string;
     };
 
-export const createDiceInventoryReply = (
-  db: SqliteDatabase,
-  userId: string,
-): InteractionResult => {
+export type DiceInventoryActionOutcome = {
+  interactionResult: InteractionResult;
+  autoRollStart?:
+    | {
+        reservation: AutoRollSessionReservation;
+        itemId: string;
+      }
+    | undefined;
+};
+
+export const createDiceInventoryReply = (db: SqliteDatabase, userId: string): InteractionResult => {
   return {
     kind: "reply",
     payload: {
@@ -39,70 +50,84 @@ export const createDiceInventoryReply = (
   };
 };
 
-export const handleDiceInventoryAction = (
+export const handleDiceInventoryAction = async (
   db: SqliteDatabase,
   actorId: string,
   customId: string,
-): InteractionResult => {
+  { reserveAutoRollSession }: { reserveAutoRollSession: ReserveAutoRollSession },
+): Promise<DiceInventoryActionOutcome> => {
   const parsed = parseDiceInventoryButtonId(customId);
   if (!parsed) {
     return {
-      kind: "reply",
-      payload: {
-        content: "Unknown inventory action.",
-        ephemeral: true,
+      interactionResult: {
+        kind: "reply",
+        payload: {
+          content: "Unknown inventory action.",
+          ephemeral: true,
+        },
       },
     };
   }
 
   if (actorId !== parsed.ownerId) {
     return {
-      kind: "reply",
-      payload: {
-        content: "This inventory menu is not assigned to you.",
-        ephemeral: true,
+      interactionResult: {
+        kind: "reply",
+        payload: {
+          content: "This inventory menu is not assigned to you.",
+          ephemeral: true,
+        },
       },
     };
   }
 
   if (parsed.action === "refresh") {
     return {
-      kind: "update",
-      payload: buildInventoryView(db, parsed.ownerId),
+      interactionResult: {
+        kind: "update",
+        payload: buildInventoryView(db, parsed.ownerId),
+      },
     };
   }
 
-  const useResult = useDiceInventoryItem(db, {
+  const useResult = await useDiceItem(db, {
     userId: parsed.ownerId,
     itemId: parsed.itemId,
+    reserveAutoRollSession,
   });
   if (!useResult.ok) {
-    if (useResult.reason === "not-owned") {
-      return {
+    return {
+      interactionResult: {
         kind: "reply",
         payload: {
-          content: `You do not have any ${useResult.item.name} to use.`,
+          content: useResult.message,
           ephemeral: true,
         },
-      };
-    }
+      },
+    };
+  }
 
+  if (useResult.autoRollReservation) {
     return {
-      kind: "reply",
-      payload: {
-        content: "That inventory item does not exist.",
-        ephemeral: true,
+      interactionResult: {
+        kind: "update",
+        payload: {
+          content: buildAutoRollSessionStartingContent(useResult.autoRollReservation),
+          components: [],
+        },
+      },
+      autoRollStart: {
+        reservation: useResult.autoRollReservation,
+        itemId: useResult.item.id,
       },
     };
   }
 
   return {
-    kind: "update",
-    payload: buildInventoryView(
-      db,
-      parsed.ownerId,
-      `${useResult.outcomeText} Remaining ${useResult.item.name}: ${useResult.remainingQuantity}.`,
-    ),
+    interactionResult: {
+      kind: "update",
+      payload: buildInventoryView(db, parsed.ownerId, useResult.statusMessage),
+    },
   };
 };
 
@@ -143,6 +168,7 @@ const buildInventoryContent = (
       `**${entry.item.name}**`,
       `Owned: ${entry.quantity}.`,
       entry.item.description,
+      entry.item.consumable ? "Consumable." : "Permanent collectible.",
       "",
     );
   }
@@ -156,12 +182,14 @@ const buildInventoryComponents = (
 ): ActionRowBuilder<ButtonBuilder>[] => {
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
 
-  const useButtons = entries.map((entry) =>
-    new ButtonBuilder()
-      .setCustomId(buildUseButtonId(userId, entry.item.id))
-      .setLabel(`Use ${entry.item.name}`)
-      .setStyle(ButtonStyle.Primary),
-  );
+  const useButtons = entries
+    .filter((entry) => entry.item.consumable)
+    .map((entry) =>
+      new ButtonBuilder()
+        .setCustomId(buildUseButtonId(userId, entry.item.id))
+        .setLabel(`Use ${entry.item.name}`)
+        .setStyle(ButtonStyle.Primary),
+    );
 
   for (let index = 0; index < useButtons.length; index += 5) {
     rows.push(
@@ -194,9 +222,7 @@ const parseDiceInventoryButtonId = (customId: string): DiceInventoryButtonId | n
     return null;
   }
 
-  const [actionRaw, ownerId, itemId] = customId
-    .slice(diceInventoryButtonPrefix.length)
-    .split(":");
+  const [actionRaw, ownerId, itemId] = customId.slice(diceInventoryButtonPrefix.length).split(":");
   if (!actionRaw || !ownerId) {
     return null;
   }

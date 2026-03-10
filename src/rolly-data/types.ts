@@ -95,6 +95,40 @@ export type DiceBalanceData = {
   };
 };
 
+export type DiceItemEffect =
+  | {
+      type: "negative-effect-shield";
+      charges: number;
+    }
+  | {
+      type: "double-roll-uses";
+      uses: number;
+    }
+  | {
+      type: "double-roll-duration";
+      minutes: number;
+    }
+  | {
+      type: "trigger-random-group-event";
+    }
+  | {
+      type: "auto-roll-session";
+      durationSeconds: number;
+      intervalSeconds: number;
+    }
+  | {
+      type: "cleanse-all-negative-effects";
+    };
+
+export type DiceItemData = {
+  id: string;
+  name: string;
+  description: string;
+  pricePips: number;
+  consumable: boolean;
+  effect: DiceItemEffect;
+};
+
 export type RollyDataSourceKind = "env" | "local" | "example";
 
 export type RollyDataSource = {
@@ -106,5 +140,6 @@ export type LoadedRollyData = {
   source: RollyDataSource;
   achievements: DiceAchievementData[];
   diceBalance: DiceBalanceData;
+  itemsV1: DiceItemData[];
   randomEventsV1: RandomEventScenario[];
 };

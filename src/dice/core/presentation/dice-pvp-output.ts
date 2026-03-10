@@ -4,11 +4,7 @@ import {
   type DicePvpChallenge,
   type DicePvpChallengeCreateResult,
 } from "../domain/pvp";
-import {
-  getDicePvpDieLabel,
-  getDuelPunishmentMs,
-  getDuelRewardMs,
-} from "../domain/game-rules";
+import { getDicePvpDieLabel, getDuelPunishmentMs, getDuelRewardMs } from "../domain/game-rules";
 
 const tierButtonsPerRow = 4;
 const openChallengeButtonToken = "any";
@@ -135,7 +131,8 @@ export const buildWinResultContent = (
   winnerId: string,
   loserId: string,
   winnerDoubleRollUntilMs: number,
-  loserLockoutUntilMs: number,
+  loserLockoutUntilMs: number | null,
+  loserBlockedByShield: boolean,
 ): string => {
   return [
     "Duel complete.",
@@ -143,7 +140,9 @@ export const buildWinResultContent = (
     `<@${challenge.challengerId}> rolled ${challengerRoll}.`,
     `<@${challenge.opponentId}> rolled ${opponentRoll}.`,
     `<@${winnerId}> is the winner.`,
-    `<@${loserId}> can play again ${formatRelativeTime(loserLockoutUntilMs)}.`,
+    loserBlockedByShield
+      ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
+      : `<@${loserId}> can play again ${formatRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
     `<@${winnerId}> has double buff on /dice. Their dice rolls are now doubled until ${formatRelativeTime(winnerDoubleRollUntilMs)}.`,
   ].join("\n");
 };

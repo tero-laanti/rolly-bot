@@ -1,0 +1,67 @@
+[
+  {
+    "id": "bad-luck-umbrella",
+    "name": "Bad Luck Umbrella",
+    "description": "Negates the next negative effect that would hit you from PvP, random events, or future hostile systems.",
+    "pricePips": 30,
+    "consumable": true,
+    "effect": {
+      "type": "negative-effect-shield",
+      "charges": 1
+    }
+  },
+  {
+    "id": "dice-revolver",
+    "name": "Dice Revolver",
+    "description": "Your next 6 /dice uses roll twice.",
+    "pricePips": 5,
+    "consumable": true,
+    "effect": {
+      "type": "double-roll-uses",
+      "uses": 6
+    }
+  },
+  {
+    "id": "longburn-spring",
+    "name": "Longburn Spring",
+    "description": "Your /dice uses roll twice for 5 minutes.",
+    "pricePips": 30,
+    "consumable": true,
+    "effect": {
+      "type": "double-roll-duration",
+      "minutes": 5
+    }
+  },
+  {
+    "id": "chaos-flare",
+    "name": "Chaos Flare",
+    "description": "Triggers a random group event immediately, if the event system can legally spawn one right now.",
+    "pricePips": 30,
+    "consumable": true,
+    "effect": {
+      "type": "trigger-random-group-event"
+    }
+  },
+  {
+    "id": "clockwork-croupier",
+    "name": "Clockwork Croupier",
+    "description": "Rolls for you every 5 seconds for 5 minutes, then posts a summary when finished.",
+    "pricePips": 100,
+    "consumable": true,
+    "effect": {
+      "type": "auto-roll-session",
+      "durationSeconds": 300,
+      "intervalSeconds": 5
+    }
+  },
+  {
+    "id": "cleanse-salt",
+    "name": "Cleanse Salt",
+    "description": "Removes all active negative effects and clears lockout.",
+    "pricePips": 50,
+    "consumable": true,
+    "effect": {
+      "type": "cleanse-all-negative-effects"
+    }
+  }
+]

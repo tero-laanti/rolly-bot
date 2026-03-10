@@ -50,7 +50,9 @@ export const getRollyDataFilePath = (source: RollyDataSource, fileName: string):
   return path.join(source.dir, fileName);
 };
 
-export const describeRollyDataSource = (source: RollyDataSource = resolveRollyDataSource()): string => {
+export const describeRollyDataSource = (
+  source: RollyDataSource = resolveRollyDataSource(),
+): string => {
   if (source.kind === "env") {
     return `ROLLY_DATA_DIR (${source.dir})`;
   }

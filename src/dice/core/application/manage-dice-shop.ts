@@ -28,10 +28,7 @@ type DiceShopButtonId =
       ownerId: string;
     };
 
-export const createDiceShopReply = (
-  db: SqliteDatabase,
-  userId: string,
-): InteractionResult => {
+export const createDiceShopReply = (db: SqliteDatabase, userId: string): InteractionResult => {
   return {
     kind: "reply",
     payload: {
@@ -108,22 +105,14 @@ export const handleDiceShopAction = (
   };
 };
 
-const buildShopView = (
-  db: SqliteDatabase,
-  userId: string,
-  statusLine?: string,
-): DiceShopView => {
+const buildShopView = (db: SqliteDatabase, userId: string, statusLine?: string): DiceShopView => {
   return {
     content: buildShopContent(db, userId, statusLine),
     components: buildShopComponents(userId),
   };
 };
 
-const buildShopContent = (
-  db: SqliteDatabase,
-  userId: string,
-  statusLine?: string,
-): string => {
+const buildShopContent = (db: SqliteDatabase, userId: string, statusLine?: string): string => {
   const economy = getEconomySnapshot(db, userId);
   const inventoryQuantities = getInventoryQuantities(db, userId);
   const lines: string[] = [];
@@ -135,7 +124,7 @@ const buildShopContent = (
   lines.push(
     `Dice shop for <@${userId}>:`,
     `Pips: ${economy.pips}.`,
-    "Spend pips on permanent inventory items.",
+    "Spend pips on inventory items.",
     "",
   );
 
@@ -163,15 +152,25 @@ const buildShopComponents = (userId: string): ActionRowBuilder<ButtonBuilder>[] 
       .setStyle(ButtonStyle.Success),
   );
 
-  return [
-    new ActionRowBuilder<ButtonBuilder>().addComponents(...purchaseButtons),
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let index = 0; index < purchaseButtons.length; index += 5) {
+    rows.push(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        ...purchaseButtons.slice(index, index + 5),
+      ),
+    );
+  }
+
+  rows.push(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(buildRefreshButtonId(userId))
         .setLabel("Refresh")
         .setStyle(ButtonStyle.Secondary),
     ),
-  ];
+  );
+
+  return rows;
 };
 
 const buildBuyButtonId = (userId: string, itemId: DiceShopItemId): string => {

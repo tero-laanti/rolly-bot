@@ -3,8 +3,11 @@ import { EmbedBuilder } from "discord.js";
 import type { ButtonInteraction, Client, Message } from "discord.js";
 import { getDatabase } from "../../../shared/db";
 import { getDiceBalanceData } from "../../../rolly-data/load";
-import { getActiveDiceLockout, setDicePvpEffects } from "../../core/domain/pvp";
 import { applyDiceTemporaryEffect } from "../../core/domain/temporary-effects";
+import {
+  applyShieldableNegativeLockout,
+  applyShieldableNegativeRollPenalty,
+} from "../../core/domain/hostile-effects";
 import {
   createRandomEventContentState,
   renderRandomEventScenario,
@@ -54,6 +57,7 @@ type RandomEventUserResolution = {
   userId: string;
   renderedOutcomeMessage: string;
   challengeRollSummary: string | null;
+  effectNotes: string[];
 };
 
 export type RandomEventsLiveActiveEventSnapshot = {
@@ -68,7 +72,10 @@ export type RandomEventsLiveActiveEventSnapshot = {
 };
 
 export type RandomEventsLiveRuntime = {
-  onTriggerOpportunity: (context: { now: Date }) => Promise<TriggerOpportunityResult>;
+  onTriggerOpportunity: (context: {
+    now: Date;
+    requiredClaimPolicy?: RandomEventClaimPolicy;
+  }) => Promise<TriggerOpportunityResult>;
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
   getActiveEventsSnapshot: () => RandomEventsLiveActiveEventSnapshot[];
   stop: () => void;
@@ -114,8 +121,9 @@ const applyOutcomeEffectsToUser = (
   userId: string,
   scenario: RandomEventScenario,
   outcome: RandomEventOutcome,
-): void => {
+): string[] => {
   const db = getDatabase();
+  const effectNotes: string[] = [];
 
   for (const effect of outcome.effects) {
     if (effect.type === "currency") {
@@ -138,30 +146,30 @@ const applyOutcomeEffectsToUser = (
     }
 
     if (effect.type === "temporary-roll-penalty") {
-      applyDiceTemporaryEffect(db, {
+      const result = applyShieldableNegativeRollPenalty(db, {
         userId,
-        effectCode: "roll-pass-divisor",
-        kind: "negative",
         source: `random-event:${scenario.id}:${outcome.id}`,
-        magnitude: effect.divisor,
-        remainingRolls: effect.rolls,
-        consumeOnCommand: "dice",
-        stackGroup: "roll-pass-divisor",
+        divisor: effect.divisor,
+        rolls: effect.rolls,
         stackMode: effect.stackMode,
       });
+      if (result.blockedByShield) {
+        effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
+      }
       continue;
     }
 
-    const nowMs = Date.now();
-    const existingLockoutUntil = getActiveDiceLockout(db, userId, nowMs);
-    const requestedLockoutUntil = nowMs + effect.durationMinutes * 60_000;
-    const nextLockoutUntil = Math.max(existingLockoutUntil ?? 0, requestedLockoutUntil);
-
-    setDicePvpEffects(db, {
+    const result = applyShieldableNegativeLockout(db, {
       userId,
-      lockoutUntil: new Date(nextLockoutUntil).toISOString(),
+      durationMs: effect.durationMinutes * 60_000,
+      nowMs: Date.now(),
     });
+    if (result.blockedByShield) {
+      effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
+    }
   }
+
+  return effectNotes;
 };
 
 const formatChallengeRollSummary = (
@@ -357,21 +365,24 @@ export const createRandomEventsLiveRuntime = ({
       const renderedOutcome = renderRandomEventScenario(context.selection.scenario, outcome, {
         textVariableValues: context.selection.textVariableValues,
       });
-      applyOutcomeEffectsToUser(userId, context.selection.scenario, outcome);
+      const effectNotes = applyOutcomeEffectsToUser(userId, context.selection.scenario, outcome);
 
       userResolutions.push({
         userId,
         renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
         challengeRollSummary: formatChallengeRollSummary(challengeProgress),
+        effectNotes,
       });
     }
 
     const lines = userResolutions.map((resolution) => {
+      const noteText =
+        resolution.effectNotes.length > 0 ? ` ${resolution.effectNotes.join(" ")}` : "";
       if (resolution.challengeRollSummary) {
-        return `<@${resolution.userId}>: ${resolution.challengeRollSummary}. ${resolution.renderedOutcomeMessage}`;
+        return `<@${resolution.userId}>: ${resolution.challengeRollSummary}. ${resolution.renderedOutcomeMessage}${noteText}`;
       }
 
-      return `<@${resolution.userId}>: ${resolution.renderedOutcomeMessage}`;
+      return `<@${resolution.userId}>: ${resolution.renderedOutcomeMessage}${noteText}`;
     });
 
     await context.message.edit({
@@ -383,8 +394,8 @@ export const createRandomEventsLiveRuntime = ({
 
   const onTriggerOpportunity = async (context: {
     now: Date;
+    requiredClaimPolicy?: RandomEventClaimPolicy;
   }): Promise<TriggerOpportunityResult> => {
-    void context;
     if (!config.channelId) {
       logger.warn("[random-events] RANDOM_EVENTS_CHANNEL_ID not set. Skipping trigger.");
       return { created: false };
@@ -407,7 +418,13 @@ export const createRandomEventsLiveRuntime = ({
 
     const randomEventBalance = getDiceBalanceData().randomEvents;
     const candidateVarietyState = cloneVarietyState(contentState);
-    const selection = selectRandomEventScenario(randomEventContentPackV1, candidateVarietyState, {
+    const candidateScenarios =
+      context.requiredClaimPolicy === undefined
+        ? randomEventContentPackV1
+        : randomEventContentPackV1.filter(
+            (scenario) => scenario.claimPolicy === context.requiredClaimPolicy,
+          );
+    const selection = selectRandomEventScenario(candidateScenarios, candidateVarietyState, {
       antiRepeatCooldownTriggers: randomEventBalance.variety.antiRepeatCooldownTriggers,
       rarityChances: randomEventBalance.variety.rarityChances,
       rarityWeightMultipliers: randomEventBalance.variety.rarityWeightMultipliers,

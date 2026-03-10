@@ -1,14 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
+import type { RandomEventClaimPolicy } from "./interaction-window";
 import {
   evaluateRandomEventTrigger,
   type RandomEventsFoundationSchedulerController,
   type TriggerOpportunityResult,
 } from "./scheduler";
-import type {
-  RandomEventsLiveActiveEventSnapshot,
-  RandomEventsLiveRuntime,
-} from "./runtime";
+import type { RandomEventsLiveActiveEventSnapshot, RandomEventsLiveRuntime } from "./runtime";
 import {
   getRandomEventsStateSnapshot,
   registerActiveRandomEvent,
@@ -76,7 +74,9 @@ export type TriggerRandomEventNowResult =
       result: TriggerOpportunityResult;
     };
 
-export const triggerRandomEventNow = async (): Promise<TriggerRandomEventNowResult> => {
+const triggerRandomEventNowWithOptions = async (options?: {
+  requiredClaimPolicy?: RandomEventClaimPolicy;
+}): Promise<TriggerRandomEventNowResult> => {
   if (!registeredController) {
     return { ok: false, reason: "unavailable" };
   }
@@ -106,7 +106,10 @@ export const triggerRandomEventNow = async (): Promise<TriggerRandomEventNowResu
 
   manualTriggerInFlight = true;
   try {
-    const result = await registeredController.runtime.onTriggerOpportunity({ now });
+    const result = await registeredController.runtime.onTriggerOpportunity({
+      now,
+      requiredClaimPolicy: options?.requiredClaimPolicy,
+    });
     resolveActiveRandomEvent(registeredController.state, reservationEventId);
 
     if (result?.created && result.eventId) {
@@ -125,4 +128,14 @@ export const triggerRandomEventNow = async (): Promise<TriggerRandomEventNowResu
   } finally {
     manualTriggerInFlight = false;
   }
+};
+
+export const triggerRandomEventNow = async (): Promise<TriggerRandomEventNowResult> => {
+  return triggerRandomEventNowWithOptions();
+};
+
+export const triggerRandomGroupEventNow = async (): Promise<TriggerRandomEventNowResult> => {
+  return triggerRandomEventNowWithOptions({
+    requiredClaimPolicy: "multi-user",
+  });
 };

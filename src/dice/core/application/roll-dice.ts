@@ -17,12 +17,8 @@ import { getDiceBans, rollDieWithBans } from "../domain/bans";
 import { getDiceChargeMultiplier, getLastDiceRollAt, setLastDiceRollAt } from "../domain/charge";
 import { recordDiceRollAnalytics, resetDiceLevelAnalyticsProgress } from "../domain/analytics";
 import { getActiveDiceLockout, getActiveDoubleRoll } from "../domain/pvp";
-import {
-  getDiceLevel,
-  getDicePrestige,
-  getDiceSides,
-  setDiceLevel,
-} from "../domain/prestige";
+import { consumeOneDoubleRollUse, getItemDoubleRollStatus } from "../domain/item-effects";
+import { getDiceLevel, getDicePrestige, getDiceSides, setDiceLevel } from "../domain/prestige";
 import {
   consumeDiceTemporaryEffectsForRoll,
   getRollPassMultiplierFromTemporaryEffects,
@@ -74,11 +70,15 @@ export const runRollDiceUseCase = ({
   const level = getDiceLevel(db, userId);
   const highestPrestige = getDicePrestige(db, userId);
   const baseDiceCount = Math.max(1, level);
-  const doubleRollUntil = getActiveDoubleRoll(db, userId, nowMs);
+  const pvpDoubleRollUntil = getActiveDoubleRoll(db, userId, nowMs);
+  const itemDoubleRollStatus = getItemDoubleRollStatus(db, userId, nowMs);
   const lastDiceRollAt = getLastDiceRollAt(db);
   const chargeMultiplier = getDiceChargeMultiplier(lastDiceRollAt, nowMs);
   const baseRollPassCount = getBaseRollPassCount(highestPrestige);
-  const doubleBuffRollPassCount = doubleRollUntil
+  const hasActiveDoubleRoll = Boolean(
+    (pvpDoubleRollUntil && pvpDoubleRollUntil > nowMs) || itemDoubleRollStatus.isActive,
+  );
+  const doubleBuffRollPassCount = hasActiveDoubleRoll
     ? getDoubleBuffRollPassCount(highestPrestige)
     : baseRollPassCount;
   const temporaryEffectsRollSummary = getRollPassMultiplierFromTemporaryEffects(db, userId, nowMs);
@@ -110,8 +110,9 @@ export const runRollDiceUseCase = ({
     getDiceAchievementsForRoll(rolls, nowMs),
   );
   const previouslyEarnedAchievementIds = new Set(getUserDiceAchievements(db, userId));
-  const allSameCount = rollPasses.filter((rolls) => rolls.every((roll) => roll === rolls[0]))
-    .length;
+  const allSameCount = rollPasses.filter((rolls) =>
+    rolls.every((roll) => roll === rolls[0]),
+  ).length;
   const hasLevelUp = allSameCount > 0;
   const levelIncrease = hasLevelUp ? 1 : 0;
   const nearLevelupRollCount = rollPasses.filter((rolls) => isOneOffLevelupRoll(rolls)).length;
@@ -147,6 +148,9 @@ export const runRollDiceUseCase = ({
         nowMs,
       });
     }
+    if (itemDoubleRollStatus.remainingUses > 0) {
+      consumeOneDoubleRollUse(db, userId, nowMs);
+    }
     setLastDiceRollAt(db, nowMs);
 
     return { newlyEarned, totalReward, levelAfter, fameAfter };
@@ -160,10 +164,23 @@ export const runRollDiceUseCase = ({
     dieSides,
   );
   const unlockedFooter = unlockedBansAfter > unlockedBansBefore ? "New ban slot unlocked." : "";
-  const doubleRollFooter =
-    doubleRollUntil && doubleRollUntil > nowMs
-      ? `Double buff remaining: ${formatRemainingTime(doubleRollUntil - nowMs)}.`
-      : "";
+  const remainingItemDoubleRollUses =
+    itemDoubleRollStatus.remainingUses > 0 ? itemDoubleRollStatus.remainingUses - 1 : 0;
+  const doubleRollFooterParts: string[] = [];
+  if (pvpDoubleRollUntil && pvpDoubleRollUntil > nowMs) {
+    doubleRollFooterParts.push(
+      `PvP double buff remaining: ${formatRemainingTime(pvpDoubleRollUntil - nowMs)}.`,
+    );
+  }
+  if (itemDoubleRollStatus.expiresAtMs && itemDoubleRollStatus.expiresAtMs > nowMs) {
+    doubleRollFooterParts.push(
+      `Item double buff remaining: ${formatRemainingTime(itemDoubleRollStatus.expiresAtMs - nowMs)}.`,
+    );
+  }
+  if (remainingItemDoubleRollUses > 0) {
+    doubleRollFooterParts.push(`Item double rolls remaining: ${remainingItemDoubleRollUses}.`);
+  }
+  const doubleRollFooter = doubleRollFooterParts.join(" ");
   const prestigeFooter =
     result.levelAfter >= getDicePrestigeBaseLevel() && level < getDicePrestigeBaseLevel()
       ? "Prestige is now available. Use /dice-prestige to advance."

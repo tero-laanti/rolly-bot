@@ -3,6 +3,8 @@ import type {
   DiceAchievementManualAward,
   DiceAchievementRule,
   DiceBalanceData,
+  DiceItemData,
+  DiceItemEffect,
   DiceBalanceVarietyConfig,
 } from "./types";
 import type {
@@ -77,13 +79,25 @@ const readFiniteNumber = (value: unknown, label: string): number => {
   return value;
 };
 
-const readInteger = (value: unknown, label: string, minValue: number = Number.MIN_SAFE_INTEGER): number => {
+const readInteger = (
+  value: unknown,
+  label: string,
+  minValue: number = Number.MIN_SAFE_INTEGER,
+): number => {
   const parsed = readFiniteNumber(value, label);
   if (!Number.isInteger(parsed) || parsed < minValue) {
     throw new Error(`${label} must be an integer >= ${minValue}.`);
   }
 
   return parsed;
+};
+
+const readBoolean = (value: unknown, label: string): boolean => {
+  if (typeof value !== "boolean") {
+    throw new Error(`${label} must be a boolean.`);
+  }
+
+  return value;
 };
 
 const readOptionalFiniteNumber = (value: unknown, label: string): number | undefined => {
@@ -128,10 +142,7 @@ const readRarityTier = (value: unknown, label: string): RandomEventRarityTier =>
   return parsed as RandomEventRarityTier;
 };
 
-const readTextVariables = (
-  value: unknown,
-  label: string,
-): Record<string, string[]> | undefined => {
+const readTextVariables = (value: unknown, label: string): Record<string, string[]> | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -235,7 +246,9 @@ const readRollChallengeDefinition = (
   return {
     id: readNonEmptyString(record.id, `${label}.id`),
     mode,
-    steps: record.steps.map((entry, index) => readRollChallengeStep(entry, `${label}.steps[${index}]`)),
+    steps: record.steps.map((entry, index) =>
+      readRollChallengeStep(entry, `${label}.steps[${index}]`),
+    ),
     failOnFirstMiss:
       record.failOnFirstMiss === undefined
         ? undefined
@@ -314,7 +327,9 @@ const readRandomEventOutcome = (value: unknown, label: string): RandomEventOutco
     id: readNonEmptyString(record.id, `${label}.id`),
     weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
     message: readNonEmptyString(record.message, `${label}.message`),
-    effects: record.effects.map((entry, index) => readRandomEventEffect(entry, `${label}.effects[${index}]`)),
+    effects: record.effects.map((entry, index) =>
+      readRandomEventEffect(entry, `${label}.effects[${index}]`),
+    ),
     textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
   };
 };
@@ -355,7 +370,9 @@ const readRandomEventScenario = (value: unknown, label: string): RandomEventScen
               `${label}.challengeOutcomeIds.failure`,
             ),
           },
-    outcomes: record.outcomes.map((entry, index) => readRandomEventOutcome(entry, `${label}.outcomes[${index}]`)),
+    outcomes: record.outcomes.map((entry, index) =>
+      readRandomEventOutcome(entry, `${label}.outcomes[${index}]`),
+    ),
     activityTemplates: readClaimActivityTemplates(
       record.activityTemplates,
       `${label}.activityTemplates`,
@@ -442,7 +459,9 @@ const readAchievementRule = (value: unknown, label: string): DiceAchievementRule
 
   return {
     type: "all-of",
-    rules: record.rules.map((entry, index) => readAchievementRule(entry, `${label}.rules[${index}]`)),
+    rules: record.rules.map((entry, index) =>
+      readAchievementRule(entry, `${label}.rules[${index}]`),
+    ),
   };
 };
 
@@ -481,7 +500,9 @@ const validateParsedRollChallengeDefinition = (
   }
 
   if (challenge.mode === "single-step" && challenge.steps.length !== 1) {
-    throw new Error(`Roll challenge ${challenge.id} single-step mode must define exactly one step.`);
+    throw new Error(
+      `Roll challenge ${challenge.id} single-step mode must define exactly one step.`,
+    );
   }
 };
 
@@ -516,7 +537,9 @@ const validateParsedRandomEventScenario = (scenario: RandomEventScenario): void 
       ["success" | "failure", string[]]
     >) {
       if (outcomeIds.length < 1) {
-        throw new Error(`Scenario ${scenario.id} challengeOutcomeIds.${key} must have at least one id.`);
+        throw new Error(
+          `Scenario ${scenario.id} challengeOutcomeIds.${key} must have at least one id.`,
+        );
       }
 
       for (const outcomeId of outcomeIds) {
@@ -582,6 +605,50 @@ const readVarietyConfig = (value: unknown, label: string): DiceBalanceVarietyCon
   };
 };
 
+const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
+  const record = assertRecord(value, label);
+  const type = readNonEmptyString(record.type, `${label}.type`);
+
+  if (type === "negative-effect-shield") {
+    return {
+      type,
+      charges: readInteger(record.charges, `${label}.charges`, 1),
+    };
+  }
+
+  if (type === "double-roll-uses") {
+    return {
+      type,
+      uses: readInteger(record.uses, `${label}.uses`, 1),
+    };
+  }
+
+  if (type === "double-roll-duration") {
+    return {
+      type,
+      minutes: readInteger(record.minutes, `${label}.minutes`, 1),
+    };
+  }
+
+  if (type === "trigger-random-group-event") {
+    return { type };
+  }
+
+  if (type === "auto-roll-session") {
+    return {
+      type,
+      durationSeconds: readInteger(record.durationSeconds, `${label}.durationSeconds`, 1),
+      intervalSeconds: readInteger(record.intervalSeconds, `${label}.intervalSeconds`, 1),
+    };
+  }
+
+  if (type === "cleanse-all-negative-effects") {
+    return { type };
+  }
+
+  throw new Error(`${label}.type is invalid.`);
+};
+
 export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => {
   if (!Array.isArray(value)) {
     throw new Error("Achievements data must be an array.");
@@ -638,7 +705,11 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
     levelUpReward: readInteger(record.levelUpReward, "diceBalance.levelUpReward", 0),
     maxRollPassCount: readInteger(record.maxRollPassCount, "diceBalance.maxRollPassCount", 1),
     charge: {
-      startAfterMinutes: readInteger(charge.startAfterMinutes, "diceBalance.charge.startAfterMinutes", 0),
+      startAfterMinutes: readInteger(
+        charge.startAfterMinutes,
+        "diceBalance.charge.startAfterMinutes",
+        0,
+      ),
       maxMultiplier: readInteger(charge.maxMultiplier, "diceBalance.charge.maxMultiplier", 1),
     },
     pvp: {
@@ -684,7 +755,44 @@ export const parseRandomEventScenarios = (value: unknown): RandomEventScenario[]
     throw new Error("Random event content must be an array.");
   }
 
-  const parsed = value.map((entry, index) => readRandomEventScenario(entry, `randomEventsV1[${index}]`));
+  const parsed = value.map((entry, index) =>
+    readRandomEventScenario(entry, `randomEventsV1[${index}]`),
+  );
   validateParsedRandomEventScenarios(parsed);
+  return parsed;
+};
+
+export const parseDiceItems = (value: unknown): DiceItemData[] => {
+  if (!Array.isArray(value)) {
+    throw new Error("Dice items data must be an array.");
+  }
+
+  const parsed = value.map((entry, index) => {
+    const record = assertRecord(entry, `itemsV1[${index}]`);
+    return {
+      id: readNonEmptyString(record.id, `itemsV1[${index}].id`),
+      name: readNonEmptyString(record.name, `itemsV1[${index}].name`),
+      description: readNonEmptyString(record.description, `itemsV1[${index}].description`),
+      pricePips: readInteger(record.pricePips, `itemsV1[${index}].pricePips`, 0),
+      consumable: readBoolean(record.consumable, `itemsV1[${index}].consumable`),
+      effect: readDiceItemEffect(record.effect, `itemsV1[${index}].effect`),
+    };
+  });
+
+  const ids = new Set<string>();
+  for (const item of parsed) {
+    if (ids.has(item.id)) {
+      throw new Error(`Duplicate item id: ${item.id}`);
+    }
+
+    if (item.effect.type === "auto-roll-session") {
+      if (item.effect.durationSeconds < item.effect.intervalSeconds) {
+        throw new Error(`Auto-roll item ${item.id} must have durationSeconds >= intervalSeconds.`);
+      }
+    }
+
+    ids.add(item.id);
+  }
+
   return parsed;
 };

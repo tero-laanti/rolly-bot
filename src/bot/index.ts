@@ -4,10 +4,7 @@ import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import type { ButtonInteraction } from "discord.js";
 import type { Command } from "../types/command";
 import { diceBansButtonPrefix, handleDiceBansButton } from "../commands/dice/dice-bans";
-import {
-  dicePrestigeButtonPrefix,
-  handleDicePrestigeButton,
-} from "../commands/dice/dice-prestige";
+import { dicePrestigeButtonPrefix, handleDicePrestigeButton } from "../commands/dice/dice-prestige";
 import {
   diceInventoryButtonPrefix,
   handleDiceInventoryButton,

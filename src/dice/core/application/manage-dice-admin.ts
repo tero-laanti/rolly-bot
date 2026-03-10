@@ -1,13 +1,12 @@
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-} from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
 import type { InteractionResult } from "../../../bot/interaction-response";
 import { getActiveDiceTemporaryEffects } from "../domain/temporary-effects";
 import { getActiveDoubleRoll, getActiveDiceLockout, setDicePvpEffects } from "../domain/pvp";
-import { getRandomEventsAdminStatus, triggerRandomEventNow } from "../../features/random-events/admin";
+import {
+  getRandomEventsAdminStatus,
+  triggerRandomEventNow,
+} from "../../features/random-events/admin";
 
 const ownerEnvName = "DISCORD_OWNER_ID";
 export const diceAdminButtonPrefix = "dice-admin:";
@@ -209,9 +208,11 @@ const buildBackComponents = (
 
 const buildMenuView = (ownerId: string, targetUserId: string): DiceAdminView => {
   return {
-    content: ["**Dice admin**", `- Target user: <@${targetUserId}>`, "- Choose a section below."].join(
-      "\n",
-    ),
+    content: [
+      "**Dice admin**",
+      `- Target user: <@${targetUserId}>`,
+      "- Choose a section below.",
+    ].join("\n"),
     components: buildMenuComponents(ownerId, targetUserId),
   };
 };

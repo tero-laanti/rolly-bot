@@ -6,7 +6,13 @@ import {
   diceInventoryButtonPrefix,
   handleDiceInventoryAction,
 } from "../../dice/core/application/manage-dice-inventory";
+import {
+  releaseAutoRollSessionReservation,
+  reserveAutoRollSession,
+  startReservedAutoRollSession,
+} from "../../dice/features/auto-roller/runtime";
 import { getDatabase } from "../../shared/db";
+import { grantInventoryItem } from "../../dice/core/domain/shop";
 
 export { diceInventoryButtonPrefix };
 
@@ -22,8 +28,34 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
 };
 
 export const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {
-  await applyButtonResult(
-    interaction,
-    handleDiceInventoryAction(getDatabase(), interaction.user.id, interaction.customId),
-  );
+  const db = getDatabase();
+  const outcome = await handleDiceInventoryAction(db, interaction.user.id, interaction.customId, {
+    reserveAutoRollSession,
+  });
+
+  await applyButtonResult(interaction, outcome.interactionResult);
+
+  if (!outcome.autoRollStart) {
+    return;
+  }
+
+  const started = await startReservedAutoRollSession(outcome.autoRollStart.reservation, {
+    db,
+    message: interaction.message,
+    userMention: interaction.user.toString(),
+  });
+  if (started) {
+    return;
+  }
+
+  releaseAutoRollSessionReservation(outcome.autoRollStart.reservation);
+  grantInventoryItem(db, {
+    userId: interaction.user.id,
+    itemId: outcome.autoRollStart.itemId,
+    quantity: 1,
+  });
+  await interaction.followUp({
+    content: "Clockwork Croupier failed to start. The item was refunded.",
+    ephemeral: true,
+  });
 };

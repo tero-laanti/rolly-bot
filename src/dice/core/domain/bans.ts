@@ -1,9 +1,6 @@
 import type { SqliteDatabase } from "../../../shared/db";
 import { getFame } from "../../../shared/economy";
-import {
-  getMaxBansPerDie,
-  getUnlockedBanSlotsFromFame,
-} from "./game-rules";
+import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "./game-rules";
 import { getDiceLevel, getDiceSides } from "./prestige";
 
 type DiceBanUpdate = {

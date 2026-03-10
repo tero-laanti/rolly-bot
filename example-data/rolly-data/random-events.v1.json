@@ -29,10 +29,7 @@
       }
     ],
     "activityTemplates": {
-      "accepted": [
-        "<@{userId}> opens the lantern crate.",
-        "<@{userId}> checks the cache."
-      ],
+      "accepted": ["<@{userId}> opens the lantern crate.", "<@{userId}> checks the cache."],
       "alreadyReady": [
         "<@{userId}> is already checking the cache.",
         "<@{userId}> is already at the lantern crate."
@@ -127,10 +124,7 @@
       }
     ],
     "activityTemplates": {
-      "accepted": [
-        "<@{userId}> joins the chant.",
-        "<@{userId}> answers the crowd."
-      ],
+      "accepted": ["<@{userId}> joins the chant.", "<@{userId}> answers the crowd."],
       "alreadyReady": [
         "<@{userId}> is already in the chant.",
         "<@{userId}> is already with the crowd."

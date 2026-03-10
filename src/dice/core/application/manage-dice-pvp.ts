@@ -34,6 +34,7 @@ import {
   type DicePvpChallenge,
 } from "../domain/pvp";
 import { updateDicePvpStats } from "../domain/analytics";
+import { applyShieldableNegativeLockout } from "../domain/hostile-effects";
 
 export const dicePvpButtonPrefix = "dice-pvp:";
 
@@ -433,17 +434,16 @@ const handleChallengeAccept = (
     const punishmentMs = getDuelPunishmentMs(challenge.duelTier);
     const rewardMs = getDuelRewardMs(challenge.duelTier);
     const winnerEffects = getDicePvpEffects(db, winnerId);
-    const loserEffects = getDicePvpEffects(db, loserId);
     const winnerDoubleRollUntilMs = extendEffect(winnerEffects.doubleRollUntil, rewardMs, nowMs);
-    const loserLockoutUntilMs = extendEffect(loserEffects.lockoutUntil, punishmentMs, nowMs);
+    const loserLockoutResult = applyShieldableNegativeLockout(db, {
+      userId: loserId,
+      durationMs: punishmentMs,
+      nowMs,
+    });
 
     setDicePvpEffects(db, {
       userId: winnerId,
       doubleRollUntil: new Date(winnerDoubleRollUntilMs).toISOString(),
-    });
-    setDicePvpEffects(db, {
-      userId: loserId,
-      lockoutUntil: new Date(loserLockoutUntilMs).toISOString(),
     });
     updateDicePvpStats(db, { userId: winnerId, wins: 1 });
     updateDicePvpStats(db, { userId: loserId, losses: 1 });
@@ -454,7 +454,8 @@ const handleChallengeAccept = (
       winnerId,
       loserId,
       winnerDoubleRollUntilMs,
-      loserLockoutUntilMs,
+      loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
+      loserBlockedByShield: loserLockoutResult.blockedByShield,
     };
   })();
 
@@ -489,6 +490,7 @@ const handleChallengeAccept = (
         outcome.loserId,
         outcome.winnerDoubleRollUntilMs,
         outcome.loserLockoutUntilMs,
+        outcome.loserBlockedByShield,
       ),
       components: [],
     },
