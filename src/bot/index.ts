@@ -8,6 +8,7 @@ import {
   dicePrestigeButtonPrefix,
   handleDicePrestigeButton,
 } from "../commands/dice/dice-prestige";
+import { diceShopButtonPrefix, handleDiceShopButton } from "../commands/dice/dice-shop";
 import { diceAdminButtonPrefix, handleDiceAdminButton } from "../commands/dice/dice-admin";
 import { dicePvpButtonPrefix, handleDicePvpButton } from "../commands/dice/dice-pvp";
 import { dispatchButtonInteraction, registerButtonHandler } from "./button-router";
@@ -51,6 +52,7 @@ const handleRandomEventButton = async (interaction: ButtonInteraction): Promise<
 
 registerButtonHandler(diceBansButtonPrefix, handleDiceBansButton);
 registerButtonHandler(dicePrestigeButtonPrefix, handleDicePrestigeButton);
+registerButtonHandler(diceShopButtonPrefix, handleDiceShopButton);
 registerButtonHandler(diceAdminButtonPrefix, handleDiceAdminButton);
 registerButtonHandler(dicePvpButtonPrefix, handleDicePvpButton);
 registerButtonHandler(randomEventButtonPrefix, handleRandomEventButton);

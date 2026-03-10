@@ -9,6 +9,15 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS inventory_items (
+      user_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+      first_acquired_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, item_id)
+    );
+
     CREATE TABLE IF NOT EXISTS dice_levels_by_prestige (
       user_id TEXT NOT NULL,
       prestige INTEGER NOT NULL,
