@@ -31,7 +31,6 @@ module.exports = [
   },
   {
     files: ["src/**/*.ts"],
-    ignores: ["src/shared/economy.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -39,7 +38,13 @@ module.exports = [
           patterns: [
             {
               group: ["**/shared/economy"],
-              message: "Import economy helpers from src/dice/economy/domain/balance.ts instead.",
+              message:
+                "The legacy shared/economy compatibility path was removed. Import from the owning context instead.",
+            },
+            {
+              group: ["**/dice/core/**", "**/dice/features/**"],
+              message:
+                "Legacy compatibility paths were removed. Import from the owning context path instead.",
             },
           ],
         },
