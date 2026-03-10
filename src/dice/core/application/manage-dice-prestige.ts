@@ -31,10 +31,7 @@ type PrestigeState = {
   canPrestigeUp: boolean;
 };
 
-export const createDicePrestigeReply = (
-  db: SqliteDatabase,
-  userId: string,
-): InteractionResult => {
+export const createDicePrestigeReply = (db: SqliteDatabase, userId: string): InteractionResult => {
   const state = getPrestigeState(db, userId);
   return {
     kind: "reply",

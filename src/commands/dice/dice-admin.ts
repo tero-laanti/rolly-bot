@@ -1,8 +1,4 @@
-import {
-  InteractionContextType,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
-} from "discord.js";
+import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import { getDatabase } from "../../shared/db";
 import {

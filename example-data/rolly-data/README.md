@@ -10,6 +10,7 @@ This directory contains example-only data for the public `rolly-bot` repository.
 - Files expected in a data directory:
   - `achievements.json`
   - `dice-balance.json`
+  - `items.v1.json`
   - `random-events.v1.json`
 
 These example values are intentionally safe to expose and do not need to match production.
