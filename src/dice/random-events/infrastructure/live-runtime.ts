@@ -1,64 +1,37 @@
-import { randomUUID } from "node:crypto";
-import { EmbedBuilder } from "discord.js";
-import type { ButtonInteraction, Client, Message } from "discord.js";
+import type { ButtonInteraction, Client } from "discord.js";
+import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
-import { getDiceBalanceData } from "../../../rolly-data/load";
-import type { DiceProgressionRepository } from "../../progression/application/ports";
-import {
-  type DiceHostileEffectsService,
-} from "../../progression/application/hostile-effects-service";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
-import {
-  createRandomEventContentState,
-  renderRandomEventScenario,
-  selectRandomEventOutcomeForScenario,
-  selectRandomEventScenario,
-  type RandomEventOutcome,
-  type RandomEventScenario,
-  type RandomEventSelectionResult,
-} from "../domain/content";
-import { randomEventContentPackV1 } from "./content-pack";
+import { createRandomEventContentState } from "../domain/content";
+import type { RandomEventClaimPolicy } from "../domain/claim-policy";
+import type { RandomEventRarityTier } from "../domain/variety";
 import {
   buildRandomEventClaimButtonId,
   buildRandomEventClaimPrompt,
   createRandomEventInteractionWindowManager,
   parseRandomEventClaimButtonId,
 } from "../interfaces/discord/interaction-window";
-import type { RandomEventClaimPolicy } from "../domain/claim-policy";
-import {
-  resolveRollChallengeImmediately,
-  type RandomEventRollChallengeProgress,
-} from "../domain/roll-challenges";
-import type { RandomEventsFoundationConfig } from "../../../shared/config";
-import { resolveActiveRandomEvent, type RandomEventsState } from "./state-store";
 import type { TriggerOpportunityResult } from "./foundation-scheduler";
-import type { RandomEventRarityTier, RandomEventVarietyState } from "../domain/variety";
-
-type RandomEventsLiveRuntimeLogger = {
-  info: (...args: unknown[]) => void;
-  warn: (...args: unknown[]) => void;
-  error: (...args: unknown[]) => void;
-};
+import {
+  buildActiveClaimDescription,
+  buildClaimActivityLine,
+  getRandomEventEmbedTitle,
+  getRandomEventRarityPresentation,
+} from "./live-runtime-presentation";
+import { resolveRandomEvent } from "./live-runtime-resolution";
+import { triggerRandomEventOpportunity } from "./live-runtime-trigger";
+import type {
+  ActiveRandomEventContext,
+  RandomEventsLiveRuntimeLogger,
+} from "./live-runtime-types";
+import type { RandomEventsState } from "./state-store";
 
 type CreateRandomEventsLiveRuntimeInput = {
   client: Client;
   config: RandomEventsFoundationConfig;
   state: RandomEventsState;
   logger?: RandomEventsLiveRuntimeLogger;
-};
-
-type ActiveRandomEventContext = {
-  eventId: string;
-  selection: RandomEventSelectionResult;
-  message: Message;
-};
-
-type RandomEventUserResolution = {
-  userId: string;
-  renderedOutcomeMessage: string;
-  challengeRollSummary: string | null;
-  effectNotes: string[];
 };
 
 export type RandomEventsLiveActiveEventSnapshot = {
@@ -80,200 +53,6 @@ export type RandomEventsLiveRuntime = {
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
   getActiveEventsSnapshot: () => RandomEventsLiveActiveEventSnapshot[];
   stop: () => void;
-};
-
-const randomEventRarityPresentation: Record<
-  RandomEventRarityTier,
-  { label: string; color: number }
-> = {
-  common: { label: "Common Event", color: 0x95a5a6 },
-  uncommon: { label: "Uncommon Event", color: 0x2ecc71 },
-  rare: { label: "Rare Event", color: 0x3498db },
-  epic: { label: "Epic Event", color: 0x9b59b6 },
-  legendary: { label: "Legendary Event", color: 0xf1c40f },
-};
-
-const formatRelativeTimestamp = (timestampMs: number): string => {
-  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
-};
-
-const getRandomEventEmbedTitle = (scenario: RandomEventScenario, renderedTitle: string): string => {
-  return `${randomEventRarityPresentation[scenario.rarity].label} • ${renderedTitle}`;
-};
-
-const cloneVarietyState = (state: RandomEventVarietyState): RandomEventVarietyState => {
-  return {
-    triggerCount: state.triggerCount,
-    nonRareStreak: state.nonRareStreak,
-    lastSeenTriggerByTemplateId: new Map(state.lastSeenTriggerByTemplateId),
-  };
-};
-
-const copyVarietyState = (
-  target: RandomEventVarietyState,
-  source: RandomEventVarietyState,
-): void => {
-  target.triggerCount = source.triggerCount;
-  target.nonRareStreak = source.nonRareStreak;
-  target.lastSeenTriggerByTemplateId = new Map(source.lastSeenTriggerByTemplateId);
-};
-
-const applyOutcomeEffectsToUser = (
-  {
-    progression,
-    hostileEffects,
-  }: {
-    progression: Pick<DiceProgressionRepository, "applyDiceTemporaryEffect">;
-    hostileEffects: Pick<
-      DiceHostileEffectsService,
-      "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
-    >;
-  },
-  userId: string,
-  scenario: RandomEventScenario,
-  outcome: RandomEventOutcome,
-): string[] => {
-  const effectNotes: string[] = [];
-
-  for (const effect of outcome.effects) {
-    if (effect.type === "currency") {
-      continue;
-    }
-
-    if (effect.type === "temporary-roll-multiplier") {
-      progression.applyDiceTemporaryEffect({
-        userId,
-        effectCode: "roll-pass-multiplier",
-        kind: "positive",
-        source: `random-event:${scenario.id}:${outcome.id}`,
-        magnitude: effect.multiplier,
-        remainingRolls: effect.rolls,
-        consumeOnCommand: "dice",
-        stackGroup: "roll-pass-multiplier",
-        stackMode: effect.stackMode,
-      });
-      continue;
-    }
-
-    if (effect.type === "temporary-roll-penalty") {
-      const result = hostileEffects.applyShieldableNegativeRollPenalty({
-        userId,
-        source: `random-event:${scenario.id}:${outcome.id}`,
-        divisor: effect.divisor,
-        rolls: effect.rolls,
-        stackMode: effect.stackMode,
-      });
-      if (result.blockedByShield) {
-        effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
-      }
-      continue;
-    }
-
-    const result = hostileEffects.applyShieldableNegativeLockout({
-      userId,
-      durationMs: effect.durationMinutes * 60_000,
-      nowMs: Date.now(),
-    });
-    if (result.blockedByShield) {
-      effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
-    }
-  }
-
-  return effectNotes;
-};
-
-const formatChallengeRollSummary = (
-  challengeProgress: RandomEventRollChallengeProgress | null,
-): string | null => {
-  if (!challengeProgress || challengeProgress.stepResults.length < 1) {
-    return null;
-  }
-
-  const rollSummary = challengeProgress.stepResults
-    .map((stepResult) => `${stepResult.rolledValue} (d${stepResult.dieSides})`)
-    .join(" → ");
-
-  return `🎲 You rolled: ${rollSummary}`;
-};
-
-const toActionText = (claimLabel: string): string => {
-  const normalized = claimLabel.trim();
-  if (normalized.length < 1) {
-    return "join";
-  }
-
-  return normalized.charAt(0).toLowerCase() + normalized.slice(1);
-};
-
-const pickRandomTemplate = (templates: string[]): string | null => {
-  if (templates.length < 1) {
-    return null;
-  }
-
-  const index = Math.floor(Math.random() * templates.length);
-  return templates[index] ?? templates[0] ?? null;
-};
-
-const buildClaimActivityLine = (
-  scenario: RandomEventScenario,
-  userId: string,
-  claimLabel: string,
-  mode: "did" | "already-ready",
-): string => {
-  const templates = scenario.activityTemplates;
-  const selectedTemplate = templates
-    ? pickRandomTemplate(mode === "already-ready" ? templates.alreadyReady : templates.accepted)
-    : null;
-
-  if (selectedTemplate) {
-    return selectedTemplate.replaceAll("{userId}", userId);
-  }
-
-  const actionText = toActionText(claimLabel);
-  if (mode === "already-ready") {
-    return `<@${userId}> is already ready to ${actionText}.`;
-  }
-
-  return `<@${userId}> did ${actionText}.`;
-};
-
-const buildActiveClaimDescription = (
-  prompt: string,
-  activityLine: string | null,
-  expiresAtMs: number | null,
-): string => {
-  const lines = [prompt];
-
-  if (activityLine) {
-    lines.push("", activityLine);
-  }
-
-  if (typeof expiresAtMs === "number") {
-    lines.push("", `⏳ Ends ${formatRelativeTimestamp(expiresAtMs)}.`);
-  }
-
-  return lines.join("\n");
-};
-
-const buildResolvedEventEmbed = (
-  selection: RandomEventSelectionResult,
-  lines: string[],
-): EmbedBuilder => {
-  const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
-  return new EmbedBuilder()
-    .setTitle(getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle))
-    .setDescription([selection.renderedPrompt, "", "**Outcome:**", ...lines].join("\n"))
-    .setColor(rarityPresentation.color)
-    .setFooter({ text: `${rarityPresentation.label} • Resolved` });
-};
-
-const buildExpiredEventEmbed = (selection: RandomEventSelectionResult): EmbedBuilder => {
-  const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
-  return new EmbedBuilder()
-    .setTitle(getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle))
-    .setDescription([selection.renderedPrompt, "", "No one claimed this event in time."].join("\n"))
-    .setColor(rarityPresentation.color)
-    .setFooter({ text: `${rarityPresentation.label} • Expired` });
 };
 
 export const createRandomEventsLiveRuntime = ({
@@ -310,7 +89,7 @@ export const createRandomEventsLiveRuntime = ({
         )
       : null;
     const windowSnapshot = windowManager.getWindow(eventId);
-    const rarityPresentation = randomEventRarityPresentation[context.selection.scenario.rarity];
+    const rarityPresentation = getRandomEventRarityPresentation(context.selection.scenario.rarity);
 
     const prompt = buildRandomEventClaimPrompt({
       title: getRandomEventEmbedTitle(context.selection.scenario, context.selection.renderedTitle),
@@ -330,183 +109,29 @@ export const createRandomEventsLiveRuntime = ({
     });
   };
 
-  const resolveEvent = async (eventId: string, participants: string[]): Promise<void> => {
-    const context = activeEventsById.get(eventId);
-    if (!context) {
-      resolveActiveRandomEvent(state, eventId);
-      return;
-    }
-
-    activeEventsById.delete(eventId);
-    resolveActiveRandomEvent(state, eventId);
-
-    if (participants.length < 1) {
-      await context.message.edit({
-        content: "",
-        embeds: [buildExpiredEventEmbed(context.selection).toJSON()],
-        components: [],
-      });
-      return;
-    }
-
-    const participantsToResolve =
-      context.selection.scenario.claimPolicy === "first-click"
-        ? [participants[0] as string]
-        : participants;
-
-    const userResolutions: RandomEventUserResolution[] = [];
-    for (const userId of participantsToResolve) {
-      let outcome = context.selection.selectedOutcome;
-      let challengeProgress: RandomEventRollChallengeProgress | null = null;
-
-      if (context.selection.scenario.rollChallenge) {
-        challengeProgress = resolveRollChallengeImmediately(
-          progression,
-          userId,
-          context.selection.scenario.rollChallenge,
-        );
-
-        const challengeResult = challengeProgress.succeeded ? "success" : "failure";
-        const challengeOutcome = selectRandomEventOutcomeForScenario(context.selection.scenario, {
-          challengeResult,
-        });
-        if (challengeOutcome) {
-          outcome = challengeOutcome;
-        }
-      }
-
-      const renderedOutcome = renderRandomEventScenario(context.selection.scenario, outcome, {
-        textVariableValues: context.selection.textVariableValues,
-      });
-      const effectNotes = applyOutcomeEffectsToUser(
-        { progression, hostileEffects },
-        userId,
-        context.selection.scenario,
-        outcome,
-      );
-
-      userResolutions.push({
-        userId,
-        renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
-        challengeRollSummary: formatChallengeRollSummary(challengeProgress),
-        effectNotes,
-      });
-    }
-
-    const lines = userResolutions.map((resolution) => {
-      const noteText =
-        resolution.effectNotes.length > 0 ? ` ${resolution.effectNotes.join(" ")}` : "";
-      if (resolution.challengeRollSummary) {
-        return `<@${resolution.userId}>: ${resolution.challengeRollSummary}. ${resolution.renderedOutcomeMessage}${noteText}`;
-      }
-
-      return `<@${resolution.userId}>: ${resolution.renderedOutcomeMessage}${noteText}`;
-    });
-
-    await context.message.edit({
-      content: "",
-      embeds: [buildResolvedEventEmbed(context.selection, lines).toJSON()],
-      components: [],
-    });
-  };
-
   const onTriggerOpportunity = async (context: {
     now: Date;
     requiredClaimPolicy?: RandomEventClaimPolicy;
   }): Promise<TriggerOpportunityResult> => {
-    if (!config.channelId) {
-      logger.warn("[random-events] RANDOM_EVENTS_CHANNEL_ID not set. Skipping trigger.");
-      return { created: false };
-    }
-
-    const channel = await client.channels.fetch(config.channelId).catch((error) => {
-      logger.error("[random-events] Failed to fetch configured event channel.", error);
-      return null;
-    });
-
-    if (
-      !channel ||
-      !channel.isTextBased() ||
-      !("send" in channel) ||
-      typeof channel.send !== "function"
-    ) {
-      logger.warn("[random-events] Configured event channel is not writable text channel.");
-      return { created: false };
-    }
-
-    const randomEventBalance = getDiceBalanceData().randomEvents;
-    const candidateVarietyState = cloneVarietyState(contentState);
-    const candidateScenarios =
-      context.requiredClaimPolicy === undefined
-        ? randomEventContentPackV1
-        : randomEventContentPackV1.filter(
-            (scenario) => scenario.claimPolicy === context.requiredClaimPolicy,
-          );
-    const selection = selectRandomEventScenario(candidateScenarios, candidateVarietyState, {
-      antiRepeatCooldownTriggers: randomEventBalance.variety.antiRepeatCooldownTriggers,
-      rarityChances: randomEventBalance.variety.rarityChances,
-      rarityWeightMultipliers: randomEventBalance.variety.rarityWeightMultipliers,
-      pity: randomEventBalance.variety.pity,
-    });
-
-    if (!selection) {
-      return { created: false };
-    }
-
-    const eventId = `random-event:${randomUUID()}`;
-    const claimWindowDurationMs =
-      selection.scenario.claimWindowSeconds *
-      1_000 *
-      randomEventBalance.claimWindowDurationMultiplier;
-    const estimatedExpiresAtMs = Date.now() + claimWindowDurationMs;
-    const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
-    const prompt = buildRandomEventClaimPrompt({
-      title: getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle),
-      description: buildActiveClaimDescription(
-        selection.renderedPrompt,
-        null,
-        estimatedExpiresAtMs,
-      ),
-      buttonCustomId: buildRandomEventClaimButtonId(eventId),
-      buttonLabel: selection.renderedClaimLabel,
-      color: rarityPresentation.color,
-      footerText: rarityPresentation.label,
-    });
-
-    const message = await channel.send(prompt).catch((error) => {
-      logger.error("[random-events] Failed to send event message.", error);
-      return null;
-    });
-
-    if (!message) {
-      return { created: false };
-    }
-
-    copyVarietyState(contentState, candidateVarietyState);
-    activeEventsById.set(eventId, {
-      eventId,
-      selection,
-      message,
-    });
-
-    windowManager.openWindow({
-      windowId: eventId,
-      durationMs: claimWindowDurationMs,
-      policy: selection.scenario.claimPolicy,
-      callbacks: {
-        onResolved: async ({ snapshot }) => {
-          await resolveEvent(eventId, snapshot.participants);
-        },
+    return triggerRandomEventOpportunity({
+      client,
+      config,
+      logger,
+      contentState,
+      activeEventsById,
+      windowManager,
+      requiredClaimPolicy: context.requiredClaimPolicy,
+      onResolved: async (eventId, participants) => {
+        await resolveRandomEvent({
+          activeEventsById,
+          state,
+          progression,
+          hostileEffects,
+          eventId,
+          participants,
+        });
       },
     });
-
-    const openedWindow = windowManager.getWindow(eventId);
-
-    return {
-      created: true,
-      eventId,
-      expiresAt: openedWindow ? new Date(openedWindow.expiresAtMs) : new Date(estimatedExpiresAtMs),
-    };
   };
 
   const handleButtonInteraction = async (interaction: ButtonInteraction): Promise<void> => {
