@@ -31,6 +31,11 @@ This file contains repository-specific guidance for future implementers working 
 - `src/dice/<context>/` is the primary architecture. New feature work should land in the owning context.
 - `src/dice/economy/domain/balance.ts` is the source of truth for Fame/Pips balance helpers. Do not add new imports from `src/shared/economy.ts`; that file is compatibility-only.
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
+- For interactive Discord flows, prefer this split:
+  context `interfaces/discord/buttons/` parses and encodes button ids,
+  context `application/` returns pure view models,
+  context `interfaces/discord/presenters/` renders `discord.js` components.
+- `src/dice/progression/application/manage-prestige/use-case.ts` and `src/dice/progression/application/manage-bans/use-case.ts` are the reference examples for this pattern.
 - `src/dice/core/` and `src/dice/features/` are legacy internals that still back some context modules during the migration. Prefer new code in the context-first paths unless you are extending existing legacy logic.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
