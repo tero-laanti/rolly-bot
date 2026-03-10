@@ -2,12 +2,15 @@ import { randomUUID } from "node:crypto";
 import { EmbedBuilder } from "discord.js";
 import type { ButtonInteraction, Client, Message } from "discord.js";
 import { getDatabase } from "../../../shared/db";
+import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import { getDiceBalanceData } from "../../../rolly-data/load";
-import { applyDiceTemporaryEffect } from "../../progression/domain/temporary-effects";
+import type { DiceProgressionRepository } from "../../progression/application/ports";
 import {
-  applyShieldableNegativeLockout,
-  applyShieldableNegativeRollPenalty,
-} from "../../progression/domain/hostile-effects";
+  createDiceHostileEffectsService,
+  type DiceHostileEffectsService,
+} from "../../progression/application/hostile-effects-service";
+import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
+import { createSqlitePvpRepository } from "../../pvp/infrastructure/sqlite/pvp-repository";
 import {
   createRandomEventContentState,
   renderRandomEventScenario,
@@ -118,11 +121,20 @@ const copyVarietyState = (
 };
 
 const applyOutcomeEffectsToUser = (
+  {
+    progression,
+    hostileEffects,
+  }: {
+    progression: Pick<DiceProgressionRepository, "applyDiceTemporaryEffect">;
+    hostileEffects: Pick<
+      DiceHostileEffectsService,
+      "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
+    >;
+  },
   userId: string,
   scenario: RandomEventScenario,
   outcome: RandomEventOutcome,
 ): string[] => {
-  const db = getDatabase();
   const effectNotes: string[] = [];
 
   for (const effect of outcome.effects) {
@@ -131,7 +143,7 @@ const applyOutcomeEffectsToUser = (
     }
 
     if (effect.type === "temporary-roll-multiplier") {
-      applyDiceTemporaryEffect(db, {
+      progression.applyDiceTemporaryEffect({
         userId,
         effectCode: "roll-pass-multiplier",
         kind: "positive",
@@ -146,7 +158,7 @@ const applyOutcomeEffectsToUser = (
     }
 
     if (effect.type === "temporary-roll-penalty") {
-      const result = applyShieldableNegativeRollPenalty(db, {
+      const result = hostileEffects.applyShieldableNegativeRollPenalty({
         userId,
         source: `random-event:${scenario.id}:${outcome.id}`,
         divisor: effect.divisor,
@@ -159,7 +171,7 @@ const applyOutcomeEffectsToUser = (
       continue;
     }
 
-    const result = applyShieldableNegativeLockout(db, {
+    const result = hostileEffects.applyShieldableNegativeLockout({
       userId,
       durationMs: effect.durationMinutes * 60_000,
       nowMs: Date.now(),
@@ -274,6 +286,14 @@ export const createRandomEventsLiveRuntime = ({
 }: CreateRandomEventsLiveRuntimeInput): RandomEventsLiveRuntime => {
   const contentState = createRandomEventContentState();
   const activeEventsById = new Map<string, ActiveRandomEventContext>();
+  const db = getDatabase();
+  const progression = createSqliteProgressionRepository(db);
+  const pvp = createSqlitePvpRepository(db);
+  const hostileEffects = createDiceHostileEffectsService({
+    progression,
+    pvp,
+    unitOfWork: createSqliteUnitOfWork(db),
+  });
 
   const windowManager = createRandomEventInteractionWindowManager({
     logger,
@@ -348,7 +368,7 @@ export const createRandomEventsLiveRuntime = ({
 
       if (context.selection.scenario.rollChallenge) {
         challengeProgress = resolveRollChallengeImmediately(
-          getDatabase(),
+          progression,
           userId,
           context.selection.scenario.rollChallenge,
         );
@@ -365,7 +385,12 @@ export const createRandomEventsLiveRuntime = ({
       const renderedOutcome = renderRandomEventScenario(context.selection.scenario, outcome, {
         textVariableValues: context.selection.textVariableValues,
       });
-      const effectNotes = applyOutcomeEffectsToUser(userId, context.selection.scenario, outcome);
+      const effectNotes = applyOutcomeEffectsToUser(
+        { progression, hostileEffects },
+        userId,
+        context.selection.scenario,
+        outcome,
+      );
 
       userResolutions.push({
         userId,

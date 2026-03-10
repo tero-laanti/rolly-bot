@@ -1,11 +1,11 @@
-import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 import {
   getRandomEventsAdminStatus,
   triggerRandomEventNow,
 } from "../../../random-events/infrastructure/admin-controller";
-import { getActiveDoubleRoll, getActiveDiceLockout, setDicePvpEffects } from "../../../pvp/domain/pvp";
-import { getActiveDiceTemporaryEffects } from "../../../progression/domain/temporary-effects";
+import type { DicePvpRepository } from "../../../pvp/application/ports";
+import type { DiceProgressionRepository } from "../../../progression/application/ports";
+import type { DiceTemporaryEffect } from "../../../progression/domain/temporary-effects";
 
 export type DiceAdminAction =
   | {
@@ -36,6 +36,14 @@ export type DiceAdminAction =
 
 export type DiceAdminResult = ActionResult<DiceAdminAction>;
 
+type ManageAdminDependencies = {
+  progression: Pick<
+    DiceProgressionRepository,
+    "clearAllDiceTemporaryEffects" | "getActiveDiceTemporaryEffects"
+  >;
+  pvp: Pick<DicePvpRepository, "getActiveDoubleRoll" | "getActiveDiceLockout" | "setDicePvpEffects">;
+};
+
 export const createDiceAdminReply = (
   ownerId: string | null,
   actorId: string,
@@ -59,34 +67,42 @@ export const createDiceAdminReply = (
   };
 };
 
-export const handleDiceAdminAction = async (
-  db: SqliteDatabase,
-  ownerId: string | null,
-  actorId: string,
-  action: DiceAdminAction,
-  guildId: string | null,
-): Promise<DiceAdminResult> => {
-  if (!ownerId || actorId !== action.ownerId || actorId !== ownerId) {
-    return replyMessage("You are not authorized to use this panel.", true);
-  }
+export const createDiceAdminUseCase = ({ progression, pvp }: ManageAdminDependencies) => {
+  const handleDiceAdminAction = async (
+    ownerId: string | null,
+    actorId: string,
+    action: DiceAdminAction,
+    guildId: string | null,
+  ): Promise<DiceAdminResult> => {
+    if (!ownerId || actorId !== action.ownerId || actorId !== ownerId) {
+      return replyMessage("You are not authorized to use this panel.", true);
+    }
 
-  if (action.type === "menu") {
-    return updateView(buildMenuView(action.ownerId, action.targetUserId));
-  }
+    if (action.type === "menu") {
+      return updateView(buildMenuView(action.ownerId, action.targetUserId));
+    }
 
-  if (action.type === "status") {
-    return updateView(buildStatusView(action.ownerId, action.targetUserId, guildId));
-  }
+    if (action.type === "status") {
+      return updateView(buildStatusView(action.ownerId, action.targetUserId, guildId));
+    }
 
-  if (action.type === "effects-user") {
-    return updateView(buildEffectsUserView(db, action.ownerId, action.targetUserId));
-  }
+    if (action.type === "effects-user") {
+      return updateView(buildEffectsUserView({ progression, pvp }, action.ownerId, action.targetUserId));
+    }
 
-  if (action.type === "effects-clear") {
-    return updateView(buildEffectsClearView(db, action.ownerId, action.targetUserId));
-  }
+    if (action.type === "effects-clear") {
+      return updateView(
+        buildEffectsClearView({ progression, pvp }, action.ownerId, action.targetUserId),
+      );
+    }
 
-  return editView(await buildEventTriggerView(action.ownerId, action.targetUserId));
+    return editView(await buildEventTriggerView(action.ownerId, action.targetUserId));
+  };
+
+  return {
+    createDiceAdminReply,
+    handleDiceAdminAction,
+  };
 };
 
 const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAdminAction> => {
@@ -164,13 +180,16 @@ const buildStatusView = (
 };
 
 const buildEffectsUserView = (
-  db: SqliteDatabase,
+  {
+    progression,
+    pvp,
+  }: Pick<ManageAdminDependencies, "progression" | "pvp">,
   ownerId: string,
   targetUserId: string,
 ): ActionView<DiceAdminAction> => {
-  const temporaryEffects = getActiveDiceTemporaryEffects(db, { userId: targetUserId });
-  const lockoutUntil = getActiveDiceLockout(db, targetUserId);
-  const doubleRollUntil = getActiveDoubleRoll(db, targetUserId);
+  const temporaryEffects = progression.getActiveDiceTemporaryEffects({ userId: targetUserId });
+  const lockoutUntil = pvp.getActiveDiceLockout(targetUserId);
+  const doubleRollUntil = pvp.getActiveDoubleRoll(targetUserId);
 
   const lines = [
     "**Dice admin · effects user**",
@@ -191,19 +210,19 @@ const buildEffectsUserView = (
 };
 
 const buildEffectsClearView = (
-  db: SqliteDatabase,
+  {
+    progression,
+    pvp,
+  }: Pick<ManageAdminDependencies, "progression" | "pvp">,
   ownerId: string,
   targetUserId: string,
 ): ActionView<DiceAdminAction> => {
-  const temporaryEffects = getActiveDiceTemporaryEffects(db, { userId: targetUserId });
-  const hadLockout = getActiveDiceLockout(db, targetUserId) !== null;
-  const hadDoubleRoll = getActiveDoubleRoll(db, targetUserId) !== null;
+  const temporaryEffects = progression.getActiveDiceTemporaryEffects({ userId: targetUserId });
+  const hadLockout = pvp.getActiveDiceLockout(targetUserId) !== null;
+  const hadDoubleRoll = pvp.getActiveDoubleRoll(targetUserId) !== null;
+  const clearedTemporaryEffects = progression.clearAllDiceTemporaryEffects(targetUserId);
 
-  const clearedTemporaryEffects = db
-    .prepare("DELETE FROM dice_temporary_effects WHERE user_id = ?")
-    .run(targetUserId).changes;
-
-  setDicePvpEffects(db, {
+  pvp.setDicePvpEffects({
     userId: targetUserId,
     lockoutUntil: null,
     doubleRollUntil: null,
@@ -290,7 +309,7 @@ const formatTimestamp = (value: Date | number | null): string => {
 };
 
 const formatTemporaryEffectLine = (
-  effect: ReturnType<typeof getActiveDiceTemporaryEffects>[number],
+  effect: DiceTemporaryEffect,
 ): string => {
   const parts = [effect.kind, effect.effectCode, `x${effect.magnitude}`, `source=${effect.source}`];
 
