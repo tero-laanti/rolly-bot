@@ -1,63 +1,41 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import { getActiveDiceLockout, setDicePvpEffects } from "../../pvp/domain/pvp";
-import { tryConsumeNegativeEffectShield } from "../../inventory/domain/item-effects";
-import { applyDiceTemporaryEffect, type DiceTemporaryEffectStackMode } from "./temporary-effects";
+import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
+import { createSqlitePvpRepository } from "../../pvp/infrastructure/sqlite/pvp-repository";
+import {
+  createDiceHostileEffectsService,
+  type ApplyShieldableNegativeLockoutResult,
+  type ApplyShieldableNegativeRollPenaltyResult,
+} from "../application/hostile-effects-service";
+import { createSqliteProgressionRepository } from "../infrastructure/sqlite/progression-repository";
+import type { DiceTemporaryEffectStackMode } from "./temporary-effects";
 
-export type ApplyShieldableNegativeLockoutResult = {
-  blockedByShield: boolean;
-  lockoutUntilMs: number | null;
+const createHostileEffects = (db: SqliteDatabase) => {
+  return createDiceHostileEffectsService({
+    progression: createSqliteProgressionRepository(db),
+    pvp: createSqlitePvpRepository(db),
+    unitOfWork: createSqliteUnitOfWork(db),
+  });
 };
 
-export type ApplyShieldableNegativeRollPenaltyResult = {
-  blockedByShield: boolean;
+export type {
+  ApplyShieldableNegativeLockoutResult,
+  ApplyShieldableNegativeRollPenaltyResult,
 };
 
 export const applyShieldableNegativeLockout = (
   db: SqliteDatabase,
-  {
-    userId,
-    durationMs,
-    nowMs = Date.now(),
-  }: {
+  input: {
     userId: string;
     durationMs: number;
     nowMs?: number;
   },
 ): ApplyShieldableNegativeLockoutResult => {
-  return db.transaction(() => {
-    if (tryConsumeNegativeEffectShield(db, userId, nowMs)) {
-      return {
-        blockedByShield: true,
-        lockoutUntilMs: null,
-      };
-    }
-
-    const existingLockoutUntil = getActiveDiceLockout(db, userId, nowMs);
-    const requestedLockoutUntil = nowMs + durationMs;
-    const nextLockoutUntil = Math.max(existingLockoutUntil ?? 0, requestedLockoutUntil);
-
-    setDicePvpEffects(db, {
-      userId,
-      lockoutUntil: new Date(nextLockoutUntil).toISOString(),
-    });
-
-    return {
-      blockedByShield: false,
-      lockoutUntilMs: nextLockoutUntil,
-    };
-  })();
+  return createHostileEffects(db).applyShieldableNegativeLockout(input);
 };
 
 export const applyShieldableNegativeRollPenalty = (
   db: SqliteDatabase,
-  {
-    userId,
-    source,
-    divisor,
-    rolls,
-    stackMode,
-    nowMs = Date.now(),
-  }: {
+  input: {
     userId: string;
     source: string;
     divisor: number;
@@ -66,27 +44,5 @@ export const applyShieldableNegativeRollPenalty = (
     nowMs?: number;
   },
 ): ApplyShieldableNegativeRollPenaltyResult => {
-  return db.transaction(() => {
-    if (tryConsumeNegativeEffectShield(db, userId, nowMs)) {
-      return {
-        blockedByShield: true,
-      };
-    }
-
-    applyDiceTemporaryEffect(db, {
-      userId,
-      effectCode: "roll-pass-divisor",
-      kind: "negative",
-      source,
-      magnitude: divisor,
-      remainingRolls: rolls,
-      consumeOnCommand: "dice",
-      stackGroup: "roll-pass-divisor",
-      stackMode,
-    });
-
-    return {
-      blockedByShield: false,
-    };
-  })();
+  return createHostileEffects(db).applyShieldableNegativeRollPenalty(input);
 };

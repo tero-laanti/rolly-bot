@@ -2,10 +2,7 @@ import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
-import {
-  createDiceAdminReply,
-  handleDiceAdminAction,
-} from "../../../application/manage-admin/use-case";
+import { createSqliteDiceAdminUseCase } from "../../../infrastructure/sqlite/services";
 import { diceAdminButtonPrefix, parseDiceAdminAction } from "../buttons/admin-buttons";
 import { renderDiceAdminResult } from "../presenters/admin.presenter";
 
@@ -28,11 +25,11 @@ const handleDiceAdminButton = async (interaction: ButtonInteraction): Promise<vo
     return;
   }
 
+  const adminUseCase = createSqliteDiceAdminUseCase(getDatabase());
   await applyButtonResult(
     interaction,
     renderDiceAdminResult(
-      await handleDiceAdminAction(
-        getDatabase(),
+      await adminUseCase.handleDiceAdminAction(
         getDiceAdminOwnerId(),
         interaction.user.id,
         action,
@@ -55,11 +52,12 @@ export const data = new SlashCommandBuilder()
   );
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
+  const adminUseCase = createSqliteDiceAdminUseCase(getDatabase());
   const targetUserId = interaction.options.getUser("user")?.id ?? interaction.user.id;
   await applyChatInputResult(
     interaction,
     renderDiceAdminResult(
-      createDiceAdminReply(getDiceAdminOwnerId(), interaction.user.id, targetUserId),
+      adminUseCase.createDiceAdminReply(getDiceAdminOwnerId(), interaction.user.id, targetUserId),
     ),
   );
 };

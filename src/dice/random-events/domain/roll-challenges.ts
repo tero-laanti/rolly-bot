@@ -1,6 +1,4 @@
-import type { SqliteDatabase } from "../../../shared/db";
-import { getDiceBans, rollDieWithBans } from "../../progression/domain/bans";
-import { getDiceSides } from "../../progression/domain/prestige";
+import { rollDieWithBans } from "../../progression/domain/bans";
 
 export type RandomEventRollComparator = "gte" | "lte" | "eq";
 
@@ -50,8 +48,13 @@ export type RandomEventRollChallengeProgress = {
   succeeded: boolean | null;
 };
 
+export type RandomEventRollChallengePlayerDice = {
+  getDiceSides: (userId: string) => number;
+  getDiceBans: (userId: string) => Map<number, Set<number>>;
+};
+
 export type AdvanceRollChallengeInput = {
-  db: SqliteDatabase;
+  playerDice: RandomEventRollChallengePlayerDice;
   userId: string;
   challenge: RandomEventRollChallengeDefinition;
   progress: RandomEventRollChallengeProgress;
@@ -88,11 +91,11 @@ const getStaticDieRoll = (sides: number): number => {
 };
 
 const rollFromPlayerDie = (
-  db: SqliteDatabase,
+  playerDice: RandomEventRollChallengePlayerDice,
   userId: string,
   source: Extract<RandomEventRollSource, { type: "player-die" }>,
 ): { dieSides: number; rolledValue: number } => {
-  const dieSides = getDiceSides(db, userId);
+  const dieSides = playerDice.getDiceSides(userId);
   if (!source.useBans) {
     return {
       dieSides,
@@ -101,7 +104,7 @@ const rollFromPlayerDie = (
   }
 
   const dieIndex = source.dieIndex ?? 1;
-  const bansByDie = getDiceBans(db, userId);
+  const bansByDie = playerDice.getDiceBans(userId);
   const bannedValues = bansByDie.get(dieIndex) ?? null;
   return {
     dieSides,
@@ -110,7 +113,7 @@ const rollFromPlayerDie = (
 };
 
 const resolveStepRoll = (
-  db: SqliteDatabase,
+  playerDice: RandomEventRollChallengePlayerDice,
   userId: string,
   step: RandomEventRollChallengeStep,
 ): { dieSides: number; rolledValue: number } => {
@@ -122,7 +125,7 @@ const resolveStepRoll = (
     };
   }
 
-  return rollFromPlayerDie(db, userId, step.source);
+  return rollFromPlayerDie(playerDice, userId, step.source);
 };
 
 const validateChallengeStep = (challengeId: string, step: RandomEventRollChallengeStep): void => {
@@ -219,7 +222,7 @@ const finalizeProgress = (
 };
 
 export const advanceRollChallengeStep = ({
-  db,
+  playerDice,
   userId,
   challenge,
   progress,
@@ -245,7 +248,7 @@ export const advanceRollChallengeStep = ({
     };
   }
 
-  const { dieSides, rolledValue } = resolveStepRoll(db, userId, step);
+  const { dieSides, rolledValue } = resolveStepRoll(playerDice, userId, step);
   const normalizedTarget = Math.max(1, Math.floor(step.target));
   const stepResult: RandomEventRollChallengeStepResult = {
     stepId: step.id,
@@ -269,7 +272,7 @@ export const advanceRollChallengeStep = ({
 };
 
 export const resolveRollChallengeImmediately = (
-  db: SqliteDatabase,
+  playerDice: RandomEventRollChallengePlayerDice,
   userId: string,
   challenge: RandomEventRollChallengeDefinition,
 ): RandomEventRollChallengeProgress => {
@@ -277,7 +280,7 @@ export const resolveRollChallengeImmediately = (
 
   while (!progress.completed) {
     progress = advanceRollChallengeStep({
-      db,
+      playerDice,
       userId,
       challenge,
       progress,

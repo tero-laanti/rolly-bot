@@ -1,7 +1,12 @@
 import type { SqliteDatabase } from "../../../shared/db";
 import { getFame } from "../../economy/domain/balance";
-import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "./game-rules";
-import { getDiceLevel, getDiceSides } from "./prestige";
+import { getDiceSidesForPrestige, getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "./game-rules";
+import {
+  getInitialDiceLevelForPrestige,
+  normalizeActiveDicePrestige,
+  normalizeDiceLevel,
+  normalizeDicePrestige,
+} from "./prestige";
 
 type DiceBanUpdate = {
   userId: string;
@@ -14,6 +19,54 @@ export const getUnlockedBanSlots = (db: SqliteDatabase, userId: string): number 
   const level = getDiceLevel(db, userId);
   const dieSides = getDiceSides(db, userId);
   return getUnlockedBanSlotsFromFame(fame, level, dieSides);
+};
+
+const getDicePrestige = (db: SqliteDatabase, userId: string): number => {
+  const row = db.prepare("SELECT prestige FROM dice_prestige WHERE user_id = ?").get(userId) as
+    | { prestige: number }
+    | undefined;
+
+  return normalizeDicePrestige(row?.prestige ?? 0);
+};
+
+const getActiveDicePrestige = (db: SqliteDatabase, userId: string): number => {
+  const highestPrestige = getDicePrestige(db, userId);
+  const row = db
+    .prepare("SELECT prestige FROM dice_active_prestige WHERE user_id = ?")
+    .get(userId) as { prestige: number } | undefined;
+
+  if (!row) {
+    return highestPrestige;
+  }
+
+  return normalizeActiveDicePrestige(row.prestige, highestPrestige);
+};
+
+const getDiceLevel = (db: SqliteDatabase, userId: string): number => {
+  const activePrestige = getActiveDicePrestige(db, userId);
+  const highestPrestige = getDicePrestige(db, userId);
+  const normalizedPrestige = normalizeDicePrestige(activePrestige);
+  const row = db
+    .prepare("SELECT level FROM dice_levels_by_prestige WHERE user_id = ? AND prestige = ?")
+    .get(userId, normalizedPrestige) as { level: number } | undefined;
+
+  if (!row) {
+    return getInitialDiceLevelForPrestige(normalizedPrestige, highestPrestige);
+  }
+
+  const normalizedLevel = normalizeDiceLevel(row.level);
+  if (
+    normalizedPrestige < highestPrestige &&
+    normalizedLevel < getInitialDiceLevelForPrestige(normalizedPrestige, highestPrestige)
+  ) {
+    return getInitialDiceLevelForPrestige(normalizedPrestige, highestPrestige);
+  }
+
+  return normalizedLevel;
+};
+
+const getDiceSides = (db: SqliteDatabase, userId: string): number => {
+  return getDiceSidesForPrestige(getActiveDicePrestige(db, userId));
 };
 
 export const getDiceBans = (db: SqliteDatabase, userId: string): Map<number, Set<number>> => {
