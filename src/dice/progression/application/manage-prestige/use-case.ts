@@ -1,15 +1,15 @@
 import type { SqliteDatabase } from "../../../../shared/db";
-import { getDiceAchievement, getPrestigeAchievementId } from "../../../core/domain/achievements";
-import { awardAchievements } from "../../../core/domain/achievements-store";
+import { getDiceAchievement, getPrestigeAchievementId } from "../../../progression/domain/achievements";
+import { awardAchievements } from "../../../progression/domain/achievements-store";
 import {
   resetDiceLevelAnalyticsProgress,
   resetDicePrestigeAnalyticsProgress,
-} from "../../../core/domain/analytics";
+} from "../../../analytics/domain/analytics";
 import {
   getDicePrestigeBaseLevel,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
-} from "../../../core/domain/game-rules";
+} from "../../../progression/domain/game-rules";
 import {
   getActiveDicePrestige,
   getDiceLevel,
@@ -17,7 +17,7 @@ import {
   setActiveDicePrestige,
   setDiceLevelForPrestige,
   setDicePrestige,
-} from "../../../core/domain/prestige";
+} from "../../../progression/domain/prestige";
 import type {
   ActionButtonSpec,
   ActionResult,

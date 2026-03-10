@@ -3,11 +3,11 @@ import { EmbedBuilder } from "discord.js";
 import type { ButtonInteraction, Client, Message } from "discord.js";
 import { getDatabase } from "../../../shared/db";
 import { getDiceBalanceData } from "../../../rolly-data/load";
-import { applyDiceTemporaryEffect } from "../../core/domain/temporary-effects";
+import { applyDiceTemporaryEffect } from "../../progression/domain/temporary-effects";
 import {
   applyShieldableNegativeLockout,
   applyShieldableNegativeRollPenalty,
-} from "../../core/domain/hostile-effects";
+} from "../../progression/domain/hostile-effects";
 import {
   createRandomEventContentState,
   renderRandomEventScenario,
@@ -16,26 +16,23 @@ import {
   type RandomEventOutcome,
   type RandomEventScenario,
   type RandomEventSelectionResult,
-} from "../../features/random-events/content";
-import { randomEventContentPackV1 } from "../../features/random-events/content-pack-v1";
+} from "../domain/content";
+import { randomEventContentPackV1 } from "./content-pack";
 import {
   buildRandomEventClaimButtonId,
   buildRandomEventClaimPrompt,
   createRandomEventInteractionWindowManager,
   parseRandomEventClaimButtonId,
-  type RandomEventClaimPolicy,
-} from "../../features/random-events/interaction-window";
+} from "../interfaces/discord/interaction-window";
+import type { RandomEventClaimPolicy } from "../domain/claim-policy";
 import {
   resolveRollChallengeImmediately,
   type RandomEventRollChallengeProgress,
-} from "../../features/random-events/roll-challenges";
+} from "../domain/roll-challenges";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
-import {
-  resolveActiveRandomEvent,
-  type RandomEventsState,
-} from "../../features/random-events/state";
+import { resolveActiveRandomEvent, type RandomEventsState } from "./state-store";
 import type { TriggerOpportunityResult } from "./foundation-scheduler";
-import type { RandomEventRarityTier, RandomEventVarietyState } from "../../features/random-events/variety";
+import type { RandomEventRarityTier, RandomEventVarietyState } from "../domain/variety";
 
 type RandomEventsLiveRuntimeLogger = {
   info: (...args: unknown[]) => void;

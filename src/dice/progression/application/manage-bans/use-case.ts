@@ -7,8 +7,8 @@ import {
   getMaxBansPerDie,
   getUnlockedBanSlotsFromFame,
   setDiceBan,
-} from "../../../core/domain/bans";
-import { getDiceLevel, getDiceSides } from "../../../core/domain/prestige";
+} from "../../../progression/domain/bans";
+import { getDiceLevel, getDiceSides } from "../../../progression/domain/prestige";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 
 const numbersPerRow = 5;

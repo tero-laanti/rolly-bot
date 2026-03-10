@@ -6,7 +6,7 @@ import {
   getInventoryQuantities,
   purchaseDiceShopItem,
   type DiceShopItem,
-} from "../../../core/domain/shop";
+} from "../../../inventory/domain/shop";
 
 export type DiceShopAction =
   | {

@@ -9,7 +9,7 @@ import {
 import {
   getOwnedInventoryEntries,
   type DiceInventoryEntry,
-} from "../../../core/domain/shop";
+} from "../../../inventory/domain/shop";
 
 export type DiceInventoryAction =
   | {

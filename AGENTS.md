@@ -32,6 +32,7 @@ This file contains repository-specific guidance for future implementers working 
 - `src/dice/economy/domain/balance.ts` is the source of truth for Fame/Pips balance helpers. Do not add new imports from `src/shared/economy.ts`; that file is compatibility-only.
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
 - `src/dice/random-events/infrastructure/` is the source of truth for random-event runtime wiring, admin control, and scheduler logic. Treat `src/dice/features/random-events/{runtime,admin,scheduler}.ts` as compatibility-only.
+- `src/dice/progression/domain/`, `src/dice/inventory/domain/`, `src/dice/pvp/domain/`, and `src/dice/analytics/domain/` are the source-of-truth gameplay domains. Treat `src/dice/core/domain/` as compatibility-only.
 - For interactive Discord flows, prefer this split:
   context `interfaces/discord/buttons/` parses and encodes button ids,
   context `application/` returns pure view models,
@@ -40,7 +41,7 @@ This file contains repository-specific guidance for future implementers working 
 - `src/app/discord/render-action-result.ts` is the shared Discord renderer for action-view results.
 - `src/app/discord/render-action-button-rows.ts` is the shared Discord renderer for button-row specs.
 - `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/progression/application/roll-dice/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, `src/dice/inventory/application/manage-inventory/use-case.ts`, `src/dice/inventory/application/use-item/use-case.ts`, `src/dice/pvp/application/manage-challenge/use-case.ts`, and `src/dice/admin/application/manage-admin/use-case.ts` are the reference examples for the current migration patterns.
-- `src/dice/core/` and `src/dice/features/` are legacy internals that still back some context modules during the migration. Prefer new code in the context-first paths unless you are extending existing legacy logic.
+- `src/dice/core/` and `src/dice/features/` now exist only to preserve legacy import paths. Do not add new source-of-truth logic there.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/types/` contains shared types and module augmentation.

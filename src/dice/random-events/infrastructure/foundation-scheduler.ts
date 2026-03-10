@@ -6,7 +6,7 @@ import {
   type RandomEventsState,
   setLastRandomEventTriggeredAt,
   sweepExpiredActiveRandomEvents,
-} from "../../features/random-events/state";
+} from "./state-store";
 
 const millisecondsPerDay = 24 * 60 * 60 * 1_000;
 

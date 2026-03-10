@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import { updateDicePvpStats } from "../../../core/domain/analytics";
+import { updateDicePvpStats } from "../../../analytics/domain/analytics";
 import {
   getDicePvpDieLabel,
   getDuelPunishmentMs,
   getDuelRewardMs,
-} from "../../../core/domain/game-rules";
-import { applyShieldableNegativeLockout } from "../../../core/domain/hostile-effects";
+} from "../../../pvp/domain/game-rules";
+import { applyShieldableNegativeLockout } from "../../../progression/domain/hostile-effects";
 import {
   createDicePvpChallengeIfUsersAvailable,
   dicePvpOpenOpponentId,
@@ -23,7 +23,7 @@ import {
   setDicePvpEffects,
   type DicePvpChallenge,
   type DicePvpChallengeCreateResult,
-} from "../../../core/domain/pvp";
+} from "../../../pvp/domain/pvp";
 
 export type DicePvpAction =
   | {

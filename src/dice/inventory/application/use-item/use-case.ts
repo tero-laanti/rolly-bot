@@ -1,18 +1,18 @@
-import { grantInventoryItem } from "../../../core/domain/shop";
+import { grantInventoryItem } from "../../../inventory/domain/shop";
 import type { TriggerRandomEventNowResult } from "../../../random-events/infrastructure/admin-controller";
 import {
   clearAllNegativeTemporaryEffects,
   grantDoubleRollDuration,
   grantDoubleRollUses,
   grantNegativeEffectShield,
-} from "../../../core/domain/item-effects";
+} from "../../../inventory/domain/item-effects";
 import {
   consumeInventoryItem,
   getDiceShopItem,
   getInventoryQuantity,
   type DiceShopItem,
-} from "../../../core/domain/shop";
-import { getActiveDiceLockout, setDicePvpEffects } from "../../../core/domain/pvp";
+} from "../../../inventory/domain/shop";
+import { getActiveDiceLockout, setDicePvpEffects } from "../../../pvp/domain/pvp";
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";
 

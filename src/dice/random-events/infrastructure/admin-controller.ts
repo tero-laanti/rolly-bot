@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
-import type { RandomEventClaimPolicy } from "../../features/random-events/interaction-window";
+import type { RandomEventClaimPolicy } from "../domain/claim-policy";
 import {
   evaluateRandomEventTrigger,
   type RandomEventsFoundationSchedulerController,
@@ -17,7 +17,7 @@ import {
   setLastRandomEventTriggeredAt,
   sweepExpiredActiveRandomEvents,
   type RandomEventsState,
-} from "../../features/random-events/state";
+} from "./state-store";
 
 type RegisteredRandomEventsAdminController = {
   config: RandomEventsFoundationConfig;
