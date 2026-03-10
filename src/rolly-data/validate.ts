@@ -12,17 +12,17 @@ import type {
   RandomEventEffect,
   RandomEventOutcome,
   RandomEventScenario,
-} from "../dice/features/random-events/content";
+} from "../dice/random-events/domain/content";
 import type {
   RandomEventRollChallengeDefinition,
   RandomEventRollChallengeStep,
   RandomEventRollSource,
-} from "../dice/features/random-events/roll-challenges";
-import type { RandomEventClaimPolicy } from "../dice/features/random-events/interaction-window";
+} from "../dice/random-events/domain/roll-challenges";
+import type { RandomEventClaimPolicy } from "../dice/random-events/domain/claim-policy";
 import type {
   RandomEventRarityTier,
   RandomEventVarietyPityConfig,
-} from "../dice/features/random-events/variety";
+} from "../dice/random-events/domain/variety";
 
 type UnknownRecord = Record<string, unknown>;
 

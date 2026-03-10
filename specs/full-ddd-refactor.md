@@ -8,6 +8,9 @@ Active migration plan. The phase-1 foundation was implemented on March 10, 2026:
 - `src/app/discord/command-registry.ts` is the explicit source of truth for slash commands and button handlers.
 - Discord command adapters now live under context-first `interfaces/discord/commands/` folders.
 - `src/shared-kernel/` now exists for stable shared architectural types.
+- `src/dice/economy/domain/balance.ts` is now the economy source of truth, with `src/shared/economy.ts` kept as a compatibility re-export.
+- `src/dice/random-events/domain/` now exposes random-event contracts for `rolly-data` and other external consumers.
+- `eslint.config.js` now enforces basic architecture guardrails for the new context-first `application/` and `domain/` modules.
 
 The remaining phases in this spec still apply. This spec does not authorize gameplay changes or destructive schema changes by itself.
 

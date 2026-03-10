@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
 import type { InteractionResult } from "../../../bot/interaction-response";
-import { getEconomySnapshot } from "../../../shared/economy";
+import { getEconomySnapshot } from "../../economy/domain/balance";
 import {
   getDiceShopItems,
   getInventoryQuantities,

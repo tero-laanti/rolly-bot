@@ -1,7 +1,7 @@
 import { getDiceItemsData } from "../../../rolly-data/load";
 import type { DiceItemData } from "../../../rolly-data/types";
 import type { SqliteDatabase } from "../../../shared/db";
-import { getPips } from "../../../shared/economy";
+import { getPips } from "../../economy/domain/balance";
 
 export type DiceShopItemId = string;
 export type DiceShopItem = DiceItemData;

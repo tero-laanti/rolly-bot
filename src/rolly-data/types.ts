@@ -1,8 +1,8 @@
-import type { RandomEventScenario } from "../dice/features/random-events/content";
+import type { RandomEventScenario } from "../dice/random-events/domain/content";
 import type {
   RandomEventRarityTier,
   RandomEventVarietyPityConfig,
-} from "../dice/features/random-events/variety";
+} from "../dice/random-events/domain/variety";
 
 export type DiceAchievementId = string;
 

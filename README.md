@@ -137,6 +137,8 @@ Rolly is a pragmatic domain-driven modular monolith.
 
 - `src/app/` contains the composition root and Discord runtime wiring.
 - `src/dice/<context>/` contains context-first modules such as progression, inventory, PvP, analytics, admin, and random-events.
+- `src/dice/economy/domain/balance.ts` is now the source of truth for Fame/Pips balance operations.
+- `src/dice/random-events/domain/` now exposes random-event contract types for external consumers such as `rolly-data`.
 - `interfaces/discord/` contains Discord command adapters, button handlers, and presentation wiring.
 - `application/` contains use cases and orchestration.
 - `infrastructure/` contains adapters such as SQLite-backed or runtime-backed integrations.
@@ -152,14 +154,17 @@ Current migration note:
 
 - `src/app/bootstrap/` contains the startup entrypoints used by [src/index.ts](src/index.ts) and [src/deploy-commands.ts](src/deploy-commands.ts).
 - `src/app/discord/` contains the Discord bot runtime, button router, interaction helpers, and explicit command registry.
+- `eslint.config.js` enforces basic architecture guardrails for the new context-first `application/` and `domain/` folders.
 - `src/dice/progression/interfaces/discord/commands/` contains progression-facing Discord commands such as `/dice`, `/dice-prestige`, `/dice-bans`, and `/dice-achievements`.
+- `src/dice/economy/domain/` contains the current economy source of truth for Fame/Pips access and updates.
 - `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
 - `src/dice/pvp/interfaces/discord/commands/` contains `/dice-pvp`.
 - `src/dice/analytics/interfaces/discord/commands/` contains `/dice-analytics`.
 - `src/dice/admin/interfaces/discord/commands/` contains `/dice-admin`.
+- `src/dice/random-events/domain/` contains random-event contract types; `src/dice/random-events/infrastructure/` contains runtime and scheduler adapters.
 - `src/system/self-update/interfaces/discord/commands/` contains the owner-only `/self-update` command.
 - `src/dice/core/` and `src/dice/features/` remain as legacy internals while the context-first migration continues.
-- `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
+- `src/shared/` contains shared infrastructure such as db, config, env, and remaining compatibility helpers.
 - `src/shared-kernel/` contains small shared architecture primitives and types.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/bot/` remains as compatibility wrappers so existing imports keep working during the migration.

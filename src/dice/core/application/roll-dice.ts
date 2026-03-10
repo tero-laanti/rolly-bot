@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import { applyFameDelta, getFame } from "../../../shared/economy";
+import { applyFameDelta, getFame } from "../../economy/domain/balance";
 import {
   awardAchievements,
   getDiceAchievementsForRoll,
