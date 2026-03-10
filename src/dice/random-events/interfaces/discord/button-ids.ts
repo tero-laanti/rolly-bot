@@ -1,1 +1,1 @@
-export { randomEventButtonPrefix } from "../../../features/random-events/interaction-window";
+export { randomEventButtonPrefix } from "./interaction-window";

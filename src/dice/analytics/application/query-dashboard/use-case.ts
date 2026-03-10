@@ -1,10 +1,10 @@
 import type { SqliteDatabase } from "../../../../shared/db";
-import { getDiceAnalytics } from "../../../core/domain/analytics";
+import { getDiceAnalytics } from "../../../analytics/domain/analytics";
 import {
   getActiveDicePrestige,
   getDiceLevel,
   getDicePrestige,
-} from "../../../core/domain/prestige";
+} from "../../../progression/domain/prestige";
 
 export type DiceAnalyticsView = {
   content: string;

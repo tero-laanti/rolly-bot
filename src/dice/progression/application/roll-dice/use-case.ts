@@ -4,7 +4,7 @@ import {
   awardAchievements,
   getDiceAchievementsForRoll,
   getUserDiceAchievements,
-} from "../../../core/domain/achievements-store";
+} from "../../../progression/domain/achievements-store";
 import {
   getBaseRollPassCount,
   getDiceLevelUpReward,
@@ -12,29 +12,29 @@ import {
   getDicePrestigeBaseLevel,
   getDoubleBuffRollPassCount,
   getUnlockedBanSlotsFromFame,
-} from "../../../core/domain/game-rules";
-import { getDiceBans, rollDieWithBans } from "../../../core/domain/bans";
+} from "../../../progression/domain/game-rules";
+import { getDiceBans, rollDieWithBans } from "../../../progression/domain/bans";
 import {
   getDiceChargeMultiplier,
   getLastDiceRollAt,
   setLastDiceRollAt,
-} from "../../../core/domain/charge";
-import { recordDiceRollAnalytics, resetDiceLevelAnalyticsProgress } from "../../../core/domain/analytics";
-import { getActiveDiceLockout, getActiveDoubleRoll } from "../../../core/domain/pvp";
+} from "../../../progression/domain/charge";
+import { recordDiceRollAnalytics, resetDiceLevelAnalyticsProgress } from "../../../analytics/domain/analytics";
+import { getActiveDiceLockout, getActiveDoubleRoll } from "../../../pvp/domain/pvp";
 import {
   consumeOneDoubleRollUse,
   getItemDoubleRollStatus,
-} from "../../../core/domain/item-effects";
+} from "../../../inventory/domain/item-effects";
 import {
   getDiceLevel,
   getDicePrestige,
   getDiceSides,
   setDiceLevel,
-} from "../../../core/domain/prestige";
+} from "../../../progression/domain/prestige";
 import {
   consumeDiceTemporaryEffectsForRoll,
   getRollPassMultiplierFromTemporaryEffects,
-} from "../../../core/domain/temporary-effects";
+} from "../../../progression/domain/temporary-effects";
 import {
   buildDiceRollReplyContent,
   formatAchievementText,

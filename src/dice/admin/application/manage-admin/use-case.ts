@@ -4,8 +4,8 @@ import {
   getRandomEventsAdminStatus,
   triggerRandomEventNow,
 } from "../../../random-events/infrastructure/admin-controller";
-import { getActiveDoubleRoll, getActiveDiceLockout, setDicePvpEffects } from "../../../core/domain/pvp";
-import { getActiveDiceTemporaryEffects } from "../../../core/domain/temporary-effects";
+import { getActiveDoubleRoll, getActiveDiceLockout, setDicePvpEffects } from "../../../pvp/domain/pvp";
+import { getActiveDiceTemporaryEffects } from "../../../progression/domain/temporary-effects";
 
 export type DiceAdminAction =
   | {

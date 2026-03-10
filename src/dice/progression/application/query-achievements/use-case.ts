@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../../../../shared/db";
-import { diceAchievements } from "../../../core/domain/achievements";
-import { getUserDiceAchievements } from "../../../core/domain/achievements-store";
+import { diceAchievements } from "../../../progression/domain/achievements";
+import { getUserDiceAchievements } from "../../../progression/domain/achievements-store";
 
 export type DiceAchievementsView = {
   content: string;

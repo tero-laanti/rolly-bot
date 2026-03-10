@@ -1,1 +1,1 @@
-export type { RandomEventClaimPolicy } from "../../features/random-events/interaction-window";
+export type RandomEventClaimPolicy = "first-click" | "multi-user";

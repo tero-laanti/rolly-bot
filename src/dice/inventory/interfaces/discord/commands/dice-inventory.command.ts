@@ -8,7 +8,7 @@ import {
   startReservedAutoRollSession,
 } from "../../../infrastructure/auto-roller-runtime";
 import { triggerRandomGroupEventNow } from "../../../../random-events/infrastructure/admin-controller";
-import { grantInventoryItem } from "../../../../core/domain/shop";
+import { grantInventoryItem } from "../../../../inventory/domain/shop";
 import {
   createDiceInventoryReply,
   handleDiceInventoryAction,

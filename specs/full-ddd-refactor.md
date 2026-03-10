@@ -16,6 +16,7 @@ Active migration plan. The phase-1 foundation was implemented on March 10, 2026:
 - PvP and admin now use the same interaction pattern, and shared Discord rendering now lives in `src/app/discord/render-action-result.ts`.
 - `/dice` and usable inventory items now run from context-first application modules instead of `src/dice/core/application/`.
 - Random-event runtime, admin control, and foundation scheduling now live under `src/dice/random-events/infrastructure/`, with the old feature entrypoints kept only as compatibility re-exports.
+- Progression, inventory, PvP, analytics, and random-event source-of-truth modules now live under their owning `src/dice/<context>/` folders, with `src/dice/core/` and `src/dice/features/` reduced to compatibility shims for legacy imports.
 
 The remaining phases in this spec still apply. This spec does not authorize gameplay changes or destructive schema changes by itself.
 
@@ -24,25 +25,25 @@ The remaining phases in this spec still apply. This spec does not authorize game
 Rolly already has a partial layered design and now has a phase-1 context-first shell:
 
 - Discord entrypoints live in `src/dice/*/interfaces/discord/commands/` and `src/app/`.
-- Rules and state helpers live in `src/dice/core/domain/`.
+- Rules and state helpers now live under their owning context domains such as `src/dice/progression/domain/`, `src/dice/inventory/domain/`, `src/dice/pvp/domain/`, `src/dice/analytics/domain/`, and `src/dice/random-events/domain/`.
 - Shared runtime concerns live in `src/shared/` and `src/rolly-data/`.
 
 That is directionally correct, but it is not full DDD yet. The main leaks are:
 
 - "Domain" modules still execute SQL and depend on `SqliteDatabase`.
 - Application modules often build `discord.js` components and return Discord-shaped payloads.
-- Random-event runtime mixes Discord I/O, database access, content selection, and game-state mutation in the same module.
-- Cross-cutting concepts such as Fame, Pips, temporary effects, and analytics are shared through helpers rather than explicit bounded-context contracts.
+- Cross-cutting concepts such as Fame, Pips, temporary effects, and analytics are still coordinated through shared helpers or direct module calls rather than explicit bounded-context contracts.
+- Some runtime-heavy adapters still embed orchestration that should eventually move behind cleaner ports.
 
 Representative examples in the current codebase:
 
-- `src/dice/core/domain/prestige.ts`
-- `src/dice/core/domain/pvp.ts`
-- `src/dice/features/random-events/content.ts`
-- `src/dice/features/random-events/state.ts`
-- `src/shared/economy.ts`
+- `src/dice/progression/domain/prestige.ts`
+- `src/dice/pvp/domain/pvp.ts`
+- `src/dice/random-events/domain/content.ts`
+- `src/dice/random-events/infrastructure/state-store.ts`
+- `src/dice/economy/domain/balance.ts`
 
-The main remaining gap is that many new context-first modules are still thin wrappers over the legacy internals in `src/dice/core/` and `src/dice/features/`.
+The main remaining gap is no longer file layout. It is that many context-first domain modules still combine gameplay rules with persistence concerns, and cross-context coordination still happens through direct helpers instead of explicit ports or events.
 
 ## Goals
 
@@ -278,8 +279,8 @@ src/
 Migration notes:
 
 - Slash command adapters have already moved from `src/commands/` into `interfaces/discord/commands/` inside their contexts.
-- `src/dice/core/presentation/` should become Discord presenters in `interfaces/discord/`.
-- `src/shared/db.ts` should move toward bootstrap plus repository wiring, not general-purpose access from anywhere.
+- `src/dice/core/` and `src/dice/features/` now act as compatibility shims for legacy import paths, not as the source of truth for new work.
+- Database access should continue moving toward bootstrap plus repository wiring, not general-purpose access from anywhere.
 - `src/rolly-data/` should become infrastructure for the contexts that consume private game data.
 
 ## Current Architecture vs Target DDD
@@ -346,11 +347,11 @@ Acceptance criteria:
 - Use cases are callable without Discord types.
 - Command files are thin adapters that call application services and presenters.
 
-### Phase 3: Economy and Shared Kernel Extraction
+### Phase 3: Economy Ports and Shared Kernel Extraction
 
 Deliverables:
 
-- Replace `src/shared/economy.ts` with an economy context or supporting domain.
+- Keep `src/dice/economy/domain/balance.ts` as the economy source of truth and retire remaining compatibility-path imports over time.
 - Define stable money-related ports and semantics for Fame and Pips.
 - Move generic helpers out of `src/shared/` when they actually belong to a domain.
 
