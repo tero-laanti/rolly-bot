@@ -122,6 +122,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 - `/dice` rolls your current dice set, handles level-ups, rewards, charge rolls, temporary effects, and achievements.
 - `/dice-prestige` manages prestige progression and active prestige selection.
 - `/dice-shop` lets players spend Pips on shop items and build an inventory.
+- `/dice-inventory` shows owned items and lets players use them.
 - `/dice-bans` configures banned values on your current dice setup.
 - `/dice-pvp` creates and resolves PvP dice duels.
 - `/dice-achievements` lists unlocked dice achievements.

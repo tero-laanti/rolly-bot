@@ -6,6 +6,7 @@ type DiceShopItemDefinition = {
   name: string;
   description: string;
   pricePips: number;
+  useText: string;
 };
 
 const diceShopItems = [
@@ -14,6 +15,7 @@ const diceShopItems = [
     name: "Debug Token",
     description: "A no-op test item for validating the Pips shop and inventory flow.",
     pricePips: 5,
+    useText: "Debug Token consumed. No gameplay effect applied.",
   },
 ] as const satisfies readonly DiceShopItemDefinition[];
 
@@ -22,6 +24,10 @@ export type DiceShopItem = (typeof diceShopItems)[number];
 
 type InventoryQuantityRow = {
   item_id: string;
+  quantity: number;
+};
+
+type InventoryQuantitySelectRow = {
   quantity: number;
 };
 
@@ -42,6 +48,28 @@ export type DiceShopPurchaseResult =
       item: DiceShopItem;
       currentPips: number;
       requiredPips: number;
+    };
+
+export type DiceInventoryEntry = {
+  item: DiceShopItem;
+  quantity: number;
+};
+
+export type DiceInventoryUseResult =
+  | {
+      ok: true;
+      item: DiceShopItem;
+      remainingQuantity: number;
+      outcomeText: string;
+    }
+  | {
+      ok: false;
+      reason: "unknown-item";
+    }
+  | {
+      ok: false;
+      reason: "not-owned";
+      item: DiceShopItem;
     };
 
 const diceShopItemsById = new Map<DiceShopItemId, DiceShopItem>(
@@ -83,6 +111,18 @@ export const getInventoryQuantity = (
   itemId: DiceShopItemId,
 ): number => {
   return getInventoryQuantities(db, userId).get(itemId) ?? 0;
+};
+
+export const getOwnedInventoryEntries = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceInventoryEntry[] => {
+  return getDiceShopItems()
+    .map((item) => ({
+      item,
+      quantity: getInventoryQuantity(db, userId, item.id),
+    }))
+    .filter((entry) => entry.quantity > 0);
 };
 
 export const purchaseDiceShopItem = (
@@ -146,6 +186,62 @@ export const purchaseDiceShopItem = (
       item,
       quantity: getInventoryQuantity(db, userId, item.id),
       remainingPips: getPips(db, userId),
+    };
+  });
+
+  return run();
+};
+
+export const useDiceInventoryItem = (
+  db: SqliteDatabase,
+  { userId, itemId }: { userId: string; itemId: string },
+): DiceInventoryUseResult => {
+  const item = getDiceShopItem(itemId);
+  if (!item) {
+    return {
+      ok: false,
+      reason: "unknown-item",
+    };
+  }
+
+  const selectQuantity = db.prepare(
+    "SELECT quantity FROM inventory_items WHERE user_id = ? AND item_id = ?",
+  );
+  const updateQuantity = db.prepare(`
+    UPDATE inventory_items
+    SET quantity = @quantity, updated_at = @updatedAt
+    WHERE user_id = @userId AND item_id = @itemId
+  `);
+  const deleteItem = db.prepare("DELETE FROM inventory_items WHERE user_id = ? AND item_id = ?");
+
+  const run = db.transaction((): DiceInventoryUseResult => {
+    const row = selectQuantity.get(userId, item.id) as InventoryQuantitySelectRow | undefined;
+    const currentQuantity = normalizeQuantity(row?.quantity ?? 0);
+    if (currentQuantity < 1) {
+      return {
+        ok: false,
+        reason: "not-owned",
+        item,
+      };
+    }
+
+    const remainingQuantity = currentQuantity - 1;
+    if (remainingQuantity > 0) {
+      updateQuantity.run({
+        userId,
+        itemId: item.id,
+        quantity: remainingQuantity,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      deleteItem.run(userId, item.id);
+    }
+
+    return {
+      ok: true,
+      item,
+      remainingQuantity,
+      outcomeText: item.useText,
     };
   });
 
