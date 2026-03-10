@@ -136,54 +136,54 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 Rolly is a pragmatic domain-driven modular monolith.
 
 - `src/app/` contains the composition root and Discord runtime wiring.
-- `src/dice/<context>/` contains context-first modules such as progression, inventory, PvP, analytics, admin, and random-events.
-- `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract, while `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
-- `src/dice/random-events/domain/` now exposes random-event contract types for external consumers such as `rolly-data`.
-- `interfaces/discord/` contains Discord command adapters, button handlers, and presentation wiring.
-- `application/` contains use cases and orchestration.
-- `infrastructure/` contains adapters such as SQLite-backed or runtime-backed integrations.
-- `src/shared-kernel/` contains small, stable shared types and architectural primitives.
+- `src/dice/<context>/` contains the source-of-truth gameplay code. Main contexts are progression, economy, inventory, PvP, analytics, admin, and random-events.
+- Each context follows the same basic split:
+  `domain/` for rules and value types,
+  `application/` for use cases and ports,
+  `infrastructure/` for SQLite and runtime adapters,
+  `interfaces/discord/` for slash commands, buttons, and presenters.
+- `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract. `src/dice/economy/domain/balance.ts` holds shared economy value types, and `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
+- `src/dice/random-events/domain/` exposes random-event contract types for external consumers such as `rolly-data`, while `src/dice/random-events/infrastructure/` owns runtime wiring, scheduling, and admin control.
+- `src/shared-kernel/` contains small, stable shared architecture primitives such as action-view models.
+- `src/shared/` contains shared infrastructure such as db, env, config, and cross-cutting helpers.
 
-Current architecture note:
+Important rules:
 
-- Progression, inventory, PvP, analytics, economy, and random-event source-of-truth modules now live under their owning `src/dice/<context>/` folders.
-- Legacy compatibility shims under `src/dice/core/` and `src/dice/features/` have been removed.
-- New feature work should start in the context-first folders.
-- Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
-- Interactive button-driven flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
-- Command adapters now call factory-built use cases from `infrastructure/sqlite/services.ts` instead of passing `SqliteDatabase` into application modules directly.
-- Context `application/` modules now depend on explicit repository ports and shared `UnitOfWork` abstractions rather than `shared/db`.
-- The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with shared Discord rendering in [render-action-result.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-result.ts) and [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
-- `/dice` now runs through the progression context, and usable inventory items now run through the inventory context instead of legacy `src/dice/core/application/` entrypoints.
-- Random-event runtime, admin control, foundation scheduling, content contracts, and state helpers now live in `src/dice/random-events/`.
+- New feature work should start in the owning `src/dice/<context>/` folder.
+- Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is not filesystem-based.
+- For SQLite-backed flows, build use cases from `src/dice/*/infrastructure/sqlite/services.ts`. Keep `application/` code on ports and `UnitOfWork`, not `shared/db`.
+- For interactive Discord flows, prefer button id parsing in `interfaces/discord/buttons/`, pure application output models, and Discord rendering in `interfaces/discord/presenters/`.
+- Legacy compatibility shims under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
 
 ## Project Layout
 
-- `src/app/bootstrap/` contains the startup entrypoints used by [src/index.ts](/Users/tero/workspace/rolly/src/index.ts) and [src/deploy-commands.ts](/Users/tero/workspace/rolly/src/deploy-commands.ts).
-- `src/app/discord/` contains the Discord bot runtime, button router, interaction helpers, and explicit command registry.
-- `eslint.config.js` enforces architecture guardrails so new `application/` code does not import Discord runtime modules or `shared/db` directly.
-- `src/dice/progression/interfaces/discord/commands/` contains progression-facing Discord commands such as `/dice`, `/dice-prestige`, `/dice-bans`, and `/dice-achievements`.
-- `src/dice/progression/application/roll-dice/` contains the migrated `/dice` use case and reply-content builder.
-- `src/dice/*/infrastructure/sqlite/services.ts` files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
-- `src/dice/progression/interfaces/discord/buttons/` and `src/dice/progression/interfaces/discord/presenters/` contain the migrated progression Discord adapters.
-- `src/dice/inventory/interfaces/discord/buttons/` and `src/dice/inventory/interfaces/discord/presenters/` contain the migrated shop and inventory Discord adapters.
-- `src/dice/inventory/application/use-item/` contains the migrated item-consumption use case used by `/dice-inventory`.
-- `src/dice/economy/` contains Fame/Pips contracts, shared economy value types, and the SQLite balance repository.
-- `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
-- `src/dice/pvp/interfaces/discord/commands/`, `src/dice/pvp/interfaces/discord/buttons/`, and `src/dice/pvp/interfaces/discord/presenters/` contain the migrated PvP Discord adapters.
-- `src/dice/analytics/interfaces/discord/commands/` contains `/dice-analytics`.
-- `src/dice/admin/interfaces/discord/commands/`, `src/dice/admin/interfaces/discord/buttons/`, and `src/dice/admin/interfaces/discord/presenters/` contain the migrated admin Discord adapters.
-- `src/dice/random-events/domain/` contains random-event contracts; `src/dice/random-events/interfaces/discord/` contains event interaction adapters; `src/dice/random-events/infrastructure/` contains runtime, admin control, scheduler, content-pack, and state adapters.
-- `src/system/self-update/interfaces/discord/commands/` contains the owner-only `/self-update` command.
-- `src/shared/` contains shared infrastructure such as db, config, env, and cross-cutting helpers.
-- `src/shared-kernel/` contains small shared architecture primitives and types.
-- `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
-- `src/bot/` remains as compatibility wrappers so existing imports keep working during the migration.
+- [src/app/bootstrap/](/Users/tero/workspace/rolly/src/app/bootstrap/) contains the startup entrypoints used by [src/index.ts](/Users/tero/workspace/rolly/src/index.ts) and [src/deploy-commands.ts](/Users/tero/workspace/rolly/src/deploy-commands.ts).
+- [src/app/discord/](/Users/tero/workspace/rolly/src/app/discord/) contains the Discord runtime, interaction helpers, button router, and explicit command registry.
+- [src/dice/progression/](/Users/tero/workspace/rolly/src/dice/progression/), [src/dice/inventory/](/Users/tero/workspace/rolly/src/dice/inventory/), [src/dice/pvp/](/Users/tero/workspace/rolly/src/dice/pvp/), [src/dice/analytics/](/Users/tero/workspace/rolly/src/dice/analytics/), [src/dice/admin/](/Users/tero/workspace/rolly/src/dice/admin/), and [src/dice/random-events/](/Users/tero/workspace/rolly/src/dice/random-events/) are the main gameplay contexts.
+- [src/dice/*/infrastructure/sqlite/services.ts](/Users/tero/workspace/rolly/src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
+- [src/system/self-update/interfaces/discord/commands/](/Users/tero/workspace/rolly/src/system/self-update/interfaces/discord/commands/) contains the owner-only `/self-update` command.
+- [src/shared/](/Users/tero/workspace/rolly/src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
+- [src/shared-kernel/](/Users/tero/workspace/rolly/src/shared-kernel/) contains shared architecture primitives and types.
+- [src/rolly-data/](/Users/tero/workspace/rolly/src/rolly-data/) is the boundary for hidden gameplay data loading and validation.
+- [src/bot/](/Users/tero/workspace/rolly/src/bot/) still contains a few compatibility wrappers for top-level runtime imports.
+- [eslint.config.js](/Users/tero/workspace/rolly/eslint.config.js) enforces the current architecture guardrails.
+
+## Adding Features
+
+When adding a new feature, the shortest path is usually:
+
+1. Pick the owning context under `src/dice/<context>/`.
+2. Put rules and domain types in `domain/`, orchestration in `application/`, adapters in `infrastructure/`, and Discord-specific parsing and rendering in `interfaces/discord/`.
+3. For SQLite-backed flows, add or extend a repository/service under `infrastructure/sqlite/` and wire the use case through that context's `services.ts`.
+4. Register new slash commands or button handlers in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts).
+5. If you change env vars, command shapes, or `rolly-data` contracts, update the related docs and deployment flow in the same change.
 
 ## Development
 
 ```bash
 npm run dev
+npm run build
+npm run typecheck
 npm run lint
 npm run format
 npm run format:check
