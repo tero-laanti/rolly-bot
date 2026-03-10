@@ -151,6 +151,8 @@ Current architecture note:
 - New feature work should start in the context-first folders.
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is no longer filesystem-based.
 - Interactive button-driven flows now use a cleaner split: button parsing in `interfaces/discord/buttons/`, pure use cases in `application/`, and Discord rendering in `interfaces/discord/presenters/`.
+- Command adapters now call factory-built use cases from `infrastructure/sqlite/services.ts` instead of passing `SqliteDatabase` into application modules directly.
+- Context `application/` modules now depend on explicit repository ports and shared `UnitOfWork` abstractions rather than `shared/db`.
 - The shared action-view contract for button-driven use cases now lives in [action-view.ts](/Users/tero/workspace/rolly/src/shared-kernel/application/action-view.ts), with shared Discord rendering in [render-action-result.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-result.ts) and [render-action-button-rows.ts](/Users/tero/workspace/rolly/src/app/discord/render-action-button-rows.ts).
 - `/dice` now runs through the progression context, and usable inventory items now run through the inventory context instead of legacy `src/dice/core/application/` entrypoints.
 - Random-event runtime, admin control, foundation scheduling, content contracts, and state helpers now live in `src/dice/random-events/`; the old `src/dice/features/random-events/` files are compatibility shims.
@@ -159,9 +161,10 @@ Current architecture note:
 
 - `src/app/bootstrap/` contains the startup entrypoints used by [src/index.ts](/Users/tero/workspace/rolly/src/index.ts) and [src/deploy-commands.ts](/Users/tero/workspace/rolly/src/deploy-commands.ts).
 - `src/app/discord/` contains the Discord bot runtime, button router, interaction helpers, and explicit command registry.
-- `eslint.config.js` enforces basic architecture guardrails for the new context-first `application/` and `domain/` folders.
+- `eslint.config.js` enforces architecture guardrails so new `application/` code does not import Discord runtime modules or `shared/db` directly.
 - `src/dice/progression/interfaces/discord/commands/` contains progression-facing Discord commands such as `/dice`, `/dice-prestige`, `/dice-bans`, and `/dice-achievements`.
 - `src/dice/progression/application/roll-dice/` contains the migrated `/dice` use case and reply-content builder.
+- `src/dice/*/infrastructure/sqlite/services.ts` files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
 - `src/dice/progression/interfaces/discord/buttons/` and `src/dice/progression/interfaces/discord/presenters/` contain the migrated progression Discord adapters.
 - `src/dice/inventory/interfaces/discord/buttons/` and `src/dice/inventory/interfaces/discord/presenters/` contain the migrated shop and inventory Discord adapters.
 - `src/dice/inventory/application/use-item/` contains the migrated item-consumption use case used by `/dice-inventory`.

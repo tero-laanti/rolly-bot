@@ -103,11 +103,8 @@ export const createDicePvpUseCase = ({
   ): Promise<DicePvpResult> => {
     if (action.type === "pick") {
       return handleTierPick({
-        analytics,
-        hostileEffects,
         progression,
         pvp,
-        unitOfWork,
       }, actorId, action, publishChallenge, nowMs);
     }
 
@@ -121,7 +118,7 @@ export const createDicePvpUseCase = ({
       }, actorId, action.challengeId, nowMs);
     }
 
-    return handleChallengeDecline({ progression, pvp }, actorId, action.challengeId, nowMs);
+    return handleChallengeDecline({ pvp }, actorId, action.challengeId, nowMs);
   };
 
   return {
@@ -350,7 +347,7 @@ const handleChallengeAccept = (
       loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
       loserBlockedByShield: loserLockoutResult.blockedByShield,
     };
-  })();
+  });
 
   if (!outcome.resolved) {
     return alreadyHandledReply();
@@ -381,9 +378,8 @@ const handleChallengeAccept = (
 
 const handleChallengeDecline = (
   {
-    progression,
     pvp,
-  }: Pick<ManageChallengeDependencies, "progression" | "pvp">,
+  }: Pick<ManageChallengeDependencies, "pvp">,
   actorId: string,
   challengeId: string,
   nowMs: number,

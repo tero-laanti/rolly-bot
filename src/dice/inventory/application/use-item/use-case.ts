@@ -1,6 +1,5 @@
 import type { TriggerRandomEventNowResult } from "../../../random-events/infrastructure/admin-controller";
 import {
-  getDiceShopItem,
   type DiceShopItem,
 } from "../../../inventory/domain/shop";
 import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";

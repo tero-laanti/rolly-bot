@@ -8,12 +8,9 @@ import {
   startReservedAutoRollSession,
 } from "../../../infrastructure/auto-roller-runtime";
 import { triggerRandomGroupEventNow } from "../../../../random-events/infrastructure/admin-controller";
-import { grantInventoryItem } from "../../../../inventory/domain/shop";
-import {
-  createDiceInventoryReply,
-  handleDiceInventoryAction,
-} from "../../../application/manage-inventory/use-case";
 import { getDatabase } from "../../../../../shared/db";
+import { createSqliteInventoryRepository } from "../../../infrastructure/sqlite/inventory-repository";
+import { createSqliteDiceInventoryUseCase } from "../../../infrastructure/sqlite/services";
 import {
   diceInventoryButtonPrefix,
   parseDiceInventoryAction,
@@ -22,6 +19,8 @@ import { renderDiceInventoryResult } from "../presenters/inventory.presenter";
 
 const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {
   const db = getDatabase();
+  const inventoryUseCase = createSqliteDiceInventoryUseCase(db);
+  const inventoryRepository = createSqliteInventoryRepository(db);
   const action = parseDiceInventoryAction(interaction.customId);
   if (!action) {
     await applyButtonResult(interaction, {
@@ -34,7 +33,7 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
     return;
   }
 
-  const outcome = await handleDiceInventoryAction(db, interaction.user.id, action, {
+  const outcome = await inventoryUseCase.handleDiceInventoryAction(interaction.user.id, action, {
     reserveAutoRollSession,
     triggerRandomGroupEvent: triggerRandomGroupEventNow,
   });
@@ -65,7 +64,7 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
   }
 
   releaseAutoRollSessionReservation(outcome.autoRollStart.reservation);
-  grantInventoryItem(db, {
+  inventoryRepository.grantInventoryItem({
     userId: interaction.user.id,
     itemId: outcome.autoRollStart.itemId,
     quantity: 1,
@@ -81,9 +80,10 @@ export const data = new SlashCommandBuilder()
   .setDescription("View and use your inventory items.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
+  const inventoryUseCase = createSqliteDiceInventoryUseCase(getDatabase());
   await applyChatInputResult(
     interaction,
-    renderDiceInventoryResult(createDiceInventoryReply(getDatabase(), interaction.user.id)),
+    renderDiceInventoryResult(inventoryUseCase.createDiceInventoryReply(interaction.user.id)),
   );
 };
 

@@ -33,6 +33,8 @@ This file contains repository-specific guidance for future implementers working 
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
 - `src/dice/random-events/infrastructure/` is the source of truth for random-event runtime wiring, admin control, and scheduler logic. Treat `src/dice/features/random-events/{runtime,admin,scheduler}.ts` as compatibility-only.
 - `src/dice/progression/domain/`, `src/dice/inventory/domain/`, `src/dice/pvp/domain/`, and `src/dice/analytics/domain/` are the source-of-truth gameplay domains. Treat `src/dice/core/domain/` as compatibility-only.
+- For SQLite-backed command flows, prefer the `infrastructure/sqlite/services.ts` builders for each context. Command adapters should build use cases there instead of passing `getDatabase()` into application modules.
+- New application code should depend on context ports plus `UnitOfWork`, not `shared/db`.
 - For interactive Discord flows, prefer this split:
   context `interfaces/discord/buttons/` parses and encodes button ids,
   context `application/` returns pure view models,
@@ -45,7 +47,7 @@ This file contains repository-specific guidance for future implementers working 
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/types/` contains shared types and module augmentation.
-- `eslint.config.js` contains architecture guardrails for context-first modules. When you add new files under context `application/` or `domain/`, keep them free of Discord runtime imports.
+- `eslint.config.js` contains architecture guardrails for context-first modules. When you add new files under context `application/` or `domain/`, keep them free of Discord runtime imports, and keep new `application/` code free of direct `shared/db` imports.
 
 ## Gameplay and Data
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
-import { runRollDiceUseCase } from "../../progression/application/roll-dice/use-case";
+import { createSqliteRollDiceUseCase } from "../../progression/infrastructure/sqlite/services";
 
 const progressBarWidth = 20;
 const maxHighlights = 8;
@@ -134,8 +134,8 @@ const runAutoRollTick = async (session: AutoRollSession): Promise<void> => {
   }
 
   const rollIndex = session.completedRolls + 1;
+  const runRollDiceUseCase = createSqliteRollDiceUseCase(session.db);
   const result = runRollDiceUseCase({
-    db: session.db,
     userId: session.reservation.userId,
     userMention: session.userMention,
   });
