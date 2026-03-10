@@ -1,5 +1,200 @@
-export {
-  createDiceInventoryReply,
-  diceInventoryButtonPrefix,
-  handleDiceInventoryAction,
-} from "../../../core/application/manage-dice-inventory";
+import type { SqliteDatabase } from "../../../../shared/db";
+import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import type { AutoRollSessionReservation } from "../../../features/auto-roller/runtime";
+import { useDiceItem, type ReserveAutoRollSession } from "../../../core/application/use-dice-item";
+import {
+  getOwnedInventoryEntries,
+  type DiceInventoryEntry,
+} from "../../../core/domain/shop";
+
+export type DiceInventoryAction =
+  | {
+      type: "use";
+      ownerId: string;
+      itemId: string;
+    }
+  | {
+      type: "refresh";
+      ownerId: string;
+    };
+
+export type DiceInventoryResult = ActionResult<DiceInventoryAction>;
+
+export type DiceInventoryActionOutcome = {
+  result: DiceInventoryResult;
+  autoRollStart?:
+    | {
+        reservation: AutoRollSessionReservation;
+        itemId: string;
+      }
+    | undefined;
+};
+
+export const createDiceInventoryReply = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceInventoryResult => {
+  return {
+    kind: "reply",
+    payload: {
+      type: "view",
+      view: buildInventoryView(db, userId),
+      ephemeral: false,
+    },
+  };
+};
+
+export const handleDiceInventoryAction = async (
+  db: SqliteDatabase,
+  actorId: string,
+  action: DiceInventoryAction,
+  { reserveAutoRollSession }: { reserveAutoRollSession: ReserveAutoRollSession },
+): Promise<DiceInventoryActionOutcome> => {
+  if (actorId !== action.ownerId) {
+    return {
+      result: {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "This inventory menu is not assigned to you.",
+          ephemeral: true,
+        },
+      },
+    };
+  }
+
+  if (action.type === "refresh") {
+    return {
+      result: {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildInventoryView(db, action.ownerId),
+        },
+      },
+    };
+  }
+
+  const useResult = await useDiceItem(db, {
+    userId: action.ownerId,
+    itemId: action.itemId,
+    reserveAutoRollSession,
+  });
+  if (!useResult.ok) {
+    return {
+      result: {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: useResult.message,
+          ephemeral: true,
+        },
+      },
+    };
+  }
+
+  if (useResult.autoRollReservation) {
+    return {
+      result: {
+        kind: "update",
+        payload: {
+          type: "message",
+          content: `${useResult.item.name} engaged.`,
+          clearComponents: true,
+        },
+      },
+      autoRollStart: {
+        reservation: useResult.autoRollReservation,
+        itemId: useResult.item.id,
+      },
+    };
+  }
+
+  return {
+    result: {
+      kind: "update",
+      payload: {
+        type: "view",
+        view: buildInventoryView(db, action.ownerId, useResult.statusMessage),
+      },
+    },
+  };
+};
+
+const buildInventoryView = (
+  db: SqliteDatabase,
+  userId: string,
+  statusLine?: string,
+): ActionView<DiceInventoryAction> => {
+  const entries = getOwnedInventoryEntries(db, userId);
+
+  return {
+    content: buildInventoryContent(userId, entries, statusLine),
+    components: buildInventoryComponents(userId, entries),
+  };
+};
+
+const buildInventoryContent = (
+  userId: string,
+  entries: DiceInventoryEntry[],
+  statusLine?: string,
+): string => {
+  const lines: string[] = [];
+
+  if (statusLine) {
+    lines.push(statusLine, "");
+  }
+
+  lines.push(`Dice inventory for <@${userId}>:`);
+
+  if (entries.length === 0) {
+    lines.push("Inventory is empty.", "Buy items with /dice-shop.");
+    return lines.join("\n");
+  }
+
+  lines.push("Use buttons below to consume items.", "");
+  for (const entry of entries) {
+    lines.push(
+      `**${entry.item.name}**`,
+      `Owned: ${entry.quantity}.`,
+      entry.item.description,
+      entry.item.consumable ? "Consumable." : "Permanent collectible.",
+      "",
+    );
+  }
+
+  return lines.slice(0, -1).join("\n");
+};
+
+const buildInventoryComponents = (
+  userId: string,
+  entries: DiceInventoryEntry[],
+): ActionView<DiceInventoryAction>["components"] => {
+  const rows: ActionView<DiceInventoryAction>["components"] = [];
+
+  const useButtons = entries
+    .filter((entry) => entry.item.consumable)
+    .map((entry) => ({
+      action: {
+        type: "use",
+        ownerId: userId,
+        itemId: entry.item.id,
+      } as const,
+      label: `Use ${entry.item.name}`,
+      style: "primary" as const,
+    }));
+
+  for (let index = 0; index < useButtons.length; index += 5) {
+    rows.push(useButtons.slice(index, index + 5));
+  }
+
+  rows.push([
+    {
+      action: { type: "refresh", ownerId: userId },
+      label: "Refresh",
+      style: "secondary",
+    },
+  ]);
+
+  return rows;
+};

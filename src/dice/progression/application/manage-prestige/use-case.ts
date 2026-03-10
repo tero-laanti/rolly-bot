@@ -18,7 +18,11 @@ import {
   setDiceLevelForPrestige,
   setDicePrestige,
 } from "../../../core/domain/prestige";
-import type { ActionButtonSpec, ActionResult, ActionView } from "../interaction-model";
+import type {
+  ActionButtonSpec,
+  ActionResult,
+  ActionView,
+} from "../../../../shared-kernel/application/action-view";
 
 const prestigeButtonsPerRow = 5;
 

@@ -1,7 +1,7 @@
 import type { InteractionResult } from "../../../../../app/discord/interaction-response";
+import { renderActionButtonRows } from "../../../../../app/discord/render-action-button-rows";
 import type { DiceBansResult } from "../../../application/manage-bans/use-case";
 import { encodeDiceBansAction } from "../buttons/bans-buttons";
-import { renderActionButtonRows } from "./render-button-rows";
 
 export const renderDiceBansResult = (result: DiceBansResult): InteractionResult => {
   if (result.payload.type === "message") {

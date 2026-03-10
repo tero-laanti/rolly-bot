@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
 import {
+  buildAutoRollSessionStartingContent,
   releaseAutoRollSessionReservation,
   reserveAutoRollSession,
   startReservedAutoRollSession,
@@ -9,18 +10,44 @@ import {
 import { grantInventoryItem } from "../../../../core/domain/shop";
 import {
   createDiceInventoryReply,
-  diceInventoryButtonPrefix,
   handleDiceInventoryAction,
 } from "../../../application/manage-inventory/use-case";
 import { getDatabase } from "../../../../../shared/db";
+import {
+  diceInventoryButtonPrefix,
+  parseDiceInventoryAction,
+} from "../buttons/inventory-buttons";
+import { renderDiceInventoryResult } from "../presenters/inventory.presenter";
 
 const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {
   const db = getDatabase();
-  const outcome = await handleDiceInventoryAction(db, interaction.user.id, interaction.customId, {
+  const action = parseDiceInventoryAction(interaction.customId);
+  if (!action) {
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Unknown inventory action.",
+        ephemeral: true,
+      },
+    });
+    return;
+  }
+
+  const outcome = await handleDiceInventoryAction(db, interaction.user.id, action, {
     reserveAutoRollSession,
   });
 
-  await applyButtonResult(interaction, outcome.interactionResult);
+  if (outcome.autoRollStart) {
+    await applyButtonResult(interaction, {
+      kind: "update",
+      payload: {
+        content: buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation),
+        components: [],
+      },
+    });
+  } else {
+    await applyButtonResult(interaction, renderDiceInventoryResult(outcome.result));
+  }
 
   if (!outcome.autoRollStart) {
     return;
@@ -54,7 +81,7 @@ export const data = new SlashCommandBuilder()
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   await applyChatInputResult(
     interaction,
-    createDiceInventoryReply(getDatabase(), interaction.user.id),
+    renderDiceInventoryResult(createDiceInventoryReply(getDatabase(), interaction.user.id)),
   );
 };
 
