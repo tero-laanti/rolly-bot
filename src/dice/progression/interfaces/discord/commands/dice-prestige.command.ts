@@ -4,14 +4,27 @@ import { applyButtonResult, applyChatInputResult } from "../../../../../app/disc
 import { getDatabase } from "../../../../../shared/db";
 import {
   createDicePrestigeReply,
-  dicePrestigeButtonPrefix,
   handleDicePrestigeAction,
 } from "../../../application/manage-prestige/use-case";
+import { dicePrestigeButtonPrefix, parseDicePrestigeAction } from "../buttons/prestige-buttons";
+import { renderDicePrestigeResult } from "../presenters/prestige.presenter";
 
 const handleDicePrestigeButton = async (interaction: ButtonInteraction): Promise<void> => {
+  const action = parseDicePrestigeAction(interaction.customId);
+  if (!action) {
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Unknown prestige action.",
+        ephemeral: true,
+      },
+    });
+    return;
+  }
+
   await applyButtonResult(
     interaction,
-    handleDicePrestigeAction(getDatabase(), interaction.user.id, interaction.customId),
+    renderDicePrestigeResult(handleDicePrestigeAction(getDatabase(), interaction.user.id, action)),
   );
 };
 
@@ -22,7 +35,7 @@ export const data = new SlashCommandBuilder()
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   await applyChatInputResult(
     interaction,
-    createDicePrestigeReply(getDatabase(), interaction.user.id),
+    renderDicePrestigeResult(createDicePrestigeReply(getDatabase(), interaction.user.id)),
   );
 };
 
