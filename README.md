@@ -137,7 +137,7 @@ Rolly is a pragmatic domain-driven modular monolith.
 
 - `src/app/` contains the composition root and Discord runtime wiring.
 - `src/dice/<context>/` contains context-first modules such as progression, inventory, PvP, analytics, admin, and random-events.
-- `src/dice/economy/domain/balance.ts` is now the source of truth for Fame/Pips balance operations.
+- `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract, while `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
 - `src/dice/random-events/domain/` now exposes random-event contract types for external consumers such as `rolly-data`.
 - `interfaces/discord/` contains Discord command adapters, button handlers, and presentation wiring.
 - `application/` contains use cases and orchestration.
@@ -168,7 +168,7 @@ Current architecture note:
 - `src/dice/progression/interfaces/discord/buttons/` and `src/dice/progression/interfaces/discord/presenters/` contain the migrated progression Discord adapters.
 - `src/dice/inventory/interfaces/discord/buttons/` and `src/dice/inventory/interfaces/discord/presenters/` contain the migrated shop and inventory Discord adapters.
 - `src/dice/inventory/application/use-item/` contains the migrated item-consumption use case used by `/dice-inventory`.
-- `src/dice/economy/domain/` contains the current economy source of truth for Fame/Pips access and updates.
+- `src/dice/economy/` contains Fame/Pips contracts, shared economy value types, and the SQLite balance repository.
 - `src/dice/inventory/interfaces/discord/commands/` contains `/dice-shop` and `/dice-inventory`.
 - `src/dice/pvp/interfaces/discord/commands/`, `src/dice/pvp/interfaces/discord/buttons/`, and `src/dice/pvp/interfaces/discord/presenters/` contain the migrated PvP Discord adapters.
 - `src/dice/analytics/interfaces/discord/commands/` contains `/dice-analytics`.
