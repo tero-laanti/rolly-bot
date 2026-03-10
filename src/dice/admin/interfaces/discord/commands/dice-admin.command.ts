@@ -4,20 +4,40 @@ import { applyButtonResult, applyChatInputResult } from "../../../../../app/disc
 import { getDatabase } from "../../../../../shared/db";
 import {
   createDiceAdminReply,
-  diceAdminButtonPrefix,
-  getDiceAdminOwnerId,
   handleDiceAdminAction,
 } from "../../../application/manage-admin/use-case";
+import { diceAdminButtonPrefix, parseDiceAdminAction } from "../buttons/admin-buttons";
+import { renderDiceAdminResult } from "../presenters/admin.presenter";
+
+const ownerEnvName = "DISCORD_OWNER_ID";
+
+const getDiceAdminOwnerId = (): string | null => {
+  return process.env[ownerEnvName] ?? null;
+};
 
 const handleDiceAdminButton = async (interaction: ButtonInteraction): Promise<void> => {
+  const action = parseDiceAdminAction(interaction.customId);
+  if (!action) {
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Unknown dice-admin action.",
+        ephemeral: true,
+      },
+    });
+    return;
+  }
+
   await applyButtonResult(
     interaction,
-    await handleDiceAdminAction(
-      getDatabase(),
-      getDiceAdminOwnerId(),
-      interaction.user.id,
-      interaction.customId,
-      interaction.guildId,
+    renderDiceAdminResult(
+      await handleDiceAdminAction(
+        getDatabase(),
+        getDiceAdminOwnerId(),
+        interaction.user.id,
+        action,
+        interaction.guildId,
+      ),
     ),
   );
 };
@@ -38,7 +58,9 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   const targetUserId = interaction.options.getUser("user")?.id ?? interaction.user.id;
   await applyChatInputResult(
     interaction,
-    createDiceAdminReply(getDiceAdminOwnerId(), interaction.user.id, targetUserId),
+    renderDiceAdminResult(
+      createDiceAdminReply(getDiceAdminOwnerId(), interaction.user.id, targetUserId),
+    ),
   );
 };
 

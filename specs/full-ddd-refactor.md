@@ -13,6 +13,7 @@ Active migration plan. The phase-1 foundation was implemented on March 10, 2026:
 - `eslint.config.js` now enforces basic architecture guardrails for the new context-first `application/` and `domain/` modules.
 - Prestige and bans now use the target interaction pattern: interface button parsing, pure application view models, and Discord presenters.
 - Shop and inventory now use the same interaction pattern, and the shared action-view contract now lives in `src/shared-kernel/application/action-view.ts`.
+- PvP and admin now use the same interaction pattern, and shared Discord rendering now lives in `src/app/discord/render-action-result.ts`.
 
 The remaining phases in this spec still apply. This spec does not authorize gameplay changes or destructive schema changes by itself.
 
@@ -21,9 +22,9 @@ The remaining phases in this spec still apply. This spec does not authorize game
 Rolly already has a partial layered design and now has a phase-1 context-first shell:
 
 - Discord entrypoints live in `src/dice/*/interfaces/discord/commands/` and `src/app/`.
-- Dice use cases live in `src/dice/core/application/`.
+- Some dice use cases still live in `src/dice/core/application/`.
 - Rules and state helpers live in `src/dice/core/domain/`.
-- Some formatting lives in `src/dice/core/presentation/`.
+- Some formatting still lives in `src/dice/core/presentation/`.
 - Shared runtime concerns live in `src/shared/` and `src/rolly-data/`.
 
 That is directionally correct, but it is not full DDD yet. The main leaks are:
@@ -37,8 +38,8 @@ Representative examples in the current codebase:
 
 - `src/dice/core/domain/prestige.ts`
 - `src/dice/core/domain/pvp.ts`
-- `src/dice/core/application/manage-dice-prestige.ts`
-- `src/dice/core/application/manage-dice-bans.ts`
+- `src/dice/core/application/roll-dice.ts`
+- `src/dice/core/application/use-dice-item.ts`
 - `src/dice/features/random-events/runtime.ts`
 - `src/shared/economy.ts`
 
