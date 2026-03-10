@@ -1,15 +1,12 @@
-import type { SqliteDatabase } from "../../../../shared/db";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";
 import {
-  useDiceItem,
+  type UseDiceItemResult,
   type ReserveAutoRollSession,
   type TriggerRandomGroupEvent,
 } from "../use-item/use-case";
-import {
-  getOwnedInventoryEntries,
-  type DiceInventoryEntry,
-} from "../../../inventory/domain/shop";
+import type { DiceInventoryEntry } from "../../../inventory/domain/shop";
+import type { DiceInventoryRepository } from "../ports";
 
 export type DiceInventoryAction =
   | {
@@ -34,107 +31,123 @@ export type DiceInventoryActionOutcome = {
     | undefined;
 };
 
-export const createDiceInventoryReply = (
-  db: SqliteDatabase,
-  userId: string,
-): DiceInventoryResult => {
-  return {
-    kind: "reply",
-    payload: {
-      type: "view",
-      view: buildInventoryView(db, userId),
-      ephemeral: false,
-    },
-  };
-};
-
-export const handleDiceInventoryAction = async (
-  db: SqliteDatabase,
-  actorId: string,
-  action: DiceInventoryAction,
-  options: {
+type ManageInventoryDependencies = {
+  inventory: Pick<DiceInventoryRepository, "getOwnedInventoryEntries">;
+  useDiceItem: (input: {
+    userId: string;
+    itemId: string;
     reserveAutoRollSession: ReserveAutoRollSession;
     triggerRandomGroupEvent: TriggerRandomGroupEvent;
-  },
-): Promise<DiceInventoryActionOutcome> => {
-  if (actorId !== action.ownerId) {
+  }) => Promise<UseDiceItemResult>;
+};
+
+export const createDiceInventoryUseCase = ({
+  inventory,
+  useDiceItem,
+}: ManageInventoryDependencies) => {
+  const createDiceInventoryReply = (userId: string): DiceInventoryResult => {
     return {
-      result: {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: "This inventory menu is not assigned to you.",
-          ephemeral: true,
-        },
+      kind: "reply",
+      payload: {
+        type: "view",
+        view: buildInventoryView(inventory, userId),
+        ephemeral: false,
       },
     };
-  }
+  };
 
-  if (action.type === "refresh") {
+  const handleDiceInventoryAction = async (
+    actorId: string,
+    action: DiceInventoryAction,
+    options: {
+      reserveAutoRollSession: ReserveAutoRollSession;
+      triggerRandomGroupEvent: TriggerRandomGroupEvent;
+    },
+  ): Promise<DiceInventoryActionOutcome> => {
+    if (actorId !== action.ownerId) {
+      return {
+        result: {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "This inventory menu is not assigned to you.",
+            ephemeral: true,
+          },
+        },
+      };
+    }
+
+    if (action.type === "refresh") {
+      return {
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildInventoryView(inventory, action.ownerId),
+          },
+        },
+      };
+    }
+
+    const useResult = await useDiceItem({
+      userId: action.ownerId,
+      itemId: action.itemId,
+      reserveAutoRollSession: options.reserveAutoRollSession,
+      triggerRandomGroupEvent: options.triggerRandomGroupEvent,
+    });
+    if (!useResult.ok) {
+      return {
+        result: {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: useResult.message,
+            ephemeral: true,
+          },
+        },
+      };
+    }
+
+    if (useResult.autoRollReservation) {
+      return {
+        result: {
+          kind: "update",
+          payload: {
+            type: "message",
+            content: `${useResult.item.name} engaged.`,
+            clearComponents: true,
+          },
+        },
+        autoRollStart: {
+          reservation: useResult.autoRollReservation,
+          itemId: useResult.item.id,
+        },
+      };
+    }
+
     return {
       result: {
         kind: "update",
         payload: {
           type: "view",
-          view: buildInventoryView(db, action.ownerId),
+          view: buildInventoryView(inventory, action.ownerId, useResult.statusMessage),
         },
       },
     };
-  }
-
-  const useResult = await useDiceItem(db, {
-    userId: action.ownerId,
-    itemId: action.itemId,
-    reserveAutoRollSession: options.reserveAutoRollSession,
-    triggerRandomGroupEvent: options.triggerRandomGroupEvent,
-  });
-  if (!useResult.ok) {
-    return {
-      result: {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: useResult.message,
-          ephemeral: true,
-        },
-      },
-    };
-  }
-
-  if (useResult.autoRollReservation) {
-    return {
-      result: {
-        kind: "update",
-        payload: {
-          type: "message",
-          content: `${useResult.item.name} engaged.`,
-          clearComponents: true,
-        },
-      },
-      autoRollStart: {
-        reservation: useResult.autoRollReservation,
-        itemId: useResult.item.id,
-      },
-    };
-  }
+  };
 
   return {
-    result: {
-      kind: "update",
-      payload: {
-        type: "view",
-        view: buildInventoryView(db, action.ownerId, useResult.statusMessage),
-      },
-    },
+    createDiceInventoryReply,
+    handleDiceInventoryAction,
   };
 };
 
 const buildInventoryView = (
-  db: SqliteDatabase,
+  inventory: Pick<DiceInventoryRepository, "getOwnedInventoryEntries">,
   userId: string,
   statusLine?: string,
 ): ActionView<DiceInventoryAction> => {
-  const entries = getOwnedInventoryEntries(db, userId);
+  const entries = inventory.getOwnedInventoryEntries(userId);
 
   return {
     content: buildInventoryContent(userId, entries, statusLine),

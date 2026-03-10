@@ -1,28 +1,17 @@
-import type { SqliteDatabase } from "../../../../shared/db";
 import { getDiceAchievement, getPrestigeAchievementId } from "../../../progression/domain/achievements";
-import { awardAchievements } from "../../../progression/domain/achievements-store";
-import {
-  resetDiceLevelAnalyticsProgress,
-  resetDicePrestigeAnalyticsProgress,
-} from "../../../analytics/domain/analytics";
+import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import {
   getDicePrestigeBaseLevel,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
 } from "../../../progression/domain/game-rules";
-import {
-  getActiveDicePrestige,
-  getDiceLevel,
-  getDicePrestige,
-  setActiveDicePrestige,
-  setDiceLevelForPrestige,
-  setDicePrestige,
-} from "../../../progression/domain/prestige";
+import type { DiceProgressionRepository } from "../ports";
 import type {
   ActionButtonSpec,
   ActionResult,
   ActionView,
 } from "../../../../shared-kernel/application/action-view";
+import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 
 const prestigeButtonsPerRow = 5;
 
@@ -54,148 +43,183 @@ export type DicePrestigeAction =
 
 export type DicePrestigeResult = ActionResult<DicePrestigeAction>;
 
-export const createDicePrestigeReply = (
-  db: SqliteDatabase,
-  userId: string,
-): DicePrestigeResult => {
-  const state = getPrestigeState(db, userId);
-  return {
-    kind: "reply",
-    payload: {
-      type: "view",
-      view: buildMainView(userId, state),
-      ephemeral: false,
-    },
-  };
+type ManagePrestigeDependencies = {
+  analytics: Pick<
+    DiceAnalyticsRepository,
+    "resetDiceLevelAnalyticsProgress" | "resetDicePrestigeAnalyticsProgress"
+  >;
+  progression: Pick<
+    DiceProgressionRepository,
+    | "awardAchievements"
+    | "getActiveDicePrestige"
+    | "getDiceLevel"
+    | "getDicePrestige"
+    | "setActiveDicePrestige"
+    | "setDiceLevelForPrestige"
+    | "setDicePrestige"
+  >;
+  unitOfWork: UnitOfWork;
 };
 
-export const handleDicePrestigeAction = (
-  db: SqliteDatabase,
-  actorId: string,
-  action: DicePrestigeAction,
-): DicePrestigeResult => {
-  if (actorId !== action.ownerId) {
+export const createDicePrestigeUseCase = ({
+  analytics,
+  progression,
+  unitOfWork,
+}: ManagePrestigeDependencies) => {
+  const createDicePrestigeReply = (userId: string): DicePrestigeResult => {
+    const state = getPrestigeState(progression, userId);
     return {
       kind: "reply",
       payload: {
-        type: "message",
-        content: "This prestige menu is not assigned to you.",
-        ephemeral: true,
-      },
-    };
-  }
-
-  if (action.type === "choose") {
-    const state = getPrestigeState(db, action.ownerId);
-    return {
-      kind: "update",
-      payload: {
         type: "view",
-        view: buildSelectView(action.ownerId, state),
+        view: buildMainView(userId, state),
+        ephemeral: false,
       },
     };
-  }
+  };
 
-  if (action.type === "back") {
-    const state = getPrestigeState(db, action.ownerId);
-    return {
-      kind: "update",
-      payload: {
-        type: "view",
-        view: buildMainView(action.ownerId, state),
-      },
-    };
-  }
-
-  if (action.type === "set") {
-    if (!Number.isInteger(action.prestige) || action.prestige < 0) {
+  const handleDicePrestigeAction = (
+    actorId: string,
+    action: DicePrestigeAction,
+  ): DicePrestigeResult => {
+    if (actorId !== action.ownerId) {
       return {
         kind: "reply",
         payload: {
           type: "message",
-          content: "Invalid prestige selection.",
+          content: "This prestige menu is not assigned to you.",
           ephemeral: true,
         },
       };
     }
 
-    const highestPrestige = getDicePrestige(db, action.ownerId);
-    if (action.prestige > highestPrestige) {
+    if (action.type === "choose") {
+      const state = getPrestigeState(progression, action.ownerId);
       return {
-        kind: "reply",
+        kind: "update",
         payload: {
-          type: "message",
-          content: "You have not unlocked that prestige level.",
-          ephemeral: true,
+          type: "view",
+          view: buildSelectView(action.ownerId, state),
         },
       };
     }
 
-    setActiveDicePrestige(db, {
-      userId: action.ownerId,
-      prestige: action.prestige,
+    if (action.type === "back") {
+      const state = getPrestigeState(progression, action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildMainView(action.ownerId, state),
+        },
+      };
+    }
+
+    if (action.type === "set") {
+      if (!Number.isInteger(action.prestige) || action.prestige < 0) {
+        return {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "Invalid prestige selection.",
+            ephemeral: true,
+          },
+        };
+      }
+
+      const highestPrestige = progression.getDicePrestige(action.ownerId);
+      if (action.prestige > highestPrestige) {
+        return {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "You have not unlocked that prestige level.",
+            ephemeral: true,
+          },
+        };
+      }
+
+      progression.setActiveDicePrestige({
+        userId: action.ownerId,
+        prestige: action.prestige,
+      });
+      analytics.resetDiceLevelAnalyticsProgress(action.ownerId);
+
+      const state = getPrestigeState(progression, action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildMainView(action.ownerId, state),
+        },
+      };
+    }
+
+    const state = getPrestigeState(progression, action.ownerId);
+    if (!state.canPrestigeUp) {
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildMainView(action.ownerId, state),
+        },
+      };
+    }
+
+    const nextPrestige = state.highestPrestige + 1;
+    const newlyEarned = unitOfWork.runInTransaction(() => {
+      progression.setDicePrestige({ userId: action.ownerId, prestige: nextPrestige });
+      progression.setActiveDicePrestige({ userId: action.ownerId, prestige: nextPrestige });
+      progression.setDiceLevelForPrestige({
+        userId: action.ownerId,
+        prestige: nextPrestige,
+        level: 1,
+      });
+      analytics.resetDicePrestigeAnalyticsProgress(action.ownerId);
+
+      const achievementId = getPrestigeAchievementId(nextPrestige);
+      if (!achievementId) {
+        return [];
+      }
+
+      return progression.awardAchievements(action.ownerId, [achievementId]);
     });
-    resetDiceLevelAnalyticsProgress(db, action.ownerId);
 
-    const state = getPrestigeState(db, action.ownerId);
+    const refreshed = getPrestigeState(progression, action.ownerId);
+    const achievementText =
+      newlyEarned.length > 0
+        ? `\nAchievement unlocked: ${newlyEarned.map((id) => getDiceAchievement(id)?.name ?? id).join(", ")}.`
+        : "";
+
     return {
       kind: "update",
       payload: {
         type: "view",
-        view: buildMainView(action.ownerId, state),
+        view: buildMainView(
+          action.ownerId,
+          refreshed,
+          `Prestige complete. Your active die is now d${getDiceSidesForPrestige(nextPrestige)} and prestige ${nextPrestige} starts at level 1.${achievementText}`,
+        ),
       },
     };
-  }
-
-  const state = getPrestigeState(db, action.ownerId);
-  if (!state.canPrestigeUp) {
-    return {
-      kind: "update",
-      payload: {
-        type: "view",
-        view: buildMainView(action.ownerId, state),
-      },
-    };
-  }
-
-  const nextPrestige = state.highestPrestige + 1;
-  const newlyEarned = db.transaction(() => {
-    setDicePrestige(db, { userId: action.ownerId, prestige: nextPrestige });
-    setActiveDicePrestige(db, { userId: action.ownerId, prestige: nextPrestige });
-    setDiceLevelForPrestige(db, { userId: action.ownerId, prestige: nextPrestige, level: 1 });
-    resetDicePrestigeAnalyticsProgress(db, action.ownerId);
-
-    const achievementId = getPrestigeAchievementId(nextPrestige);
-    if (!achievementId) {
-      return [];
-    }
-
-    return awardAchievements(db, action.ownerId, [achievementId]);
-  })();
-
-  const refreshed = getPrestigeState(db, action.ownerId);
-  const achievementText =
-    newlyEarned.length > 0
-      ? `\nAchievement unlocked: ${newlyEarned.map((id) => getDiceAchievement(id)?.name ?? id).join(", ")}.`
-      : "";
+  };
 
   return {
-    kind: "update",
-    payload: {
-      type: "view",
-      view: buildMainView(
-        action.ownerId,
-        refreshed,
-        `Prestige complete. Your active die is now d${getDiceSidesForPrestige(nextPrestige)} and prestige ${nextPrestige} starts at level 1.${achievementText}`,
-      ),
-    },
+    createDicePrestigeReply,
+    handleDicePrestigeAction,
   };
 };
 
-const getPrestigeState = (db: SqliteDatabase, userId: string): PrestigeState => {
-  const highestPrestige = getDicePrestige(db, userId);
-  const activePrestige = getActiveDicePrestige(db, userId);
-  const activeLevel = getDiceLevel(db, userId);
+const getPrestigeState = (
+  progression: Pick<
+    DiceProgressionRepository,
+    "getActiveDicePrestige" | "getDiceLevel" | "getDicePrestige"
+  >,
+  userId: string,
+): PrestigeState => {
+  const highestPrestige = progression.getDicePrestige(userId);
+  const activePrestige = progression.getActiveDicePrestige(userId);
+  const activeLevel = progression.getDiceLevel(userId);
   const maxDicePrestige = getMaxDicePrestige();
   const canPrestigeUp =
     activePrestige === highestPrestige &&
