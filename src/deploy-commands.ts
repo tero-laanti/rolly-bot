@@ -1,1 +1,1 @@
-import "./bot/deploy-commands";
+import "./app/bootstrap/deploy-discord-commands";
