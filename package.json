@@ -26,10 +26,12 @@
     "deploy:commands": "npm run build && node --env-file=.env dist/deploy-commands.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "hooks:install": "node scripts/install-git-hooks.mjs",
     "lint": "eslint .",
     "prebuild": "npm run clean",
     "start": "node --env-file=.env dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run format:check && npm run lint && npm run typecheck"
   },
   "repository": {
     "type": "git",
