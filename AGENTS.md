@@ -57,8 +57,6 @@ This file contains repository-specific guidance for future implementers working 
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 - `src/system/self-update/` follows the same application/infrastructure/interfaces split as the dice contexts.
 - `src/types/` contains shared types and module augmentation.
-- Legacy compatibility paths under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
-- `src/bot/` still exists as compatibility wrappers for a few top-level runtime imports.
 - `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/progression/application/roll-dice/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, `src/dice/inventory/application/manage-inventory/use-case.ts`, `src/dice/inventory/application/use-item/use-case.ts`, `src/dice/pvp/application/manage-challenge/use-case.ts`, and `src/dice/admin/application/manage-admin/use-case.ts` are the reference examples for the current context-first use-case patterns.
 - `eslint.config.js` contains architecture guardrails for context-first modules. When you add new files under context `application/` or `domain/`, keep them free of Discord runtime imports, and keep new `application/` code free of direct `shared/db` imports.
 
