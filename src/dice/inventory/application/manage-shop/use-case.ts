@@ -41,10 +41,7 @@ export const createDiceShopUseCase = ({
     };
   };
 
-  const handleDiceShopAction = (
-    actorId: string,
-    action: DiceShopAction,
-  ): DiceShopResult => {
+  const handleDiceShopAction = (actorId: string, action: DiceShopAction): DiceShopResult => {
     if (actorId !== action.ownerId) {
       return {
         kind: "reply",

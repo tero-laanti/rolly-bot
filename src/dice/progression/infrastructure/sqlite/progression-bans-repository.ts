@@ -40,8 +40,9 @@ export const createSqliteProgressionBansRepository = (
   };
 
   const clearSingleDiceBan = (userId: string, dieIndex: number, bannedValue: number): void => {
-    db.prepare("DELETE FROM dice_bans WHERE user_id = ? AND die_index = ? AND banned_value = ?")
-      .run(userId, dieIndex, bannedValue);
+    db.prepare(
+      "DELETE FROM dice_bans WHERE user_id = ? AND die_index = ? AND banned_value = ?",
+    ).run(userId, dieIndex, bannedValue);
   };
 
   const clearDiceBan = (userId: string, dieIndex: number): void => {

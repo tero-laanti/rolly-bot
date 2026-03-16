@@ -38,7 +38,10 @@ type ManageAdminDependencies = {
     DiceProgressionRepository,
     "clearAllDiceTemporaryEffects" | "getActiveDiceTemporaryEffects"
   >;
-  pvp: Pick<DicePvpRepository, "getActiveDoubleRoll" | "getActiveDiceLockout" | "setDicePvpEffects">;
+  pvp: Pick<
+    DicePvpRepository,
+    "getActiveDoubleRoll" | "getActiveDiceLockout" | "setDicePvpEffects"
+  >;
   randomEventsAdmin: RandomEventsAdminPort;
 };
 
@@ -91,7 +94,9 @@ export const createDiceAdminUseCase = ({
     }
 
     if (action.type === "effects-user") {
-      return updateView(buildEffectsUserView({ progression, pvp }, action.ownerId, action.targetUserId));
+      return updateView(
+        buildEffectsUserView({ progression, pvp }, action.ownerId, action.targetUserId),
+      );
     }
 
     if (action.type === "effects-clear") {
@@ -187,10 +192,7 @@ const buildStatusView = (
 };
 
 const buildEffectsUserView = (
-  {
-    progression,
-    pvp,
-  }: Pick<ManageAdminDependencies, "progression" | "pvp">,
+  { progression, pvp }: Pick<ManageAdminDependencies, "progression" | "pvp">,
   ownerId: string,
   targetUserId: string,
 ): ActionView<DiceAdminAction> => {
@@ -217,10 +219,7 @@ const buildEffectsUserView = (
 };
 
 const buildEffectsClearView = (
-  {
-    progression,
-    pvp,
-  }: Pick<ManageAdminDependencies, "progression" | "pvp">,
+  { progression, pvp }: Pick<ManageAdminDependencies, "progression" | "pvp">,
   ownerId: string,
   targetUserId: string,
 ): ActionView<DiceAdminAction> => {
@@ -316,9 +315,7 @@ const formatTimestamp = (value: Date | number | null): string => {
   return `<t:${timestampSeconds}:f> (<t:${timestampSeconds}:R>)`;
 };
 
-const formatTemporaryEffectLine = (
-  effect: DiceTemporaryEffect,
-): string => {
+const formatTemporaryEffectLine = (effect: DiceTemporaryEffect): string => {
   const parts = [effect.kind, effect.effectCode, `x${effect.magnitude}`, `source=${effect.source}`];
 
   if (effect.remainingRolls !== null) {

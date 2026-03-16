@@ -21,10 +21,7 @@ import {
 } from "./live-runtime-presentation";
 import { resolveRandomEvent } from "./live-runtime-resolution";
 import { triggerRandomEventOpportunity } from "./live-runtime-trigger";
-import type {
-  ActiveRandomEventContext,
-  RandomEventsLiveRuntimeLogger,
-} from "./live-runtime-types";
+import type { ActiveRandomEventContext, RandomEventsLiveRuntimeLogger } from "./live-runtime-types";
 import type { RandomEventsState } from "./state-store";
 
 type CreateRandomEventsLiveRuntimeInput = {

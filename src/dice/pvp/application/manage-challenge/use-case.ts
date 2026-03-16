@@ -102,20 +102,31 @@ export const createDicePvpUseCase = ({
     nowMs: number = Date.now(),
   ): Promise<DicePvpResult> => {
     if (action.type === "pick") {
-      return handleTierPick({
-        progression,
-        pvp,
-      }, actorId, action, publishChallenge, nowMs);
+      return handleTierPick(
+        {
+          progression,
+          pvp,
+        },
+        actorId,
+        action,
+        publishChallenge,
+        nowMs,
+      );
     }
 
     if (action.type === "accept") {
-      return handleChallengeAccept({
-        analytics,
-        hostileEffects,
-        progression,
-        pvp,
-        unitOfWork,
-      }, actorId, action.challengeId, nowMs);
+      return handleChallengeAccept(
+        {
+          analytics,
+          hostileEffects,
+          progression,
+          pvp,
+          unitOfWork,
+        },
+        actorId,
+        action.challengeId,
+        nowMs,
+      );
     }
 
     return handleChallengeDecline({ pvp }, actorId, action.challengeId, nowMs);
@@ -128,10 +139,7 @@ export const createDicePvpUseCase = ({
 };
 
 const handleTierPick = async (
-  {
-    progression,
-    pvp,
-  }: Pick<ManageChallengeDependencies, "progression" | "pvp">,
+  { progression, pvp }: Pick<ManageChallengeDependencies, "progression" | "pvp">,
   actorId: string,
   action: Extract<DicePvpAction, { type: "pick" }>,
   publishChallenge: PublishChallenge | null,
@@ -202,13 +210,7 @@ const handleTierPick = async (
 };
 
 const handleChallengeAccept = (
-  {
-    analytics,
-    hostileEffects,
-    progression,
-    pvp,
-    unitOfWork,
-  }: ManageChallengeDependencies,
+  { analytics, hostileEffects, progression, pvp, unitOfWork }: ManageChallengeDependencies,
   actorId: string,
   challengeId: string,
   nowMs: number,
@@ -245,7 +247,12 @@ const handleChallengeAccept = (
 
   const challengerLockoutUntil = pvp.getActiveDiceLockout(challenge.challengerId, nowMs);
   if (challengerLockoutUntil) {
-    return cancelChallengeForLockout(pvp, challenge, challenge.challengerId, challengerLockoutUntil);
+    return cancelChallengeForLockout(
+      pvp,
+      challenge,
+      challenge.challengerId,
+      challengerLockoutUntil,
+    );
   }
 
   const opponentLockoutUntil = pvp.getActiveDiceLockout(opponentIdForDuel, nowMs);
@@ -377,9 +384,7 @@ const handleChallengeAccept = (
 };
 
 const handleChallengeDecline = (
-  {
-    pvp,
-  }: Pick<ManageChallengeDependencies, "pvp">,
+  { pvp }: Pick<ManageChallengeDependencies, "pvp">,
   actorId: string,
   challengeId: string,
   nowMs: number,
@@ -412,7 +417,12 @@ const handleChallengeDecline = (
 
   const challengerLockoutUntil = pvp.getActiveDiceLockout(challenge.challengerId, nowMs);
   if (challengerLockoutUntil) {
-    return cancelChallengeForLockout(pvp, challenge, challenge.challengerId, challengerLockoutUntil);
+    return cancelChallengeForLockout(
+      pvp,
+      challenge,
+      challenge.challengerId,
+      challengerLockoutUntil,
+    );
   }
 
   if (challenge.opponentId !== dicePvpOpenOpponentId) {

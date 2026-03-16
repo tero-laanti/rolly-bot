@@ -161,7 +161,7 @@ Important rules:
 - [src/app/bootstrap/](src/app/bootstrap/) contains the startup entrypoints used by [src/index.ts](src/index.ts) and [src/deploy-commands.ts](src/deploy-commands.ts).
 - [src/app/discord/](src/app/discord/) contains the Discord runtime, interaction helpers, button router, and explicit command registry.
 - [src/dice/progression/](src/dice/progression/), [src/dice/inventory/](src/dice/inventory/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), and [src/dice/random-events/](src/dice/random-events/) are the main gameplay contexts.
-- [src/dice/*/infrastructure/sqlite/services.ts](src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
+- [src/dice/\*/infrastructure/sqlite/services.ts](src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
 - [src/system/self-update/](src/system/self-update/) contains the self-update application use case, infrastructure command runner, and owner-only Discord command.
 - [src/shared/](src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
 - [src/shared-kernel/](src/shared-kernel/) contains shared architecture primitives and types.

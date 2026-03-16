@@ -54,10 +54,7 @@ const getInventoryQuantity = (
   return normalizeQuantity(row?.quantity ?? 0);
 };
 
-const getOwnedInventoryEntries = (
-  db: SqliteDatabase,
-  userId: string,
-): DiceInventoryEntry[] => {
+const getOwnedInventoryEntries = (db: SqliteDatabase, userId: string): DiceInventoryEntry[] => {
   const quantities = getInventoryQuantities(db, userId);
   return getDiceShopItems()
     .map((item) => ({
@@ -159,9 +156,7 @@ const consumeInventoryItem = (
   })();
 };
 
-export const createSqliteInventoryRepository = (
-  db: SqliteDatabase,
-): DiceInventoryRepository => {
+export const createSqliteInventoryRepository = (db: SqliteDatabase): DiceInventoryRepository => {
   return {
     getInventoryQuantities: (userId) => getInventoryQuantities(db, userId),
     getInventoryQuantity: (userId, itemId) => getInventoryQuantity(db, userId, itemId),

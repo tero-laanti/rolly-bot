@@ -29,10 +29,7 @@ export const normalizeDicePrestige = (prestige: number): number => {
   return Math.min(getMaxDicePrestige(), Math.max(0, Math.floor(prestige)));
 };
 
-export const normalizeActiveDicePrestige = (
-  prestige: number,
-  highestPrestige: number,
-): number => {
+export const normalizeActiveDicePrestige = (prestige: number, highestPrestige: number): number => {
   return Math.min(normalizeDicePrestige(highestPrestige), normalizeDicePrestige(prestige));
 };
 

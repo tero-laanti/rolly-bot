@@ -44,11 +44,8 @@ export const createSqliteDiceInventoryCommandServices = (db: SqliteDatabase) => 
       inventory,
       useDiceItem,
     }),
-    refundInventoryItem: (input: {
-      userId: string;
-      itemId: string;
-      quantity?: number;
-    }) => inventory.grantInventoryItem(input),
+    refundInventoryItem: (input: { userId: string; itemId: string; quantity?: number }) =>
+      inventory.grantInventoryItem(input),
     triggerRandomGroupEvent: triggerRandomGroupEventNow,
   };
 };

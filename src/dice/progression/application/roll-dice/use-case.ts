@@ -48,10 +48,7 @@ type RunRollDiceDependencies = {
     "recordDiceRollAnalytics" | "resetDiceLevelAnalyticsProgress"
   >;
   economy: Pick<DiceEconomyRepository, "applyFameDelta" | "getFame">;
-  itemEffects: Pick<
-    DiceItemEffectsService,
-    "consumeOneDoubleRollUse" | "getItemDoubleRollStatus"
-  >;
+  itemEffects: Pick<DiceItemEffectsService, "consumeOneDoubleRollUse" | "getItemDoubleRollStatus">;
   progression: Pick<
     DiceProgressionRepository,
     | "awardAchievements"
@@ -140,8 +137,7 @@ export const createRunRollDiceUseCase = ({
         ? Math.max(chargeRollPassCount, nonChargeRollPassCount)
         : nonChargeRollPassCount;
     const rollPassCount = Math.max(1, Math.min(getDiceMaxRollPassCount(), uncappedRollPassCount));
-    const didChargePathWin =
-      chargeMultiplier > 1 && chargeRollPassCount >= nonChargeRollPassCount;
+    const didChargePathWin = chargeMultiplier > 1 && chargeRollPassCount >= nonChargeRollPassCount;
     const dieSides = progression.getDiceSides(userId);
     const fameBefore = economy.getFame(userId);
     const unlockedBansBefore = getUnlockedBanSlotsFromFame(fameBefore, level, dieSides);

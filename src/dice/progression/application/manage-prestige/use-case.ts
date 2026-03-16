@@ -1,4 +1,7 @@
-import { getDiceAchievement, getPrestigeAchievementId } from "../../../progression/domain/achievements";
+import {
+  getDiceAchievement,
+  getPrestigeAchievementId,
+} from "../../../progression/domain/achievements";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import {
   getDicePrestigeBaseLevel,
@@ -263,10 +266,7 @@ const buildMainView = (
   };
 };
 
-const buildSelectView = (
-  userId: string,
-  state: PrestigeState,
-): ActionView<DicePrestigeAction> => {
+const buildSelectView = (userId: string, state: PrestigeState): ActionView<DicePrestigeAction> => {
   const levelButtons: ActionButtonSpec<DicePrestigeAction>[] = Array.from(
     { length: state.highestPrestige + 1 },
     (_, index) => {
