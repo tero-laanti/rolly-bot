@@ -73,8 +73,15 @@ export const buildActiveClaimDescription = (
   prompt: string,
   activityLine: string | null,
   expiresAtMs: number | null,
+  participants: string[] = [],
 ): string => {
   const lines = [prompt];
+
+  if (participants.length > 0) {
+    const participantMentions = participants.map((userId) => `<@${userId}>`).join(", ");
+    const participantLabel = participants.length === 1 ? "Participant" : "Participants";
+    lines.push("", `**${participantLabel} so far:** ${participantMentions}`);
+  }
 
   if (activityLine) {
     lines.push("", activityLine);
