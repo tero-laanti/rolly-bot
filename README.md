@@ -142,31 +142,28 @@ Rolly is a pragmatic domain-driven modular monolith.
   `application/` for use cases and ports,
   `infrastructure/` for SQLite and runtime adapters,
   `interfaces/discord/` for slash commands, buttons, and presenters.
-- `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract. `src/dice/economy/domain/balance.ts` holds shared economy value types, and `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
-- `src/dice/random-events/domain/` exposes random-event contract types for external consumers such as `rolly-data`, while `src/dice/random-events/infrastructure/` owns runtime wiring, scheduling, and admin control.
+- `src/system/self-update/` follows the same application/infrastructure/interfaces split as the dice contexts.
 - `src/shared-kernel/` contains small, stable shared architecture primitives such as action-view models.
 - `src/shared/` contains shared infrastructure such as db, env, config, and cross-cutting helpers.
+- `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
 
 Important rules:
 
 - New feature work should start in the owning `src/dice/<context>/` folder.
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](src/app/discord/command-registry.ts). Command discovery is not filesystem-based.
-- For SQLite-backed flows, build use cases from `src/dice/*/infrastructure/sqlite/services.ts`. Keep `application/` code on ports and `UnitOfWork`, not `shared/db`.
-- Keep `application/` and `domain/` code free of `infrastructure/` and `interfaces/` imports. Wire concrete adapters in `infrastructure/` or `app/`.
-- For interactive Discord flows, prefer button id parsing in `interfaces/discord/buttons/`, pure application output models, and Discord rendering in `interfaces/discord/presenters/`.
-- Legacy compatibility shims under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
+- Keep `application/` and `domain/` code free of Discord runtime and infrastructure dependencies. Wire concrete adapters in `infrastructure/` or `app/`.
+- Contributor-specific implementation guardrails live in [AGENTS.md](AGENTS.md).
 
 ## Project Layout
 
 - [src/app/bootstrap/](src/app/bootstrap/) contains the startup entrypoints used by [src/index.ts](src/index.ts) and [src/deploy-commands.ts](src/deploy-commands.ts).
 - [src/app/discord/](src/app/discord/) contains the Discord runtime, interaction helpers, button router, and explicit command registry.
-- [src/dice/progression/](src/dice/progression/), [src/dice/inventory/](src/dice/inventory/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), and [src/dice/random-events/](src/dice/random-events/) are the main gameplay contexts.
+- [src/dice/progression/](src/dice/progression/), [src/dice/economy/](src/dice/economy/), [src/dice/inventory/](src/dice/inventory/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), and [src/dice/random-events/](src/dice/random-events/) are the main gameplay contexts.
 - [src/dice/\*/infrastructure/sqlite/services.ts](src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
 - [src/system/self-update/](src/system/self-update/) contains the self-update application use case, infrastructure command runner, and owner-only Discord command.
 - [src/shared/](src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
 - [src/shared-kernel/](src/shared-kernel/) contains shared architecture primitives and types.
 - [src/rolly-data/](src/rolly-data/) is the boundary for hidden gameplay data loading and validation.
-- [src/bot/](src/bot/) still contains a few compatibility wrappers for top-level runtime imports.
 - [eslint.config.js](eslint.config.js) enforces the current architecture guardrails.
 
 ## Adding Features

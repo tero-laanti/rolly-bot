@@ -31,25 +31,7 @@ module.exports = [
   },
   {
     files: ["src/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/shared/economy"],
-              message:
-                "The legacy shared/economy compatibility path was removed. Import from the owning context instead.",
-            },
-            {
-              group: ["**/dice/core/**", "**/dice/features/**"],
-              message:
-                "Legacy compatibility paths were removed. Import from the owning context path instead.",
-            },
-          ],
-        },
-      ],
-    },
+    rules: {},
   },
   {
     files: [
@@ -85,7 +67,7 @@ module.exports = [
                 "Context application and domain code must not depend on infrastructure or interface modules.",
             },
             {
-              group: ["**/app/discord/**", "**/bot/**"],
+              group: ["**/app/discord/**"],
               message:
                 "Context application and domain code must not depend on Discord runtime modules.",
             },
@@ -120,7 +102,7 @@ module.exports = [
                 "Context application code must not depend on infrastructure or interface modules.",
             },
             {
-              group: ["**/app/discord/**", "**/bot/**"],
+              group: ["**/app/discord/**"],
               message:
                 "Context application and domain code must not depend on Discord runtime modules.",
             },
