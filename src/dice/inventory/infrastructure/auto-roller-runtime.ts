@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
+import type { AutoRollSessionReservation } from "../application/ports";
 import { createSqliteRollDiceUseCase } from "../../progression/infrastructure/sqlite/services";
 
 const progressBarWidth = 20;
@@ -16,15 +17,6 @@ type AutoRollSession = {
   interestingRolls: number;
   highlights: string[];
   timer: ReturnType<typeof setTimeout> | null;
-};
-
-export type AutoRollSessionReservation = {
-  id: string;
-  userId: string;
-  itemName: string;
-  durationSeconds: number;
-  intervalSeconds: number;
-  totalRolls: number;
 };
 
 const reservedSessionIdsByUserId = new Map<string, string>();

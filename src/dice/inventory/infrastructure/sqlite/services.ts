@@ -2,6 +2,7 @@ import type { SqliteDatabase } from "../../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
+import { triggerRandomGroupEventNow } from "../../../random-events/infrastructure/admin-controller";
 import { createDiceInventoryUseCase } from "../../application/manage-inventory/use-case";
 import { createDiceShopUseCase } from "../../application/manage-shop/use-case";
 import { createUseDiceItemUseCase } from "../../application/use-item/use-case";
@@ -32,6 +33,24 @@ export const createSqliteDiceInventoryUseCase = (db: SqliteDatabase) => {
     inventory,
     useDiceItem,
   });
+};
+
+export const createSqliteDiceInventoryCommandServices = (db: SqliteDatabase) => {
+  const inventory = createSqliteInventoryRepository(db);
+  const useDiceItem = createSqliteUseDiceItemUseCase(db);
+
+  return {
+    inventoryUseCase: createDiceInventoryUseCase({
+      inventory,
+      useDiceItem,
+    }),
+    refundInventoryItem: (input: {
+      userId: string;
+      itemId: string;
+      quantity?: number;
+    }) => inventory.grantInventoryItem(input),
+    triggerRandomGroupEvent: triggerRandomGroupEventNow,
+  };
 };
 
 export const createSqliteDiceShopUseCase = (db: SqliteDatabase) => {

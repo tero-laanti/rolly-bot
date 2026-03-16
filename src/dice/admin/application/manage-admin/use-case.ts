@@ -1,10 +1,7 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import {
-  getRandomEventsAdminStatus,
-  triggerRandomEventNow,
-} from "../../../random-events/infrastructure/admin-controller";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
+import type { RandomEventsAdminPort } from "../../../random-events/application/ports";
 import type { DiceTemporaryEffect } from "../../../progression/domain/temporary-effects";
 
 export type DiceAdminAction =
@@ -42,6 +39,7 @@ type ManageAdminDependencies = {
     "clearAllDiceTemporaryEffects" | "getActiveDiceTemporaryEffects"
   >;
   pvp: Pick<DicePvpRepository, "getActiveDoubleRoll" | "getActiveDiceLockout" | "setDicePvpEffects">;
+  randomEventsAdmin: RandomEventsAdminPort;
 };
 
 export const createDiceAdminReply = (
@@ -67,7 +65,11 @@ export const createDiceAdminReply = (
   };
 };
 
-export const createDiceAdminUseCase = ({ progression, pvp }: ManageAdminDependencies) => {
+export const createDiceAdminUseCase = ({
+  progression,
+  pvp,
+  randomEventsAdmin,
+}: ManageAdminDependencies) => {
   const handleDiceAdminAction = async (
     ownerId: string | null,
     actorId: string,
@@ -83,7 +85,9 @@ export const createDiceAdminUseCase = ({ progression, pvp }: ManageAdminDependen
     }
 
     if (action.type === "status") {
-      return updateView(buildStatusView(action.ownerId, action.targetUserId, guildId));
+      return updateView(
+        buildStatusView(randomEventsAdmin, action.ownerId, action.targetUserId, guildId),
+      );
     }
 
     if (action.type === "effects-user") {
@@ -96,7 +100,9 @@ export const createDiceAdminUseCase = ({ progression, pvp }: ManageAdminDependen
       );
     }
 
-    return editView(await buildEventTriggerView(action.ownerId, action.targetUserId));
+    return editView(
+      await buildEventTriggerView(randomEventsAdmin, action.ownerId, action.targetUserId),
+    );
   };
 
   return {
@@ -140,11 +146,12 @@ const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAd
 };
 
 const buildStatusView = (
+  randomEventsAdmin: RandomEventsAdminPort,
   ownerId: string,
   targetUserId: string,
   guildId: string | null,
 ): ActionView<DiceAdminAction> => {
-  const status = getRandomEventsAdminStatus();
+  const status = randomEventsAdmin.getAdminStatus();
   if (!status) {
     return {
       content: "**Dice admin · status**\nRandom-event runtime is currently unavailable.",
@@ -247,10 +254,11 @@ const buildEffectsClearView = (
 };
 
 const buildEventTriggerView = async (
+  randomEventsAdmin: RandomEventsAdminPort,
   ownerId: string,
   targetUserId: string,
 ): Promise<ActionView<DiceAdminAction>> => {
-  const result = await triggerRandomEventNow();
+  const result = await randomEventsAdmin.triggerEventNow();
   if (!result.ok) {
     const content =
       result.reason === "disabled"

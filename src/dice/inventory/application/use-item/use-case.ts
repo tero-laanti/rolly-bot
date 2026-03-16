@@ -1,10 +1,11 @@
-import type { TriggerRandomEventNowResult } from "../../../random-events/infrastructure/admin-controller";
-import {
-  type DiceShopItem,
-} from "../../../inventory/domain/shop";
-import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";
+import type { TriggerRandomEventNowResult } from "../../../random-events/application/ports";
+import type { DiceShopItem } from "../../../inventory/domain/shop";
 import type { DiceItemEffectsService } from "../item-effects-service";
-import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
+import type {
+  AutoRollSessionReservation,
+  DiceInventoryRepository,
+  DiceShopCatalog,
+} from "../ports";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 

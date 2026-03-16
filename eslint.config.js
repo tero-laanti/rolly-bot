@@ -80,6 +80,11 @@ module.exports = [
               message: "Discord imports belong in interfaces/discord or app/discord only.",
             },
             {
+              group: ["**/infrastructure/**", "**/interfaces/**"],
+              message:
+                "Context application and domain code must not depend on infrastructure or interface modules.",
+            },
+            {
               group: ["**/app/discord/**", "**/bot/**"],
               message: "Context application and domain code must not depend on Discord runtime modules.",
             },
@@ -107,6 +112,11 @@ module.exports = [
             {
               group: ["discord.js"],
               message: "Discord imports belong in interfaces/discord or app/discord only.",
+            },
+            {
+              group: ["**/infrastructure/**", "**/interfaces/**"],
+              message:
+                "Context application code must not depend on infrastructure or interface modules.",
             },
             {
               group: ["**/app/discord/**", "**/bot/**"],

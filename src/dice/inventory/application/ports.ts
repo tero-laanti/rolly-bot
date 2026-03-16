@@ -5,6 +5,15 @@ import type {
   DiceShopItemId,
 } from "../domain/shop";
 
+export type AutoRollSessionReservation = {
+  id: string;
+  userId: string;
+  itemName: string;
+  durationSeconds: number;
+  intervalSeconds: number;
+  totalRolls: number;
+};
+
 export type DiceInventoryRepository = {
   getInventoryQuantities: (userId: string) => Map<DiceShopItemId, number>;
   getInventoryQuantity: (userId: string, itemId: DiceShopItemId) => number;

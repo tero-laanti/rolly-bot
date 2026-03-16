@@ -1,11 +1,6 @@
 import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
-import {
-  buildUpdateSteps,
-  formatCommandResult,
-  runCommandStep,
-  truncateCommandOutput,
-} from "../../../infrastructure/update-runner";
+import { createLocalRunSelfUpdateUseCase } from "../../../infrastructure/update-runner";
 
 const ownerEnvName = "DISCORD_OWNER_ID";
 const outputLimit = 1800;
@@ -41,29 +36,17 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   }
 
   const install = interaction.options.getBoolean("install") ?? false;
-  const steps = buildUpdateSteps({ install });
+  const runSelfUpdate = createLocalRunSelfUpdateUseCase({
+    outputLimit,
+  });
 
   await interaction.deferReply({ ephemeral: true });
 
-  const results: string[] = [];
-  let success = true;
+  const result = await runSelfUpdate({ install });
 
-  for (const step of steps) {
-    const result = await runCommandStep(step);
-    results.push(formatCommandResult(result));
-    if (result.code !== 0) {
-      success = false;
-      break;
-    }
-  }
+  await interaction.editReply(result.responseText);
 
-  const summary = success ? "Update finished." : "Update failed.";
-  const detail = truncateCommandOutput(results.join("\n\n"), outputLimit);
-  const response = detail ? `${summary}\n\n\`\`\`\n${detail}\n\`\`\`` : summary;
-
-  await interaction.editReply(response);
-
-  if (success) {
+  if (result.success) {
     setTimeout(() => process.exit(0), 1000);
   }
 };

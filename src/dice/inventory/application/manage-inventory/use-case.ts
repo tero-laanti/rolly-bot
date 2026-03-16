@@ -1,12 +1,11 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
-import type { AutoRollSessionReservation } from "../../infrastructure/auto-roller-runtime";
 import {
   type UseDiceItemResult,
   type ReserveAutoRollSession,
   type TriggerRandomGroupEvent,
 } from "../use-item/use-case";
 import type { DiceInventoryEntry } from "../../../inventory/domain/shop";
-import type { DiceInventoryRepository } from "../ports";
+import type { AutoRollSessionReservation, DiceInventoryRepository } from "../ports";
 
 export type DiceInventoryAction =
   | {
