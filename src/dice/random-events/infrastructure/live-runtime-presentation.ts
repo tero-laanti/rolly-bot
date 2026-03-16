@@ -69,12 +69,30 @@ export const buildClaimActivityLine = (
   return `<@${userId}> did ${actionText}.`;
 };
 
+const formatParticipantMentions = (participants: string[], maxVisible = 5): string => {
+  const visibleParticipants = participants.slice(0, maxVisible).map((userId) => `<@${userId}>`);
+  const hiddenCount = participants.length - visibleParticipants.length;
+
+  if (hiddenCount < 1) {
+    return visibleParticipants.join(", ");
+  }
+
+  const hiddenLabel = `and ${hiddenCount} more`;
+  return `${visibleParticipants.join(", ")}, ${hiddenLabel}`;
+};
+
 export const buildActiveClaimDescription = (
   prompt: string,
   activityLine: string | null,
   expiresAtMs: number | null,
+  participants: string[] = [],
 ): string => {
   const lines = [prompt];
+
+  if (participants.length > 0) {
+    const participantLabel = participants.length === 1 ? "Participant" : "Participants";
+    lines.push("", `**${participantLabel} so far:** ${formatParticipantMentions(participants)}`);
+  }
 
   if (activityLine) {
     lines.push("", activityLine);

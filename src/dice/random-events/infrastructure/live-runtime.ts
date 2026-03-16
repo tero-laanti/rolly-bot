@@ -94,6 +94,7 @@ export const createRandomEventsLiveRuntime = ({
         context.selection.renderedPrompt,
         activityLine,
         windowSnapshot?.expiresAtMs ?? null,
+        windowSnapshot?.participants ?? [],
       ),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
       buttonLabel: context.selection.renderedClaimLabel,
