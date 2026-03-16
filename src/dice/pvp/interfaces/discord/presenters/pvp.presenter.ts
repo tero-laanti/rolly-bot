@@ -3,10 +3,7 @@ import {
   renderActionResult,
   renderActionView,
 } from "../../../../../app/discord/render-action-result";
-import type {
-  DicePvpResult,
-  DicePvpAction,
-} from "../../../application/manage-challenge/use-case";
+import type { DicePvpResult, DicePvpAction } from "../../../application/manage-challenge/use-case";
 import { encodeDicePvpAction } from "../buttons/pvp-buttons";
 import type { ActionView } from "../../../../../shared-kernel/application/action-view";
 

@@ -17,10 +17,7 @@ import {
   getRandomEventEmbedTitle,
   getRandomEventRarityPresentation,
 } from "./live-runtime-presentation";
-import type {
-  ActiveRandomEventContext,
-  RandomEventsLiveRuntimeLogger,
-} from "./live-runtime-types";
+import type { ActiveRandomEventContext, RandomEventsLiveRuntimeLogger } from "./live-runtime-types";
 
 const cloneVarietyState = (state: RandomEventVarietyState): RandomEventVarietyState => {
   return {

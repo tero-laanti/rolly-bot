@@ -297,15 +297,12 @@ const updateDicePvpStats = (
   });
 };
 
-export const createSqliteAnalyticsRepository = (
-  db: SqliteDatabase,
-): DiceAnalyticsRepository => {
+export const createSqliteAnalyticsRepository = (db: SqliteDatabase): DiceAnalyticsRepository => {
   return {
     getDiceAnalytics: (userId) => getDiceAnalytics(db, userId),
     recordDiceRollAnalytics: (update) => recordDiceRollAnalytics(db, update),
     resetDiceLevelAnalyticsProgress: (userId) => resetDiceLevelAnalyticsProgress(db, userId),
-    resetDicePrestigeAnalyticsProgress: (userId) =>
-      resetDicePrestigeAnalyticsProgress(db, userId),
+    resetDicePrestigeAnalyticsProgress: (userId) => resetDicePrestigeAnalyticsProgress(db, userId),
     updateDicePvpStats: (update) => updateDicePvpStats(db, update),
   };
 };

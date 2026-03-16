@@ -1,6 +1,9 @@
 import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
+import {
+  applyButtonResult,
+  applyChatInputResult,
+} from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteDiceAdminUseCase } from "../../../infrastructure/sqlite/services";
 import { diceAdminButtonPrefix, parseDiceAdminAction } from "../buttons/admin-buttons";

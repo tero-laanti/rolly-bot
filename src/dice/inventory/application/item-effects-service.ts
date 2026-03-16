@@ -9,16 +9,8 @@ export type DiceItemDoubleRollStatus = {
 export type DiceItemEffectsService = {
   getItemDoubleRollStatus: (userId: string, nowMs?: number) => DiceItemDoubleRollStatus;
   consumeOneDoubleRollUse: (userId: string, nowMs?: number) => boolean;
-  grantNegativeEffectShield: (input: {
-    userId: string;
-    source: string;
-    charges?: number;
-  }) => void;
-  grantDoubleRollUses: (input: {
-    userId: string;
-    source: string;
-    uses: number;
-  }) => void;
+  grantNegativeEffectShield: (input: { userId: string; source: string; charges?: number }) => void;
+  grantDoubleRollUses: (input: { userId: string; source: string; uses: number }) => void;
   grantDoubleRollDuration: (input: {
     userId: string;
     source: string;

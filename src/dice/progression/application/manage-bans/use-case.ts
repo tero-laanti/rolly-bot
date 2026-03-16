@@ -1,8 +1,5 @@
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
-import {
-  getMaxBansPerDie,
-  getUnlockedBanSlotsFromFame,
-} from "../../../progression/domain/bans";
+import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "../../../progression/domain/bans";
 import type { DiceProgressionRepository } from "../ports";
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 
@@ -57,10 +54,7 @@ type ManageBansDependencies = {
   >;
 };
 
-export const createDiceBansUseCase = ({
-  economy,
-  progression,
-}: ManageBansDependencies) => {
+export const createDiceBansUseCase = ({ economy, progression }: ManageBansDependencies) => {
   const createDiceBansReply = (userId: string): DiceBansResult => {
     const diceLevel = progression.getDiceLevel(userId);
     const dieSides = progression.getDiceSides(userId);
@@ -90,10 +84,7 @@ export const createDiceBansUseCase = ({
     };
   };
 
-  const handleDiceBansAction = (
-    actorId: string,
-    action: DiceBansAction,
-  ): DiceBansResult => {
+  const handleDiceBansAction = (actorId: string, action: DiceBansAction): DiceBansResult => {
     if (actorId !== action.ownerId) {
       return {
         kind: "reply",
@@ -336,10 +327,9 @@ const buildDieSelectionView = (
     };
   });
 
-  const contentSections = [
-    prefixMessage,
-    buildDieSelectionContent({ bans, unlockedSlots }),
-  ].filter((section): section is string => Boolean(section));
+  const contentSections = [prefixMessage, buildDieSelectionContent({ bans, unlockedSlots })].filter(
+    (section): section is string => Boolean(section),
+  );
 
   return {
     content: contentSections.join("\n"),

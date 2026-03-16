@@ -1,6 +1,9 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
+import {
+  applyButtonResult,
+  applyChatInputResult,
+} from "../../../../../app/discord/interaction-response";
 import {
   buildAutoRollSessionStartingContent,
   releaseAutoRollSessionReservation,
@@ -12,10 +15,7 @@ import {
   createSqliteDiceInventoryCommandServices,
   createSqliteDiceInventoryUseCase,
 } from "../../../infrastructure/sqlite/services";
-import {
-  diceInventoryButtonPrefix,
-  parseDiceInventoryAction,
-} from "../buttons/inventory-buttons";
+import { diceInventoryButtonPrefix, parseDiceInventoryAction } from "../buttons/inventory-buttons";
 import { renderDiceInventoryResult } from "../presenters/inventory.presenter";
 
 const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {

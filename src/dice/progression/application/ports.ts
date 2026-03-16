@@ -54,14 +54,8 @@ export type DiceProgressionRepository = {
     input: GetActiveDiceTemporaryEffectsInput,
   ) => DiceTemporaryEffect[];
   applyDiceTemporaryEffect: (input: ApplyDiceTemporaryEffectInput) => DiceTemporaryEffect;
-  consumeDiceTemporaryEffectsForRoll: (
-    input: ConsumeDiceTemporaryEffectsForRollInput,
-  ) => number;
+  consumeDiceTemporaryEffectsForRoll: (input: ConsumeDiceTemporaryEffectsForRollInput) => number;
   clearAllDiceTemporaryEffects: (userId: string) => number;
   clearNegativeDiceTemporaryEffects: (userId: string, nowMs?: number) => number;
-  consumeOldestEffectChargeByCode: (
-    userId: string,
-    effectCode: string,
-    nowMs?: number,
-  ) => boolean;
+  consumeOldestEffectChargeByCode: (userId: string, effectCode: string, nowMs?: number) => boolean;
 };

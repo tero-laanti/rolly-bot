@@ -1,6 +1,9 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
-import { applyButtonResult, applyChatInputResult } from "../../../../../app/discord/interaction-response";
+import {
+  applyButtonResult,
+  applyChatInputResult,
+} from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteDicePvpUseCase } from "../../../infrastructure/sqlite/services";
 import { dicePvpButtonPrefix, parseDicePvpAction } from "../buttons/pvp-buttons";

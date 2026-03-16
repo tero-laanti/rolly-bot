@@ -1,8 +1,4 @@
-import {
-  createRollContext,
-  diceAchievements,
-  type DiceAchievementId,
-} from "./achievements";
+import { createRollContext, diceAchievements, type DiceAchievementId } from "./achievements";
 
 export const getDiceAchievementsForRoll = (
   rolls: number[],

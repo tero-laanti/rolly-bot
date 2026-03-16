@@ -86,7 +86,8 @@ module.exports = [
             },
             {
               group: ["**/app/discord/**", "**/bot/**"],
-              message: "Context application and domain code must not depend on Discord runtime modules.",
+              message:
+                "Context application and domain code must not depend on Discord runtime modules.",
             },
           ],
         },
@@ -120,7 +121,8 @@ module.exports = [
             },
             {
               group: ["**/app/discord/**", "**/bot/**"],
-              message: "Context application and domain code must not depend on Discord runtime modules.",
+              message:
+                "Context application and domain code must not depend on Discord runtime modules.",
             },
             {
               group: ["**/shared/db"],
