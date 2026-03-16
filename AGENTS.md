@@ -36,10 +36,12 @@ This file contains repository-specific guidance for future implementers working 
 - Inside a context, use `domain/` for rules and value types, `application/` for use cases and ports, `infrastructure/` for adapters, and `interfaces/discord/` for Discord-specific parsing and rendering.
 - `src/dice/economy/application/ports.ts` defines the Fame/Pips repository contract, `src/dice/economy/domain/balance.ts` holds shared economy value types, and `src/dice/economy/infrastructure/sqlite/balance-repository.ts` is the current SQLite implementation.
 - `src/dice/random-events/domain/` is the source of truth for random-event contracts consumed outside the runtime implementation, including `rolly-data` validation.
+- `src/dice/random-events/application/ports.ts` owns the random-event admin contracts consumed by other contexts.
 - `src/dice/random-events/infrastructure/` is the source of truth for random-event runtime wiring, admin control, and scheduler logic.
 - `src/dice/progression/domain/`, `src/dice/inventory/domain/`, `src/dice/pvp/domain/`, and `src/dice/analytics/domain/` are the source-of-truth gameplay domains.
 - For SQLite-backed command flows, prefer the `infrastructure/sqlite/services.ts` builders for each context. Command adapters should build use cases there instead of passing `getDatabase()` into application modules.
 - New application code should depend on context ports plus `UnitOfWork`, not `shared/db`.
+- Keep context `application/` and `domain/` code free of `infrastructure/` and `interfaces/` imports. Wire adapters in `infrastructure/` or `app/`.
 - For interactive Discord flows, prefer this split:
   `interfaces/discord/buttons/` parses and encodes button ids,
   `application/` returns pure view models,
@@ -53,6 +55,7 @@ This file contains repository-specific guidance for future implementers working 
 - `src/shared-kernel/` contains stable shared types and architectural primitives.
 - `src/shared/` contains shared infrastructure such as db, config, env, and remaining cross-cutting helpers.
 - `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
+- `src/system/self-update/` follows the same application/infrastructure/interfaces split as the dice contexts.
 - `src/types/` contains shared types and module augmentation.
 - Legacy compatibility paths under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
 - `src/bot/` still exists as compatibility wrappers for a few top-level runtime imports.

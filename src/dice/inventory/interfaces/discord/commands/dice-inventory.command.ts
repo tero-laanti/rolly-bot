@@ -7,10 +7,11 @@ import {
   reserveAutoRollSession,
   startReservedAutoRollSession,
 } from "../../../infrastructure/auto-roller-runtime";
-import { triggerRandomGroupEventNow } from "../../../../random-events/infrastructure/admin-controller";
 import { getDatabase } from "../../../../../shared/db";
-import { createSqliteInventoryRepository } from "../../../infrastructure/sqlite/inventory-repository";
-import { createSqliteDiceInventoryUseCase } from "../../../infrastructure/sqlite/services";
+import {
+  createSqliteDiceInventoryCommandServices,
+  createSqliteDiceInventoryUseCase,
+} from "../../../infrastructure/sqlite/services";
 import {
   diceInventoryButtonPrefix,
   parseDiceInventoryAction,
@@ -19,8 +20,8 @@ import { renderDiceInventoryResult } from "../presenters/inventory.presenter";
 
 const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {
   const db = getDatabase();
-  const inventoryUseCase = createSqliteDiceInventoryUseCase(db);
-  const inventoryRepository = createSqliteInventoryRepository(db);
+  const { inventoryUseCase, refundInventoryItem, triggerRandomGroupEvent } =
+    createSqliteDiceInventoryCommandServices(db);
   const action = parseDiceInventoryAction(interaction.customId);
   if (!action) {
     await applyButtonResult(interaction, {
@@ -35,7 +36,7 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
 
   const outcome = await inventoryUseCase.handleDiceInventoryAction(interaction.user.id, action, {
     reserveAutoRollSession,
-    triggerRandomGroupEvent: triggerRandomGroupEventNow,
+    triggerRandomGroupEvent,
   });
 
   if (outcome.autoRollStart) {
@@ -64,7 +65,7 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
   }
 
   releaseAutoRollSessionReservation(outcome.autoRollStart.reservation);
-  inventoryRepository.grantInventoryItem({
+  refundInventoryItem({
     userId: interaction.user.id,
     itemId: outcome.autoRollStart.itemId,
     quantity: 1,

@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
+import type {
+  RandomEventsAdminPort,
+  RandomEventsAdminStatus,
+  TriggerRandomEventNowResult,
+} from "../application/ports";
 import {
   evaluateRandomEventTrigger,
   type RandomEventsFoundationSchedulerController,
-  type TriggerOpportunityResult,
 } from "./foundation-scheduler";
-import type {
-  RandomEventsLiveActiveEventSnapshot,
-  RandomEventsLiveRuntime,
-} from "./live-runtime";
+import type { RandomEventsLiveRuntime } from "./live-runtime";
 import {
   getRandomEventsStateSnapshot,
   registerActiveRandomEvent,
@@ -24,15 +25,6 @@ type RegisteredRandomEventsAdminController = {
   state: RandomEventsState;
   runtime: RandomEventsLiveRuntime;
   scheduler: RandomEventsFoundationSchedulerController;
-};
-
-export type RandomEventsAdminStatus = {
-  enabled: boolean;
-  channelId: string | null;
-  nextCheckAt: Date | null;
-  gate: ReturnType<typeof evaluateRandomEventTrigger>;
-  snapshot: ReturnType<typeof getRandomEventsStateSnapshot>;
-  activeEvents: RandomEventsLiveActiveEventSnapshot[];
 };
 
 let registeredController: RegisteredRandomEventsAdminController | null = null;
@@ -66,16 +58,6 @@ export const getRandomEventsAdminStatus = (): RandomEventsAdminStatus | null => 
     activeEvents: registeredController.runtime.getActiveEventsSnapshot(),
   };
 };
-
-export type TriggerRandomEventNowResult =
-  | {
-      ok: false;
-      reason: "unavailable" | "disabled" | "active-event-exists";
-    }
-  | {
-      ok: true;
-      result: TriggerOpportunityResult;
-    };
 
 const triggerRandomEventNowWithOptions = async (options?: {
   requiredClaimPolicy?: RandomEventClaimPolicy;
@@ -141,4 +123,10 @@ export const triggerRandomGroupEventNow = async (): Promise<TriggerRandomEventNo
   return triggerRandomEventNowWithOptions({
     requiredClaimPolicy: "multi-user",
   });
+};
+
+export const randomEventsAdminPort: RandomEventsAdminPort = {
+  getAdminStatus: getRandomEventsAdminStatus,
+  triggerEventNow: triggerRandomEventNow,
+  triggerGroupEventNow: triggerRandomGroupEventNow,
 };

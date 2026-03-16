@@ -152,6 +152,7 @@ Important rules:
 - New feature work should start in the owning `src/dice/<context>/` folder.
 - Slash commands and button handlers are registered explicitly in [src/app/discord/command-registry.ts](/Users/tero/workspace/rolly/src/app/discord/command-registry.ts). Command discovery is not filesystem-based.
 - For SQLite-backed flows, build use cases from `src/dice/*/infrastructure/sqlite/services.ts`. Keep `application/` code on ports and `UnitOfWork`, not `shared/db`.
+- Keep `application/` and `domain/` code free of `infrastructure/` and `interfaces/` imports. Wire concrete adapters in `infrastructure/` or `app/`.
 - For interactive Discord flows, prefer button id parsing in `interfaces/discord/buttons/`, pure application output models, and Discord rendering in `interfaces/discord/presenters/`.
 - Legacy compatibility shims under `src/dice/core/` and `src/dice/features/` were removed. Do not reintroduce them.
 
@@ -161,7 +162,7 @@ Important rules:
 - [src/app/discord/](/Users/tero/workspace/rolly/src/app/discord/) contains the Discord runtime, interaction helpers, button router, and explicit command registry.
 - [src/dice/progression/](/Users/tero/workspace/rolly/src/dice/progression/), [src/dice/inventory/](/Users/tero/workspace/rolly/src/dice/inventory/), [src/dice/pvp/](/Users/tero/workspace/rolly/src/dice/pvp/), [src/dice/analytics/](/Users/tero/workspace/rolly/src/dice/analytics/), [src/dice/admin/](/Users/tero/workspace/rolly/src/dice/admin/), and [src/dice/random-events/](/Users/tero/workspace/rolly/src/dice/random-events/) are the main gameplay contexts.
 - [src/dice/*/infrastructure/sqlite/services.ts](/Users/tero/workspace/rolly/src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
-- [src/system/self-update/interfaces/discord/commands/](/Users/tero/workspace/rolly/src/system/self-update/interfaces/discord/commands/) contains the owner-only `/self-update` command.
+- [src/system/self-update/](/Users/tero/workspace/rolly/src/system/self-update/) contains the self-update application use case, infrastructure command runner, and owner-only Discord command.
 - [src/shared/](/Users/tero/workspace/rolly/src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
 - [src/shared-kernel/](/Users/tero/workspace/rolly/src/shared-kernel/) contains shared architecture primitives and types.
 - [src/rolly-data/](/Users/tero/workspace/rolly/src/rolly-data/) is the boundary for hidden gameplay data loading and validation.
