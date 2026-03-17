@@ -35,6 +35,7 @@ export type BlackjackResolution =
     };
 
 const minuteMs = 60_000;
+export const dicePokerDiceCount = 5;
 
 const getCasinoBetConfig = () => {
   return getDiceCasinoData().bet;
@@ -436,10 +437,6 @@ export const standBlackjackRound = (round: BlackjackRoundState): BlackjackResolu
   };
 };
 
-export const getDicePokerDiceCount = (): number => {
-  return getDicePokerConfig().diceCount;
-};
-
 export const getDicePokerDieSides = (): number => {
   return getDicePokerConfig().dieSides;
 };
@@ -462,7 +459,7 @@ export const createDicePokerRound = (bet: number): DicePokerRoundState => {
   return {
     type: "dice-poker",
     bet,
-    initialRoll: rollDice(getDicePokerDiceCount(), getDicePokerDieSides()),
+    initialRoll: rollDice(dicePokerDiceCount, getDicePokerDieSides()),
     heldIndices: [],
     stage: "holding",
   };
@@ -488,17 +485,17 @@ export const classifyDicePokerHand = (roll: number[], bet: number): DicePokerRes
   const groups = [...counts.values()].sort((left, right) => right - left);
   const uniqueValues = [...counts.keys()].sort((left, right) => left - right);
   const isStraight =
-    uniqueValues.length === getDicePokerDiceCount() &&
-    uniqueValues.at(-1)! - uniqueValues[0]! === getDicePokerDiceCount() - 1;
+    uniqueValues.length === dicePokerDiceCount &&
+    uniqueValues.at(-1)! - uniqueValues[0]! === dicePokerDiceCount - 1;
 
-  if (groups[0] === getDicePokerDiceCount()) {
+  if (groups[0] === dicePokerDiceCount) {
     return {
       kind: "five-of-a-kind",
       payout: bet * getDicePokerPayoutMultiplier("five-of-a-kind"),
     };
   }
 
-  if (groups[0] === getDicePokerDiceCount() - 1) {
+  if (groups[0] === dicePokerDiceCount - 1) {
     return {
       kind: "four-of-a-kind",
       payout: bet * getDicePokerPayoutMultiplier("four-of-a-kind"),
