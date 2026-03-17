@@ -111,5 +111,31 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
 
     CREATE INDEX IF NOT EXISTS idx_dice_temporary_effects_user_stack_group
       ON dice_temporary_effects (user_id, stack_group);
+
+    CREATE TABLE IF NOT EXISTS dice_casino_sessions (
+      user_id TEXT PRIMARY KEY,
+      bet INTEGER NOT NULL CHECK (bet >= 1),
+      game TEXT NOT NULL,
+      state_json TEXT NOT NULL,
+      status TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_casino_analytics (
+      user_id TEXT NOT NULL,
+      game TEXT NOT NULL,
+      bet_tier TEXT NOT NULL,
+      rounds_started INTEGER NOT NULL DEFAULT 0,
+      rounds_completed INTEGER NOT NULL DEFAULT 0,
+      wins INTEGER NOT NULL DEFAULT 0,
+      losses INTEGER NOT NULL DEFAULT 0,
+      pushes INTEGER NOT NULL DEFAULT 0,
+      total_wagered INTEGER NOT NULL DEFAULT 0,
+      total_paid_out INTEGER NOT NULL DEFAULT 0,
+      largest_payout INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, game, bet_tier)
+    );
   `);
 };

@@ -122,6 +122,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 
 - `/dice` rolls your current dice set, handles level-ups, rewards, charge rolls, temporary effects, and achievements.
 - `/dice-prestige` manages prestige progression and active prestige selection.
+- `/dice-casino` opens the casino panel for Exact Roll, Push Your Luck, Blackjack, and Dice Poker.
 - `/dice-shop` lets players spend Pips on shop items and build an inventory.
 - `/dice-inventory` shows owned items and lets players use them.
 - `/dice-bans` configures banned values on your current dice setup.
@@ -136,7 +137,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 Rolly is a pragmatic domain-driven modular monolith.
 
 - `src/app/` contains the composition root and Discord runtime wiring.
-- `src/dice/<context>/` contains the source-of-truth gameplay code. Main contexts are progression, economy, inventory, PvP, analytics, admin, and random-events.
+- `src/dice/<context>/` contains the source-of-truth gameplay code. Main contexts are progression, economy, inventory, casino, PvP, analytics, admin, and random-events.
 - Each context follows the same basic split:
   `domain/` for rules and value types,
   `application/` for use cases and ports,
@@ -158,7 +159,7 @@ Important rules:
 
 - [src/app/bootstrap/](src/app/bootstrap/) contains the startup entrypoints used by [src/index.ts](src/index.ts) and [src/deploy-commands.ts](src/deploy-commands.ts).
 - [src/app/discord/](src/app/discord/) contains the Discord runtime, interaction helpers, button router, and explicit command registry.
-- [src/dice/progression/](src/dice/progression/), [src/dice/economy/](src/dice/economy/), [src/dice/inventory/](src/dice/inventory/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), and [src/dice/random-events/](src/dice/random-events/) are the main gameplay contexts.
+- [src/dice/progression/](src/dice/progression/), [src/dice/economy/](src/dice/economy/), [src/dice/inventory/](src/dice/inventory/), [src/dice/casino/](src/dice/casino/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), and [src/dice/random-events/](src/dice/random-events/) are the main gameplay contexts.
 - [src/dice/\*/infrastructure/sqlite/services.ts](src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
 - [src/system/self-update/](src/system/self-update/) contains the self-update application use case, infrastructure command runner, and owner-only Discord command.
 - [src/shared/](src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
