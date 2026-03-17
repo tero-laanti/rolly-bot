@@ -82,7 +82,6 @@ export type DiceBalanceData = {
     maxMultiplier: number;
   };
   pvp: {
-    maxTier: number;
     challengeExpireMinutes: number;
     loserLockoutBaseMinutes: number;
     winnerBuffBaseMinutes: number;

@@ -24,7 +24,7 @@ export const getMaxDicePrestige = (): number => {
 };
 
 export const getMaxDicePvpTier = (): number => {
-  return getDiceBalanceData().pvp.maxTier;
+  return getMaxDicePrestige();
 };
 
 export const getDicePvpChallengeExpireMs = (): number => {

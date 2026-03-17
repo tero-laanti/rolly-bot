@@ -8,7 +8,6 @@
     "maxMultiplier": 8
   },
   "pvp": {
-    "maxTier": 3,
     "challengeExpireMinutes": 3,
     "loserLockoutBaseMinutes": 30,
     "winnerBuffBaseMinutes": 3
