@@ -128,7 +128,6 @@ export type DiceCasinoData = {
     winPayoutMultiplier: number;
   };
   dicePoker: {
-    dieSides: number;
     payoutMultipliers: {
       fiveOfAKind: number;
       fourOfAKind: number;
