@@ -40,7 +40,6 @@
     "winPayoutMultiplier": 2
   },
   "dicePoker": {
-    "diceCount": 5,
     "dieSides": 8,
     "payoutMultipliers": {
       "fiveOfAKind": 20,

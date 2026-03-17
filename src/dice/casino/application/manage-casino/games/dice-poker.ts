@@ -1,9 +1,9 @@
 import {
   createDicePokerRound,
   describePokerResult,
+  dicePokerDiceCount,
   formatDice,
   getDiceCasinoBetTier,
-  getDicePokerDiceCount,
   getDicePokerDieSides,
   getDicePokerPayoutMultiplier,
   rerollDicePokerRound,
@@ -28,12 +28,11 @@ import type {
 } from "../types";
 
 const buildStraightExamples = (): string => {
-  const straightCount = getDicePokerDiceCount();
-  const maxStart = getDicePokerDieSides() - straightCount + 1;
+  const maxStart = getDicePokerDieSides() - dicePokerDiceCount + 1;
   const ranges: string[] = [];
 
   for (let start = 1; start <= maxStart; start += 1) {
-    ranges.push(`${start}-${start + straightCount - 1}`);
+    ranges.push(`${start}-${start + dicePokerDiceCount - 1}`);
   }
 
   return ranges.join(", ");
@@ -44,7 +43,7 @@ const buildDicePokerDescriptionLines = (
 ): string[] => {
   const lines = [
     "**Dice Poker**",
-    `Roll ${getDicePokerDiceCount()}d${getDicePokerDieSides()}, hold any subset from 0 to ${getDicePokerDiceCount()} dice, then reroll the rest once.`,
+    `Roll ${dicePokerDiceCount}d${getDicePokerDieSides()}, hold any subset from 0 to ${dicePokerDiceCount} dice, then reroll the rest once.`,
     `Five of a Kind: ${session.bet * getDicePokerPayoutMultiplier("five-of-a-kind")} total.`,
     `Four of a Kind: ${session.bet * getDicePokerPayoutMultiplier("four-of-a-kind")} total.`,
     `Full House: ${session.bet * getDicePokerPayoutMultiplier("full-house")} total.`,
@@ -120,7 +119,7 @@ const startDicePokerRound = ({
       state: {
         ...session.state,
         activeRound: pokerRound,
-        lastOutcome: `Dice Poker hand started. Hold any dice, including all ${getDicePokerDiceCount()}, then reroll once.`,
+        lastOutcome: `Dice Poker hand started. Hold any dice, including all ${dicePokerDiceCount}, then reroll once.`,
       },
     },
     nextPips,
