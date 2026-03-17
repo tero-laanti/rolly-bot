@@ -36,6 +36,7 @@ export type BlackjackResolution =
 
 const minuteMs = 60_000;
 export const dicePokerDiceCount = 5;
+export const dicePokerDieSides = 8;
 
 const getCasinoBetConfig = () => {
   return getDiceCasinoData().bet;
@@ -437,10 +438,6 @@ export const standBlackjackRound = (round: BlackjackRoundState): BlackjackResolu
   };
 };
 
-export const getDicePokerDieSides = (): number => {
-  return getDicePokerConfig().dieSides;
-};
-
 export const getDicePokerPayoutMultiplier = (kind: DicePokerHandKind): number => {
   const multipliers = getDicePokerConfig().payoutMultipliers;
   switch (kind) {
@@ -459,7 +456,7 @@ export const createDicePokerRound = (bet: number): DicePokerRoundState => {
   return {
     type: "dice-poker",
     bet,
-    initialRoll: rollDice(dicePokerDiceCount, getDicePokerDieSides()),
+    initialRoll: rollDice(dicePokerDiceCount, dicePokerDieSides),
     heldIndices: [],
     stage: "holding",
   };
@@ -469,7 +466,7 @@ export const rerollDicePokerRound = (
   round: DicePokerRoundState,
 ): { finalRoll: number[]; result: DicePokerResult } => {
   const finalRoll = round.initialRoll.map((value, index) =>
-    round.heldIndices.includes(index) ? value : rollDie(getDicePokerDieSides()),
+    round.heldIndices.includes(index) ? value : rollDie(dicePokerDieSides),
   );
   return {
     finalRoll,

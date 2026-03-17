@@ -840,7 +840,6 @@ export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
       ),
     },
     dicePoker: {
-      dieSides: readInteger(dicePoker.dieSides, "casinoV1.dicePoker.dieSides", 2),
       payoutMultipliers: {
         fiveOfAKind: readInteger(
           dicePokerPayoutMultipliers.fiveOfAKind,

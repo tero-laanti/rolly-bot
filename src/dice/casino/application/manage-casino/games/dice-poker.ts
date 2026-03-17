@@ -1,10 +1,10 @@
 import {
   createDicePokerRound,
+  dicePokerDieSides,
   describePokerResult,
   dicePokerDiceCount,
   formatDice,
   getDiceCasinoBetTier,
-  getDicePokerDieSides,
   getDicePokerPayoutMultiplier,
   rerollDicePokerRound,
 } from "../../../domain/game-rules";
@@ -28,7 +28,7 @@ import type {
 } from "../types";
 
 const buildStraightExamples = (): string => {
-  const maxStart = getDicePokerDieSides() - dicePokerDiceCount + 1;
+  const maxStart = dicePokerDieSides - dicePokerDiceCount + 1;
   const ranges: string[] = [];
 
   for (let start = 1; start <= maxStart; start += 1) {
@@ -43,7 +43,7 @@ const buildDicePokerDescriptionLines = (
 ): string[] => {
   const lines = [
     "**Dice Poker**",
-    `Roll ${dicePokerDiceCount}d${getDicePokerDieSides()}, hold any subset from 0 to ${dicePokerDiceCount} dice, then reroll the rest once.`,
+    `Roll ${dicePokerDiceCount}d${dicePokerDieSides}, hold any subset from 0 to ${dicePokerDiceCount} dice, then reroll the rest once.`,
     `Five of a Kind: ${session.bet * getDicePokerPayoutMultiplier("five-of-a-kind")} total.`,
     `Four of a Kind: ${session.bet * getDicePokerPayoutMultiplier("four-of-a-kind")} total.`,
     `Full House: ${session.bet * getDicePokerPayoutMultiplier("full-house")} total.`,

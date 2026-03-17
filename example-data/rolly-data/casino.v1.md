@@ -90,7 +90,6 @@ Dice Poker:
 ```json
 {
   "dicePoker": {
-    "dieSides": 8,
     "payoutMultipliers": {
       "fiveOfAKind": 20,
       "fourOfAKind": 10,
@@ -101,7 +100,6 @@ Dice Poker:
 }
 ```
 
-- Dice Poker always uses a five-die hand in the current implementation.
-- `dieSides` defines the die size for each of those five dice.
+- Dice Poker always uses a five-die `d8` hand in the current implementation.
 - Payout multipliers are total payout multipliers applied to the bet.
 - Only the listed hand kinds are paid in the current implementation.
