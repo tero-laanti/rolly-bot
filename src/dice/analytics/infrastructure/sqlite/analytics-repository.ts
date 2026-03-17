@@ -1,6 +1,11 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { DiceAnalyticsRepository } from "../../application/ports";
-import type { DiceAnalytics } from "../../domain/analytics";
+import type {
+  DiceCasinoAnalytics,
+  DiceCasinoGameAnalytics,
+  DiceProgressionAnalytics,
+} from "../../domain/analytics";
+import type { DiceCasinoGame } from "../../../casino/domain/casino-session";
 import { getMaxDicePrestige } from "../../../progression/domain/game-rules";
 
 type DiceAnalyticsRow = {
@@ -15,6 +20,17 @@ type DiceAnalyticsRow = {
   pvp_losses: number;
   pvp_draws: number;
   updated_at: string;
+};
+
+type DiceCasinoAnalyticsRow = {
+  game: DiceCasinoGame;
+  rounds_completed: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+  total_wagered: number;
+  total_paid_out: number;
+  largest_payout: number;
 };
 
 type DiceRollAnalyticsUpdate = {
@@ -78,7 +94,14 @@ const getActiveDicePrestige = (db: SqliteDatabase, userId: string): number => {
   return normalizedActive;
 };
 
-const mapDiceAnalyticsRow = (row: DiceAnalyticsRow): DiceAnalytics => {
+const diceCasinoGameOrder: DiceCasinoGame[] = [
+  "exact-roll",
+  "push-your-luck",
+  "blackjack",
+  "dice-poker",
+];
+
+const mapDiceAnalyticsRow = (row: DiceAnalyticsRow): DiceProgressionAnalytics => {
   return {
     levelStartedAt: row.level_started_at,
     prestigeStartedAt: row.prestige_started_at,
@@ -89,6 +112,19 @@ const mapDiceAnalyticsRow = (row: DiceAnalyticsRow): DiceAnalytics => {
     pvpWins: row.pvp_wins,
     pvpLosses: row.pvp_losses,
     pvpDraws: row.pvp_draws,
+  };
+};
+
+const createEmptyDiceCasinoGameAnalytics = (game: DiceCasinoGame): DiceCasinoGameAnalytics => {
+  return {
+    game,
+    roundsCompleted: 0,
+    wins: 0,
+    losses: 0,
+    pushes: 0,
+    totalWagered: 0,
+    totalPaidOut: 0,
+    largestPayout: 0,
   };
 };
 
@@ -188,8 +224,71 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
   return created;
 };
 
-const getDiceAnalytics = (db: SqliteDatabase, userId: string): DiceAnalytics => {
+const getDiceProgressionAnalytics = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceProgressionAnalytics => {
   return mapDiceAnalyticsRow(getOrCreateDiceAnalyticsRow(db, userId));
+};
+
+const getDiceCasinoAnalyticsRows = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceCasinoAnalyticsRow[] => {
+  return db
+    .prepare(
+      `
+      SELECT
+        game,
+        SUM(rounds_completed) AS rounds_completed,
+        SUM(wins) AS wins,
+        SUM(losses) AS losses,
+        SUM(pushes) AS pushes,
+        SUM(total_wagered) AS total_wagered,
+        SUM(total_paid_out) AS total_paid_out,
+        MAX(largest_payout) AS largest_payout
+      FROM dice_casino_analytics
+      WHERE user_id = ?
+      GROUP BY game
+    `,
+    )
+    .all(userId) as DiceCasinoAnalyticsRow[];
+};
+
+const getDiceCasinoAnalytics = (db: SqliteDatabase, userId: string): DiceCasinoAnalytics => {
+  const aggregatedGames = new Map<DiceCasinoGame, DiceCasinoGameAnalytics>(
+    diceCasinoGameOrder.map((game) => [game, createEmptyDiceCasinoGameAnalytics(game)]),
+  );
+
+  for (const row of getDiceCasinoAnalyticsRows(db, userId)) {
+    aggregatedGames.set(row.game, {
+      game: row.game,
+      roundsCompleted: row.rounds_completed,
+      wins: row.wins,
+      losses: row.losses,
+      pushes: row.pushes,
+      totalWagered: row.total_wagered,
+      totalPaidOut: row.total_paid_out,
+      largestPayout: row.largest_payout,
+    });
+  }
+
+  const games = diceCasinoGameOrder.map((game) => {
+    const analytics = aggregatedGames.get(game);
+    if (!analytics) {
+      throw new Error(`Missing casino analytics entry for game ${game}`);
+    }
+
+    return analytics;
+  });
+
+  return {
+    totalRoundsCompleted: games.reduce((sum, game) => sum + game.roundsCompleted, 0),
+    totalWagered: games.reduce((sum, game) => sum + game.totalWagered, 0),
+    totalPaidOut: games.reduce((sum, game) => sum + game.totalPaidOut, 0),
+    largestPayout: games.reduce((max, game) => Math.max(max, game.largestPayout), 0),
+    games,
+  };
 };
 
 const recordDiceRollAnalytics = (
@@ -299,7 +398,8 @@ const updateDicePvpStats = (
 
 export const createSqliteAnalyticsRepository = (db: SqliteDatabase): DiceAnalyticsRepository => {
   return {
-    getDiceAnalytics: (userId) => getDiceAnalytics(db, userId),
+    getDiceProgressionAnalytics: (userId) => getDiceProgressionAnalytics(db, userId),
+    getDiceCasinoAnalytics: (userId) => getDiceCasinoAnalytics(db, userId),
     recordDiceRollAnalytics: (update) => recordDiceRollAnalytics(db, update),
     resetDiceLevelAnalyticsProgress: (userId) => resetDiceLevelAnalyticsProgress(db, userId),
     resetDicePrestigeAnalyticsProgress: (userId) => resetDicePrestigeAnalyticsProgress(db, userId),

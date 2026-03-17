@@ -1,13 +1,24 @@
 import type { DiceAnalyticsRepository } from "../ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
+import type { DiceCasinoAnalytics, DiceProgressionAnalytics } from "../../domain/analytics";
+import { getDiceCasinoGameLabel } from "../../../casino/domain/game-rules";
 
-export type DiceAnalyticsView = {
-  content: string;
+export type DiceAnalyticsSectionView = {
+  heading?: string;
+  lines: string[];
+};
+
+export type DiceAnalyticsDashboardView = {
+  title: string;
+  sections: DiceAnalyticsSectionView[];
   ephemeral: boolean;
 };
 
 type QueryDiceAnalyticsDependencies = {
-  analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics">;
+  analytics: Pick<
+    DiceAnalyticsRepository,
+    "getDiceProgressionAnalytics" | "getDiceCasinoAnalytics"
+  >;
   progression: Pick<
     DiceProgressionRepository,
     "getActiveDicePrestige" | "getDiceLevel" | "getDicePrestige"
@@ -28,31 +39,99 @@ export const createQueryDiceAnalyticsUseCase = ({
     userId,
     userMention,
     nowMs = Date.now(),
-  }: QueryDiceAnalyticsInput): DiceAnalyticsView => {
-    const analyticsView = analytics.getDiceAnalytics(userId);
+  }: QueryDiceAnalyticsInput): DiceAnalyticsDashboardView => {
+    const progressionAnalytics = analytics.getDiceProgressionAnalytics(userId);
+    const casinoAnalytics = analytics.getDiceCasinoAnalytics(userId);
     const level = progression.getDiceLevel(userId);
     const highestPrestige = progression.getDicePrestige(userId);
     const activePrestige = progression.getActiveDicePrestige(userId);
 
-    const lines = [
-      `Dice analytics for ${userMention}:`,
-      `Current level: ${level}.`,
-      `Time on current level: ${formatElapsed(analyticsView.levelStartedAt, nowMs)}.`,
-      `Roll sets on current level: ${analyticsView.rollsCurrentLevel}.`,
-      `One-off level-up roll sets on current level: ${analyticsView.nearLevelupRollsCurrentLevel}.`,
-      `Active prestige: ${activePrestige}.`,
-      `Highest prestige: ${highestPrestige}.`,
-      `Time on current prestige: ${formatElapsed(analyticsView.prestigeStartedAt, nowMs)}.`,
-      `Dice rolled on current prestige: ${analyticsView.diceRolledCurrentPrestige}.`,
-      `Total dice rolled: ${analyticsView.totalDiceRolled}.`,
-      `PvP stats: ${analyticsView.pvpWins}W / ${analyticsView.pvpLosses}L / ${analyticsView.pvpDraws}D.`,
-    ];
-
     return {
-      content: lines.join("\n"),
+      title: `Dice analytics for ${userMention}:`,
+      sections: [
+        {
+          lines: buildProgressionSectionLines({
+            activePrestige,
+            analytics: progressionAnalytics,
+            highestPrestige,
+            level,
+            nowMs,
+          }),
+        },
+        {
+          heading: "Casino",
+          lines: buildCasinoSectionLines(casinoAnalytics),
+        },
+      ],
       ephemeral: false,
     };
   };
+};
+
+type BuildProgressionSectionLinesInput = {
+  analytics: DiceProgressionAnalytics;
+  level: number;
+  activePrestige: number;
+  highestPrestige: number;
+  nowMs: number;
+};
+
+const buildProgressionSectionLines = ({
+  analytics,
+  level,
+  activePrestige,
+  highestPrestige,
+  nowMs,
+}: BuildProgressionSectionLinesInput): string[] => {
+  return [
+    `Current level: ${level}.`,
+    `Time on current level: ${formatElapsed(analytics.levelStartedAt, nowMs)}.`,
+    `Roll sets on current level: ${analytics.rollsCurrentLevel}.`,
+    `One-off level-up roll sets on current level: ${analytics.nearLevelupRollsCurrentLevel}.`,
+    `Active prestige: ${activePrestige}.`,
+    `Highest prestige: ${highestPrestige}.`,
+    `Time on current prestige: ${formatElapsed(analytics.prestigeStartedAt, nowMs)}.`,
+    `Dice rolled on current prestige: ${analytics.diceRolledCurrentPrestige}.`,
+    `Total dice rolled: ${analytics.totalDiceRolled}.`,
+    `PvP stats: ${analytics.pvpWins}W / ${analytics.pvpLosses}L / ${analytics.pvpDraws}D.`,
+  ];
+};
+
+const buildCasinoSectionLines = (analytics: DiceCasinoAnalytics): string[] => {
+  const hasCasinoActivity =
+    analytics.totalRoundsCompleted > 0 ||
+    analytics.totalWagered > 0 ||
+    analytics.totalPaidOut > 0 ||
+    analytics.largestPayout > 0;
+
+  if (!hasCasinoActivity) {
+    return ["No casino rounds recorded yet."];
+  }
+
+  const lines = [
+    `Rounds completed: ${analytics.totalRoundsCompleted}.`,
+    `Total wagered: ${analytics.totalWagered}.`,
+    `Total paid out: ${analytics.totalPaidOut}.`,
+    `Net result: ${formatNetPips(analytics.totalPaidOut - analytics.totalWagered)}.`,
+    `Best payout: ${analytics.largestPayout}.`,
+  ];
+
+  for (const game of analytics.games) {
+    lines.push(
+      "",
+      `${getDiceCasinoGameLabel(game.game)}: ${game.roundsCompleted} rounds, ${game.wins}W / ${game.losses}L / ${game.pushes}D, wagered ${game.totalWagered}, paid ${game.totalPaidOut}, net ${formatNetPips(game.totalPaidOut - game.totalWagered)}, best ${game.largestPayout}.`,
+    );
+  }
+
+  return lines;
+};
+
+const formatNetPips = (value: number): string => {
+  if (value > 0) {
+    return `+${value}`;
+  }
+
+  return `${value}`;
 };
 
 const formatElapsed = (startedAtIso: string, nowMs: number): string => {

@@ -1,4 +1,4 @@
-import type { DiceAnalytics } from "../domain/analytics";
+import type { DiceCasinoAnalytics, DiceProgressionAnalytics } from "../domain/analytics";
 
 export type DiceRollAnalyticsUpdate = {
   userId: string;
@@ -15,7 +15,8 @@ export type DicePvpStatsUpdate = {
 };
 
 export type DiceAnalyticsRepository = {
-  getDiceAnalytics: (userId: string) => DiceAnalytics;
+  getDiceProgressionAnalytics: (userId: string) => DiceProgressionAnalytics;
+  getDiceCasinoAnalytics: (userId: string) => DiceCasinoAnalytics;
   recordDiceRollAnalytics: (update: DiceRollAnalyticsUpdate) => void;
   resetDiceLevelAnalyticsProgress: (userId: string) => void;
   resetDicePrestigeAnalyticsProgress: (userId: string) => void;
