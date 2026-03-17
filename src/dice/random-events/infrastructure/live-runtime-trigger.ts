@@ -122,6 +122,7 @@ export const triggerRandomEventOpportunity = async ({
     eventId,
     selection,
     message,
+    sequenceChallenge: null,
   });
 
   windowManager.openWindow({

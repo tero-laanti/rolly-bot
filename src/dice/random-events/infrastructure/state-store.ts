@@ -37,6 +37,20 @@ export const resolveActiveRandomEvent = (state: RandomEventsState, eventId: stri
   return state.activeEventsById.delete(eventId);
 };
 
+export const updateActiveRandomEventExpiry = (
+  state: RandomEventsState,
+  eventId: string,
+  expiresAt: Date | null,
+): boolean => {
+  const entry = state.activeEventsById.get(eventId);
+  if (!entry) {
+    return false;
+  }
+
+  entry.expiresAtMs = expiresAt ? expiresAt.getTime() : null;
+  return true;
+};
+
 export const getActiveRandomEventCount = (state: RandomEventsState): number => {
   return state.activeEventsById.size;
 };

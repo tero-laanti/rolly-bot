@@ -40,22 +40,31 @@
     "id": "bridge-wager",
     "rarity": "rare",
     "title": "Bridge Wager",
-    "prompt": "A ferryman offers a risky shortcut if you can beat a 5+ roll with your current die. Take the wager?",
+    "prompt": "A ferryman offers a risky shortcut if you can land a strong opening roll and then keep your footing on the bridge. Take the wager?",
     "claimLabel": "Take wager",
     "claimPolicy": "first-click",
     "claimWindowSeconds": 90,
     "tags": ["example", "roll-check"],
     "rollChallenge": {
       "id": "ferryman-check",
-      "mode": "single-step",
+      "mode": "sequence",
       "steps": [
         {
           "id": "wager-roll",
-          "label": "Roll 5+ with your current die",
+          "label": "Open strong with a 5+ roll",
           "source": {
             "type": "player-die"
           },
           "target": 5,
+          "comparator": "gte"
+        },
+        {
+          "id": "bridge-balance",
+          "label": "Keep your footing with a 3+ roll",
+          "source": {
+            "type": "player-die"
+          },
+          "target": 3,
           "comparator": "gte"
         }
       ],

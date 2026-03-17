@@ -5,6 +5,11 @@ import { createSqliteDiceHostileEffectsService } from "../../progression/infrast
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import { createRandomEventContentState } from "../domain/content";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
+import {
+  advanceRollChallengeStep,
+  createRollChallengeProgress,
+  type RandomEventRollChallengeDefinition,
+} from "../domain/roll-challenges";
 import type { RandomEventRarityTier } from "../domain/variety";
 import {
   buildRandomEventClaimButtonId,
@@ -16,13 +21,19 @@ import type { TriggerOpportunityResult } from "./foundation-scheduler";
 import {
   buildActiveClaimDescription,
   buildClaimActivityLine,
+  buildSequenceChallengeButtonLabel,
+  buildSequenceChallengeDescription,
   getRandomEventEmbedTitle,
   getRandomEventRarityPresentation,
 } from "./live-runtime-presentation";
 import { resolveRandomEvent } from "./live-runtime-resolution";
 import { triggerRandomEventOpportunity } from "./live-runtime-trigger";
-import type { ActiveRandomEventContext, RandomEventsLiveRuntimeLogger } from "./live-runtime-types";
-import type { RandomEventsState } from "./state-store";
+import type {
+  ActiveRandomEventContext,
+  ActiveRandomEventSequenceChallenge,
+  RandomEventsLiveRuntimeLogger,
+} from "./live-runtime-types";
+import { type RandomEventsState, updateActiveRandomEventExpiry } from "./state-store";
 
 type CreateRandomEventsLiveRuntimeInput = {
   client: Client;
@@ -50,6 +61,39 @@ export type RandomEventsLiveRuntime = {
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
   getActiveEventsSnapshot: () => RandomEventsLiveActiveEventSnapshot[];
   stop: () => void;
+};
+
+const getSequenceChallengeDurationMs = (challenge: RandomEventRollChallengeDefinition): number => {
+  return Math.min(60_000, Math.max(20_000, challenge.steps.length * 12_000));
+};
+
+const getSequenceChallenge = (
+  context: ActiveRandomEventContext | undefined,
+): {
+  challenge: RandomEventRollChallengeDefinition;
+  session: ActiveRandomEventSequenceChallenge;
+} | null => {
+  if (!context?.sequenceChallenge) {
+    return null;
+  }
+
+  const challenge = context.selection.scenario.rollChallenge;
+  if (!challenge || challenge.mode !== "sequence") {
+    return null;
+  }
+
+  return {
+    challenge,
+    session: context.sequenceChallenge,
+  };
+};
+
+const clearSequenceChallengeTimer = (context: ActiveRandomEventContext | undefined): void => {
+  if (!context?.sequenceChallenge) {
+    return;
+  }
+
+  clearTimeout(context.sequenceChallenge.timer);
 };
 
 export const createRandomEventsLiveRuntime = ({
@@ -107,6 +151,148 @@ export const createRandomEventsLiveRuntime = ({
     });
   };
 
+  const refreshSequenceChallengePrompt = async (eventId: string): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    const sequenceContext = getSequenceChallenge(context);
+    if (!context || !sequenceContext) {
+      return;
+    }
+
+    const { challenge, session } = sequenceContext;
+    const rarityPresentation = getRandomEventRarityPresentation(context.selection.scenario.rarity);
+    const prompt = buildRandomEventClaimPrompt({
+      title: getRandomEventEmbedTitle(context.selection.scenario, context.selection.renderedTitle),
+      description: buildSequenceChallengeDescription({
+        selection: context.selection,
+        userId: session.userId,
+        challenge,
+        progress: session.progress,
+        expiresAtMs: session.expiresAtMs,
+      }),
+      buttonCustomId: buildRandomEventClaimButtonId(eventId),
+      buttonLabel: buildSequenceChallengeButtonLabel(session.progress, challenge.steps.length),
+      color: rarityPresentation.color,
+      footerText: `${rarityPresentation.label} • Challenge`,
+    });
+
+    await context.message.edit(prompt).catch((error) => {
+      logger.warn("[random-events] Failed to refresh staged challenge prompt.", error);
+    });
+  };
+
+  const resolveEvent = async ({
+    eventId,
+    participants,
+    challengeProgressByUserId,
+    resolutionNotesByUserId,
+  }: {
+    eventId: string;
+    participants: string[];
+    challengeProgressByUserId?: ReadonlyMap<string, ReturnType<typeof createRollChallengeProgress>>;
+    resolutionNotesByUserId?: ReadonlyMap<string, string>;
+  }): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    clearSequenceChallengeTimer(context);
+    if (context) {
+      context.sequenceChallenge = null;
+    }
+
+    await resolveRandomEvent({
+      activeEventsById,
+      state,
+      progression,
+      hostileEffects,
+      eventId,
+      participants,
+      challengeProgressByUserId,
+      resolutionNotesByUserId,
+    });
+  };
+
+  const autoResolveSequenceChallenge = async (eventId: string): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    const sequenceContext = getSequenceChallenge(context);
+    if (!context || !sequenceContext) {
+      return;
+    }
+
+    const { challenge, session } = sequenceContext;
+    let progress = session.progress;
+    while (!progress.completed) {
+      progress = advanceRollChallengeStep({
+        playerDice: progression,
+        userId: session.userId,
+        challenge,
+        progress,
+      });
+    }
+
+    context.sequenceChallenge = {
+      ...session,
+      progress,
+    };
+
+    await resolveEvent({
+      eventId,
+      participants: [session.userId],
+      challengeProgressByUserId: new Map([[session.userId, progress]]),
+      resolutionNotesByUserId: new Map([
+        [session.userId, "⏱️ The remaining rolls were resolved automatically when time ran out."],
+      ]),
+    });
+  };
+
+  const startSequenceChallenge = async (eventId: string, userId: string): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    if (!context) {
+      return;
+    }
+
+    const challenge = context.selection.scenario.rollChallenge;
+    if (!challenge || challenge.mode !== "sequence") {
+      await resolveEvent({
+        eventId,
+        participants: [userId],
+      });
+      return;
+    }
+
+    const durationMs = getSequenceChallengeDurationMs(challenge);
+    const expiresAtMs = Date.now() + durationMs;
+    const timer = setTimeout(() => {
+      void autoResolveSequenceChallenge(eventId).catch((error) => {
+        logger.warn("[random-events] Failed to auto-resolve staged challenge.", error);
+      });
+    }, durationMs);
+
+    context.sequenceChallenge = {
+      userId,
+      progress: createRollChallengeProgress(challenge),
+      expiresAtMs,
+      timer,
+    };
+
+    updateActiveRandomEventExpiry(state, eventId, new Date(expiresAtMs));
+    await refreshSequenceChallengePrompt(eventId);
+  };
+
+  const onClaimWindowResolved = async (eventId: string, participants: string[]): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    const challenge = context?.selection.scenario.rollChallenge;
+
+    if (
+      context &&
+      participants.length === 1 &&
+      context.selection.scenario.claimPolicy === "first-click" &&
+      challenge?.mode === "sequence"
+    ) {
+      await startSequenceChallenge(eventId, participants[0] as string);
+      return;
+    }
+
+    await resolveEvent({ eventId, participants });
+  };
+
   const onTriggerOpportunity = async (context: {
     now: Date;
     requiredClaimPolicy?: RandomEventClaimPolicy;
@@ -120,14 +306,7 @@ export const createRandomEventsLiveRuntime = ({
       windowManager,
       requiredClaimPolicy: context.requiredClaimPolicy,
       onResolved: async (eventId, participants) => {
-        await resolveRandomEvent({
-          activeEventsById,
-          state,
-          progression,
-          hostileEffects,
-          eventId,
-          participants,
-        });
+        await onClaimWindowResolved(eventId, participants);
       },
     });
   };
@@ -136,6 +315,51 @@ export const createRandomEventsLiveRuntime = ({
     const eventId = parseRandomEventClaimButtonId(interaction.customId);
     if (!eventId) {
       await interaction.deferUpdate();
+      return;
+    }
+
+    const activeContext = activeEventsById.get(eventId);
+    const sequenceContext = getSequenceChallenge(activeContext);
+    if (activeContext && sequenceContext) {
+      const { challenge, session } = sequenceContext;
+
+      if (interaction.user.id !== session.userId) {
+        await interaction.reply({
+          content: "Too late — this challenge belongs to someone else.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferUpdate();
+
+      if (Date.now() >= session.expiresAtMs) {
+        await autoResolveSequenceChallenge(eventId);
+        return;
+      }
+
+      const nextProgress = advanceRollChallengeStep({
+        playerDice: progression,
+        userId: session.userId,
+        challenge,
+        progress: session.progress,
+      });
+
+      activeContext.sequenceChallenge = {
+        ...session,
+        progress: nextProgress,
+      };
+
+      if (nextProgress.completed) {
+        await resolveEvent({
+          eventId,
+          participants: [session.userId],
+          challengeProgressByUserId: new Map([[session.userId, nextProgress]]),
+        });
+        return;
+      }
+
+      await refreshSequenceChallengePrompt(eventId);
       return;
     }
 
@@ -182,14 +406,19 @@ export const createRandomEventsLiveRuntime = ({
   const getActiveEventsSnapshot = (): RandomEventsLiveActiveEventSnapshot[] => {
     return Array.from(activeEventsById.values())
       .map((context) => {
-        const windowSnapshot = windowManager.getWindow(context.eventId);
+        const sequenceContext = getSequenceChallenge(context);
+        const windowSnapshot = sequenceContext ? null : windowManager.getWindow(context.eventId);
         return {
           eventId: context.eventId,
           title: context.selection.renderedTitle,
           rarity: context.selection.scenario.rarity,
           claimPolicy: context.selection.scenario.claimPolicy,
-          participantCount: windowSnapshot?.participants.length ?? 0,
-          expiresAt: windowSnapshot ? new Date(windowSnapshot.expiresAtMs) : null,
+          participantCount: sequenceContext ? 1 : (windowSnapshot?.participants.length ?? 0),
+          expiresAt: sequenceContext
+            ? new Date(sequenceContext.session.expiresAtMs)
+            : windowSnapshot
+              ? new Date(windowSnapshot.expiresAtMs)
+              : null,
           channelId: context.message.channelId,
           messageId: context.message.id,
         };
@@ -203,6 +432,9 @@ export const createRandomEventsLiveRuntime = ({
 
   const stop = (): void => {
     windowManager.stop();
+    for (const context of activeEventsById.values()) {
+      clearSequenceChallengeTimer(context);
+    }
     activeEventsById.clear();
   };
 

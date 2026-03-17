@@ -19,6 +19,7 @@ type RandomEventUserResolution = {
   renderedOutcomeMessage: string;
   challengeRollSummary: string | null;
   effectNotes: string[];
+  resolutionNote: string | null;
 };
 
 const applyOutcomeEffectsToUser = (
@@ -109,6 +110,8 @@ export const resolveRandomEvent = async ({
   hostileEffects,
   eventId,
   participants,
+  challengeProgressByUserId,
+  resolutionNotesByUserId,
 }: {
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
@@ -122,6 +125,8 @@ export const resolveRandomEvent = async ({
   >;
   eventId: string;
   participants: string[];
+  challengeProgressByUserId?: ReadonlyMap<string, RandomEventRollChallengeProgress>;
+  resolutionNotesByUserId?: ReadonlyMap<string, string>;
 }): Promise<void> => {
   const context = activeEventsById.get(eventId);
   if (!context) {
@@ -149,15 +154,17 @@ export const resolveRandomEvent = async ({
   const userResolutions: RandomEventUserResolution[] = [];
   for (const userId of participantsToResolve) {
     let outcome = context.selection.selectedOutcome;
-    let challengeProgress: RandomEventRollChallengeProgress | null = null;
+    let challengeProgress = challengeProgressByUserId?.get(userId) ?? null;
 
-    if (context.selection.scenario.rollChallenge) {
+    if (context.selection.scenario.rollChallenge && !challengeProgress) {
       challengeProgress = resolveRollChallengeImmediately(
         progression,
         userId,
         context.selection.scenario.rollChallenge,
       );
+    }
 
+    if (context.selection.scenario.rollChallenge && challengeProgress) {
       const challengeResult = challengeProgress.succeeded ? "success" : "failure";
       const challengeOutcome = selectRandomEventOutcomeForScenario(context.selection.scenario, {
         challengeResult,
@@ -182,12 +189,17 @@ export const resolveRandomEvent = async ({
       renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
       challengeRollSummary: formatChallengeRollSummary(challengeProgress),
       effectNotes,
+      resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
     });
   }
 
   const lines = userResolutions.map((resolution) => {
-    const noteText =
-      resolution.effectNotes.length > 0 ? ` ${resolution.effectNotes.join(" ")}` : "";
+    const noteParts = [...resolution.effectNotes];
+    if (resolution.resolutionNote) {
+      noteParts.push(resolution.resolutionNote);
+    }
+
+    const noteText = noteParts.length > 0 ? ` ${noteParts.join(" ")}` : "";
     if (resolution.challengeRollSummary) {
       return `<@${resolution.userId}>: ${resolution.challengeRollSummary}. ${resolution.renderedOutcomeMessage}${noteText}`;
     }
