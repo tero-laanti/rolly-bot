@@ -872,9 +872,7 @@ export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
   }
 
   if (parsed.exactRoll.highLowLowMaxFace >= parsed.exactRoll.dieSides) {
-    throw new Error(
-      "casinoV1.exactRoll.highLowLowMaxFace must be between 1 and dieSides - 1.",
-    );
+    throw new Error("casinoV1.exactRoll.highLowLowMaxFace must be between 1 and dieSides - 1.");
   }
 
   if (

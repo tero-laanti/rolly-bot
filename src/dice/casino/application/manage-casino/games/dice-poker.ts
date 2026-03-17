@@ -39,7 +39,9 @@ const buildStraightExamples = (): string => {
   return ranges.join(", ");
 };
 
-const buildDicePokerDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
+const buildDicePokerDescriptionLines = (
+  session: DiceCasinoMutationContext["session"],
+): string[] => {
   const lines = [
     "**Dice Poker**",
     `Roll ${getDicePokerDiceCount()}d${getDicePokerDieSides()}, hold any subset from 0 to ${getDicePokerDiceCount()} dice, then reroll the rest once.`,
@@ -163,7 +165,10 @@ const handleDicePokerAction = (
     const rerollResult = rerollDicePokerRound(round);
     let nextPips = pips;
     if (rerollResult.result.payout > 0) {
-      nextPips = economy.applyPipsDelta({ userId: session.userId, amount: rerollResult.result.payout });
+      nextPips = economy.applyPipsDelta({
+        userId: session.userId,
+        amount: rerollResult.result.payout,
+      });
     }
 
     analytics.recordRoundCompleted({

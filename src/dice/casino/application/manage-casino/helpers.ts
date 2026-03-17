@@ -7,11 +7,7 @@ import {
   getDiceCasinoMinBet,
   getDiceCasinoSessionTimeoutMs,
 } from "../../domain/game-rules";
-import type {
-  DiceCasinoBetAdjustment,
-  DiceCasinoResult,
-  MutateSessionResult,
-} from "./types";
+import type { DiceCasinoBetAdjustment, DiceCasinoResult, MutateSessionResult } from "./types";
 
 export const resolveInitialBet = (
   requestedBet: number | null,
@@ -66,7 +62,10 @@ export const refreshSession = (session: DiceCasinoSession, nowMs: number): DiceC
   };
 };
 
-export const normalizeSessionBet = (session: DiceCasinoSession, pips: number): DiceCasinoSession => {
+export const normalizeSessionBet = (
+  session: DiceCasinoSession,
+  pips: number,
+): DiceCasinoSession => {
   if (session.state.activeRound || pips < getDiceCasinoMinBet()) {
     return session;
   }
@@ -121,10 +120,7 @@ export const canStartCasinoRound = (bet: number, pips: number): boolean => {
   return pips >= bet && bet >= getDiceCasinoMinBet();
 };
 
-export const getOutcomeFromPayout = (
-  bet: number,
-  payout: number,
-): "win" | "loss" | "push" => {
+export const getOutcomeFromPayout = (bet: number, payout: number): "win" | "loss" | "push" => {
   if (payout === 0) {
     return "loss";
   }
@@ -153,7 +149,10 @@ export const replyMutation = (content: string, ephemeral: boolean): MutateSessio
 };
 
 export const insufficientPipsReply = (bet: number, pips: number): MutateSessionResult => {
-  return replyMutation(`You need ${bet} pips to play that round. Current balance: ${pips} pips.`, true);
+  return replyMutation(
+    `You need ${bet} pips to play that round. Current balance: ${pips} pips.`,
+    true,
+  );
 };
 
 export const invalidCasinoAction = (): MutateSessionResult => {
