@@ -599,10 +599,6 @@ const readVarietyConfig = (value: unknown, label: string): DiceBalanceVarietyCon
       0,
     ),
     rarityChances: readRarityNumberRecord(record.rarityChances, `${label}.rarityChances`),
-    rarityWeightMultipliers: readRarityNumberRecord(
-      record.rarityWeightMultipliers,
-      `${label}.rarityWeightMultipliers`,
-    ),
     pity: readPityConfig(record.pity, `${label}.pity`),
   };
 };

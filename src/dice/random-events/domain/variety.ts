@@ -18,7 +18,6 @@ export type RandomEventVarietyPityConfig = {
 export type RandomEventVarietyOptions = {
   antiRepeatCooldownTriggers?: number;
   rarityChances?: Partial<Record<RandomEventRarityTier, number>>;
-  rarityWeightMultipliers?: Partial<Record<RandomEventRarityTier, number>>;
   pity?: Partial<RandomEventVarietyPityConfig>;
   random?: () => number;
 };
@@ -45,14 +44,6 @@ const defaultRarityChances: Record<RandomEventRarityTier, number> = {
   rare: 0.17,
   epic: 0.08,
   legendary: 0.02,
-};
-
-const defaultRarityWeightMultipliers: Record<RandomEventRarityTier, number> = {
-  common: 1,
-  uncommon: 1,
-  rare: 1,
-  epic: 1,
-  legendary: 1,
 };
 
 const defaultPityConfig: RandomEventVarietyPityConfig = {
@@ -265,13 +256,9 @@ const getBucketSelectionWeight = (
     options.rarityChances?.[rarity],
     defaultRarityChances[rarity],
   );
-  const weightMultiplier = normalizeNonNegativeNumber(
-    options.rarityWeightMultipliers?.[rarity],
-    defaultRarityWeightMultipliers[rarity],
-  );
   const pityBonusMultiplier = getPityBonusMultiplier(rarity, state.nonRareStreak, pityConfig);
 
-  return baseChance * weightMultiplier * pityBonusMultiplier;
+  return baseChance * pityBonusMultiplier;
 };
 
 export const createRandomEventVarietyState = (): RandomEventVarietyState => {

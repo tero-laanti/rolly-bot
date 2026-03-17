@@ -84,7 +84,6 @@ export const triggerRandomEventOpportunity = async ({
   const selection = selectRandomEventScenario(candidateScenarios, candidateVarietyState, {
     antiRepeatCooldownTriggers: randomEventBalance.variety.antiRepeatCooldownTriggers,
     rarityChances: randomEventBalance.variety.rarityChances,
-    rarityWeightMultipliers: randomEventBalance.variety.rarityWeightMultipliers,
     pity: randomEventBalance.variety.pity,
   });
 

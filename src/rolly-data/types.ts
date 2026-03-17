@@ -69,7 +69,6 @@ export type DiceAchievementData = {
 export type DiceBalanceVarietyConfig = {
   antiRepeatCooldownTriggers: number;
   rarityChances: Record<RandomEventRarityTier, number>;
-  rarityWeightMultipliers: Record<RandomEventRarityTier, number>;
   pity: RandomEventVarietyPityConfig;
 };
 
