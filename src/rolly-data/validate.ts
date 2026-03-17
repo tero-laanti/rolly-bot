@@ -357,7 +357,6 @@ const readRandomEventScenario = (value: unknown, label: string): RandomEventScen
     claimLabel: readNonEmptyString(record.claimLabel, `${label}.claimLabel`),
     claimPolicy: readClaimPolicy(record.claimPolicy, `${label}.claimPolicy`),
     claimWindowSeconds: readInteger(record.claimWindowSeconds, `${label}.claimWindowSeconds`, 1),
-    tags: record.tags === undefined ? undefined : readStringArray(record.tags, `${label}.tags`),
     weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
     textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
     rollChallenge: readRollChallengeDefinition(record.rollChallenge, `${label}.rollChallenge`),

@@ -7,7 +7,6 @@
     "claimLabel": "Open crate",
     "claimPolicy": "first-click",
     "claimWindowSeconds": 75,
-    "tags": ["example", "starter"],
     "outcomes": [
       {
         "id": "steady-light",
@@ -44,7 +43,6 @@
     "claimLabel": "Take wager",
     "claimPolicy": "first-click",
     "claimWindowSeconds": 90,
-    "tags": ["example", "roll-check"],
     "rollChallenge": {
       "id": "ferryman-check",
       "mode": "sequence",
@@ -117,7 +115,6 @@
     "claimLabel": "Join chant",
     "claimPolicy": "multi-user",
     "claimWindowSeconds": 110,
-    "tags": ["example", "multi-user"],
     "outcomes": [
       {
         "id": "shared-rhythm",

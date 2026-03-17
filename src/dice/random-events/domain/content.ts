@@ -63,7 +63,6 @@ export type RandomEventScenario = {
   claimLabel: string;
   claimPolicy: RandomEventClaimPolicy;
   claimWindowSeconds: number;
-  tags?: string[];
   weight?: number;
   textVariables?: RandomEventTextVariables;
   rollChallenge?: RandomEventRollChallengeDefinition;
