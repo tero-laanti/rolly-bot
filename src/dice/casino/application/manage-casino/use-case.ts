@@ -1006,7 +1006,7 @@ const buildCasinoComponents = (
   ]);
 
   if (session.state.selectedGame === "exact-roll" && !roundActive) {
-    rows.push([
+    const exactModeRow: ActionView<DiceCasinoAction>["components"][number] = [
       {
         action: { type: "exact-mode", ownerId: session.userId, mode: "exact-face" },
         label: "Exact Face",
@@ -1017,7 +1017,18 @@ const buildCasinoComponents = (
         label: "High / Low",
         style: session.state.exactRollMode === "high-low" ? "primary" : "secondary",
       },
-    ]);
+    ];
+
+    if (session.state.exactRollMode === "exact-face") {
+      exactModeRow.push({
+        action: { type: "exact-face", ownerId: session.userId, face: 6 },
+        label: "6",
+        style: session.state.exactRollFace === 6 ? "primary" : "secondary",
+        disabled: !hasAffordableBet,
+      });
+    }
+
+    rows.push(exactModeRow);
 
     if (session.state.exactRollMode === "exact-face") {
       rows.push(
@@ -1028,14 +1039,6 @@ const buildCasinoComponents = (
           disabled: !hasAffordableBet,
         })),
       );
-      rows.push([
-        {
-          action: { type: "exact-face", ownerId: session.userId, face: 6 },
-          label: "6",
-          style: session.state.exactRollFace === 6 ? "primary" : "secondary",
-          disabled: !hasAffordableBet,
-        },
-      ]);
     } else {
       rows.push([
         {
