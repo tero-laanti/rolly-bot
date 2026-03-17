@@ -1,6 +1,7 @@
 import { getDiceBalanceData } from "../../../rolly-data/load";
 
 const minuteMs = 60_000;
+const maxDiceRollPassCount = 120;
 
 const getDicePrestigeSides = (): number[] => {
   return getDiceBalanceData().prestigeSides;
@@ -39,7 +40,7 @@ export const getDiceLevelUpReward = (): number => {
 };
 
 export const getDiceMaxRollPassCount = (): number => {
-  return getDiceBalanceData().maxRollPassCount;
+  return maxDiceRollPassCount;
 };
 
 export const getDiceChargeStartMs = (): number => {
