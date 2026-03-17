@@ -24,13 +24,6 @@
         "epic": 0.08,
         "legendary": 0.02
       },
-      "rarityWeightMultipliers": {
-        "common": 1,
-        "uncommon": 1,
-        "rare": 1,
-        "epic": 1,
-        "legendary": 1
-      },
       "pity": {
         "enabled": true,
         "startAfterNonRareTriggers": 5,
