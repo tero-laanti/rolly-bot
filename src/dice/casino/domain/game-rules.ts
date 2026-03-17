@@ -284,7 +284,7 @@ const drawBlackjackDealerToCompletion = (dealerHand: number[]): number[] => {
   const nextHand = [...dealerHand];
   while (true) {
     const totals = getBlackjackHandTotals(nextHand);
-    if (totals.total > 17 || (totals.total === 17 && !totals.isSoft)) {
+    if (totals.total >= 17) {
       return nextHand;
     }
 

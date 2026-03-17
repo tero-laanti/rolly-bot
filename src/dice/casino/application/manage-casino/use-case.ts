@@ -942,14 +942,20 @@ const buildCasinoComponents = (
   const hasAffordableBet = canStartCasinoRound(session.bet, pips);
   const rows: ActionView<DiceCasinoAction>["components"] = [];
 
-  rows.push(
-    gameButtonOrder.map((game) => ({
-      action: { type: "select-game", ownerId: session.userId, game } as const,
-      label: getDiceCasinoGameLabel(game),
-      style: session.state.selectedGame === game ? "primary" : "secondary",
-      disabled: roundActive,
-    })),
-  );
+  const gameSelectionRow = gameButtonOrder.map<
+    ActionView<DiceCasinoAction>["components"][number][number]
+  >((game) => ({
+    action: { type: "select-game", ownerId: session.userId, game } as const,
+    label: getDiceCasinoGameLabel(game),
+    style: session.state.selectedGame === game ? "primary" : "secondary",
+    disabled: roundActive,
+  }));
+  gameSelectionRow.push({
+    action: { type: "refresh", ownerId: session.userId },
+    label: "Refresh",
+    style: "secondary",
+  });
+  rows.push(gameSelectionRow);
 
   rows.push([
     {
@@ -996,11 +1002,6 @@ const buildCasinoComponents = (
       label: session.state.selectedGame === "exact-roll" ? "Use Bet Buttons" : "Play",
       style: "success",
       disabled: roundActive || !hasAffordableBet || session.state.selectedGame === "exact-roll",
-    },
-    {
-      action: { type: "refresh", ownerId: session.userId },
-      label: "Refresh",
-      style: "secondary",
     },
   ]);
 
