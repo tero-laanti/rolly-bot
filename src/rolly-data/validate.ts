@@ -729,7 +729,6 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
       maxMultiplier: readInteger(charge.maxMultiplier, "diceBalance.charge.maxMultiplier", 1),
     },
     pvp: {
-      maxTier: readInteger(pvp.maxTier, "diceBalance.pvp.maxTier", 1),
       challengeExpireMinutes: readInteger(
         pvp.challengeExpireMinutes,
         "diceBalance.pvp.challengeExpireMinutes",
@@ -757,10 +756,6 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
 
   if (parsed.prestigeSides.length < 2) {
     throw new Error("diceBalance.prestigeSides must include at least two entries.");
-  }
-
-  if (parsed.pvp.maxTier > parsed.prestigeSides.length - 1) {
-    throw new Error("diceBalance.pvp.maxTier must be unlockable from prestigeSides.");
   }
 
   return parsed;
