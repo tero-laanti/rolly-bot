@@ -32,7 +32,9 @@ import type {
   MutateSessionResult,
 } from "../types";
 
-const buildBlackjackDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
+const buildBlackjackDescriptionLines = (
+  session: DiceCasinoMutationContext["session"],
+): string[] => {
   const lines = [
     "**Blackjack**",
     `d${getBlackjackDieSides()} draws. A 1 is Ace (1 or 11). Dealer stands on soft ${getBlackjackDealerStandOnTotal()}.`,

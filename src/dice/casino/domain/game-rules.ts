@@ -313,7 +313,9 @@ export const getBlackjackHandTotals = (hand: number[]): BlackjackHandTotals => {
 };
 
 export const isBlackjackNatural = (hand: number[]): boolean => {
-  return hand.length === getBlackjackInitialCardsPerHand() && getBlackjackHandTotals(hand).total === 21;
+  return (
+    hand.length === getBlackjackInitialCardsPerHand() && getBlackjackHandTotals(hand).total === 21
+  );
 };
 
 export const getBlackjackNaturalPayout = (bet: number): number => {

@@ -29,7 +29,9 @@ import type {
   MutateSessionResult,
 } from "../types";
 
-const buildPushYourLuckDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
+const buildPushYourLuckDescriptionLines = (
+  session: DiceCasinoMutationContext["session"],
+): string[] => {
   const lines = [
     "**Push Your Luck**",
     `Roll 1d${getPushYourLuckDieSides()}. If you repeat a face, you bust. Cash out from ${getPushYourLuckCashoutStartUniqueFaces()} uniques onward.`,

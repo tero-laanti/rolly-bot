@@ -16,3 +16,5 @@ This directory contains example-only data for the public `rolly-bot` repository.
 
 These example values are intentionally safe to expose and do not need to match production.
 They are for local development only.
+
+For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

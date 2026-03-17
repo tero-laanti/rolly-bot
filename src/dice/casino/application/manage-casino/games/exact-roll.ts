@@ -31,7 +31,9 @@ import type {
   MutateSessionResult,
 } from "../types";
 
-const buildExactRollDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
+const buildExactRollDescriptionLines = (
+  session: DiceCasinoMutationContext["session"],
+): string[] => {
   return [
     "**Exact Roll**",
     `Mode: ${session.state.exactRollMode === "exact-face" ? "Exact Face" : "High / Low"}.`,
@@ -82,11 +84,11 @@ const buildExactRollComponentRows = ({
       { length: getExactRollDieSides() },
       (_, index) => index + 1,
     ).map((face) => ({
-        action: { type: "exact-face", ownerId: session.userId, face } as const,
-        label: `${face}`,
-        style: session.state.exactRollFace === face ? "primary" : "secondary",
-        disabled: !hasAffordableBet,
-      }));
+      action: { type: "exact-face", ownerId: session.userId, face } as const,
+      label: `${face}`,
+      style: session.state.exactRollFace === face ? "primary" : "secondary",
+      disabled: !hasAffordableBet,
+    }));
     rows.push(...chunkFaceButtons(faceButtons));
   } else {
     const choiceRow: DiceCasinoActionRow = [
