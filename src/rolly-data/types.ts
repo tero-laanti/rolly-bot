@@ -99,11 +99,6 @@ export type DiceCasinoPayoutRatio = {
   denominator: number;
 };
 
-export type DiceCasinoAnalyticsTierData = {
-  id: string;
-  maxBet: number;
-};
-
 export type DiceCasinoPushYourLuckPayoutData = DiceCasinoPayoutRatio & {
   uniqueFaces: number;
 };
@@ -114,7 +109,6 @@ export type DiceCasinoData = {
     max: number;
     default: number;
     sessionTimeoutMinutes: number;
-    analyticsTiers: DiceCasinoAnalyticsTierData[];
   };
   exactRoll: {
     dieSides: number;

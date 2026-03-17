@@ -83,13 +83,7 @@ export const getDiceCasinoSessionTimeoutMs = (): number => {
 };
 
 export const getDiceCasinoBetTier = (bet: number): DiceCasinoBetTier => {
-  for (const tier of getCasinoBetConfig().analyticsTiers) {
-    if (bet <= tier.maxBet) {
-      return tier.id;
-    }
-  }
-
-  return getCasinoBetConfig().analyticsTiers.at(-1)?.id ?? "default";
+  return String(clampDiceCasinoBet(bet));
 };
 
 export const clampDiceCasinoBet = (bet: number): number => {
