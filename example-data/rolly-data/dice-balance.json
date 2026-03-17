@@ -3,7 +3,6 @@
   "lowerPrestigeBaseLevel": 5,
   "banStep": 4,
   "levelUpReward": 1,
-  "maxRollPassCount": 120,
   "charge": {
     "startAfterMinutes": 10,
     "maxMultiplier": 8

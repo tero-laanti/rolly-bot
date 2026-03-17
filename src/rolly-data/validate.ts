@@ -733,7 +733,6 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
     ),
     banStep: readInteger(record.banStep, "diceBalance.banStep", 1),
     levelUpReward: readInteger(record.levelUpReward, "diceBalance.levelUpReward", 0),
-    maxRollPassCount: readInteger(record.maxRollPassCount, "diceBalance.maxRollPassCount", 1),
     charge: {
       startAfterMinutes: readInteger(
         charge.startAfterMinutes,
