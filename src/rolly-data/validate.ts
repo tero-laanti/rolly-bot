@@ -1,7 +1,6 @@
 import type {
   DiceAchievementData,
   DiceAchievementManualAward,
-  DiceCasinoAnalyticsTierData,
   DiceCasinoData,
   DiceCasinoPayoutRatio,
   DiceCasinoPushYourLuckPayoutData,
@@ -699,14 +698,6 @@ const readCasinoPayoutRatio = (value: unknown, label: string): DiceCasinoPayoutR
   };
 };
 
-const readCasinoAnalyticsTier = (value: unknown, label: string): DiceCasinoAnalyticsTierData => {
-  const record = assertRecord(value, label);
-  return {
-    id: readNonEmptyString(record.id, `${label}.id`),
-    maxBet: readInteger(record.maxBet, `${label}.maxBet`, 1),
-  };
-};
-
 const readCasinoPushYourLuckPayout = (
   value: unknown,
   label: string,
@@ -791,10 +782,6 @@ export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
     "casinoV1.dicePoker.payoutMultipliers",
   );
 
-  if (!Array.isArray(bet.analyticsTiers)) {
-    throw new Error("casinoV1.bet.analyticsTiers must be an array.");
-  }
-
   if (!Array.isArray(pushYourLuck.payouts)) {
     throw new Error("casinoV1.pushYourLuck.payouts must be an array.");
   }
@@ -808,9 +795,6 @@ export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
         bet.sessionTimeoutMinutes,
         "casinoV1.bet.sessionTimeoutMinutes",
         1,
-      ),
-      analyticsTiers: bet.analyticsTiers.map((entry, index) =>
-        readCasinoAnalyticsTier(entry, `casinoV1.bet.analyticsTiers[${index}]`),
       ),
     },
     exactRoll: {
@@ -894,31 +878,6 @@ export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
 
   if (parsed.bet.min > parsed.bet.default || parsed.bet.default > parsed.bet.max) {
     throw new Error("casinoV1.bet must satisfy min <= default <= max.");
-  }
-
-  if (parsed.bet.analyticsTiers.length < 1) {
-    throw new Error("casinoV1.bet.analyticsTiers must include at least one entry.");
-  }
-
-  const tierIds = new Set<string>();
-  let previousMaxBet = 0;
-  for (const tier of parsed.bet.analyticsTiers) {
-    if (tierIds.has(tier.id)) {
-      throw new Error(`Duplicate casino analytics tier id: ${tier.id}.`);
-    }
-    if (tier.maxBet <= previousMaxBet) {
-      throw new Error("casinoV1.bet.analyticsTiers maxBet values must be strictly increasing.");
-    }
-    tierIds.add(tier.id);
-    previousMaxBet = tier.maxBet;
-  }
-
-  if ((parsed.bet.analyticsTiers.at(-1)?.maxBet ?? 0) !== parsed.bet.max) {
-    throw new Error("casinoV1.bet.analyticsTiers final maxBet must match casinoV1.bet.max.");
-  }
-
-  if ((parsed.bet.analyticsTiers[0]?.maxBet ?? 0) < parsed.bet.min) {
-    throw new Error("casinoV1.bet.analyticsTiers must cover casinoV1.bet.min.");
   }
 
   if (parsed.exactRoll.highLowLowMaxFace >= parsed.exactRoll.dieSides) {
