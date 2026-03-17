@@ -9,6 +9,7 @@ This directory contains example-only data for the public `rolly-bot` repository.
   3. `./example-data/rolly-data` only when `ROLLY_ALLOW_EXAMPLE_DATA=true`
 - Files expected in a data directory:
   - `achievements.json`
+  - `casino.v1.json`
   - `dice-balance.json`
   - `items.v1.json`
   - `random-events.v1.json`

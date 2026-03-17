@@ -2,8 +2,12 @@ import {
   createBlackjackRound,
   formatBlackjackDice,
   formatDice,
+  getBlackjackDealerStandOnTotal,
   getBlackjackHandTotals,
+  getBlackjackDieSides,
   getBlackjackNaturalPayout,
+  getBlackjackNaturalPayoutRatio,
+  getBlackjackWinPayoutMultiplier,
   getDiceCasinoBetTier,
   hitBlackjackRound,
   resolveBlackjackOpening,
@@ -31,10 +35,10 @@ import type {
 const buildBlackjackDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
   const lines = [
     "**Blackjack**",
-    "d10 draws. A 1 is Ace (1 or 11). Dealer stands on soft 17.",
-    `Normal win: ${session.bet * 2} total.`,
+    `d${getBlackjackDieSides()} draws. A 1 is Ace (1 or 11). Dealer stands on soft ${getBlackjackDealerStandOnTotal()}.`,
+    `Normal win: ${session.bet * getBlackjackWinPayoutMultiplier()} total.`,
     `Push: ${session.bet} total.`,
-    `Natural: ${getBlackjackNaturalPayout(session.bet)} total.`,
+    `Natural: floor(${getBlackjackNaturalPayoutRatio().numerator} * bet / ${getBlackjackNaturalPayoutRatio().denominator}) = ${getBlackjackNaturalPayout(session.bet)}.`,
     "Dealer natural is checked immediately after the opening deal.",
   ];
 

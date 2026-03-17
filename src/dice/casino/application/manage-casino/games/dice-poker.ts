@@ -3,6 +3,9 @@ import {
   describePokerResult,
   formatDice,
   getDiceCasinoBetTier,
+  getDicePokerDiceCount,
+  getDicePokerDieSides,
+  getDicePokerPayoutMultiplier,
   rerollDicePokerRound,
 } from "../../../domain/game-rules";
 import {
@@ -24,15 +27,27 @@ import type {
   MutateSessionResult,
 } from "../types";
 
+const buildStraightExamples = (): string => {
+  const straightCount = getDicePokerDiceCount();
+  const maxStart = getDicePokerDieSides() - straightCount + 1;
+  const ranges: string[] = [];
+
+  for (let start = 1; start <= maxStart; start += 1) {
+    ranges.push(`${start}-${start + straightCount - 1}`);
+  }
+
+  return ranges.join(", ");
+};
+
 const buildDicePokerDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
   const lines = [
     "**Dice Poker**",
-    "Roll 5d8, hold any subset from 0 to 5 dice, then reroll the rest once.",
-    `Five of a Kind: ${session.bet * 20} total.`,
-    `Four of a Kind: ${session.bet * 10} total.`,
-    `Full House: ${session.bet * 3} total.`,
-    `Straight: ${session.bet * 3} total.`,
-    "Straight means 1-5, 2-6, 3-7, or 4-8.",
+    `Roll ${getDicePokerDiceCount()}d${getDicePokerDieSides()}, hold any subset from 0 to ${getDicePokerDiceCount()} dice, then reroll the rest once.`,
+    `Five of a Kind: ${session.bet * getDicePokerPayoutMultiplier("five-of-a-kind")} total.`,
+    `Four of a Kind: ${session.bet * getDicePokerPayoutMultiplier("four-of-a-kind")} total.`,
+    `Full House: ${session.bet * getDicePokerPayoutMultiplier("full-house")} total.`,
+    `Straight: ${session.bet * getDicePokerPayoutMultiplier("straight")} total.`,
+    `Straight means ${buildStraightExamples()}.`,
   ];
 
   const round = getExpectedRound(session.state.activeRound, "dice-poker");
@@ -103,7 +118,7 @@ const startDicePokerRound = ({
       state: {
         ...session.state,
         activeRound: pokerRound,
-        lastOutcome: "Dice Poker hand started. Hold any dice, including all 5, then reroll once.",
+        lastOutcome: `Dice Poker hand started. Hold any dice, including all ${getDicePokerDiceCount()}, then reroll once.`,
       },
     },
     nextPips,

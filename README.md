@@ -54,7 +54,7 @@ Rolly reads configuration from `.env`. The source of truth for available variabl
 ### Optional
 
 - `DISCORD_GUILD_ID`: Development guild/server ID for fast slash-command iteration. If omitted, commands are deployed globally.
-- `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and only falls back to `./example-data/rolly-data` when `ROLLY_ALLOW_EXAMPLE_DATA=true`. Expected files include `achievements.json`, `dice-balance.json`, `items.v1.json`, and `random-events.v1.json`.
+- `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and only falls back to `./example-data/rolly-data` when `ROLLY_ALLOW_EXAMPLE_DATA=true`. Expected files include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, and `random-events.v1.json`.
 - `ROLLY_ALLOW_EXAMPLE_DATA`: Development-only flag. Set to `true` only if you intentionally want to run against the public example data. Default: disabled.
 - `RANDOM_EVENTS_CHANNEL_ID`: Channel ID where random events are posted. If random events are enabled but this is unset, no event messages can be posted.
 - `RANDOM_EVENTS_ENABLED`: Enables or disables the random-event scheduler. Default: `true`.
@@ -99,6 +99,7 @@ At startup, the bot loads gameplay data in this order:
 Expected files in a data directory:
 
 - `achievements.json`
+- `casino.v1.json`
 - `dice-balance.json`
 - `items.v1.json`
 - `random-events.v1.json`

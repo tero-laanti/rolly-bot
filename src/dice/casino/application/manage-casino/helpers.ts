@@ -2,10 +2,10 @@ import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casi
 import { createDefaultDiceCasinoSessionState } from "../../domain/casino-session";
 import {
   clampDiceCasinoBet,
-  diceCasinoDefaultBet,
-  diceCasinoMaxBet,
-  diceCasinoMinBet,
-  diceCasinoSessionTimeoutMs,
+  getDiceCasinoDefaultBet,
+  getDiceCasinoMaxBet,
+  getDiceCasinoMinBet,
+  getDiceCasinoSessionTimeoutMs,
 } from "../../domain/game-rules";
 import type {
   DiceCasinoBetAdjustment,
@@ -17,7 +17,7 @@ export const resolveInitialBet = (
   requestedBet: number | null,
   availablePips: number,
 ): { ok: true; bet: number } | { ok: false; message: string } => {
-  if (availablePips < diceCasinoMinBet) {
+  if (availablePips < getDiceCasinoMinBet()) {
     return {
       ok: false,
       message: "You need at least 1 pip to open the casino.",
@@ -40,7 +40,7 @@ export const resolveInitialBet = (
 
   return {
     ok: true,
-    bet: availablePips >= diceCasinoDefaultBet ? diceCasinoDefaultBet : availablePips,
+    bet: availablePips >= getDiceCasinoDefaultBet() ? getDiceCasinoDefaultBet() : availablePips,
   };
 };
 
@@ -53,7 +53,7 @@ export const createSessionRecord = (
     userId,
     bet,
     state: createDefaultDiceCasinoSessionState(),
-    expiresAt: new Date(nowMs + diceCasinoSessionTimeoutMs).toISOString(),
+    expiresAt: new Date(nowMs + getDiceCasinoSessionTimeoutMs()).toISOString(),
     updatedAt: new Date(nowMs).toISOString(),
   };
 };
@@ -61,13 +61,13 @@ export const createSessionRecord = (
 export const refreshSession = (session: DiceCasinoSession, nowMs: number): DiceCasinoSession => {
   return {
     ...session,
-    expiresAt: new Date(nowMs + diceCasinoSessionTimeoutMs).toISOString(),
+    expiresAt: new Date(nowMs + getDiceCasinoSessionTimeoutMs()).toISOString(),
     updatedAt: new Date(nowMs).toISOString(),
   };
 };
 
 export const normalizeSessionBet = (session: DiceCasinoSession, pips: number): DiceCasinoSession => {
-  if (session.state.activeRound || pips < diceCasinoMinBet) {
+  if (session.state.activeRound || pips < getDiceCasinoMinBet()) {
     return session;
   }
 
@@ -78,11 +78,11 @@ export const normalizeSessionBet = (session: DiceCasinoSession, pips: number): D
 };
 
 const clampBetToBalance = (bet: number, pips: number): number => {
-  if (pips < diceCasinoMinBet) {
-    return diceCasinoMinBet;
+  if (pips < getDiceCasinoMinBet()) {
+    return getDiceCasinoMinBet();
   }
 
-  return Math.max(diceCasinoMinBet, Math.min(clampDiceCasinoBet(bet), pips));
+  return Math.max(getDiceCasinoMinBet(), Math.min(clampDiceCasinoBet(bet), pips));
 };
 
 export const adjustSessionBet = (
@@ -90,9 +90,12 @@ export const adjustSessionBet = (
   adjustment: DiceCasinoBetAdjustment,
   availablePips: number,
 ): number => {
-  const maxAffordable = Math.max(diceCasinoMinBet, Math.min(diceCasinoMaxBet, availablePips));
+  const maxAffordable = Math.max(
+    getDiceCasinoMinBet(),
+    Math.min(getDiceCasinoMaxBet(), availablePips),
+  );
   const stepMap = {
-    min: diceCasinoMinBet,
+    min: getDiceCasinoMinBet(),
     max: maxAffordable,
     "-10": bet - 10,
     "-1": bet - 1,
@@ -100,7 +103,7 @@ export const adjustSessionBet = (
     "+10": bet + 10,
   } as const;
 
-  return Math.max(diceCasinoMinBet, Math.min(maxAffordable, stepMap[adjustment]));
+  return Math.max(getDiceCasinoMinBet(), Math.min(maxAffordable, stepMap[adjustment]));
 };
 
 export const getExpectedRound = <TRoundType extends DiceCasinoActiveRound["type"]>(
@@ -115,7 +118,7 @@ export const getExpectedRound = <TRoundType extends DiceCasinoActiveRound["type"
 };
 
 export const canStartCasinoRound = (bet: number, pips: number): boolean => {
-  return pips >= bet && bet >= diceCasinoMinBet;
+  return pips >= bet && bet >= getDiceCasinoMinBet();
 };
 
 export const getOutcomeFromPayout = (

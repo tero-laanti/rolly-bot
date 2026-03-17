@@ -4,7 +4,11 @@ import {
   createPushYourLuckRound,
   formatDice,
   getDiceCasinoBetTier,
+  getPushYourLuckAutoCashoutAtUniqueFaces,
+  getPushYourLuckCashoutStartUniqueFaces,
   getPushYourLuckCashoutPayout,
+  getPushYourLuckDieSides,
+  getPushYourLuckPayoutTable,
 } from "../../../domain/game-rules";
 import {
   canStartCasinoRound,
@@ -28,12 +32,11 @@ import type {
 const buildPushYourLuckDescriptionLines = (session: DiceCasinoMutationContext["session"]): string[] => {
   const lines = [
     "**Push Your Luck**",
-    "Roll 1d6. If you repeat a face, you bust. Cash out from 2 uniques onward.",
-    `2 uniques: ${getPushYourLuckCashoutPayout(session.bet, 2)} total.`,
-    `3 uniques: ${getPushYourLuckCashoutPayout(session.bet, 3)} total.`,
-    `4 uniques: ${getPushYourLuckCashoutPayout(session.bet, 4)} total.`,
-    `5 uniques: ${getPushYourLuckCashoutPayout(session.bet, 5)} total.`,
-    `6 uniques: ${getPushYourLuckCashoutPayout(session.bet, 6)} total.`,
+    `Roll 1d${getPushYourLuckDieSides()}. If you repeat a face, you bust. Cash out from ${getPushYourLuckCashoutStartUniqueFaces()} uniques onward.`,
+    ...getPushYourLuckPayoutTable().map(
+      (payout) =>
+        `${payout.uniqueFaces} uniques: ${getPushYourLuckCashoutPayout(session.bet, payout.uniqueFaces)} total.`,
+    ),
   ];
 
   const round = getExpectedRound(session.state.activeRound, "push-your-luck");
@@ -176,7 +179,7 @@ const handlePushYourLuckAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `Perfect run. Rolled ${rollResult.rolledValue} for 6 uniques and paid ${rollResult.payout} pips total.`,
+            lastOutcome: `Perfect run. Rolled ${rollResult.rolledValue} for ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips total.`,
           },
         },
         nextPips,

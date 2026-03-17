@@ -1,3 +1,4 @@
+import { getDiceCasinoData } from "../../../rolly-data/load";
 import type {
   BlackjackRoundState,
   DiceCasinoGame,
@@ -6,7 +7,7 @@ import type {
   PushYourLuckRoundState,
 } from "./casino-session";
 
-export type DiceCasinoBetTier = "1-5" | "6-10" | "11-20" | "21-50";
+export type DiceCasinoBetTier = string;
 
 export type DicePokerHandKind = "five-of-a-kind" | "four-of-a-kind" | "full-house" | "straight";
 
@@ -33,29 +34,66 @@ export type BlackjackResolution =
       playerHand: number[];
     };
 
-export const diceCasinoMinBet = 1;
-export const diceCasinoMaxBet = 50;
-export const diceCasinoDefaultBet = 5;
-export const diceCasinoSessionTimeoutMs = 5 * 60 * 1000;
+const minuteMs = 60_000;
+
+const getCasinoBetConfig = () => {
+  return getDiceCasinoData().bet;
+};
+
+const getExactRollConfig = () => {
+  return getDiceCasinoData().exactRoll;
+};
+
+const getPushYourLuckConfig = () => {
+  return getDiceCasinoData().pushYourLuck;
+};
+
+const getBlackjackConfig = () => {
+  return getDiceCasinoData().blackjack;
+};
+
+const getDicePokerConfig = () => {
+  return getDiceCasinoData().dicePoker;
+};
+
+const applyPayoutRatio = (
+  bet: number,
+  payout: {
+    numerator: number;
+    denominator: number;
+  },
+): number => {
+  return Math.floor((payout.numerator * bet) / payout.denominator);
+};
+
+export const getDiceCasinoMinBet = (): number => {
+  return getCasinoBetConfig().min;
+};
+
+export const getDiceCasinoMaxBet = (): number => {
+  return getCasinoBetConfig().max;
+};
+
+export const getDiceCasinoDefaultBet = (): number => {
+  return getCasinoBetConfig().default;
+};
+
+export const getDiceCasinoSessionTimeoutMs = (): number => {
+  return getCasinoBetConfig().sessionTimeoutMinutes * minuteMs;
+};
 
 export const getDiceCasinoBetTier = (bet: number): DiceCasinoBetTier => {
-  if (bet <= 5) {
-    return "1-5";
+  for (const tier of getCasinoBetConfig().analyticsTiers) {
+    if (bet <= tier.maxBet) {
+      return tier.id;
+    }
   }
 
-  if (bet <= 10) {
-    return "6-10";
-  }
-
-  if (bet <= 20) {
-    return "11-20";
-  }
-
-  return "21-50";
+  return getCasinoBetConfig().analyticsTiers.at(-1)?.id ?? "default";
 };
 
 export const clampDiceCasinoBet = (bet: number): number => {
-  return Math.max(diceCasinoMinBet, Math.min(diceCasinoMaxBet, Math.floor(bet)));
+  return Math.max(getDiceCasinoMinBet(), Math.min(getDiceCasinoMaxBet(), Math.floor(bet)));
 };
 
 export const getDiceCasinoGameLabel = (game: DiceCasinoGame): string => {
@@ -79,12 +117,32 @@ export const rollDice = (count: number, sides: number): number[] => {
   return Array.from({ length: count }, () => rollDie(sides));
 };
 
+export const getExactRollDieSides = (): number => {
+  return getExactRollConfig().dieSides;
+};
+
+export const getExactRollLowMaxFace = (): number => {
+  return getExactRollConfig().highLowLowMaxFace;
+};
+
+export const getExactRollHighMinFace = (): number => {
+  return getExactRollLowMaxFace() + 1;
+};
+
+export const getExactRollFacePayoutRatio = () => {
+  return getExactRollConfig().facePayout;
+};
+
+export const getExactRollHighLowPayoutRatio = () => {
+  return getExactRollConfig().highLowPayout;
+};
+
 export const getExactRollFacePayout = (bet: number): number => {
-  return Math.floor((59 * bet) / 10);
+  return applyPayoutRatio(bet, getExactRollFacePayoutRatio());
 };
 
 export const getExactRollHighLowPayout = (bet: number): number => {
-  return Math.floor((197 * bet) / 100);
+  return applyPayoutRatio(bet, getExactRollHighLowPayoutRatio());
 };
 
 export const resolveExactRollFace = (
@@ -103,31 +161,32 @@ export const resolveExactRollHighLow = (
   choice: ExactRollHighLowChoice,
   rolledFace: number,
 ): { payout: number; won: boolean } => {
-  const resultChoice: ExactRollHighLowChoice = rolledFace <= 3 ? "low" : "high";
+  const resultChoice: ExactRollHighLowChoice =
+    rolledFace <= getExactRollLowMaxFace() ? "low" : "high";
   return {
     payout: resultChoice === choice ? getExactRollHighLowPayout(bet) : 0,
     won: resultChoice === choice,
   };
 };
 
-const pushYourLuckPayoutNumerators: Record<number, number> = {
-  2: 59,
-  3: 177,
-  4: 177,
-  5: 531,
-  6: 1593,
+export const getPushYourLuckDieSides = (): number => {
+  return getPushYourLuckConfig().dieSides;
 };
 
-const pushYourLuckPayoutDenominators: Record<number, number> = {
-  2: 50,
-  3: 100,
-  4: 50,
-  5: 50,
-  6: 25,
+export const getPushYourLuckCashoutStartUniqueFaces = (): number => {
+  return getPushYourLuckConfig().cashoutStartsAtUniqueFaces;
+};
+
+export const getPushYourLuckAutoCashoutAtUniqueFaces = (): number => {
+  return getPushYourLuckConfig().autoCashoutAtUniqueFaces;
+};
+
+export const getPushYourLuckPayoutTable = () => {
+  return getPushYourLuckConfig().payouts;
 };
 
 export const createPushYourLuckRound = (bet: number): PushYourLuckRoundState => {
-  const firstRoll = rollDie(6);
+  const firstRoll = rollDie(getPushYourLuckDieSides());
   return {
     type: "push-your-luck",
     bet,
@@ -137,13 +196,16 @@ export const createPushYourLuckRound = (bet: number): PushYourLuckRoundState => 
 };
 
 export const canPushYourLuckCashOut = (round: PushYourLuckRoundState): boolean => {
-  return round.uniqueValues.length >= 2;
+  return round.uniqueValues.length >= getPushYourLuckCashoutStartUniqueFaces();
 };
 
 export const getPushYourLuckCashoutPayout = (bet: number, uniqueCount: number): number => {
-  return Math.floor(
-    (pushYourLuckPayoutNumerators[uniqueCount] * bet) / pushYourLuckPayoutDenominators[uniqueCount],
-  );
+  const payout = getPushYourLuckPayoutTable().find((entry) => entry.uniqueFaces === uniqueCount);
+  if (!payout) {
+    throw new Error(`Missing Push Your Luck payout for ${uniqueCount} unique faces.`);
+  }
+
+  return applyPayoutRatio(bet, payout);
 };
 
 export const advancePushYourLuckRound = (
@@ -162,7 +224,7 @@ export const advancePushYourLuckRound = (
       rolledValue: number;
       payout: number;
     } => {
-  const rolledValue = rollDie(6);
+  const rolledValue = rollDie(getPushYourLuckDieSides());
   if (round.uniqueValues.includes(rolledValue)) {
     return {
       kind: "bust",
@@ -176,7 +238,7 @@ export const advancePushYourLuckRound = (
     uniqueValues: [...round.uniqueValues, rolledValue],
   };
 
-  if (nextRound.uniqueValues.length >= 6) {
+  if (nextRound.uniqueValues.length >= getPushYourLuckAutoCashoutAtUniqueFaces()) {
     return {
       kind: "auto-cashout",
       rolledValue,
@@ -190,12 +252,36 @@ export const advancePushYourLuckRound = (
   };
 };
 
+export const getBlackjackDieSides = (): number => {
+  return getBlackjackConfig().dieSides;
+};
+
+export const getBlackjackInitialCardsPerHand = (): number => {
+  return getBlackjackConfig().initialCardsPerHand;
+};
+
+export const getBlackjackDealerStandOnTotal = (): number => {
+  return getBlackjackConfig().dealerStandOnTotal;
+};
+
+export const getBlackjackNaturalPayoutRatio = () => {
+  return getBlackjackConfig().naturalPayout;
+};
+
+export const getBlackjackWinPayoutMultiplier = (): number => {
+  return getBlackjackConfig().winPayoutMultiplier;
+};
+
+const getBlackjackWinPayout = (bet: number): number => {
+  return bet * getBlackjackWinPayoutMultiplier();
+};
+
 export const createBlackjackRound = (bet: number): BlackjackRoundState => {
   return {
     type: "blackjack",
     bet,
-    playerHand: [rollDie(10), rollDie(10)],
-    dealerHand: [rollDie(10), rollDie(10)],
+    playerHand: rollDice(getBlackjackInitialCardsPerHand(), getBlackjackDieSides()),
+    dealerHand: rollDice(getBlackjackInitialCardsPerHand(), getBlackjackDieSides()),
     status: "active",
   };
 };
@@ -233,11 +319,11 @@ export const getBlackjackHandTotals = (hand: number[]): BlackjackHandTotals => {
 };
 
 export const isBlackjackNatural = (hand: number[]): boolean => {
-  return hand.length === 2 && getBlackjackHandTotals(hand).total === 21;
+  return hand.length === getBlackjackInitialCardsPerHand() && getBlackjackHandTotals(hand).total === 21;
 };
 
 export const getBlackjackNaturalPayout = (bet: number): number => {
-  return Math.floor((11 * bet) / 5);
+  return applyPayoutRatio(bet, getBlackjackNaturalPayoutRatio());
 };
 
 export const resolveBlackjackOpening = (round: BlackjackRoundState): BlackjackResolution => {
@@ -248,7 +334,7 @@ export const resolveBlackjackOpening = (round: BlackjackRoundState): BlackjackRe
     return {
       kind: "resolved",
       payout: round.bet,
-      summary: `Both you and the dealer opened with natural 21. Push.`,
+      summary: "Both you and the dealer opened with natural 21. Push.",
       dealerHand: round.dealerHand,
       playerHand: round.playerHand,
     };
@@ -258,7 +344,7 @@ export const resolveBlackjackOpening = (round: BlackjackRoundState): BlackjackRe
     return {
       kind: "resolved",
       payout: 0,
-      summary: `Dealer natural 21. You lose.`,
+      summary: "Dealer natural 21. You lose.",
       dealerHand: round.dealerHand,
       playerHand: round.playerHand,
     };
@@ -284,18 +370,18 @@ const drawBlackjackDealerToCompletion = (dealerHand: number[]): number[] => {
   const nextHand = [...dealerHand];
   while (true) {
     const totals = getBlackjackHandTotals(nextHand);
-    if (totals.total >= 17) {
+    if (totals.total >= getBlackjackDealerStandOnTotal()) {
       return nextHand;
     }
 
-    nextHand.push(rollDie(10));
+    nextHand.push(rollDie(getBlackjackDieSides()));
   }
 };
 
 export const hitBlackjackRound = (round: BlackjackRoundState): BlackjackResolution => {
   const nextRound: BlackjackRoundState = {
     ...round,
-    playerHand: [...round.playerHand, rollDie(10)],
+    playerHand: [...round.playerHand, rollDie(getBlackjackDieSides())],
   };
   const playerTotals = getBlackjackHandTotals(nextRound.playerHand);
 
@@ -325,10 +411,11 @@ export const standBlackjackRound = (round: BlackjackRoundState): BlackjackResolu
   const dealerTotals = getBlackjackHandTotals(dealerHand);
 
   if (dealerTotals.total > 21 || playerTotals.total > dealerTotals.total) {
+    const payout = getBlackjackWinPayout(round.bet);
     return {
       kind: "resolved",
-      payout: round.bet * 2,
-      summary: `You win ${round.bet * 2} pips total. Dealer ${dealerTotals.total}, you ${playerTotals.total}.`,
+      payout,
+      summary: `You win ${payout} pips total. Dealer ${dealerTotals.total}, you ${playerTotals.total}.`,
       dealerHand,
       playerHand: round.playerHand,
     };
@@ -353,11 +440,33 @@ export const standBlackjackRound = (round: BlackjackRoundState): BlackjackResolu
   };
 };
 
+export const getDicePokerDiceCount = (): number => {
+  return getDicePokerConfig().diceCount;
+};
+
+export const getDicePokerDieSides = (): number => {
+  return getDicePokerConfig().dieSides;
+};
+
+export const getDicePokerPayoutMultiplier = (kind: DicePokerHandKind): number => {
+  const multipliers = getDicePokerConfig().payoutMultipliers;
+  switch (kind) {
+    case "five-of-a-kind":
+      return multipliers.fiveOfAKind;
+    case "four-of-a-kind":
+      return multipliers.fourOfAKind;
+    case "full-house":
+      return multipliers.fullHouse;
+    case "straight":
+      return multipliers.straight;
+  }
+};
+
 export const createDicePokerRound = (bet: number): DicePokerRoundState => {
   return {
     type: "dice-poker",
     bet,
-    initialRoll: rollDice(5, 8),
+    initialRoll: rollDice(getDicePokerDiceCount(), getDicePokerDieSides()),
     heldIndices: [],
     stage: "holding",
   };
@@ -367,7 +476,7 @@ export const rerollDicePokerRound = (
   round: DicePokerRoundState,
 ): { finalRoll: number[]; result: DicePokerResult } => {
   const finalRoll = round.initialRoll.map((value, index) =>
-    round.heldIndices.includes(index) ? value : rollDie(8),
+    round.heldIndices.includes(index) ? value : rollDie(getDicePokerDieSides()),
   );
   return {
     finalRoll,
@@ -382,22 +491,36 @@ export const classifyDicePokerHand = (roll: number[], bet: number): DicePokerRes
   }
   const groups = [...counts.values()].sort((left, right) => right - left);
   const uniqueValues = [...counts.keys()].sort((left, right) => left - right);
-  const isStraight = uniqueValues.length === 5 && uniqueValues[4] - uniqueValues[0] === 4;
+  const isStraight =
+    uniqueValues.length === getDicePokerDiceCount() &&
+    uniqueValues.at(-1)! - uniqueValues[0]! === getDicePokerDiceCount() - 1;
 
-  if (groups[0] === 5) {
-    return { kind: "five-of-a-kind", payout: bet * 20 };
+  if (groups[0] === getDicePokerDiceCount()) {
+    return {
+      kind: "five-of-a-kind",
+      payout: bet * getDicePokerPayoutMultiplier("five-of-a-kind"),
+    };
   }
 
-  if (groups[0] === 4) {
-    return { kind: "four-of-a-kind", payout: bet * 10 };
+  if (groups[0] === getDicePokerDiceCount() - 1) {
+    return {
+      kind: "four-of-a-kind",
+      payout: bet * getDicePokerPayoutMultiplier("four-of-a-kind"),
+    };
   }
 
   if (groups[0] === 3 && groups[1] === 2) {
-    return { kind: "full-house", payout: bet * 3 };
+    return {
+      kind: "full-house",
+      payout: bet * getDicePokerPayoutMultiplier("full-house"),
+    };
   }
 
   if (isStraight) {
-    return { kind: "straight", payout: bet * 3 };
+    return {
+      kind: "straight",
+      payout: bet * getDicePokerPayoutMultiplier("straight"),
+    };
   }
 
   return { kind: "loss", payout: 0 };
