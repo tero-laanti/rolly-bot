@@ -1,0 +1,58 @@
+{
+  "bet": {
+    "min": 1,
+    "max": 50,
+    "default": 5,
+    "sessionTimeoutMinutes": 5,
+    "analyticsTiers": [
+      { "id": "1-5", "maxBet": 5 },
+      { "id": "6-10", "maxBet": 10 },
+      { "id": "11-20", "maxBet": 20 },
+      { "id": "21-50", "maxBet": 50 }
+    ]
+  },
+  "exactRoll": {
+    "dieSides": 6,
+    "highLowLowMaxFace": 3,
+    "facePayout": {
+      "numerator": 59,
+      "denominator": 10
+    },
+    "highLowPayout": {
+      "numerator": 197,
+      "denominator": 100
+    }
+  },
+  "pushYourLuck": {
+    "dieSides": 6,
+    "cashoutStartsAtUniqueFaces": 2,
+    "autoCashoutAtUniqueFaces": 6,
+    "payouts": [
+      { "uniqueFaces": 2, "numerator": 59, "denominator": 50 },
+      { "uniqueFaces": 3, "numerator": 177, "denominator": 100 },
+      { "uniqueFaces": 4, "numerator": 177, "denominator": 50 },
+      { "uniqueFaces": 5, "numerator": 531, "denominator": 50 },
+      { "uniqueFaces": 6, "numerator": 1593, "denominator": 25 }
+    ]
+  },
+  "blackjack": {
+    "dieSides": 10,
+    "initialCardsPerHand": 2,
+    "dealerStandOnTotal": 17,
+    "naturalPayout": {
+      "numerator": 11,
+      "denominator": 5
+    },
+    "winPayoutMultiplier": 2
+  },
+  "dicePoker": {
+    "diceCount": 5,
+    "dieSides": 8,
+    "payoutMultipliers": {
+      "fiveOfAKind": 20,
+      "fourOfAKind": 10,
+      "fullHouse": 3,
+      "straight": 3
+    }
+  }
+}

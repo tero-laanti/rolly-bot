@@ -1,5 +1,5 @@
 import type { ActionView } from "../../../../shared-kernel/application/action-view";
-import { diceCasinoMinBet, getDiceCasinoGameLabel } from "../../domain/game-rules";
+import { getDiceCasinoGameLabel, getDiceCasinoMinBet } from "../../domain/game-rules";
 import { canStartCasinoRound } from "./helpers";
 import { diceCasinoGameButtonOrder, getDiceCasinoGameModule } from "./games";
 import type { DiceCasinoAction, DiceCasinoActionRow } from "./types";
@@ -56,31 +56,31 @@ const buildCasinoComponents = (
       action: { type: "adjust-bet", ownerId: session.userId, adjustment: "min" },
       label: "Min",
       style: "secondary",
-      disabled: roundActive || pips < diceCasinoMinBet,
+      disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
       action: { type: "adjust-bet", ownerId: session.userId, adjustment: "-10" },
       label: "-10",
       style: "secondary",
-      disabled: roundActive || pips < diceCasinoMinBet,
+      disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
       action: { type: "adjust-bet", ownerId: session.userId, adjustment: "-1" },
       label: "-1",
       style: "secondary",
-      disabled: roundActive || pips < diceCasinoMinBet,
+      disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
       action: { type: "adjust-bet", ownerId: session.userId, adjustment: "+1" },
       label: "+1",
       style: "secondary",
-      disabled: roundActive || pips < diceCasinoMinBet,
+      disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
       action: { type: "adjust-bet", ownerId: session.userId, adjustment: "+10" },
       label: "+10",
       style: "secondary",
-      disabled: roundActive || pips < diceCasinoMinBet,
+      disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
   ]);
 
@@ -89,7 +89,7 @@ const buildCasinoComponents = (
       action: { type: "adjust-bet", ownerId: session.userId, adjustment: "max" },
       label: "Max",
       style: "secondary",
-      disabled: roundActive || pips < diceCasinoMinBet,
+      disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
       action: { type: "play", ownerId: session.userId },

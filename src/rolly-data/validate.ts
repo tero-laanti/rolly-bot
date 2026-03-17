@@ -1,6 +1,10 @@
 import type {
   DiceAchievementData,
   DiceAchievementManualAward,
+  DiceCasinoAnalyticsTierData,
+  DiceCasinoData,
+  DiceCasinoPayoutRatio,
+  DiceCasinoPushYourLuckPayoutData,
   DiceAchievementRule,
   DiceBalanceData,
   DiceItemData,
@@ -688,6 +692,33 @@ export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => 
   return parsed;
 };
 
+const readCasinoPayoutRatio = (value: unknown, label: string): DiceCasinoPayoutRatio => {
+  const record = assertRecord(value, label);
+  return {
+    numerator: readInteger(record.numerator, `${label}.numerator`, 1),
+    denominator: readInteger(record.denominator, `${label}.denominator`, 1),
+  };
+};
+
+const readCasinoAnalyticsTier = (value: unknown, label: string): DiceCasinoAnalyticsTierData => {
+  const record = assertRecord(value, label);
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    maxBet: readInteger(record.maxBet, `${label}.maxBet`, 1),
+  };
+};
+
+const readCasinoPushYourLuckPayout = (
+  value: unknown,
+  label: string,
+): DiceCasinoPushYourLuckPayoutData => {
+  const record = assertRecord(value, label);
+  return {
+    uniqueFaces: readInteger(record.uniqueFaces, `${label}.uniqueFaces`, 1),
+    ...readCasinoPayoutRatio(record, label),
+  };
+};
+
 export const parseDiceBalance = (value: unknown): DiceBalanceData => {
   const record = assertRecord(value, "diceBalance");
   const charge = assertRecord(record.charge, "diceBalance.charge");
@@ -745,6 +776,198 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
 
   if (parsed.pvp.maxTier > parsed.prestigeSides.length - 1) {
     throw new Error("diceBalance.pvp.maxTier must be unlockable from prestigeSides.");
+  }
+
+  return parsed;
+};
+
+export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
+  const record = assertRecord(value, "casinoV1");
+  const bet = assertRecord(record.bet, "casinoV1.bet");
+  const exactRoll = assertRecord(record.exactRoll, "casinoV1.exactRoll");
+  const pushYourLuck = assertRecord(record.pushYourLuck, "casinoV1.pushYourLuck");
+  const blackjack = assertRecord(record.blackjack, "casinoV1.blackjack");
+  const dicePoker = assertRecord(record.dicePoker, "casinoV1.dicePoker");
+  const dicePokerPayoutMultipliers = assertRecord(
+    dicePoker.payoutMultipliers,
+    "casinoV1.dicePoker.payoutMultipliers",
+  );
+
+  if (!Array.isArray(bet.analyticsTiers)) {
+    throw new Error("casinoV1.bet.analyticsTiers must be an array.");
+  }
+
+  if (!Array.isArray(pushYourLuck.payouts)) {
+    throw new Error("casinoV1.pushYourLuck.payouts must be an array.");
+  }
+
+  const parsed: DiceCasinoData = {
+    bet: {
+      min: readInteger(bet.min, "casinoV1.bet.min", 1),
+      max: readInteger(bet.max, "casinoV1.bet.max", 1),
+      default: readInteger(bet.default, "casinoV1.bet.default", 1),
+      sessionTimeoutMinutes: readInteger(
+        bet.sessionTimeoutMinutes,
+        "casinoV1.bet.sessionTimeoutMinutes",
+        1,
+      ),
+      analyticsTiers: bet.analyticsTiers.map((entry, index) =>
+        readCasinoAnalyticsTier(entry, `casinoV1.bet.analyticsTiers[${index}]`),
+      ),
+    },
+    exactRoll: {
+      dieSides: readInteger(exactRoll.dieSides, "casinoV1.exactRoll.dieSides", 2),
+      highLowLowMaxFace: readInteger(
+        exactRoll.highLowLowMaxFace,
+        "casinoV1.exactRoll.highLowLowMaxFace",
+        1,
+      ),
+      facePayout: readCasinoPayoutRatio(exactRoll.facePayout, "casinoV1.exactRoll.facePayout"),
+      highLowPayout: readCasinoPayoutRatio(
+        exactRoll.highLowPayout,
+        "casinoV1.exactRoll.highLowPayout",
+      ),
+    },
+    pushYourLuck: {
+      dieSides: readInteger(pushYourLuck.dieSides, "casinoV1.pushYourLuck.dieSides", 2),
+      cashoutStartsAtUniqueFaces: readInteger(
+        pushYourLuck.cashoutStartsAtUniqueFaces,
+        "casinoV1.pushYourLuck.cashoutStartsAtUniqueFaces",
+        1,
+      ),
+      autoCashoutAtUniqueFaces: readInteger(
+        pushYourLuck.autoCashoutAtUniqueFaces,
+        "casinoV1.pushYourLuck.autoCashoutAtUniqueFaces",
+        1,
+      ),
+      payouts: pushYourLuck.payouts.map((entry, index) =>
+        readCasinoPushYourLuckPayout(entry, `casinoV1.pushYourLuck.payouts[${index}]`),
+      ),
+    },
+    blackjack: {
+      dieSides: readInteger(blackjack.dieSides, "casinoV1.blackjack.dieSides", 2),
+      initialCardsPerHand: readInteger(
+        blackjack.initialCardsPerHand,
+        "casinoV1.blackjack.initialCardsPerHand",
+        2,
+      ),
+      dealerStandOnTotal: readInteger(
+        blackjack.dealerStandOnTotal,
+        "casinoV1.blackjack.dealerStandOnTotal",
+        2,
+      ),
+      naturalPayout: readCasinoPayoutRatio(
+        blackjack.naturalPayout,
+        "casinoV1.blackjack.naturalPayout",
+      ),
+      winPayoutMultiplier: readInteger(
+        blackjack.winPayoutMultiplier,
+        "casinoV1.blackjack.winPayoutMultiplier",
+        1,
+      ),
+    },
+    dicePoker: {
+      diceCount: readInteger(dicePoker.diceCount, "casinoV1.dicePoker.diceCount", 2),
+      dieSides: readInteger(dicePoker.dieSides, "casinoV1.dicePoker.dieSides", 2),
+      payoutMultipliers: {
+        fiveOfAKind: readInteger(
+          dicePokerPayoutMultipliers.fiveOfAKind,
+          "casinoV1.dicePoker.payoutMultipliers.fiveOfAKind",
+          1,
+        ),
+        fourOfAKind: readInteger(
+          dicePokerPayoutMultipliers.fourOfAKind,
+          "casinoV1.dicePoker.payoutMultipliers.fourOfAKind",
+          1,
+        ),
+        fullHouse: readInteger(
+          dicePokerPayoutMultipliers.fullHouse,
+          "casinoV1.dicePoker.payoutMultipliers.fullHouse",
+          1,
+        ),
+        straight: readInteger(
+          dicePokerPayoutMultipliers.straight,
+          "casinoV1.dicePoker.payoutMultipliers.straight",
+          1,
+        ),
+      },
+    },
+  };
+
+  if (parsed.bet.min > parsed.bet.default || parsed.bet.default > parsed.bet.max) {
+    throw new Error("casinoV1.bet must satisfy min <= default <= max.");
+  }
+
+  if (parsed.bet.analyticsTiers.length < 1) {
+    throw new Error("casinoV1.bet.analyticsTiers must include at least one entry.");
+  }
+
+  const tierIds = new Set<string>();
+  let previousMaxBet = 0;
+  for (const tier of parsed.bet.analyticsTiers) {
+    if (tierIds.has(tier.id)) {
+      throw new Error(`Duplicate casino analytics tier id: ${tier.id}.`);
+    }
+    if (tier.maxBet <= previousMaxBet) {
+      throw new Error("casinoV1.bet.analyticsTiers maxBet values must be strictly increasing.");
+    }
+    tierIds.add(tier.id);
+    previousMaxBet = tier.maxBet;
+  }
+
+  if ((parsed.bet.analyticsTiers.at(-1)?.maxBet ?? 0) !== parsed.bet.max) {
+    throw new Error("casinoV1.bet.analyticsTiers final maxBet must match casinoV1.bet.max.");
+  }
+
+  if ((parsed.bet.analyticsTiers[0]?.maxBet ?? 0) < parsed.bet.min) {
+    throw new Error("casinoV1.bet.analyticsTiers must cover casinoV1.bet.min.");
+  }
+
+  if (parsed.exactRoll.highLowLowMaxFace >= parsed.exactRoll.dieSides) {
+    throw new Error(
+      "casinoV1.exactRoll.highLowLowMaxFace must be between 1 and dieSides - 1.",
+    );
+  }
+
+  if (
+    parsed.pushYourLuck.cashoutStartsAtUniqueFaces > parsed.pushYourLuck.autoCashoutAtUniqueFaces
+  ) {
+    throw new Error(
+      "casinoV1.pushYourLuck.cashoutStartsAtUniqueFaces must be <= autoCashoutAtUniqueFaces.",
+    );
+  }
+
+  if (parsed.pushYourLuck.autoCashoutAtUniqueFaces > parsed.pushYourLuck.dieSides) {
+    throw new Error("casinoV1.pushYourLuck.autoCashoutAtUniqueFaces must be <= dieSides.");
+  }
+
+  const expectedUniqueFaces: number[] = [];
+  for (
+    let uniqueFaces = parsed.pushYourLuck.cashoutStartsAtUniqueFaces;
+    uniqueFaces <= parsed.pushYourLuck.autoCashoutAtUniqueFaces;
+    uniqueFaces += 1
+  ) {
+    expectedUniqueFaces.push(uniqueFaces);
+  }
+
+  const actualUniqueFaces = parsed.pushYourLuck.payouts.map((entry) => entry.uniqueFaces);
+  const sortedUniqueFaces = [...actualUniqueFaces].sort((left, right) => left - right);
+  if (sortedUniqueFaces.some((value, index) => value !== actualUniqueFaces[index])) {
+    throw new Error("casinoV1.pushYourLuck.payouts must be sorted by uniqueFaces.");
+  }
+
+  const uniqueFaceSet = new Set(actualUniqueFaces);
+  if (uniqueFaceSet.size !== actualUniqueFaces.length) {
+    throw new Error("casinoV1.pushYourLuck.payouts must not contain duplicate uniqueFaces.");
+  }
+
+  if (
+    expectedUniqueFaces.length !== actualUniqueFaces.length ||
+    expectedUniqueFaces.some((value, index) => value !== actualUniqueFaces[index])
+  ) {
+    throw new Error(
+      "casinoV1.pushYourLuck.payouts must cover every uniqueFaces value from cashoutStartsAtUniqueFaces through autoCashoutAtUniqueFaces.",
+    );
   }
 
   return parsed;

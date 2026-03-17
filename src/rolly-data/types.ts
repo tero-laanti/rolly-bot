@@ -95,6 +95,59 @@ export type DiceBalanceData = {
   };
 };
 
+export type DiceCasinoPayoutRatio = {
+  numerator: number;
+  denominator: number;
+};
+
+export type DiceCasinoAnalyticsTierData = {
+  id: string;
+  maxBet: number;
+};
+
+export type DiceCasinoPushYourLuckPayoutData = DiceCasinoPayoutRatio & {
+  uniqueFaces: number;
+};
+
+export type DiceCasinoData = {
+  bet: {
+    min: number;
+    max: number;
+    default: number;
+    sessionTimeoutMinutes: number;
+    analyticsTiers: DiceCasinoAnalyticsTierData[];
+  };
+  exactRoll: {
+    dieSides: number;
+    highLowLowMaxFace: number;
+    facePayout: DiceCasinoPayoutRatio;
+    highLowPayout: DiceCasinoPayoutRatio;
+  };
+  pushYourLuck: {
+    dieSides: number;
+    cashoutStartsAtUniqueFaces: number;
+    autoCashoutAtUniqueFaces: number;
+    payouts: DiceCasinoPushYourLuckPayoutData[];
+  };
+  blackjack: {
+    dieSides: number;
+    initialCardsPerHand: number;
+    dealerStandOnTotal: number;
+    naturalPayout: DiceCasinoPayoutRatio;
+    winPayoutMultiplier: number;
+  };
+  dicePoker: {
+    diceCount: number;
+    dieSides: number;
+    payoutMultipliers: {
+      fiveOfAKind: number;
+      fourOfAKind: number;
+      fullHouse: number;
+      straight: number;
+    };
+  };
+};
+
 export type DiceItemEffect =
   | {
       type: "negative-effect-shield";
@@ -139,6 +192,7 @@ export type RollyDataSource = {
 export type LoadedRollyData = {
   source: RollyDataSource;
   achievements: DiceAchievementData[];
+  casinoV1: DiceCasinoData;
   diceBalance: DiceBalanceData;
   itemsV1: DiceItemData[];
   randomEventsV1: RandomEventScenario[];

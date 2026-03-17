@@ -5,6 +5,7 @@ import {
   applyChatInputResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
+import { getDiceCasinoMaxBet, getDiceCasinoMinBet } from "../../../domain/game-rules";
 import { createSqliteDiceCasinoUseCase } from "../../../infrastructure/sqlite/services";
 import { diceCasinoButtonPrefix, parseDiceCasinoAction } from "../buttons/casino-buttons";
 import { renderDiceCasinoResult } from "../presenters/casino.presenter";
@@ -36,8 +37,8 @@ export const data = new SlashCommandBuilder()
     option
       .setName("bet")
       .setDescription("Optional opening bet.")
-      .setMinValue(1)
-      .setMaxValue(50)
+      .setMinValue(getDiceCasinoMinBet())
+      .setMaxValue(getDiceCasinoMaxBet())
       .setRequired(false),
   );
 

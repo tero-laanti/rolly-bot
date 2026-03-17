@@ -7,6 +7,7 @@ import {
 } from "./paths";
 import type {
   DiceAchievementData,
+  DiceCasinoData,
   DiceBalanceData,
   DiceItemData,
   LoadedRollyData,
@@ -14,6 +15,7 @@ import type {
 } from "./types";
 import {
   parseDiceAchievements,
+  parseDiceCasinoData,
   parseDiceBalance,
   parseDiceItems,
   parseRandomEventScenarios,
@@ -21,6 +23,7 @@ import {
 import type { RandomEventScenario } from "../dice/random-events/domain/content";
 
 const achievementsFileName = "achievements.json";
+const casinoV1FileName = "casino.v1.json";
 const diceBalanceFileName = "dice-balance.json";
 const itemsV1FileName = "items.v1.json";
 const randomEventsV1FileName = "random-events.v1.json";
@@ -67,6 +70,7 @@ const loadRollyData = (): LoadedRollyData => {
   return {
     source,
     achievements: parseDiceAchievements(readJsonFile(source, achievementsFileName)),
+    casinoV1: parseDiceCasinoData(readJsonFile(source, casinoV1FileName)),
     diceBalance: parseDiceBalance(readJsonFile(source, diceBalanceFileName)),
     itemsV1: parseDiceItems(readJsonFile(source, itemsV1FileName)),
     randomEventsV1: parseRandomEventScenarios(readJsonFile(source, randomEventsV1FileName)),
@@ -88,6 +92,10 @@ export const getDiceAchievementsData = (): DiceAchievementData[] => {
 
 export const getDiceBalanceData = (): DiceBalanceData => {
   return getRollyData().diceBalance;
+};
+
+export const getDiceCasinoData = (): DiceCasinoData => {
+  return getRollyData().casinoV1;
 };
 
 export const getDiceItemsData = (): DiceItemData[] => {

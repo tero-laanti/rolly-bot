@@ -1,4 +1,5 @@
 import type { DiceCasinoAction } from "../../../application/manage-casino/use-case";
+import { getExactRollDieSides } from "../../../domain/game-rules";
 
 export const diceCasinoButtonPrefix = "dice-casino:";
 
@@ -90,7 +91,7 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
 
   if (action === "exact-face") {
     const face = Number.parseInt(arg ?? "", 10);
-    if (!Number.isInteger(face) || face < 1 || face > 6) {
+    if (!Number.isInteger(face) || face < 1 || face > getExactRollDieSides()) {
       return null;
     }
 

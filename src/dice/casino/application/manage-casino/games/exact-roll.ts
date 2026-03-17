@@ -1,7 +1,12 @@
 import {
+  getExactRollDieSides,
   getDiceCasinoBetTier,
   getExactRollFacePayout,
+  getExactRollFacePayoutRatio,
   getExactRollHighLowPayout,
+  getExactRollHighLowPayoutRatio,
+  getExactRollHighMinFace,
+  getExactRollLowMaxFace,
   resolveExactRollFace,
   resolveExactRollHighLow,
   rollDie,
@@ -30,12 +35,21 @@ const buildExactRollDescriptionLines = (session: DiceCasinoMutationContext["sess
   return [
     "**Exact Roll**",
     `Mode: ${session.state.exactRollMode === "exact-face" ? "Exact Face" : "High / Low"}.`,
-    `Exact Face total return: floor(59 * bet / 10) = ${getExactRollFacePayout(session.bet)}.`,
-    `High / Low total return: floor(197 * bet / 100) = ${getExactRollHighLowPayout(session.bet)}.`,
+    `Exact Face total return: floor(${getExactRollFacePayoutRatio().numerator} * bet / ${getExactRollFacePayoutRatio().denominator}) = ${getExactRollFacePayout(session.bet)}.`,
+    `High / Low total return: floor(${getExactRollHighLowPayoutRatio().numerator} * bet / ${getExactRollHighLowPayoutRatio().denominator}) = ${getExactRollHighLowPayout(session.bet)}.`,
     `Current exact face: ${session.state.exactRollFace}.`,
     `Current High / Low pick: ${capitalize(session.state.exactRollHighLowChoice)}.`,
     "Use the buttons below to place the bet directly.",
   ];
+};
+
+const chunkFaceButtons = (buttons: DiceCasinoActionRow): DiceCasinoActionRows => {
+  const rows: DiceCasinoActionRows = [];
+  for (let index = 0; index < buttons.length; index += 5) {
+    rows.push(buttons.slice(index, index + 5));
+  }
+
+  return rows;
 };
 
 const buildExactRollComponentRows = ({
@@ -61,38 +75,30 @@ const buildExactRollComponentRows = ({
     },
   ];
 
-  if (session.state.exactRollMode === "exact-face") {
-    exactModeRow.push({
-      action: { type: "exact-face", ownerId: session.userId, face: 6 } as const,
-      label: "6",
-      style: session.state.exactRollFace === 6 ? "primary" : "secondary",
-      disabled: !hasAffordableBet,
-    });
-  }
-
   rows.push(exactModeRow);
 
   if (session.state.exactRollMode === "exact-face") {
-    const faceRow: DiceCasinoActionRow = Array.from({ length: 5 }, (_, index) => index + 1).map(
-      (face) => ({
+    const faceButtons: DiceCasinoActionRow = Array.from(
+      { length: getExactRollDieSides() },
+      (_, index) => index + 1,
+    ).map((face) => ({
         action: { type: "exact-face", ownerId: session.userId, face } as const,
         label: `${face}`,
         style: session.state.exactRollFace === face ? "primary" : "secondary",
         disabled: !hasAffordableBet,
-      }),
-    );
-    rows.push(faceRow);
+      }));
+    rows.push(...chunkFaceButtons(faceButtons));
   } else {
     const choiceRow: DiceCasinoActionRow = [
       {
         action: { type: "exact-high-low", ownerId: session.userId, choice: "low" } as const,
-        label: "Low (1-3)",
+        label: `Low (1-${getExactRollLowMaxFace()})`,
         style: session.state.exactRollHighLowChoice === "low" ? "primary" : "secondary",
         disabled: !hasAffordableBet,
       },
       {
         action: { type: "exact-high-low", ownerId: session.userId, choice: "high" } as const,
-        label: "High (4-6)",
+        label: `High (${getExactRollHighMinFace()}-${getExactRollDieSides()})`,
         style: session.state.exactRollHighLowChoice === "high" ? "primary" : "secondary",
         disabled: !hasAffordableBet,
       },
@@ -138,7 +144,7 @@ const handleExactRollAction = (
     }
 
     let nextPips = economy.applyPipsDelta({ userId: session.userId, amount: -session.bet });
-    const rolledFace = rollDie(6);
+    const rolledFace = rollDie(getExactRollDieSides());
     const resolution = resolveExactRollFace(session.bet, action.face, rolledFace);
     if (resolution.payout > 0) {
       nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
@@ -187,7 +193,7 @@ const handleExactRollAction = (
     }
 
     let nextPips = economy.applyPipsDelta({ userId: session.userId, amount: -session.bet });
-    const rolledFace = rollDie(6);
+    const rolledFace = rollDie(getExactRollDieSides());
     const resolution = resolveExactRollHighLow(session.bet, action.choice, rolledFace);
     if (resolution.payout > 0) {
       nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
