@@ -260,7 +260,9 @@ export const createRandomEventsLiveRuntime = ({
     const durationMs = getSequenceChallengeDurationMs(challenge);
     const expiresAtMs = Date.now() + durationMs;
     const timer = setTimeout(() => {
-      void autoResolveSequenceChallenge(eventId);
+      void autoResolveSequenceChallenge(eventId).catch((error) => {
+        logger.warn("[random-events] Failed to auto-resolve staged challenge.", error);
+      });
     }, durationMs);
 
     context.sequenceChallenge = {
