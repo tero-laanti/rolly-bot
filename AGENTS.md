@@ -82,7 +82,7 @@ When implementing a new feature:
 - The current `rolly-data` contract is `achievements.json`, `dice-balance.json`, `items.v1.json`, and `random-events.v1.json`.
 - Keep public example data safe to expose. Do not copy production achievements, tuning, or random-event content back into tracked source files or `example-data/`.
 - Do not publish exact private repository URLs, clone commands, or other private infrastructure identifiers in public docs.
-- If the `rolly-data` schema or loader behavior changes, update `src/rolly-data/`, `example-data/rolly-data/`, `.env.example`, and `README.md` together.
+- If the `rolly-data` schema or loader behavior changes, update `src/rolly-data/`, `example-data/rolly-data/*.json`, the matching `example-data/rolly-data/*.md` authoring docs, `.env.example`, and `README.md` together.
 - If a command name, description, or options change, update the command deployment flow and remind the user to run `npm run deploy:commands`.
 
 ## TypeScript

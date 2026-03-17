@@ -200,4 +200,4 @@ If you want the same checks to run automatically before each push, install the r
 npm run hooks:install
 ```
 
-When you add or change environment variables or the `rolly-data` file contract, update `.env.example`, `README.md`, and `example-data/rolly-data` in the same change.
+When you add or change environment variables or the `rolly-data` file contract, update `.env.example`, `README.md`, `example-data/rolly-data/*.json`, and the matching `example-data/rolly-data/*.md` authoring docs in the same change.
