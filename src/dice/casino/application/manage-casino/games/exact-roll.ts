@@ -45,15 +45,6 @@ const buildExactRollDescriptionLines = (
   ];
 };
 
-const chunkFaceButtons = (buttons: DiceCasinoActionRow): DiceCasinoActionRows => {
-  const rows: DiceCasinoActionRows = [];
-  for (let index = 0; index < buttons.length; index += 5) {
-    rows.push(buttons.slice(index, index + 5));
-  }
-
-  return rows;
-};
-
 const buildExactRollComponentRows = ({
   hasAffordableBet,
   roundActive,
@@ -77,8 +68,6 @@ const buildExactRollComponentRows = ({
     },
   ];
 
-  rows.push(exactModeRow);
-
   if (session.state.exactRollMode === "exact-face") {
     const faceButtons: DiceCasinoActionRow = Array.from(
       { length: getExactRollDieSides() },
@@ -89,8 +78,20 @@ const buildExactRollComponentRows = ({
       style: session.state.exactRollFace === face ? "primary" : "secondary",
       disabled: !hasAffordableBet,
     }));
-    rows.push(...chunkFaceButtons(faceButtons));
+    const modeRowFaceCapacity = 5 - exactModeRow.length;
+    exactModeRow.push(...faceButtons.slice(-modeRowFaceCapacity));
+    rows.push(exactModeRow);
+
+    const remainingFaceButtons = faceButtons.slice(
+      0,
+      Math.max(0, faceButtons.length - modeRowFaceCapacity),
+    );
+    if (remainingFaceButtons.length > 0) {
+      rows.push(remainingFaceButtons);
+    }
   } else {
+    rows.push(exactModeRow);
+
     const choiceRow: DiceCasinoActionRow = [
       {
         action: { type: "exact-high-low", ownerId: session.userId, choice: "low" } as const,

@@ -875,6 +875,12 @@ export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
     throw new Error("casinoV1.exactRoll.highLowLowMaxFace must be between 1 and dieSides - 1.");
   }
 
+  if (parsed.exactRoll.dieSides > 8) {
+    throw new Error(
+      "casinoV1.exactRoll.dieSides must be <= 8 to fit Discord component row limits.",
+    );
+  }
+
   if (
     parsed.pushYourLuck.cashoutStartsAtUniqueFaces > parsed.pushYourLuck.autoCashoutAtUniqueFaces
   ) {
