@@ -1,34 +1,53 @@
 import type { DiceBansAction } from "../../../application/manage-bans/use-case";
+import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const diceBansButtonPrefix = "dice-bans:";
 
 export const encodeDiceBansAction = (action: DiceBansAction): string => {
   if (action.type === "back") {
-    return `${diceBansButtonPrefix}back:${action.ownerId}`;
+    return encodeActionId(diceBansButtonPrefix, "back", action.ownerId);
   }
 
   if (action.type === "close") {
-    return `${diceBansButtonPrefix}close:${action.ownerId}`;
+    return encodeActionId(diceBansButtonPrefix, "close", action.ownerId);
   }
 
   if (action.type === "clear-bans") {
-    return `${diceBansButtonPrefix}clear-bans:${action.ownerId}`;
+    return encodeActionId(diceBansButtonPrefix, "clear-bans", action.ownerId);
   }
 
   if (action.type === "die") {
-    return `${diceBansButtonPrefix}die:${action.ownerId}:${action.dieIndex}`;
+    return encodeActionId(diceBansButtonPrefix, "die", action.ownerId, action.dieIndex);
   }
 
   if (action.type === "page") {
-    return `${diceBansButtonPrefix}page:${action.ownerId}:${action.dieIndex}:${action.page}`;
+    return encodeActionId(
+      diceBansButtonPrefix,
+      "page",
+      action.ownerId,
+      action.dieIndex,
+      action.page,
+    );
   }
 
-  return `${diceBansButtonPrefix}ban:${action.ownerId}:${action.dieIndex}:${action.value}:${action.page}`;
+  return encodeActionId(
+    diceBansButtonPrefix,
+    "ban",
+    action.ownerId,
+    action.dieIndex,
+    action.value,
+    action.page,
+  );
 };
 
 export const parseDiceBansAction = (customId: string): DiceBansAction | null => {
-  const [prefix, action, ownerId, dieIndexRaw, valueRaw, pageRaw] = customId.split(":");
-  if (prefix !== diceBansButtonPrefix.slice(0, -1) || !ownerId) {
+  const parsed = parseActionId(customId, diceBansButtonPrefix);
+  if (!parsed) {
+    return null;
+  }
+
+  const [action, ownerId, dieIndexRaw, valueRaw, pageRaw] = parsed;
+  if (!ownerId) {
     return null;
   }
 

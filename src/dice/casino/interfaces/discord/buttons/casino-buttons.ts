@@ -1,5 +1,6 @@
 import type { DiceCasinoAction } from "../../../application/manage-casino/use-case";
 import { getExactRollDieSides } from "../../../domain/game-rules";
+import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const diceCasinoButtonPrefix = "dice-casino:";
 
@@ -13,25 +14,35 @@ export const encodeDiceCasinoAction = (action: DiceCasinoAction): string => {
     case "blackjack-stand":
     case "poker-reroll":
     case "poker-cancel":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}`;
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId);
     case "select-game":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.game}`;
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.game);
     case "adjust-bet":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.adjustment}`;
+      return encodeActionId(
+        diceCasinoButtonPrefix,
+        action.type,
+        action.ownerId,
+        action.adjustment,
+      );
     case "exact-mode":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.mode}`;
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.mode);
     case "exact-face":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.face}`;
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.face);
     case "exact-high-low":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.choice}`;
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.choice);
     case "poker-toggle-hold":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.index}`;
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.index);
   }
 };
 
 export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null => {
-  const [prefix, action, ownerId, arg] = customId.split(":");
-  if (prefix !== diceCasinoButtonPrefix.slice(0, -1) || !action || !ownerId) {
+  const parsed = parseActionId(customId, diceCasinoButtonPrefix);
+  if (!parsed) {
+    return null;
+  }
+
+  const [action, ownerId, arg] = parsed;
+  if (!action || !ownerId) {
     return null;
   }
 

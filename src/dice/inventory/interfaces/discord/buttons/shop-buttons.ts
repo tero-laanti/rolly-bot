@@ -1,18 +1,24 @@
 import type { DiceShopAction } from "../../../application/manage-shop/use-case";
+import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const diceShopButtonPrefix = "dice-shop:";
 
 export const encodeDiceShopAction = (action: DiceShopAction): string => {
   if (action.type === "refresh") {
-    return `${diceShopButtonPrefix}refresh:${action.ownerId}`;
+    return encodeActionId(diceShopButtonPrefix, "refresh", action.ownerId);
   }
 
-  return `${diceShopButtonPrefix}buy:${action.ownerId}:${action.itemId}`;
+  return encodeActionId(diceShopButtonPrefix, "buy", action.ownerId, action.itemId);
 };
 
 export const parseDiceShopAction = (customId: string): DiceShopAction | null => {
-  const [prefix, action, ownerId, itemId] = customId.split(":");
-  if (prefix !== diceShopButtonPrefix.slice(0, -1) || !ownerId) {
+  const parsed = parseActionId(customId, diceShopButtonPrefix);
+  if (!parsed) {
+    return null;
+  }
+
+  const [action, ownerId, itemId] = parsed;
+  if (!ownerId) {
     return null;
   }
 
