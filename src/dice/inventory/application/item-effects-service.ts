@@ -1,4 +1,5 @@
 import type { DiceProgressionRepository } from "../../progression/application/ports";
+import { minutesToMs } from "../../../shared/time";
 
 export type DiceItemDoubleRollStatus = {
   isActive: boolean;
@@ -93,7 +94,7 @@ export const createDiceItemEffectsService = (
         kind: "positive",
         source,
         magnitude: 1,
-        expiresAt: new Date(nowMs + minutes * 60_000).toISOString(),
+        expiresAt: new Date(nowMs + minutesToMs(minutes)).toISOString(),
         consumeOnCommand: "none",
         stackMode: "stack",
       });

@@ -1,26 +1,32 @@
 import type { DicePrestigeAction } from "../../../application/manage-prestige/use-case";
+import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const dicePrestigeButtonPrefix = "dice-prestige:";
 
 export const encodeDicePrestigeAction = (action: DicePrestigeAction): string => {
   if (action.type === "choose") {
-    return `${dicePrestigeButtonPrefix}choose:${action.ownerId}`;
+    return encodeActionId(dicePrestigeButtonPrefix, "choose", action.ownerId);
   }
 
   if (action.type === "back") {
-    return `${dicePrestigeButtonPrefix}back:${action.ownerId}`;
+    return encodeActionId(dicePrestigeButtonPrefix, "back", action.ownerId);
   }
 
   if (action.type === "set") {
-    return `${dicePrestigeButtonPrefix}set:${action.ownerId}:${action.prestige}`;
+    return encodeActionId(dicePrestigeButtonPrefix, "set", action.ownerId, action.prestige);
   }
 
-  return `${dicePrestigeButtonPrefix}up:${action.ownerId}`;
+  return encodeActionId(dicePrestigeButtonPrefix, "up", action.ownerId);
 };
 
 export const parseDicePrestigeAction = (customId: string): DicePrestigeAction | null => {
-  const [prefix, action, ownerId, prestigeRaw] = customId.split(":");
-  if (prefix !== dicePrestigeButtonPrefix.slice(0, -1) || !ownerId) {
+  const parsed = parseActionId(customId, dicePrestigeButtonPrefix);
+  if (!parsed) {
+    return null;
+  }
+
+  const [action, ownerId, prestigeRaw] = parsed;
+  if (!ownerId) {
     return null;
   }
 

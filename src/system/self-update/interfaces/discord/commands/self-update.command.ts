@@ -1,9 +1,10 @@
 import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
+import { secondMs } from "../../../../../shared/time";
 import { createLocalRunSelfUpdateUseCase } from "../../../infrastructure/update-runner";
 
 const ownerEnvName = "DISCORD_OWNER_ID";
-const outputLimit = 1800;
+const selfUpdateRestartDelayMs = secondMs;
 
 export const data = new SlashCommandBuilder()
   .setName("self-update")
@@ -36,9 +37,7 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   }
 
   const install = interaction.options.getBoolean("install") ?? false;
-  const runSelfUpdate = createLocalRunSelfUpdateUseCase({
-    outputLimit,
-  });
+  const runSelfUpdate = createLocalRunSelfUpdateUseCase();
 
   await interaction.deferReply({ ephemeral: true });
 
@@ -47,6 +46,6 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   await interaction.editReply(result.responseText);
 
   if (result.success) {
-    setTimeout(() => process.exit(0), 1000);
+    setTimeout(() => process.exit(0), selfUpdateRestartDelayMs);
   }
 };

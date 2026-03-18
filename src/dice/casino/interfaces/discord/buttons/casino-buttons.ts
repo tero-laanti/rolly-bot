@@ -1,22 +1,21 @@
 import type { DiceCasinoAction } from "../../../application/manage-casino/use-case";
 import { getExactRollDieSides } from "../../../domain/game-rules";
+import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const diceCasinoButtonPrefix = "dice-casino:";
 
-const basePrefix = diceCasinoButtonPrefix.slice(0, -1);
-
 const encodeDiceCasinoTarget = (action: DiceCasinoAction, arg?: string | number): string => {
-  const parts = [basePrefix, action.type, action.ownerId];
+  const parts: Array<string | number> = [action.type, action.ownerId];
 
   if (action.sessionToken) {
     parts.push(action.sessionToken);
   }
 
   if (arg !== undefined) {
-    parts.push(String(arg));
+    parts.push(arg);
   }
 
-  return parts.join(":");
+  return encodeActionId(diceCasinoButtonPrefix, ...parts);
 };
 
 export const encodeDiceCasinoAction = (action: DiceCasinoAction): string => {
@@ -69,8 +68,13 @@ const parseCasinoActionTarget = (
 };
 
 export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null => {
-  const [prefix, action, ownerId, part4, part5, extra] = customId.split(":");
-  if (prefix !== basePrefix || !action || !ownerId || extra !== undefined) {
+  const parsed = parseActionId(customId, diceCasinoButtonPrefix);
+  if (!parsed) {
+    return null;
+  }
+
+  const [action, ownerId, part4, part5, extra] = parsed;
+  if (!action || !ownerId || extra !== undefined) {
     return null;
   }
 

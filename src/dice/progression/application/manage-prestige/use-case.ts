@@ -14,6 +14,7 @@ import type {
   ActionResult,
   ActionView,
 } from "../../../../shared-kernel/application/action-view";
+import { chunkActionButtons } from "../../../../shared-kernel/application/action-view";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 
 const prestigeButtonsPerRow = 5;
@@ -281,10 +282,7 @@ const buildSelectView = (userId: string, state: PrestigeState): ActionView<DiceP
     },
   );
 
-  const rows: ActionView<DicePrestigeAction>["components"] = [];
-  for (let index = 0; index < levelButtons.length; index += prestigeButtonsPerRow) {
-    rows.push(levelButtons.slice(index, index + prestigeButtonsPerRow));
-  }
+  const rows = chunkActionButtons(levelButtons, prestigeButtonsPerRow);
 
   rows.push([
     {

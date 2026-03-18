@@ -10,6 +10,7 @@ import {
   resolveRollChallengeImmediately,
   type RandomEventRollChallengeProgress,
 } from "../domain/roll-challenges";
+import { minutesToMs } from "../../../shared/time";
 import { buildExpiredEventEmbed, buildResolvedEventEmbed } from "./live-runtime-presentation";
 import type { ActiveRandomEventContext } from "./live-runtime-types";
 import { resolveActiveRandomEvent, type RandomEventsState } from "./state-store";
@@ -78,7 +79,7 @@ const applyOutcomeEffectsToUser = (
 
     const result = hostileEffects.applyShieldableNegativeLockout({
       userId,
-      durationMs: effect.durationMinutes * 60_000,
+      durationMs: minutesToMs(effect.durationMinutes),
       nowMs: Date.now(),
     });
     if (result.blockedByShield) {

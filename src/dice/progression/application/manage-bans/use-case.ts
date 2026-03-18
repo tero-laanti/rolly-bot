@@ -1,7 +1,11 @@
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "../../../progression/domain/bans";
 import type { DiceProgressionRepository } from "../ports";
-import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import {
+  chunkActionButtons,
+  type ActionResult,
+  type ActionView,
+} from "../../../../shared-kernel/application/action-view";
 
 const numbersPerRow = 5;
 const numberRowsPerPage = 4;
@@ -334,7 +338,7 @@ const buildDieSelectionView = (
   return {
     content: contentSections.join("\n"),
     components: [
-      ...chunkButtons(dieButtons),
+      ...chunkActionButtons(dieButtons, numbersPerRow),
       [
         {
           action: { type: "close", ownerId },
@@ -431,7 +435,7 @@ const buildNumberSelectionView = ({
       dieSides,
       page: currentPage,
     }),
-    components: [...chunkButtons(numberButtons), navigationButtons],
+    components: [...chunkActionButtons(numberButtons, numbersPerRow), navigationButtons],
   };
 };
 
@@ -501,16 +505,6 @@ const countUsedBans = (bans: Map<number, Set<number>>): number => {
     count += values.size;
   }
   return count;
-};
-
-const chunkButtons = <TAction>(
-  buttons: ActionView<TAction>["components"][number],
-): ActionView<TAction>["components"] => {
-  const rows: ActionView<TAction>["components"] = [];
-  for (let index = 0; index < buttons.length; index += numbersPerRow) {
-    rows.push(buttons.slice(index, index + numbersPerRow));
-  }
-  return rows;
 };
 
 const getNumberPageCount = (dieSides: number): number => {

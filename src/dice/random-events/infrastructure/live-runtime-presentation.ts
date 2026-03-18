@@ -1,4 +1,5 @@
 import { EmbedBuilder } from "discord.js";
+import { formatDiscordRelativeTime } from "../../../shared/discord";
 import type { RandomEventScenario, RandomEventSelectionResult } from "../domain/content";
 import type {
   RandomEventRollChallengeDefinition,
@@ -16,10 +17,6 @@ const randomEventRarityPresentation: Record<
   rare: { label: "Rare Event", color: 0x3498db },
   epic: { label: "Epic Event", color: 0x9b59b6 },
   legendary: { label: "Legendary Event", color: 0xf1c40f },
-};
-
-const formatRelativeTimestamp = (timestampMs: number): string => {
-  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
 };
 
 const toActionText = (claimLabel: string): string => {
@@ -127,7 +124,7 @@ export const buildActiveClaimDescription = (
   }
 
   if (typeof expiresAtMs === "number") {
-    lines.push("", `⏳ Ends ${formatRelativeTimestamp(expiresAtMs)}.`);
+    lines.push("", `⏳ Ends ${formatDiscordRelativeTime(expiresAtMs)}.`);
   }
 
   return lines.join("\n");
@@ -171,7 +168,7 @@ export const buildSequenceChallengeDescription = ({
         "",
         `**Next step ${progress.nextStepIndex + 1}/${challenge.steps.length}:** ${nextStep.label}`,
         `Need ${formatComparator(nextStep.comparator, nextStep.target)}.`,
-        `⏳ Auto-resolves ${formatRelativeTimestamp(expiresAtMs)} if no one continues.`,
+        `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`,
       );
     }
   }

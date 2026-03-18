@@ -1,4 +1,8 @@
-import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import {
+  chunkActionButtons,
+  type ActionResult,
+  type ActionView,
+} from "../../../../shared-kernel/application/action-view";
 import {
   type UseDiceItemResult,
   type ReserveAutoRollSession,
@@ -159,39 +163,38 @@ const buildInventoryContent = (
   entries: DiceInventoryEntry[],
   statusLine?: string,
 ): string => {
-  const lines: string[] = [];
+  const sections: string[] = [];
 
   if (statusLine) {
-    lines.push(statusLine, "");
+    sections.push(statusLine);
   }
-
-  lines.push(`Dice inventory for <@${userId}>:`);
 
   if (entries.length === 0) {
-    lines.push("Inventory is empty.", "Buy items with /dice-shop.");
-    return lines.join("\n");
-  }
-
-  lines.push("Use buttons below to consume items.", "");
-  for (const entry of entries) {
-    lines.push(
-      `**${entry.item.name}**`,
-      `Owned: ${entry.quantity}.`,
-      entry.item.description,
-      entry.item.consumable ? "Consumable." : "Permanent collectible.",
-      "",
+    sections.push(
+      `Dice inventory for <@${userId}>:\nInventory is empty.\nBuy items with /dice-shop.`,
     );
+    return sections.join("\n\n");
   }
 
-  return lines.slice(0, -1).join("\n");
+  sections.push(`Dice inventory for <@${userId}>:\nUse buttons below to consume items.`);
+  sections.push(
+    ...entries.map((entry) =>
+      [
+        `**${entry.item.name}**`,
+        `Owned: ${entry.quantity}.`,
+        entry.item.description,
+        entry.item.consumable ? "Consumable." : "Permanent collectible.",
+      ].join("\n"),
+    ),
+  );
+
+  return sections.join("\n\n");
 };
 
 const buildInventoryComponents = (
   userId: string,
   entries: DiceInventoryEntry[],
 ): ActionView<DiceInventoryAction>["components"] => {
-  const rows: ActionView<DiceInventoryAction>["components"] = [];
-
   const useButtons = entries
     .filter((entry) => entry.item.consumable)
     .map((entry) => ({
@@ -204,17 +207,14 @@ const buildInventoryComponents = (
       style: "primary" as const,
     }));
 
-  for (let index = 0; index < useButtons.length; index += 5) {
-    rows.push(useButtons.slice(index, index + 5));
-  }
-
-  rows.push([
-    {
-      action: { type: "refresh", ownerId: userId },
-      label: "Refresh",
-      style: "secondary",
-    },
-  ]);
-
-  return rows;
+  return [
+    ...chunkActionButtons(useButtons),
+    [
+      {
+        action: { type: "refresh", ownerId: userId },
+        label: "Refresh",
+        style: "secondary",
+      },
+    ],
+  ];
 };

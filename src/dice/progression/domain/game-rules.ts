@@ -1,6 +1,6 @@
 import { getDiceBalanceData } from "../../../rolly-data/load";
+import { minuteMs } from "../../../shared/time";
 
-const minuteMs = 60_000;
 const maxDiceRollPassCount = 120;
 
 const getDicePrestigeSides = (): number[] => {

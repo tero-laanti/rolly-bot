@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import {
+  chunkActionButtons,
+  type ActionResult,
+  type ActionView,
+} from "../../../../shared-kernel/application/action-view";
+import { formatDiscordRelativeTime } from "../../../../shared/discord";
+import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import {
@@ -71,7 +77,7 @@ export const createDicePvpUseCase = ({
   ): DicePvpResult => {
     const lockoutUntil = pvp.getActiveDiceLockout(challengerId, nowMs);
     if (lockoutUntil) {
-      return replyMessage(`You can play again ${formatRelativeTime(lockoutUntil)}.`, true);
+      return replyMessage(`You can play again ${formatDiscordRelativeTime(lockoutUntil)}.`, true);
     }
 
     if (opponent) {
@@ -156,14 +162,14 @@ const handleTierPick = async (
   const opponentId = action.opponentId ?? dicePvpOpenOpponentId;
   const lockoutUntil = pvp.getActiveDiceLockout(action.ownerId, nowMs);
   if (lockoutUntil) {
-    return updateMessage(`You can play again ${formatRelativeTime(lockoutUntil)}.`, true);
+    return updateMessage(`You can play again ${formatDiscordRelativeTime(lockoutUntil)}.`, true);
   }
 
   if (opponentId !== dicePvpOpenOpponentId) {
     const opponentLockoutUntil = pvp.getActiveDiceLockout(opponentId, nowMs);
     if (opponentLockoutUntil) {
       return updateMessage(
-        `<@${opponentId}> can play again ${formatRelativeTime(opponentLockoutUntil)}.`,
+        `<@${opponentId}> can play again ${formatDiscordRelativeTime(opponentLockoutUntil)}.`,
         true,
       );
     }
@@ -258,7 +264,10 @@ const handleChallengeAccept = (
   const opponentLockoutUntil = pvp.getActiveDiceLockout(opponentIdForDuel, nowMs);
   if (opponentLockoutUntil) {
     if (isOpenChallenge) {
-      return replyMessage(`You can play again ${formatRelativeTime(opponentLockoutUntil)}.`, true);
+      return replyMessage(
+        `You can play again ${formatDiscordRelativeTime(opponentLockoutUntil)}.`,
+        true,
+      );
     }
 
     return cancelChallengeForLockout(pvp, challenge, opponentIdForDuel, opponentLockoutUntil);
@@ -459,14 +468,9 @@ const buildSetupView = (
     };
   });
 
-  const rows: ActionView<DicePvpAction>["components"] = [];
-  for (let index = 0; index < tierButtons.length; index += 4) {
-    rows.push(tierButtons.slice(index, index + 4));
-  }
-
   return {
     content: buildSetupContent(opponentId),
-    components: rows,
+    components: chunkActionButtons(tierButtons, 4),
   };
 };
 
@@ -523,7 +527,7 @@ const buildChallengeContent = (
     openChallenge
       ? `Anyone can accept if they have ${duelDieLabel} unlocked.`
       : `<@${opponentId}> can accept if they have ${duelDieLabel} unlocked.`,
-    `Challenge expires ${formatRelativeTime(expiresAtMs)}.`,
+    `Challenge expires ${formatDiscordRelativeTime(expiresAtMs)}.`,
     `Loser lockout: ${formatMinutesOrHours(getDuelPunishmentMs(duelTier))}.`,
     `Winner buff: ${formatMinutesOrHours(getDuelRewardMs(duelTier))} of double buff on /dice.`,
   ].join("\n");
@@ -563,13 +567,13 @@ const buildWinResultContent = (
     `<@${winnerId}> is the winner.`,
     loserBlockedByShield
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
-      : `<@${loserId}> can play again ${formatRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
-    `<@${winnerId}> has double buff on /dice. Their dice rolls are now doubled until ${formatRelativeTime(winnerDoubleRollUntilMs)}.`,
+      : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
+    `<@${winnerId}> has double buff on /dice. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
   ].join("\n");
 };
 
 const buildLockoutCancellationContent = (lockedUserId: string, lockoutUntil: number): string => {
-  return `Challenge cancelled because <@${lockedUserId}> is currently locked out and can play again ${formatRelativeTime(lockoutUntil)}.`;
+  return `Challenge cancelled because <@${lockedUserId}> is currently locked out and can play again ${formatDiscordRelativeTime(lockoutUntil)}.`;
 };
 
 const buildPendingConflictContent = (
@@ -616,19 +620,15 @@ const formatChallengeExpiry = (expiresAt: string): string => {
     return "soon";
   }
 
-  return formatRelativeTime(expiresAtMs);
+  return formatDiscordRelativeTime(expiresAtMs);
 };
 
 const formatChallengeUserLabel = (userId: string): string => {
   return userId === dicePvpOpenOpponentId ? "anyone" : `<@${userId}>`;
 };
 
-const formatRelativeTime = (timestampMs: number): string => {
-  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
-};
-
 const formatMinutesOrHours = (durationMs: number): string => {
-  const minutes = Math.floor(durationMs / 60_000);
+  const minutes = Math.floor(durationMs / minuteMs);
   if (minutes % 60 === 0) {
     return `${minutes / 60}h`;
   }
