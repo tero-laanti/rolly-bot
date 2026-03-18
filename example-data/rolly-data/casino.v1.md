@@ -90,11 +90,6 @@ Dice Poker:
 ```json
 {
   "dicePoker": {
-<<<<<<< HEAD
-=======
-    "diceCount": 5,
-    "dieSides": 8,
->>>>>>> 4b8b23c (Add example rolly-data authoring docs)
     "payoutMultipliers": {
       "fiveOfAKind": 20,
       "fourOfAKind": 10,
@@ -105,10 +100,6 @@ Dice Poker:
 }
 ```
 
-<<<<<<< HEAD
-
-- # Dice Poker always uses a five-die `d8` hand in the current implementation.
-- `diceCount` and `dieSides` define the rolled hand.
-  > > > > > > > 4b8b23c (Add example rolly-data authoring docs)
+- Dice Poker always uses a five-die `d8` hand in the current implementation.
 - Payout multipliers are total payout multipliers applied to the bet.
 - Only the listed hand kinds are paid in the current implementation.

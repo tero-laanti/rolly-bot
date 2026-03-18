@@ -36,16 +36,20 @@ const buildCasinoComponents = (
 ): ActionView<DiceCasinoAction>["components"] => {
   const roundActive = Boolean(session.state.activeRound);
   const hasAffordableBet = canStartCasinoRound(session.bet, pips);
+  const actionTarget = {
+    ownerId: session.userId,
+    sessionToken: session.state.sessionToken,
+  } as const;
   const rows: ActionView<DiceCasinoAction>["components"] = [];
 
   const gameSelectionRow: DiceCasinoActionRow = diceCasinoGameButtonOrder.map((game) => ({
-    action: { type: "select-game", ownerId: session.userId, game } as const,
+    action: { type: "select-game", ...actionTarget, game } as const,
     label: getDiceCasinoGameLabel(game),
     style: session.state.selectedGame === game ? "primary" : "secondary",
     disabled: roundActive,
   }));
   gameSelectionRow.push({
-    action: { type: "refresh", ownerId: session.userId },
+    action: { type: "refresh", ...actionTarget },
     label: "Refresh",
     style: "secondary",
   });
@@ -53,31 +57,31 @@ const buildCasinoComponents = (
 
   rows.push([
     {
-      action: { type: "adjust-bet", ownerId: session.userId, adjustment: "min" },
+      action: { type: "adjust-bet", ...actionTarget, adjustment: "min" },
       label: "Min",
       style: "secondary",
       disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
-      action: { type: "adjust-bet", ownerId: session.userId, adjustment: "-10" },
+      action: { type: "adjust-bet", ...actionTarget, adjustment: "-10" },
       label: "-10",
       style: "secondary",
       disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
-      action: { type: "adjust-bet", ownerId: session.userId, adjustment: "-1" },
+      action: { type: "adjust-bet", ...actionTarget, adjustment: "-1" },
       label: "-1",
       style: "secondary",
       disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
-      action: { type: "adjust-bet", ownerId: session.userId, adjustment: "+1" },
+      action: { type: "adjust-bet", ...actionTarget, adjustment: "+1" },
       label: "+1",
       style: "secondary",
       disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
-      action: { type: "adjust-bet", ownerId: session.userId, adjustment: "+10" },
+      action: { type: "adjust-bet", ...actionTarget, adjustment: "+10" },
       label: "+10",
       style: "secondary",
       disabled: roundActive || pips < getDiceCasinoMinBet(),
@@ -86,13 +90,13 @@ const buildCasinoComponents = (
 
   rows.push([
     {
-      action: { type: "adjust-bet", ownerId: session.userId, adjustment: "max" },
+      action: { type: "adjust-bet", ...actionTarget, adjustment: "max" },
       label: "Max",
       style: "secondary",
       disabled: roundActive || pips < getDiceCasinoMinBet(),
     },
     {
-      action: { type: "play", ownerId: session.userId },
+      action: { type: "play", ...actionTarget },
       label: session.state.selectedGame === "exact-roll" ? "Use Bet Buttons" : "Play",
       style: "success",
       disabled: roundActive || !hasAffordableBet || session.state.selectedGame === "exact-roll",

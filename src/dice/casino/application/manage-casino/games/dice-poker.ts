@@ -72,19 +72,23 @@ const buildDicePokerComponentRows = ({
     return [];
   }
 
+  const actionTarget = {
+    ownerId: session.userId,
+    sessionToken: session.state.sessionToken,
+  } as const;
   const holdRow: DiceCasinoActionRow = round.initialRoll.map((_, index) => ({
-    action: { type: "poker-toggle-hold", ownerId: session.userId, index } as const,
+    action: { type: "poker-toggle-hold", ...actionTarget, index } as const,
     label: round.heldIndices.includes(index) ? `Release ${index + 1}` : `Hold ${index + 1}`,
     style: round.heldIndices.includes(index) ? "danger" : "secondary",
   }));
   const actionRow: DiceCasinoActionRow = [
     {
-      action: { type: "poker-reroll", ownerId: session.userId } as const,
+      action: { type: "poker-reroll", ...actionTarget } as const,
       label: "Reroll",
       style: "success",
     },
     {
-      action: { type: "poker-cancel", ownerId: session.userId } as const,
+      action: { type: "poker-cancel", ...actionTarget } as const,
       label: "Cancel",
       style: "danger",
     },

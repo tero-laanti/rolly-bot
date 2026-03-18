@@ -64,14 +64,18 @@ const buildBlackjackComponentRows = ({
     return [];
   }
 
+  const actionTarget = {
+    ownerId: session.userId,
+    sessionToken: session.state.sessionToken,
+  } as const;
   const roundRow: DiceCasinoActionRow = [
     {
-      action: { type: "blackjack-hit", ownerId: session.userId } as const,
+      action: { type: "blackjack-hit", ...actionTarget } as const,
       label: "Hit",
       style: "primary",
     },
     {
-      action: { type: "blackjack-stand", ownerId: session.userId } as const,
+      action: { type: "blackjack-stand", ...actionTarget } as const,
       label: "Stand",
       style: "success",
     },

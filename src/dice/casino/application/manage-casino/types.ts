@@ -10,69 +10,60 @@ import type {
 
 export type DiceCasinoBetAdjustment = "min" | "max" | "-10" | "-1" | "+1" | "+10";
 
+type DiceCasinoActionTarget = {
+  ownerId: string;
+  sessionToken?: string;
+};
+
 export type DiceCasinoAction =
-  | {
+  | ({
       type: "refresh";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "select-game";
-      ownerId: string;
       game: DiceCasinoGame;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "adjust-bet";
-      ownerId: string;
       adjustment: DiceCasinoBetAdjustment;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "play";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "exact-mode";
-      ownerId: string;
       mode: ExactRollMode;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "exact-face";
-      ownerId: string;
       face: number;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "exact-high-low";
-      ownerId: string;
       choice: ExactRollHighLowChoice;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "push-roll";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "push-cashout";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "blackjack-hit";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "blackjack-stand";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "poker-toggle-hold";
-      ownerId: string;
       index: number;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "poker-reroll";
-      ownerId: string;
-    }
-  | {
+    } & DiceCasinoActionTarget)
+  | ({
       type: "poker-cancel";
-      ownerId: string;
-    };
+    } & DiceCasinoActionTarget);
 
 export type DiceCasinoResult = ActionResult<DiceCasinoAction>;
 
@@ -92,6 +83,9 @@ export type MutateSessionResult =
     }
   | {
       kind: "expired";
+    }
+  | {
+      kind: "replaced";
     };
 
 export type DiceCasinoMutationContext = {

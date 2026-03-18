@@ -55,14 +55,18 @@ const buildExactRollComponentRows = ({
   }
 
   const rows: DiceCasinoActionRows = [];
+  const actionTarget = {
+    ownerId: session.userId,
+    sessionToken: session.state.sessionToken,
+  } as const;
   const exactModeRow: DiceCasinoActionRow = [
     {
-      action: { type: "exact-mode", ownerId: session.userId, mode: "exact-face" } as const,
+      action: { type: "exact-mode", ...actionTarget, mode: "exact-face" } as const,
       label: "Exact Face",
       style: session.state.exactRollMode === "exact-face" ? "primary" : "secondary",
     },
     {
-      action: { type: "exact-mode", ownerId: session.userId, mode: "high-low" } as const,
+      action: { type: "exact-mode", ...actionTarget, mode: "high-low" } as const,
       label: "High / Low",
       style: session.state.exactRollMode === "high-low" ? "primary" : "secondary",
     },
@@ -73,7 +77,7 @@ const buildExactRollComponentRows = ({
       { length: getExactRollDieSides() },
       (_, index) => index + 1,
     ).map((face) => ({
-      action: { type: "exact-face", ownerId: session.userId, face } as const,
+      action: { type: "exact-face", ...actionTarget, face } as const,
       label: `${face}`,
       style: session.state.exactRollFace === face ? "primary" : "secondary",
       disabled: !hasAffordableBet,
@@ -94,13 +98,13 @@ const buildExactRollComponentRows = ({
 
     const choiceRow: DiceCasinoActionRow = [
       {
-        action: { type: "exact-high-low", ownerId: session.userId, choice: "low" } as const,
+        action: { type: "exact-high-low", ...actionTarget, choice: "low" } as const,
         label: `Low (1-${getExactRollLowMaxFace()})`,
         style: session.state.exactRollHighLowChoice === "low" ? "primary" : "secondary",
         disabled: !hasAffordableBet,
       },
       {
-        action: { type: "exact-high-low", ownerId: session.userId, choice: "high" } as const,
+        action: { type: "exact-high-low", ...actionTarget, choice: "high" } as const,
         label: `High (${getExactRollHighMinFace()}-${getExactRollDieSides()})`,
         style: session.state.exactRollHighLowChoice === "high" ? "primary" : "secondary",
         disabled: !hasAffordableBet,

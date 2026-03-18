@@ -7,6 +7,7 @@ import type {
 } from "../../application/ports";
 import {
   createDefaultDiceCasinoSessionState,
+  normalizeDiceCasinoSessionState,
   type DiceCasinoSession,
   type DiceCasinoSessionState,
 } from "../../domain/casino-session";
@@ -22,7 +23,7 @@ type DiceCasinoSessionRow = {
 
 const parseDiceCasinoSessionState = (raw: string): DiceCasinoSessionState => {
   try {
-    return JSON.parse(raw) as DiceCasinoSessionState;
+    return normalizeDiceCasinoSessionState(JSON.parse(raw) as Partial<DiceCasinoSessionState>);
   } catch {
     return createDefaultDiceCasinoSessionState();
   }

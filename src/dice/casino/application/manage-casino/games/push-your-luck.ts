@@ -62,14 +62,18 @@ const buildPushYourLuckComponentRows = ({
     return [];
   }
 
+  const actionTarget = {
+    ownerId: session.userId,
+    sessionToken: session.state.sessionToken,
+  } as const;
   const roundRow: DiceCasinoActionRow = [
     {
-      action: { type: "push-roll", ownerId: session.userId } as const,
+      action: { type: "push-roll", ...actionTarget } as const,
       label: "Roll",
       style: "primary",
     },
     {
-      action: { type: "push-cashout", ownerId: session.userId } as const,
+      action: { type: "push-cashout", ...actionTarget } as const,
       label: "Cash Out",
       style: "success",
       disabled: !canPushYourLuckCashOut(round),

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export type DiceCasinoGame = "exact-roll" | "push-your-luck" | "blackjack" | "dice-poker";
 
 export type ExactRollMode = "exact-face" | "high-low";
@@ -33,6 +35,8 @@ export type DiceCasinoActiveRound =
   | DicePokerRoundState;
 
 export type DiceCasinoSessionState = {
+  sessionToken: string;
+  allowLegacyActions: boolean;
   selectedGame: DiceCasinoGame;
   exactRollMode: ExactRollMode;
   exactRollFace: number;
@@ -49,13 +53,41 @@ export type DiceCasinoSession = {
   updatedAt: string;
 };
 
-export const createDefaultDiceCasinoSessionState = (): DiceCasinoSessionState => {
+export const createDiceCasinoSessionToken = (): string => randomUUID();
+
+export const createDefaultDiceCasinoSessionState = (
+  sessionToken: string = createDiceCasinoSessionToken(),
+): DiceCasinoSessionState => {
   return {
+    sessionToken,
+    allowLegacyActions: false,
     selectedGame: "exact-roll",
     exactRollMode: "exact-face",
     exactRollFace: 1,
     exactRollHighLowChoice: "low",
     activeRound: null,
     lastOutcome: null,
+  };
+};
+
+export const normalizeDiceCasinoSessionState = (
+  state: Partial<DiceCasinoSessionState> | null | undefined,
+): DiceCasinoSessionState => {
+  const parsedState = typeof state === "object" && state ? state : {};
+  const hasSessionToken =
+    typeof parsedState.sessionToken === "string" && parsedState.sessionToken.length > 0;
+  const sessionToken = hasSessionToken
+    ? (parsedState.sessionToken as string)
+    : createDiceCasinoSessionToken();
+  const allowLegacyActions =
+    typeof parsedState.allowLegacyActions === "boolean"
+      ? parsedState.allowLegacyActions
+      : !hasSessionToken;
+
+  return {
+    ...createDefaultDiceCasinoSessionState(sessionToken),
+    ...parsedState,
+    sessionToken,
+    allowLegacyActions,
   };
 };

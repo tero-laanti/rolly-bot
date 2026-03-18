@@ -4,9 +4,11 @@ import type { DiceCasinoAnalyticsRepository, DiceCasinoSessionRepository } from 
 import {
   adjustSessionBet,
   createSessionRecord,
+  disableLegacyActions,
   invalidCasinoAction,
   normalizeSessionBet,
   refreshSession,
+  reopenSessionRecord,
   replyMessage,
   replyMutation,
   resolveInitialBet,
@@ -24,6 +26,11 @@ type ManageCasinoDependencies = {
   unitOfWork: UnitOfWork;
 };
 
+type DiceCasinoReplyPlan = {
+  result: DiceCasinoResult;
+  finalizeSessionToken?: string;
+};
+
 export const createDiceCasinoUseCase = ({
   analytics,
   economy,
@@ -34,26 +41,123 @@ export const createDiceCasinoUseCase = ({
     userId: string,
     requestedBet: number | null,
     nowMs: number = Date.now(),
-  ): DiceCasinoResult => {
-    if (sessions.getActiveSession(userId, nowMs)) {
-      return replyMessage("You already have an active casino session.", true);
-    }
-
+  ): DiceCasinoReplyPlan => {
     const pips = economy.getPips(userId);
-    const initialBet = resolveInitialBet(requestedBet, pips);
-    if (!initialBet.ok) {
-      return replyMessage(initialBet.message, true);
+    const activeSession = sessions.getActiveSession(userId, nowMs);
+
+    if (activeSession) {
+      const reopenedSession = reopenSessionRecord({
+        session: activeSession,
+        requestedBet,
+        availablePips: pips,
+        nowMs,
+      });
+      if (!reopenedSession.ok) {
+        return {
+          result: replyMessage(reopenedSession.message, true),
+        };
+      }
+
+      return {
+        result: {
+          kind: "reply",
+          payload: {
+            type: "view",
+            view: buildCasinoView(reopenedSession.session, pips),
+            ephemeral: false,
+          },
+        },
+        finalizeSessionToken: reopenedSession.session.state.sessionToken,
+      };
     }
 
-    const session = createSessionRecord(userId, initialBet.bet, nowMs);
-    sessions.saveSession(session);
+    const session = unitOfWork.runInTransaction(() => {
+      const initialBet = resolveInitialBet(requestedBet, pips);
+      if (!initialBet.ok) {
+        return {
+          message: initialBet.message,
+        };
+      }
+
+      const nextSession = createSessionRecord(userId, initialBet.bet, nowMs);
+      sessions.saveSession(nextSession);
+      return nextSession;
+    });
+
+    if ("message" in session) {
+      return {
+        result: replyMessage(session.message, true),
+      };
+    }
 
     return {
-      kind: "reply",
+      result: {
+        kind: "reply",
+        payload: {
+          type: "view",
+          view: buildCasinoView(session, pips),
+          ephemeral: false,
+        },
+      },
+    };
+  };
+
+  const finalizeDiceCasinoReply = (
+    userId: string,
+    requestedBet: number | null,
+    sessionToken: string,
+    nowMs: number = Date.now(),
+  ): DiceCasinoResult => {
+    const pips = economy.getPips(userId);
+
+    const session = unitOfWork.runInTransaction(() => {
+      const activeSession = sessions.getActiveSession(userId, nowMs);
+      if (activeSession) {
+        const reopenedSession = reopenSessionRecord({
+          session: activeSession,
+          requestedBet,
+          availablePips: pips,
+          nowMs,
+          sessionToken,
+        });
+        if (!reopenedSession.ok) {
+          return {
+            message: reopenedSession.message,
+          };
+        }
+
+        sessions.saveSession(reopenedSession.session);
+        return reopenedSession.session;
+      }
+
+      const initialBet = resolveInitialBet(requestedBet, pips);
+      if (!initialBet.ok) {
+        return {
+          message: initialBet.message,
+        };
+      }
+
+      const nextSession = createSessionRecord(userId, initialBet.bet, nowMs, sessionToken);
+      sessions.saveSession(nextSession);
+      return nextSession;
+    });
+
+    if ("message" in session) {
+      return {
+        kind: "edit",
+        payload: {
+          type: "message",
+          content: session.message,
+          clearComponents: true,
+        },
+      };
+    }
+
+    return {
+      kind: "edit",
       payload: {
         type: "view",
         view: buildCasinoView(session, pips),
-        ephemeral: false,
       },
     };
   };
@@ -86,6 +190,18 @@ export const createDiceCasinoUseCase = ({
       };
     }
 
+    if (mutation.kind === "replaced") {
+      return {
+        kind: "edit",
+        payload: {
+          type: "message",
+          content:
+            "This casino session is no longer current. Start or rerun `/dice-casino` to continue.",
+          clearComponents: true,
+        },
+      };
+    }
+
     return {
       kind: "update",
       payload: {
@@ -97,6 +213,7 @@ export const createDiceCasinoUseCase = ({
 
   return {
     createDiceCasinoReply,
+    finalizeDiceCasinoReply,
     handleDiceCasinoAction,
   };
 };
@@ -121,9 +238,21 @@ const mutateCasinoSession = ({
     };
   }
 
+  if (action.sessionToken) {
+    if (session.state.sessionToken !== action.sessionToken) {
+      return {
+        kind: "replaced",
+      };
+    }
+  } else if (!session.state.allowLegacyActions) {
+    return {
+      kind: "replaced",
+    };
+  }
+
   const initialPips = economy.getPips(action.ownerId);
-  let nextSession = refreshSession(session, nowMs);
-  let nextPips = initialPips;
+  const nextSession = refreshSession(session, nowMs);
+  const nextPips = initialPips;
 
   if (action.type === "refresh") {
     return persistMutationResult(
@@ -206,9 +335,14 @@ const persistMutationResult = (
   sessions: DiceCasinoSessionRepository,
   result: MutateSessionResult,
 ): MutateSessionResult => {
-  if (result.kind === "view") {
-    sessions.saveSession(result.session);
+  if (result.kind !== "view") {
+    return result;
   }
 
-  return result;
+  const session = disableLegacyActions(result.session);
+  sessions.saveSession(session);
+  return {
+    ...result,
+    session,
+  };
 };

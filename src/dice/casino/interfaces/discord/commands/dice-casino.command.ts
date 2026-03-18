@@ -44,15 +44,44 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const casinoUseCase = createSqliteDiceCasinoUseCase(getDatabase());
-  await applyChatInputResult(
-    interaction,
-    renderDiceCasinoResult(
-      casinoUseCase.createDiceCasinoReply(
+  const requestedBet = interaction.options.getInteger("bet");
+  const replyPlan = casinoUseCase.createDiceCasinoReply(interaction.user.id, requestedBet);
+
+  await applyChatInputResult(interaction, renderDiceCasinoResult(replyPlan.result));
+
+  if (!replyPlan.finalizeSessionToken) {
+    return;
+  }
+
+  let finalizedReply: ReturnType<typeof renderDiceCasinoResult>;
+  try {
+    finalizedReply = renderDiceCasinoResult(
+      casinoUseCase.finalizeDiceCasinoReply(
         interaction.user.id,
-        interaction.options.getInteger("bet"),
+        requestedBet,
+        replyPlan.finalizeSessionToken,
       ),
-    ),
-  );
+    );
+  } catch (error) {
+    try {
+      await interaction.editReply({
+        content: "Failed to refresh the casino panel. Your previous panel is still active.",
+        components: [],
+      });
+    } catch {
+      // Ignore best-effort recovery failures and surface the original error.
+    }
+
+    throw error;
+  }
+
+  if (finalizedReply.kind !== "edit") {
+    throw new Error(
+      `Casino reply finalization must edit the initial reply, got ${finalizedReply.kind}.`,
+    );
+  }
+
+  await interaction.editReply(finalizedReply.payload);
 };
 
 export const buttonHandlers = [
