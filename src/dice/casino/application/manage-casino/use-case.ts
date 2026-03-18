@@ -7,7 +7,7 @@ import {
   invalidCasinoAction,
   normalizeSessionBet,
   refreshSession,
-  replaceSessionRecord,
+  reopenSessionRecord,
   replyMessage,
   replyMutation,
   resolveInitialBet,
@@ -41,9 +41,20 @@ export const createDiceCasinoUseCase = ({
     const session = unitOfWork.runInTransaction(() => {
       const activeSession = sessions.getActiveSession(userId, nowMs);
       if (activeSession) {
-        const replacementSession = replaceSessionRecord(activeSession, nowMs);
-        sessions.saveSession(replacementSession);
-        return replacementSession;
+        const reopenedSession = reopenSessionRecord({
+          session: activeSession,
+          requestedBet,
+          availablePips: pips,
+          nowMs,
+        });
+        if (!reopenedSession.ok) {
+          return {
+            message: reopenedSession.message,
+          };
+        }
+
+        sessions.saveSession(reopenedSession.session);
+        return reopenedSession.session;
       }
 
       const initialBet = resolveInitialBet(requestedBet, pips);

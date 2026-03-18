@@ -78,6 +78,47 @@ export const replaceSessionRecord = (
   };
 };
 
+export const reopenSessionRecord = ({
+  session,
+  requestedBet,
+  availablePips,
+  nowMs,
+}: {
+  session: DiceCasinoSession;
+  requestedBet: number | null;
+  availablePips: number;
+  nowMs: number;
+}): { ok: true; session: DiceCasinoSession } | { ok: false; message: string } => {
+  const replacementSession = replaceSessionRecord(session, nowMs);
+
+  if (requestedBet === null || requestedBet === session.bet) {
+    return {
+      ok: true,
+      session: replacementSession,
+    };
+  }
+
+  if (session.state.activeRound) {
+    return {
+      ok: false,
+      message: "Finish the current round before changing the bet.",
+    };
+  }
+
+  const nextBet = resolveInitialBet(requestedBet, availablePips);
+  if (!nextBet.ok) {
+    return nextBet;
+  }
+
+  return {
+    ok: true,
+    session: {
+      ...replacementSession,
+      bet: nextBet.bet,
+    },
+  };
+};
+
 export const normalizeSessionBet = (
   session: DiceCasinoSession,
   pips: number,
