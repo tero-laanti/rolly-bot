@@ -4,12 +4,7 @@ import { encodeActionId, parseActionId } from "../../../../../shared-kernel/appl
 export const diceAdminButtonPrefix = "dice-admin:";
 
 export const encodeDiceAdminAction = (action: DiceAdminAction): string => {
-  return encodeActionId(
-    diceAdminButtonPrefix,
-    action.type,
-    action.ownerId,
-    action.targetUserId,
-  );
+  return encodeActionId(diceAdminButtonPrefix, action.type, action.ownerId, action.targetUserId);
 };
 
 export const parseDiceAdminAction = (customId: string): DiceAdminAction | null => {

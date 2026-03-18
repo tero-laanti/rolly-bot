@@ -1,9 +1,4 @@
-import {
-  durationMsToWholeSeconds,
-  secondsPerDay,
-  secondsPerHour,
-  secondsPerMinute,
-} from "./time";
+import { durationMsToWholeSeconds, secondsPerDay, secondsPerHour, secondsPerMinute } from "./time";
 
 export const formatUnit = (value: number, unit: string): string => {
   return `${value} ${unit}${value === 1 ? "" : "s"}`;
