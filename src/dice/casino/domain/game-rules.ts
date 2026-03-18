@@ -1,4 +1,5 @@
 import { getDiceCasinoData } from "../../../rolly-data/load";
+import { minuteMs } from "../../../shared/time";
 import type {
   BlackjackRoundState,
   DiceCasinoGame,
@@ -34,7 +35,6 @@ export type BlackjackResolution =
       playerHand: number[];
     };
 
-const minuteMs = 60_000;
 export const dicePokerDiceCount = 5;
 export const dicePokerDieSides = 8;
 

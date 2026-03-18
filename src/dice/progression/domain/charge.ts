@@ -1,6 +1,5 @@
 import { getDiceChargeMaxMultiplier, getDiceChargeStartMs } from "./game-rules";
-
-const minuteMs = 60_000;
+import { minuteMs } from "../../../shared/time";
 
 export const getDiceChargeMultiplier = (
   lastRollAtMs: number | null,

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Client } from "discord.js";
 import { getDiceBalanceData } from "../../../rolly-data/load";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
+import { secondMs } from "../../../shared/time";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
 import { selectRandomEventScenario } from "../domain/content";
 import type { RandomEventVarietyState } from "../domain/variety";
@@ -94,7 +95,7 @@ export const triggerRandomEventOpportunity = async ({
   const eventId = `random-event:${randomUUID()}`;
   const claimWindowDurationMs =
     selection.scenario.claimWindowSeconds *
-    1_000 *
+    secondMs *
     randomEventBalance.claimWindowDurationMultiplier;
   const estimatedExpiresAtMs = Date.now() + claimWindowDurationMs;
   const rarityPresentation = getRandomEventRarityPresentation(selection.scenario.rarity);
