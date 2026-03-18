@@ -35,18 +35,21 @@ export const createDiceCasinoUseCase = ({
     requestedBet: number | null,
     nowMs: number = Date.now(),
   ): DiceCasinoResult => {
-    if (sessions.getActiveSession(userId, nowMs)) {
-      return replyMessage("You already have an active casino session.", true);
-    }
-
     const pips = economy.getPips(userId);
     const initialBet = resolveInitialBet(requestedBet, pips);
     if (!initialBet.ok) {
       return replyMessage(initialBet.message, true);
     }
 
-    const session = createSessionRecord(userId, initialBet.bet, nowMs);
-    sessions.saveSession(session);
+    const session = unitOfWork.runInTransaction(() => {
+      if (sessions.getActiveSession(userId, nowMs)) {
+        sessions.expireSession(userId);
+      }
+
+      const nextSession = createSessionRecord(userId, initialBet.bet, nowMs);
+      sessions.saveSession(nextSession);
+      return nextSession;
+    });
 
     return {
       kind: "reply",
