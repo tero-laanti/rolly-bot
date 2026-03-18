@@ -20,6 +20,7 @@ type HighlightedRollSet = {
 
 type BuildDiceRollReplyContentInput = {
   achievementText: string;
+  multiplierFooter: string;
   unlockedFooter: string;
   doubleRollFooter: string;
   prestigeFooter: string;
@@ -56,6 +57,7 @@ export const formatRewardText = (totalReward: number, hasLevelUp: boolean): stri
 
 export const buildDiceRollReplyContent = ({
   achievementText,
+  multiplierFooter,
   unlockedFooter,
   doubleRollFooter,
   prestigeFooter,
@@ -82,7 +84,13 @@ export const buildDiceRollReplyContent = ({
     newlyUnlockedAchievementIdsByRollSet,
   });
 
-  const fixedContentParts = [achievementText, unlockedFooter, doubleRollFooter, prestigeFooter];
+  const fixedContentParts = [
+    achievementText,
+    multiplierFooter,
+    unlockedFooter,
+    doubleRollFooter,
+    prestigeFooter,
+  ];
   const initialRollSetOutputMode: RollSetOutputMode =
     rollPassCount > compactRollSetThreshold ? "compact" : "detailed";
 
@@ -101,6 +109,7 @@ export const buildDiceRollReplyContent = ({
   let content = buildDiceReplyContent({
     achievementText,
     resultLines,
+    multiplierFooter,
     unlockedFooter,
     doubleRollFooter,
     prestigeFooter,
@@ -121,6 +130,7 @@ export const buildDiceRollReplyContent = ({
     content = buildDiceReplyContent({
       achievementText,
       resultLines,
+      multiplierFooter,
       unlockedFooter,
       doubleRollFooter,
       prestigeFooter,
@@ -148,6 +158,7 @@ export const buildDiceRollReplyContent = ({
     content = buildDiceReplyContent({
       achievementText,
       resultLines,
+      multiplierFooter,
       unlockedFooter,
       doubleRollFooter,
       prestigeFooter,
@@ -513,6 +524,7 @@ const appendSuffixWithinLimit = (
 type BuildReplyContentInput = {
   achievementText: string;
   resultLines: string[];
+  multiplierFooter: string;
   unlockedFooter: string;
   doubleRollFooter: string;
   prestigeFooter: string;
@@ -521,11 +533,19 @@ type BuildReplyContentInput = {
 const buildDiceReplyContent = ({
   achievementText,
   resultLines,
+  multiplierFooter,
   unlockedFooter,
   doubleRollFooter,
   prestigeFooter,
 }: BuildReplyContentInput): string => {
-  return [achievementText, resultLines.join("\n"), unlockedFooter, doubleRollFooter, prestigeFooter]
+  return [
+    achievementText,
+    resultLines.join("\n"),
+    multiplierFooter,
+    unlockedFooter,
+    doubleRollFooter,
+    prestigeFooter,
+  ]
     .filter((part): part is string => part.length > 0)
     .join("\n\n");
 };
