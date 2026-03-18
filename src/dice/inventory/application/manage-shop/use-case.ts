@@ -1,4 +1,8 @@
-import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import {
+  chunkActionButtons,
+  type ActionResult,
+  type ActionView,
+} from "../../../../shared-kernel/application/action-view";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
@@ -145,24 +149,27 @@ const buildShopContent = (
 ): string => {
   const economySnapshot = economy.getEconomySnapshot(userId);
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
-  const lines: string[] = [];
+  const sections: string[] = [];
 
   if (statusLine) {
-    lines.push(statusLine, "");
+    sections.push(statusLine);
   }
 
-  lines.push(
-    `Dice shop for <@${userId}>:`,
-    `Pips: ${economySnapshot.pips}.`,
-    "Spend pips on inventory items.",
-    "",
+  sections.push(
+    [
+      `Dice shop for <@${userId}>:`,
+      `Pips: ${economySnapshot.pips}.`,
+      "Spend pips on inventory items.",
+    ].join("\n"),
   );
 
-  for (const item of shopCatalog.getDiceShopItems()) {
-    lines.push(...buildItemLines(item, inventoryQuantities.get(item.id) ?? 0), "");
-  }
+  sections.push(
+    ...shopCatalog
+      .getDiceShopItems()
+      .map((item) => buildItemLines(item, inventoryQuantities.get(item.id) ?? 0).join("\n")),
+  );
 
-  return lines.slice(0, -1).join("\n");
+  return sections.join("\n\n");
 };
 
 const buildItemLines = (item: DiceShopItem, ownedQuantity: number): string[] => {
@@ -188,18 +195,14 @@ const buildShopComponents = (
     style: "success" as const,
   }));
 
-  const rows: ActionView<DiceShopAction>["components"] = [];
-  for (let index = 0; index < purchaseButtons.length; index += 5) {
-    rows.push(purchaseButtons.slice(index, index + 5));
-  }
-
-  rows.push([
-    {
-      action: { type: "refresh", ownerId: userId },
-      label: "Refresh",
-      style: "secondary",
-    },
-  ]);
-
-  return rows;
+  return [
+    ...chunkActionButtons(purchaseButtons),
+    [
+      {
+        action: { type: "refresh", ownerId: userId },
+        label: "Refresh",
+        style: "secondary",
+      },
+    ],
+  ];
 };

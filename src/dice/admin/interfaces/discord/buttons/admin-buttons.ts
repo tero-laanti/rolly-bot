@@ -1,14 +1,25 @@
 import type { DiceAdminAction } from "../../../application/manage-admin/use-case";
+import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const diceAdminButtonPrefix = "dice-admin:";
 
 export const encodeDiceAdminAction = (action: DiceAdminAction): string => {
-  return `${diceAdminButtonPrefix}${action.type}:${action.ownerId}:${action.targetUserId}`;
+  return encodeActionId(
+    diceAdminButtonPrefix,
+    action.type,
+    action.ownerId,
+    action.targetUserId,
+  );
 };
 
 export const parseDiceAdminAction = (customId: string): DiceAdminAction | null => {
-  const [prefix, action, ownerId, targetUserId] = customId.split(":");
-  if (prefix !== diceAdminButtonPrefix.slice(0, -1) || !ownerId || !targetUserId) {
+  const parsed = parseActionId(customId, diceAdminButtonPrefix);
+  if (!parsed) {
+    return null;
+  }
+
+  const [action, ownerId, targetUserId] = parsed;
+  if (!ownerId || !targetUserId) {
     return null;
   }
 
