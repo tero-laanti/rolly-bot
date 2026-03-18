@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
+import { dayMs } from "../../../shared/time";
 import {
   getActiveRandomEventCount,
   registerActiveRandomEvent,
@@ -7,8 +8,6 @@ import {
   setLastRandomEventTriggeredAt,
   sweepExpiredActiveRandomEvents,
 } from "./state-store";
-
-const millisecondsPerDay = 24 * 60 * 60 * 1_000;
 
 type RandomEventsFoundationLogger = {
   info: (...args: unknown[]) => void;
@@ -160,7 +159,7 @@ const getRandomCadenceDelayMs = (
   config: RandomEventsFoundationConfig,
   random: () => number,
 ): number => {
-  const baselineIntervalMs = millisecondsPerDay / Math.max(1, config.targetEventsPerDay);
+  const baselineIntervalMs = dayMs / Math.max(1, config.targetEventsPerDay);
   const jitterRangeMs = baselineIntervalMs * config.jitterRatio;
   const randomOffsetMs = (random() * 2 - 1) * jitterRangeMs;
   const randomizedDelayMs = baselineIntervalMs + randomOffsetMs;
