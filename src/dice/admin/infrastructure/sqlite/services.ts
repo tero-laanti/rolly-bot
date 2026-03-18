@@ -3,11 +3,13 @@ import { createDiceAdminUseCase } from "../../application/manage-admin/use-case"
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
 import { createSqliteProgressionRepository } from "../../../progression/infrastructure/sqlite/progression-repository";
 import { randomEventsAdminPort } from "../../../random-events/infrastructure/admin-controller";
+import { raidsAdminPort } from "../../../raids/infrastructure/admin-controller";
 
 export const createSqliteDiceAdminUseCase = (db: SqliteDatabase) => {
   return createDiceAdminUseCase({
     progression: createSqliteProgressionRepository(db),
     pvp: createSqlitePvpRepository(db),
     randomEventsAdmin: randomEventsAdminPort,
+    raidsAdmin: raidsAdminPort,
   });
 };

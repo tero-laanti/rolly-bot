@@ -4,6 +4,7 @@ import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import type { RandomEventsAdminPort } from "../../../random-events/application/ports";
 import type { DiceTemporaryEffect } from "../../../progression/domain/temporary-effects";
+import type { RaidsAdminPort } from "../../../raids/application/ports";
 
 export type DiceAdminAction =
   | {
@@ -18,6 +19,16 @@ export type DiceAdminAction =
     }
   | {
       type: "event-trigger";
+      ownerId: string;
+      targetUserId: string;
+    }
+  | {
+      type: "raid-status";
+      ownerId: string;
+      targetUserId: string;
+    }
+  | {
+      type: "raid-trigger";
       ownerId: string;
       targetUserId: string;
     }
@@ -44,6 +55,7 @@ type ManageAdminDependencies = {
     "getActiveDoubleRoll" | "getActiveDiceLockout" | "setDicePvpEffects"
   >;
   randomEventsAdmin: RandomEventsAdminPort;
+  raidsAdmin: RaidsAdminPort;
 };
 
 export const createDiceAdminReply = (
@@ -73,6 +85,7 @@ export const createDiceAdminUseCase = ({
   progression,
   pvp,
   randomEventsAdmin,
+  raidsAdmin,
 }: ManageAdminDependencies) => {
   const handleDiceAdminAction = async (
     ownerId: string | null,
@@ -92,6 +105,16 @@ export const createDiceAdminUseCase = ({
       return updateView(
         buildStatusView(randomEventsAdmin, action.ownerId, action.targetUserId, guildId),
       );
+    }
+
+    if (action.type === "raid-status") {
+      return updateView(
+        buildRaidStatusView(raidsAdmin, action.ownerId, action.targetUserId, guildId),
+      );
+    }
+
+    if (action.type === "raid-trigger") {
+      return editView(await buildRaidTriggerView(raidsAdmin, action.ownerId, action.targetUserId));
     }
 
     if (action.type === "effects-user") {
@@ -136,6 +159,18 @@ const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAd
           label: "Event trigger",
           style: "primary",
         },
+        {
+          action: { type: "raid-status", ownerId, targetUserId },
+          label: "Raid status",
+          style: "primary",
+        },
+        {
+          action: { type: "raid-trigger", ownerId, targetUserId },
+          label: "Raid trigger",
+          style: "primary",
+        },
+      ],
+      [
         {
           action: { type: "effects-user", ownerId, targetUserId },
           label: "Effects user",
@@ -287,6 +322,84 @@ const buildEventTriggerView = async (
       "Random event triggered.",
       `- Event id: ${result.result.eventId ?? "unknown"}`,
       `- Expires: ${formatTimestamp(result.result.expiresAt ?? null)}`,
+    ].join("\n"),
+    components: buildBackComponents(ownerId, targetUserId),
+  };
+};
+
+const buildRaidStatusView = (
+  raidsAdmin: RaidsAdminPort,
+  ownerId: string,
+  targetUserId: string,
+  guildId: string | null,
+): ActionView<DiceAdminAction> => {
+  const status = raidsAdmin.getAdminStatus();
+  if (!status) {
+    return {
+      content: "**Dice admin · raid status**\nRaid runtime is currently unavailable.",
+      components: buildBackComponents(ownerId, targetUserId),
+    };
+  }
+
+  const lines = [
+    "**Dice admin · raid status**",
+    `- Enabled: ${status.enabled ? "yes" : "no"}`,
+    `- Channel: ${status.channelId ? `<#${status.channelId}>` : "not configured"}`,
+    `- Join lead: ${Math.round(status.joinLeadMs / 60_000)} min`,
+    `- Active duration: ${Math.round(status.activeDurationMs / 60_000)} min`,
+    `- Active raid count: ${status.snapshot.activeRaidCount}`,
+  ];
+
+  if (status.activeRaids.length > 0) {
+    lines.push("", "**Active raids**");
+    for (const raid of status.activeRaids) {
+      const messageId = raid.activeMessageId ?? raid.announcementMessageId;
+      lines.push(
+        `- ${raid.title} [${raid.status}] • participants: ${raid.participantCount} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
+      );
+    }
+  }
+
+  return {
+    content: lines.join("\n"),
+    components: buildBackComponents(ownerId, targetUserId),
+  };
+};
+
+const buildRaidTriggerView = async (
+  raidsAdmin: RaidsAdminPort,
+  ownerId: string,
+  targetUserId: string,
+): Promise<ActionView<DiceAdminAction>> => {
+  const result = await raidsAdmin.triggerRaidNow();
+  if (!result.ok) {
+    const content =
+      result.reason === "disabled"
+        ? "**Dice admin · raid trigger**\nRaids are disabled in config."
+        : result.reason === "active-raid-exists"
+          ? "**Dice admin · raid trigger**\nA raid is already active. Use Raid status first."
+          : "**Dice admin · raid trigger**\nRaid runtime is currently unavailable.";
+
+    return {
+      content,
+      components: buildBackComponents(ownerId, targetUserId),
+    };
+  }
+
+  if (!result.result?.created) {
+    return {
+      content:
+        "**Dice admin · raid trigger**\nNo raid was created. Check raid config or channel permissions.",
+      components: buildBackComponents(ownerId, targetUserId),
+    };
+  }
+
+  return {
+    content: [
+      "**Dice admin · raid trigger**",
+      "Raid announced.",
+      `- Raid id: ${result.result.raidId ?? "unknown"}`,
+      `- Scheduled start: ${formatTimestamp(result.result.scheduledStartAt ?? null)}`,
     ].join("\n"),
     components: buildBackComponents(ownerId, targetUserId),
   };

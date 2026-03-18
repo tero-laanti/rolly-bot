@@ -19,6 +19,13 @@ export type RandomEventsFoundationConfig = {
   quietHours: QuietHoursConfig;
 };
 
+export type RaidsConfig = {
+  enabled: boolean;
+  channelId: string | null;
+  joinLeadMs: number;
+  activeDurationMs: number;
+};
+
 const parseNumberWithFallback = (
   rawValue: string | undefined,
   fallback: number,
@@ -104,6 +111,13 @@ const defaultRandomEventsConfig = {
   },
 };
 
+const defaultRaidsConfig = {
+  enabled: false,
+  channelId: null,
+  joinLeadMinutes: 30,
+  activeDurationMinutes: 12,
+};
+
 export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
   enabled: parseBooleanWithFallback(
     process.env.RANDOM_EVENTS_ENABLED,
@@ -156,4 +170,23 @@ export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
       defaultRandomEventsConfig.quietHours.timezone,
     ),
   },
+};
+
+export const raidsConfig: RaidsConfig = {
+  enabled: parseBooleanWithFallback(process.env.RAIDS_ENABLED, defaultRaidsConfig.enabled),
+  channelId: parseOptionalString(process.env.RAIDS_CHANNEL_ID),
+  joinLeadMs: minutesToMs(
+    parseNumberWithFallback(
+      process.env.RAIDS_JOIN_LEAD_MINUTES,
+      defaultRaidsConfig.joinLeadMinutes,
+      1,
+    ),
+  ),
+  activeDurationMs: minutesToMs(
+    parseNumberWithFallback(
+      process.env.RAIDS_ACTIVE_DURATION_MINUTES,
+      defaultRaidsConfig.activeDurationMinutes,
+      1,
+    ),
+  ),
 };
