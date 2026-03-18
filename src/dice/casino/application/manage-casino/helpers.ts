@@ -74,6 +74,7 @@ export const replaceSessionRecord = (
     state: {
       ...session.state,
       sessionToken: createDiceCasinoSessionToken(),
+      allowLegacyActions: false,
     },
   };
 };
@@ -115,6 +116,20 @@ export const reopenSessionRecord = ({
     session: {
       ...replacementSession,
       bet: nextBet.bet,
+    },
+  };
+};
+
+export const disableLegacyActions = (session: DiceCasinoSession): DiceCasinoSession => {
+  if (!session.state.allowLegacyActions) {
+    return session;
+  }
+
+  return {
+    ...session,
+    state: {
+      ...session.state,
+      allowLegacyActions: false,
     },
   };
 };

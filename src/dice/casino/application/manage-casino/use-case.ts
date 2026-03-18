@@ -4,6 +4,7 @@ import type { DiceCasinoAnalyticsRepository, DiceCasinoSessionRepository } from 
 import {
   adjustSessionBet,
   createSessionRecord,
+  disableLegacyActions,
   invalidCasinoAction,
   normalizeSessionBet,
   refreshSession,
@@ -116,7 +117,8 @@ export const createDiceCasinoUseCase = ({
         kind: "edit",
         payload: {
           type: "message",
-          content: "This casino session has been replaced. Use the newest `/dice-casino` message.",
+          content:
+            "This casino session is no longer current. Start or rerun `/dice-casino` to continue.",
           clearComponents: true,
         },
       };
@@ -157,7 +159,13 @@ const mutateCasinoSession = ({
     };
   }
 
-  if (action.sessionToken && session.state.sessionToken !== action.sessionToken) {
+  if (action.sessionToken) {
+    if (session.state.sessionToken !== action.sessionToken) {
+      return {
+        kind: "replaced",
+      };
+    }
+  } else if (!session.state.allowLegacyActions) {
     return {
       kind: "replaced",
     };
@@ -248,9 +256,14 @@ const persistMutationResult = (
   sessions: DiceCasinoSessionRepository,
   result: MutateSessionResult,
 ): MutateSessionResult => {
-  if (result.kind === "view") {
-    sessions.saveSession(result.session);
+  if (result.kind !== "view") {
+    return result;
   }
 
-  return result;
+  const session = disableLegacyActions(result.session);
+  sessions.saveSession(session);
+  return {
+    ...result,
+    session,
+  };
 };

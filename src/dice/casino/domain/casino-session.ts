@@ -36,6 +36,7 @@ export type DiceCasinoActiveRound =
 
 export type DiceCasinoSessionState = {
   sessionToken: string;
+  allowLegacyActions: boolean;
   selectedGame: DiceCasinoGame;
   exactRollMode: ExactRollMode;
   exactRollFace: number;
@@ -59,6 +60,7 @@ export const createDefaultDiceCasinoSessionState = (
 ): DiceCasinoSessionState => {
   return {
     sessionToken,
+    allowLegacyActions: false,
     selectedGame: "exact-roll",
     exactRollMode: "exact-face",
     exactRollFace: 1,
@@ -72,14 +74,20 @@ export const normalizeDiceCasinoSessionState = (
   state: Partial<DiceCasinoSessionState> | null | undefined,
 ): DiceCasinoSessionState => {
   const parsedState = typeof state === "object" && state ? state : {};
-  const sessionToken =
-    typeof parsedState.sessionToken === "string" && parsedState.sessionToken.length > 0
-      ? parsedState.sessionToken
-      : createDiceCasinoSessionToken();
+  const hasSessionToken =
+    typeof parsedState.sessionToken === "string" && parsedState.sessionToken.length > 0;
+  const sessionToken = hasSessionToken
+    ? (parsedState.sessionToken as string)
+    : createDiceCasinoSessionToken();
+  const allowLegacyActions =
+    typeof parsedState.allowLegacyActions === "boolean"
+      ? parsedState.allowLegacyActions
+      : !hasSessionToken;
 
   return {
     ...createDefaultDiceCasinoSessionState(sessionToken),
     ...parsedState,
     sessionToken,
+    allowLegacyActions,
   };
 };
