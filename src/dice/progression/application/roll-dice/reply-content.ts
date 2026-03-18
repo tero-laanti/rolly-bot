@@ -24,8 +24,8 @@ type BuildDiceRollReplyContentInput = {
   unlockedFooter: string;
   doubleRollFooter: string;
   prestigeFooter: string;
-  chargeMultiplier: number;
-  didChargePathWin: boolean;
+  chargeFactorText: string;
+  didUseChargeRoll: boolean;
   rollPasses: number[][];
   rollPassAchievementIds: DiceAchievementId[][];
   previouslyEarnedAchievementIds: Set<DiceAchievementId>;
@@ -61,8 +61,8 @@ export const buildDiceRollReplyContent = ({
   unlockedFooter,
   doubleRollFooter,
   prestigeFooter,
-  chargeMultiplier,
-  didChargePathWin,
+  chargeFactorText,
+  didUseChargeRoll,
   rollPasses,
   rollPassAchievementIds,
   previouslyEarnedAchievementIds,
@@ -70,7 +70,7 @@ export const buildDiceRollReplyContent = ({
   rewardText,
 }: BuildDiceRollReplyContentInput): string => {
   const rollPassCount = rollPasses.length;
-  const isChargedRoll = didChargePathWin;
+  const isChargedRoll = didUseChargeRoll;
   const formattedRollPasses = rollPasses.map(formatCompactRollSet);
   const allSameByRollSet = rollPasses.map((rolls) => rolls.every((roll) => roll === rolls[0]));
   const knownAchievementIds = new Set(previouslyEarnedAchievementIds);
@@ -95,7 +95,7 @@ export const buildDiceRollReplyContent = ({
     rollPassCount > compactRollSetThreshold ? "compact" : "detailed";
 
   let resultLines = buildResultLines({
-    chargeMultiplier,
+    chargeFactorText,
     isChargedRoll,
     rollPassCount,
     matchCount,
@@ -117,7 +117,7 @@ export const buildDiceRollReplyContent = ({
 
   if (content.length > discordMessageCharacterLimit && initialRollSetOutputMode !== "compact") {
     resultLines = buildResultLines({
-      chargeMultiplier,
+      chargeFactorText,
       isChargedRoll,
       rollPassCount,
       matchCount,
@@ -144,7 +144,7 @@ export const buildDiceRollReplyContent = ({
       messageLimit: discordMessageCharacterLimit,
     });
     resultLines = buildResultLines({
-      chargeMultiplier,
+      chargeFactorText,
       isChargedRoll,
       rollPassCount,
       matchCount,
@@ -169,7 +169,7 @@ export const buildDiceRollReplyContent = ({
 };
 
 type BuildResultLinesInput = {
-  chargeMultiplier: number;
+  chargeFactorText: string;
   isChargedRoll: boolean;
   rollPassCount: number;
   matchCount: number;
@@ -182,7 +182,7 @@ type BuildResultLinesInput = {
 };
 
 const buildResultLines = ({
-  chargeMultiplier,
+  chargeFactorText,
   isChargedRoll,
   rollPassCount,
   matchCount,
@@ -195,7 +195,7 @@ const buildResultLines = ({
 }: BuildResultLinesInput): string[] => {
   const resultLines: string[] = [];
   if (isChargedRoll) {
-    resultLines.push(`${chargeMultiplier}x Dice charge!`);
+    resultLines.push(`${chargeFactorText}x Dice charge!`);
   }
 
   if (rollPassCount === 1) {
@@ -235,7 +235,7 @@ const buildResultLines = ({
     resultLines.join("\n").length > maxResultLength
   ) {
     return buildCompactResultLinesWithinLimit({
-      chargeMultiplier,
+      chargeFactorText,
       isChargedRoll,
       rollPassCount,
       matchCount,
@@ -333,7 +333,7 @@ const sortHighlightedRollSets = (
 };
 
 type BuildCompactResultLinesWithinLimitInput = {
-  chargeMultiplier: number;
+  chargeFactorText: string;
   isChargedRoll: boolean;
   rollPassCount: number;
   matchCount: number;
@@ -344,7 +344,7 @@ type BuildCompactResultLinesWithinLimitInput = {
 };
 
 const buildCompactResultLinesWithinLimit = ({
-  chargeMultiplier,
+  chargeFactorText,
   isChargedRoll,
   rollPassCount,
   matchCount,
@@ -355,7 +355,7 @@ const buildCompactResultLinesWithinLimit = ({
 }: BuildCompactResultLinesWithinLimitInput): string[] => {
   const leadingLines: string[] = [];
   if (isChargedRoll) {
-    leadingLines.push(`${chargeMultiplier}x Dice charge!`);
+    leadingLines.push(`${chargeFactorText}x Dice charge!`);
   }
   leadingLines.push("Roll results:");
 

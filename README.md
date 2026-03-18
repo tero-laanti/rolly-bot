@@ -106,6 +106,8 @@ Expected files in a data directory:
 
 The committed files under `example-data/rolly-data` are safe examples only. They document the schema and can keep the public repo runnable when explicitly enabled, but they are not intended to match production values.
 
+In `dice-balance.json`, progression tuning includes prestige sides, charge settings, ban step, and the overall `/dice` roll-pass cap via `maxRollPassCount`.
+
 In `casino.v1.json`, Dice Poker always uses a five-die `d8` hand. The tunable fields there are the payout multipliers.
 
 By default, the app refuses to start on `example-data`. If you intentionally want to run the public sample data for local development, set `ROLLY_ALLOW_EXAMPLE_DATA=true`.

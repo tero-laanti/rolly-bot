@@ -30,6 +30,14 @@ Fame and bans:
 Level-up and roll-pass tuning:
 
 - `levelUpReward`: pips granted on level-up.
+- `maxRollPassCount`: hard cap for total roll passes after charge or other roll-pass modifiers are applied.
+
+```json
+{
+  "levelUpReward": 1,
+  "maxRollPassCount": 500
+}
+```
 
 Charge:
 
@@ -37,7 +45,7 @@ Charge:
 {
   "charge": {
     "startAfterMinutes": 10,
-    "maxMultiplier": 8
+    "maxMultiplier": 100
   }
 }
 ```
@@ -45,6 +53,7 @@ Charge:
 - Charge only starts after this many idle minutes.
 - Once active, the multiplier grows with elapsed charged minutes.
 - The runtime clamps the final value to `maxMultiplier`.
+- When charge is active, `/dice` uses the charge roll instead of other roll-pass modifiers.
 
 PvP:
 
