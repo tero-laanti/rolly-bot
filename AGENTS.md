@@ -108,8 +108,8 @@ When implementing a new feature:
 
 ## Testing and Validation
 
-- Default verification for code changes: `npm run build` and `npm run typecheck`.
-- Run `npm run lint` when touching broader TypeScript structure, configs, or formatting-sensitive areas.
+- Default verification for code changes: `npm run build`, `npm run typecheck`, and `npm run format:check`.
+- Run `npm run lint` when touching broader TypeScript structure or configs.
 - Prefer manual Discord validation for behavior-heavy changes such as dice progression, PvP flows, random events, admin panels, and self-update behavior.
 - Unit tests are optional. Add them when logic is complex enough that tests improve clarity or confidence.
 

@@ -264,7 +264,10 @@ const handleChallengeAccept = (
   const opponentLockoutUntil = pvp.getActiveDiceLockout(opponentIdForDuel, nowMs);
   if (opponentLockoutUntil) {
     if (isOpenChallenge) {
-      return replyMessage(`You can play again ${formatDiscordRelativeTime(opponentLockoutUntil)}.`, true);
+      return replyMessage(
+        `You can play again ${formatDiscordRelativeTime(opponentLockoutUntil)}.`,
+        true,
+      );
     }
 
     return cancelChallengeForLockout(pvp, challenge, opponentIdForDuel, opponentLockoutUntil);

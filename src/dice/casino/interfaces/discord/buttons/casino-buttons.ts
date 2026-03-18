@@ -18,12 +18,7 @@ export const encodeDiceCasinoAction = (action: DiceCasinoAction): string => {
     case "select-game":
       return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.game);
     case "adjust-bet":
-      return encodeActionId(
-        diceCasinoButtonPrefix,
-        action.type,
-        action.ownerId,
-        action.adjustment,
-      );
+      return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.adjustment);
     case "exact-mode":
       return encodeActionId(diceCasinoButtonPrefix, action.type, action.ownerId, action.mode);
     case "exact-face":

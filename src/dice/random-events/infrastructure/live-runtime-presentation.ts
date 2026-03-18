@@ -168,7 +168,7 @@ export const buildSequenceChallengeDescription = ({
         "",
         `**Next step ${progress.nextStepIndex + 1}/${challenge.steps.length}:** ${nextStep.label}`,
         `Need ${formatComparator(nextStep.comparator, nextStep.target)}.`,
-        `⏳ Auto-resolves ${formatRelativeTimestamp(expiresAtMs)} if no one continues.`,
+        `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`,
       );
     }
   }

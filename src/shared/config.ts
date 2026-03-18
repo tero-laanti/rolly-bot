@@ -115,27 +115,25 @@ export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
     defaultRandomEventsConfig.targetEventsPerDay,
     1,
   ),
-  minGapMs:
-    minutesToMs(
-      parseNumberWithFallback(
-        process.env.RANDOM_EVENTS_MIN_GAP_MINUTES,
-        defaultRandomEventsConfig.minGapMinutes,
-        1,
-      ),
+  minGapMs: minutesToMs(
+    parseNumberWithFallback(
+      process.env.RANDOM_EVENTS_MIN_GAP_MINUTES,
+      defaultRandomEventsConfig.minGapMinutes,
+      1,
     ),
+  ),
   maxActiveEvents: parseNumberWithFallback(
     process.env.RANDOM_EVENTS_MAX_ACTIVE,
     defaultRandomEventsConfig.maxActiveEvents,
     1,
   ),
-  retryDelayMs:
-    secondsToMs(
-      parseNumberWithFallback(
-        process.env.RANDOM_EVENTS_RETRY_DELAY_SECONDS,
-        defaultRandomEventsConfig.retryDelaySeconds,
-        15,
-      ),
+  retryDelayMs: secondsToMs(
+    parseNumberWithFallback(
+      process.env.RANDOM_EVENTS_RETRY_DELAY_SECONDS,
+      defaultRandomEventsConfig.retryDelaySeconds,
+      15,
     ),
+  ),
   jitterRatio: Math.min(
     0.95,
     parseNumberWithFallback(
