@@ -141,7 +141,7 @@ const startRaidsFoundation = (): void => {
   console.log("[raids] Lifecycle runtime started.");
 };
 
-const stopBackgroundSchedulers = (): void => {
+const stopBackgroundSchedulers = async (): Promise<void> => {
   clearRandomEventsAdminController();
   clearRaidsAdminController();
 
@@ -156,7 +156,7 @@ const stopBackgroundSchedulers = (): void => {
   }
 
   if (raidsLiveRuntime) {
-    raidsLiveRuntime.stop();
+    await raidsLiveRuntime.stop();
     raidsLiveRuntime = null;
   }
 };
@@ -165,7 +165,7 @@ let shutdownInProgress = false;
 
 type ShutdownSignal = "SIGINT" | "SIGTERM";
 
-const shutdown = (signal: ShutdownSignal): void => {
+const shutdown = async (signal: ShutdownSignal): Promise<void> => {
   if (shutdownInProgress) {
     return;
   }
@@ -173,13 +173,17 @@ const shutdown = (signal: ShutdownSignal): void => {
   shutdownInProgress = true;
   console.log(`Received ${signal}. Shutting down...`);
 
-  stopBackgroundSchedulers();
+  await stopBackgroundSchedulers();
   client.destroy();
   process.exit(0);
 };
 
-process.once("SIGINT", () => shutdown("SIGINT"));
-process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => {
+  void shutdown("SIGINT");
+});
+process.once("SIGTERM", () => {
+  void shutdown("SIGTERM");
+});
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
