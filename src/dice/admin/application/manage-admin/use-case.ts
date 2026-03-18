@@ -1,4 +1,5 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import { formatDiscordFullTime, formatDiscordRelativeTime } from "../../../../shared/discord";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import type { RandomEventsAdminPort } from "../../../random-events/application/ports";
@@ -311,8 +312,8 @@ const formatTimestamp = (value: Date | number | null): string => {
     return "none";
   }
 
-  const timestampSeconds = Math.floor((value instanceof Date ? value.getTime() : value) / 1000);
-  return `<t:${timestampSeconds}:f> (<t:${timestampSeconds}:R>)`;
+  const timestampMs = value instanceof Date ? value.getTime() : value;
+  return `${formatDiscordFullTime(timestampMs)} (${formatDiscordRelativeTime(timestampMs)})`;
 };
 
 const formatTemporaryEffectLine = (effect: DiceTemporaryEffect): string => {
