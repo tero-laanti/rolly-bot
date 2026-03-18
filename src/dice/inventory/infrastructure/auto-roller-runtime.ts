@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "discord.js";
 import type { SqliteDatabase } from "../../../shared/db";
+import { formatClockDuration } from "../../../shared/text";
+import { secondsToMs } from "../../../shared/time";
 import type { AutoRollSessionReservation } from "../application/ports";
 import { createSqliteRollDiceUseCase } from "../../progression/infrastructure/sqlite/services";
 
@@ -117,7 +119,7 @@ export const startReservedAutoRollSession = async (
 const scheduleNextTick = (session: AutoRollSession): void => {
   session.timer = setTimeout(() => {
     void runAutoRollTick(session);
-  }, session.reservation.intervalSeconds * 1_000);
+  }, secondsToMs(session.reservation.intervalSeconds));
 };
 
 const runAutoRollTick = async (session: AutoRollSession): Promise<void> => {
@@ -223,7 +225,7 @@ const buildAutoRollContent = ({
     `${itemName} ${isFinished ? "finished" : "running"} for <@${userId}>.`,
     buildProgressBar(completedRolls, totalRolls),
     `Rolls: ${completedRolls}/${totalRolls}.`,
-    `Elapsed: ${formatDuration(elapsedSeconds)} / ${formatDuration(durationSeconds)}.`,
+    `Elapsed: ${formatClockDuration(elapsedSeconds)} / ${formatClockDuration(durationSeconds)}.`,
     `Interesting rolls: ${interestingRolls}.`,
     `Blocked rolls: ${blockedRolls}.`,
     "",
@@ -246,13 +248,6 @@ const buildProgressBar = (completed: number, total: number): string => {
   const filledWidth = Math.round((Math.max(0, completed) / clampedTotal) * progressBarWidth);
   const emptyWidth = Math.max(0, progressBarWidth - filledWidth);
   return `[${"#".repeat(filledWidth)}${"-".repeat(emptyWidth)}]`;
-};
-
-const formatDuration = (totalSeconds: number): string => {
-  const normalizedSeconds = Math.max(0, Math.floor(totalSeconds));
-  const minutes = Math.floor(normalizedSeconds / 60);
-  const seconds = normalizedSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
 const pushHighlight = (highlights: string[], line: string): void => {

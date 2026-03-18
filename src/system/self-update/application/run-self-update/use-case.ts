@@ -1,3 +1,5 @@
+import { truncateWithSuffix } from "../../../../shared/text";
+
 export type SelfUpdateCommandStep = {
   label: string;
   command: string;
@@ -18,6 +20,8 @@ export type RunSelfUpdateResult = {
   results: SelfUpdateCommandResult[];
   responseText: string;
 };
+
+export const defaultSelfUpdateOutputLimit = 1_800;
 
 type BuildSelfUpdateStepsInput = {
   install: boolean;
@@ -103,16 +107,12 @@ export const formatSelfUpdateCommandResult = (result: SelfUpdateCommandResult): 
 };
 
 export const truncateSelfUpdateOutput = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, maxLength - 20)}\n... (truncated)`;
+  return truncateWithSuffix(text, maxLength, "\n... (truncated)");
 };
 
 export const createRunSelfUpdateUseCase = (
   { getRollyDataUpdateStep, runCommandStep }: RunSelfUpdateDependencies,
-  { outputLimit = 1_800 }: RunSelfUpdateOptions = {},
+  { outputLimit = defaultSelfUpdateOutputLimit }: RunSelfUpdateOptions = {},
 ) => {
   return async ({ install }: RunSelfUpdateInput): Promise<RunSelfUpdateResult> => {
     const steps = buildSelfUpdateSteps({

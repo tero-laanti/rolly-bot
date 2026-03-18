@@ -2,9 +2,10 @@ import {
   getDiceAchievement,
   type DiceAchievementId,
 } from "../../../progression/domain/achievements";
+import { discordMessageCharacterLimit } from "../../../../shared/discord";
+import { truncateWithSuffix } from "../../../../shared/text";
 
 const compactRollSetThreshold = 35;
-const discordMessageCharacterLimit = 2_000;
 const nonBreakingSpace = "\u00A0";
 const compactRollSetSeparator = " | ";
 
@@ -68,7 +69,7 @@ export const buildDiceRollReplyContent = ({
 }: BuildDiceRollReplyContentInput): string => {
   const rollPassCount = rollPasses.length;
   const isChargedRoll = didChargePathWin;
-  const formattedRollPasses = rollPasses.map(formatRolls);
+  const formattedRollPasses = rollPasses.map(formatCompactRollSet);
   const allSameByRollSet = rollPasses.map((rolls) => rolls.every((roll) => roll === rolls[0]));
   const knownAchievementIds = new Set(previouslyEarnedAchievementIds);
   const newlyUnlockedAchievementIdsByRollSet = getNewlyUnlockedAchievementIdsByRollSet(
@@ -154,10 +155,6 @@ export const buildDiceRollReplyContent = ({
   }
 
   return truncateToLimit(content, discordMessageCharacterLimit);
-};
-
-const formatRolls = (rolls: number[]): string => {
-  return `**${rolls.join(`,${nonBreakingSpace}`)}**`;
 };
 
 type BuildResultLinesInput = {
@@ -559,15 +556,7 @@ const fitToLength = (value: string, maxLength: number): string => {
 };
 
 const truncateToLimit = (content: string, maxLength: number): string => {
-  if (content.length <= maxLength) {
-    return content;
-  }
-
-  if (maxLength <= 3) {
-    return ".".repeat(Math.max(0, maxLength));
-  }
-
-  return `${content.slice(0, maxLength - 3)}...`;
+  return truncateWithSuffix(content, maxLength, "...");
 };
 
 const getNewlyUnlockedAchievementIdsByRollSet = (
@@ -614,7 +603,7 @@ const getHighlightedRollSets = ({
   });
 };
 
-const getMatchingRollSummary = (matchCount: number, totalRollSets: number): string => {
+export const formatMatchingRollSummary = (matchCount: number, totalRollSets: number): string => {
   if (matchCount >= totalRollSets) {
     return "Every set had all matching dice.";
   }
@@ -631,5 +620,5 @@ const getMatchLine = (matchCount: number, totalRollSets: number): string | null 
     return null;
   }
 
-  return getMatchingRollSummary(matchCount, totalRollSets);
+  return formatMatchingRollSummary(matchCount, totalRollSets);
 };

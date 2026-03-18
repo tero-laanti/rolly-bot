@@ -1,4 +1,6 @@
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
+import { formatDiscordRelativeTime } from "../../../../shared/discord";
+import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceItemEffectsService } from "../../../inventory/application/item-effects-service";
@@ -18,6 +20,7 @@ import type { DicePvpRepository } from "../../../pvp/application/ports";
 import {
   buildDiceRollReplyContent,
   formatAchievementText,
+  formatMatchingRollSummary,
   formatRewardText,
 } from "./reply-content";
 
@@ -81,7 +84,7 @@ export const createRunRollDiceUseCase = ({
   return ({ userId, userMention, nowMs = Date.now() }: RunRollDiceUseCaseInput): DiceRollResult => {
     const lockoutUntil = pvp.getActiveDiceLockout(userId, nowMs);
     if (lockoutUntil) {
-      const content = `${userMention}, you can play again ${formatRelativeTime(lockoutUntil)}.`;
+      const content = `${userMention}, you can play again ${formatDiscordRelativeTime(lockoutUntil)}.`;
       return {
         content,
         ephemeral: false,
@@ -319,7 +322,7 @@ const buildAutoRollClassification = ({
     summaryParts.push(rewardText);
   }
   if (matchCount > 0) {
-    summaryParts.push(getMatchSummary(matchCount, totalRollSets));
+    summaryParts.push(formatMatchingRollSummary(matchCount, totalRollSets));
   }
   if (didChargePathWin) {
     summaryParts.push(`${chargeMultiplier}x Dice charge!`);
@@ -341,49 +344,13 @@ const buildAutoRollClassification = ({
   };
 };
 
-const getMatchSummary = (matchCount: number, totalRollSets: number): string => {
-  if (matchCount >= totalRollSets) {
-    return "Every set had all matching dice.";
-  }
-
-  if (matchCount === 1) {
-    return "One set had all matching dice.";
-  }
-
-  return `${matchCount} sets had all matching dice.`;
-};
-
 const summarizeAutoRollText = (content: string): string => {
   const singleLine = content.replace(/\s+/g, " ").trim();
-  if (singleLine.length <= 220) {
-    return singleLine;
-  }
-
-  return `${singleLine.slice(0, 217)}...`;
-};
-
-const formatRelativeTime = (timestampMs: number): string => {
-  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
+  return truncateWithSuffix(singleLine, 220, "...");
 };
 
 const formatRemainingTime = (durationMs: number): string => {
-  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${formatUnit(hours, "hour")} ${formatUnit(minutes, "minute")} ${formatUnit(seconds, "second")}`;
-  }
-  if (minutes > 0) {
-    return `${formatUnit(minutes, "minute")} ${formatUnit(seconds, "second")}`;
-  }
-
-  return formatUnit(seconds, "second");
-};
-
-const formatUnit = (value: number, unit: string): string => {
-  return `${value} ${unit}${value === 1 ? "" : "s"}`;
+  return formatDurationWords(durationMs);
 };
 
 const isOneOffLevelupRoll = (rolls: number[]): boolean => {
