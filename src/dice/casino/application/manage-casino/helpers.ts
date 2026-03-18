@@ -1,5 +1,8 @@
 import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
-import { createDefaultDiceCasinoSessionState } from "../../domain/casino-session";
+import {
+  createDefaultDiceCasinoSessionState,
+  createDiceCasinoSessionToken,
+} from "../../domain/casino-session";
 import {
   clampDiceCasinoBet,
   getDiceCasinoDefaultBet,
@@ -59,6 +62,19 @@ export const refreshSession = (session: DiceCasinoSession, nowMs: number): DiceC
     ...session,
     expiresAt: new Date(nowMs + getDiceCasinoSessionTimeoutMs()).toISOString(),
     updatedAt: new Date(nowMs).toISOString(),
+  };
+};
+
+export const replaceSessionRecord = (
+  session: DiceCasinoSession,
+  nowMs: number,
+): DiceCasinoSession => {
+  return {
+    ...refreshSession(session, nowMs),
+    state: {
+      ...session.state,
+      sessionToken: createDiceCasinoSessionToken(),
+    },
   };
 };
 

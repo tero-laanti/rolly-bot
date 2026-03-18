@@ -7,6 +7,7 @@ import {
   invalidCasinoAction,
   normalizeSessionBet,
   refreshSession,
+  replaceSessionRecord,
   replyMessage,
   replyMutation,
   resolveInitialBet,
@@ -36,20 +37,30 @@ export const createDiceCasinoUseCase = ({
     nowMs: number = Date.now(),
   ): DiceCasinoResult => {
     const pips = economy.getPips(userId);
-    const initialBet = resolveInitialBet(requestedBet, pips);
-    if (!initialBet.ok) {
-      return replyMessage(initialBet.message, true);
-    }
 
     const session = unitOfWork.runInTransaction(() => {
-      if (sessions.getActiveSession(userId, nowMs)) {
-        sessions.expireSession(userId);
+      const activeSession = sessions.getActiveSession(userId, nowMs);
+      if (activeSession) {
+        const replacementSession = replaceSessionRecord(activeSession, nowMs);
+        sessions.saveSession(replacementSession);
+        return replacementSession;
+      }
+
+      const initialBet = resolveInitialBet(requestedBet, pips);
+      if (!initialBet.ok) {
+        return {
+          message: initialBet.message,
+        };
       }
 
       const nextSession = createSessionRecord(userId, initialBet.bet, nowMs);
       sessions.saveSession(nextSession);
       return nextSession;
     });
+
+    if ("message" in session) {
+      return replyMessage(session.message, true);
+    }
 
     return {
       kind: "reply",
@@ -89,6 +100,17 @@ export const createDiceCasinoUseCase = ({
       };
     }
 
+    if (mutation.kind === "replaced") {
+      return {
+        kind: "edit",
+        payload: {
+          type: "message",
+          content: "This casino session has been replaced. Use the newest `/dice-casino` message.",
+          clearComponents: true,
+        },
+      };
+    }
+
     return {
       kind: "update",
       payload: {
@@ -121,6 +143,12 @@ const mutateCasinoSession = ({
   if (!session) {
     return {
       kind: "expired",
+    };
+  }
+
+  if (action.sessionToken && session.state.sessionToken !== action.sessionToken) {
+    return {
+      kind: "replaced",
     };
   }
 

@@ -3,6 +3,22 @@ import { getExactRollDieSides } from "../../../domain/game-rules";
 
 export const diceCasinoButtonPrefix = "dice-casino:";
 
+const basePrefix = diceCasinoButtonPrefix.slice(0, -1);
+
+const encodeDiceCasinoTarget = (action: DiceCasinoAction, arg?: string | number): string => {
+  const parts = [basePrefix, action.type, action.ownerId];
+
+  if (action.sessionToken) {
+    parts.push(action.sessionToken);
+  }
+
+  if (arg !== undefined) {
+    parts.push(String(arg));
+  }
+
+  return parts.join(":");
+};
+
 export const encodeDiceCasinoAction = (action: DiceCasinoAction): string => {
   switch (action.type) {
     case "refresh":
@@ -13,25 +29,48 @@ export const encodeDiceCasinoAction = (action: DiceCasinoAction): string => {
     case "blackjack-stand":
     case "poker-reroll":
     case "poker-cancel":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}`;
+      return encodeDiceCasinoTarget(action);
     case "select-game":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.game}`;
+      return encodeDiceCasinoTarget(action, action.game);
     case "adjust-bet":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.adjustment}`;
+      return encodeDiceCasinoTarget(action, action.adjustment);
     case "exact-mode":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.mode}`;
+      return encodeDiceCasinoTarget(action, action.mode);
     case "exact-face":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.face}`;
+      return encodeDiceCasinoTarget(action, action.face);
     case "exact-high-low":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.choice}`;
+      return encodeDiceCasinoTarget(action, action.choice);
     case "poker-toggle-hold":
-      return `${diceCasinoButtonPrefix}${action.type}:${action.ownerId}:${action.index}`;
+      return encodeDiceCasinoTarget(action, action.index);
   }
 };
 
+const parseCasinoActionTarget = (
+  ownerId: string,
+  maybeSessionToken?: string,
+  maybeArg?: string,
+): {
+  ownerId: string;
+  sessionToken?: string;
+  arg?: string;
+} => {
+  if (maybeArg !== undefined) {
+    return {
+      ownerId,
+      sessionToken: maybeSessionToken,
+      arg: maybeArg,
+    };
+  }
+
+  return {
+    ownerId,
+    arg: maybeSessionToken,
+  };
+};
+
 export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null => {
-  const [prefix, action, ownerId, arg] = customId.split(":");
-  if (prefix !== diceCasinoButtonPrefix.slice(0, -1) || !action || !ownerId) {
+  const [prefix, action, ownerId, part4, part5, extra] = customId.split(":");
+  if (prefix !== basePrefix || !action || !ownerId || extra !== undefined) {
     return null;
   }
 
@@ -45,7 +84,13 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
     action === "poker-reroll" ||
     action === "poker-cancel"
   ) {
-    return { type: action, ownerId };
+    return part5 === undefined ? { type: action, ownerId, sessionToken: part4 } : null;
+  }
+
+  const target = parseCasinoActionTarget(ownerId, part4, part5);
+  const arg = target.arg;
+  if (!arg) {
+    return null;
   }
 
   if (action === "select-game") {
@@ -60,7 +105,8 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
 
     return {
       type: "select-game",
-      ownerId,
+      ownerId: target.ownerId,
+      sessionToken: target.sessionToken,
       game: arg,
     };
   }
@@ -76,7 +122,8 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
   ) {
     return {
       type: "adjust-bet",
-      ownerId,
+      ownerId: target.ownerId,
+      sessionToken: target.sessionToken,
       adjustment: arg,
     };
   }
@@ -84,20 +131,22 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
   if (action === "exact-mode" && (arg === "exact-face" || arg === "high-low")) {
     return {
       type: "exact-mode",
-      ownerId,
+      ownerId: target.ownerId,
+      sessionToken: target.sessionToken,
       mode: arg,
     };
   }
 
   if (action === "exact-face") {
-    const face = Number.parseInt(arg ?? "", 10);
+    const face = Number.parseInt(arg, 10);
     if (!Number.isInteger(face) || face < 1 || face > getExactRollDieSides()) {
       return null;
     }
 
     return {
       type: "exact-face",
-      ownerId,
+      ownerId: target.ownerId,
+      sessionToken: target.sessionToken,
       face,
     };
   }
@@ -105,20 +154,22 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
   if (action === "exact-high-low" && (arg === "low" || arg === "high")) {
     return {
       type: "exact-high-low",
-      ownerId,
+      ownerId: target.ownerId,
+      sessionToken: target.sessionToken,
       choice: arg,
     };
   }
 
   if (action === "poker-toggle-hold") {
-    const index = Number.parseInt(arg ?? "", 10);
+    const index = Number.parseInt(arg, 10);
     if (!Number.isInteger(index)) {
       return null;
     }
 
     return {
       type: "poker-toggle-hold",
-      ownerId,
+      ownerId: target.ownerId,
+      sessionToken: target.sessionToken,
       index,
     };
   }
