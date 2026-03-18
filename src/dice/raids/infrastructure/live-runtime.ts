@@ -5,6 +5,7 @@ import { parseRaidJoinButtonId } from "../interfaces/discord/button-ids";
 import {
   buildRaidAnnouncementPrompt,
   buildRaidCancelledPrompt,
+  buildRaidInterruptedPrompt,
   buildRaidResolvedPrompt,
   buildRaidStartedPrompt,
 } from "../interfaces/discord/prompt";
@@ -38,7 +39,7 @@ export type RaidsLiveRuntime = {
   triggerRaidNow: () => Promise<TriggerRaidNowResult>;
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
   getActiveRaidsSnapshot: () => RaidAdminActiveRaidSnapshot[];
-  stop: () => void;
+  stop: () => Promise<void>;
 };
 
 const raidTitle = "Dice raid";
@@ -312,10 +313,36 @@ export const createRaidsLiveRuntime = ({
       .sort((left, right) => left.scheduledStartAt.getTime() - right.scheduledStartAt.getTime());
   };
 
-  const stop = (): void => {
-    for (const context of activeRaidsById.values()) {
+  const stop = async (): Promise<void> => {
+    const activeRaids = Array.from(activeRaidsById.values());
+    for (const context of activeRaids) {
       clearRaidTimers(context);
+
+      await context.announcementMessage
+        .edit(
+          buildRaidAnnouncementPrompt({
+            raidId: context.raidId,
+            participantIds: Array.from(context.participantIds),
+            scheduledStartAtMs: context.scheduledStartAtMs,
+            disabled: true,
+          }),
+        )
+        .catch((error) => {
+          logger.warn("[raids] Failed to disable raid announcement during shutdown.", error);
+        });
+
+      const interruptedPrompt = buildRaidInterruptedPrompt({
+        participantIds: Array.from(context.participantIds),
+      });
+
+      const targetMessage = context.activeMessage ?? context.announcementMessage;
+      await targetMessage.edit(interruptedPrompt).catch((error) => {
+        logger.warn("[raids] Failed to close raid during shutdown.", error);
+      });
+
+      resolveActiveRaid(state, context.raidId);
     }
+
     activeRaidsById.clear();
   };
 
