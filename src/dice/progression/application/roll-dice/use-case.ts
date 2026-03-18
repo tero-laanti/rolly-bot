@@ -211,6 +211,7 @@ export const createRunRollDiceUseCase = ({
       hasActiveItemDoubleRoll: itemDoubleRollStatus.isActive,
       temporaryEffectsRollSummary,
       didChargePathWin,
+      realizedNonChargeFactor: rollPassCount / baseRollPassCount,
     });
     const unlockedBansAfter = getUnlockedBanSlotsFromFame(
       result.fameAfter,
@@ -308,20 +309,30 @@ const buildRollModifierFooter = ({
   hasActiveItemDoubleRoll,
   temporaryEffectsRollSummary,
   didChargePathWin,
+  realizedNonChargeFactor,
 }: {
   hasActivePvpDoubleRoll: boolean;
   hasActiveItemDoubleRoll: boolean;
   temporaryEffectsRollSummary: ReturnType<typeof summarizeRollPassEffects>;
   didChargePathWin: boolean;
+  realizedNonChargeFactor: number;
 }): string => {
   const modifierParts: string[] = [];
 
-  if (hasActivePvpDoubleRoll) {
-    modifierParts.push("PvP double ×2");
-  }
+  if (hasActivePvpDoubleRoll || hasActiveItemDoubleRoll) {
+    const doubleRollSources: string[] = [];
+    if (hasActivePvpDoubleRoll) {
+      doubleRollSources.push("PvP");
+    }
+    if (hasActiveItemDoubleRoll) {
+      doubleRollSources.push("item");
+    }
 
-  if (hasActiveItemDoubleRoll) {
-    modifierParts.push("item double ×2");
+    modifierParts.push(
+      doubleRollSources.length === 1
+        ? `${doubleRollSources[0]} double ×2`
+        : `double-roll buff ×2 (${doubleRollSources.join(" + ")})`,
+    );
   }
 
   if (temporaryEffectsRollSummary.multiplier > 1) {
@@ -344,12 +355,7 @@ const buildRollModifierFooter = ({
     return `Other active roll modifiers: ${modifierParts.join(" · ")}.`;
   }
 
-  const totalFactor =
-    (hasActivePvpDoubleRoll ? 2 : 1) *
-    (hasActiveItemDoubleRoll ? 2 : 1) *
-    temporaryEffectsRollSummary.effectiveFactor;
-
-  return `Roll modifiers: ${modifierParts.join(" · ")} → effective ×${formatMultiplierFactor(totalFactor)}.`;
+  return `Roll modifiers: ${modifierParts.join(" · ")} → effective ×${formatMultiplierFactor(realizedNonChargeFactor)}.`;
 };
 
 const formatMultiplierFactor = (value: number): string => {
