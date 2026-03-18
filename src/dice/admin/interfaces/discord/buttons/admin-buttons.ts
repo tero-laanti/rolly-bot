@@ -22,6 +22,8 @@ export const parseDiceAdminAction = (customId: string): DiceAdminAction | null =
     action !== "menu" &&
     action !== "status" &&
     action !== "event-trigger" &&
+    action !== "raid-status" &&
+    action !== "raid-trigger" &&
     action !== "effects-user" &&
     action !== "effects-clear"
   ) {

@@ -66,6 +66,10 @@ Rolly reads configuration from `.env`. The source of truth for available variabl
 - `RANDOM_EVENTS_QUIET_HOURS_START`: Quiet-hours start time in `HH:MM` 24-hour format. Default: `23:00`.
 - `RANDOM_EVENTS_QUIET_HOURS_END`: Quiet-hours end time in `HH:MM` 24-hour format. Default: `08:00`.
 - `RANDOM_EVENTS_QUIET_HOURS_TIMEZONE`: IANA timezone used for quiet hours. Default: `Europe/Helsinki`.
+- `RAIDS_ENABLED`: Enables or disables the raid lifecycle runtime. Default: `false`.
+- `RAIDS_CHANNEL_ID`: Channel ID where raid announcements and active raid posts are sent.
+- `RAIDS_JOIN_LEAD_MINUTES`: Lead time between a raid announcement and the active raid start. Units: minutes. Default: `30`.
+- `RAIDS_ACTIVE_DURATION_MINUTES`: How long the active raid window remains open after the boss arrives. Units: minutes. Default: `12`.
 
 Use placeholder values in `.env.example`, keep your real `.env` private, and do not commit real tokens or IDs you consider sensitive.
 
@@ -134,7 +138,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 - `/dice-pvp` creates and resolves PvP dice duels.
 - `/dice-achievements` lists unlocked dice achievements.
 - `/dice-analytics` shows progression and PvP stats.
-- `/dice-admin` exposes owner-only dice admin tools, including random-event status and effect cleanup. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
+- `/dice-admin` exposes owner-only dice admin tools, including random-event controls, raid lifecycle controls, and effect cleanup. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
 - `/self-update` pulls the latest code, optionally runs `npm install`, refreshes `rolly-data` when configured as a git checkout, rebuilds, and redeploys commands. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
 
 ## Architecture
@@ -142,7 +146,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 Rolly is a pragmatic domain-driven modular monolith.
 
 - `src/app/` contains the composition root and Discord runtime wiring.
-- `src/dice/<context>/` contains the source-of-truth gameplay code. Main contexts are progression, economy, inventory, casino, PvP, analytics, admin, and random-events.
+- `src/dice/<context>/` contains the source-of-truth gameplay code. Main contexts are progression, economy, inventory, casino, PvP, analytics, admin, random-events, and raids.
 - Each context follows the same basic split:
   `domain/` for rules and value types,
   `application/` for use cases and ports,
@@ -164,7 +168,7 @@ Important rules:
 
 - [src/app/bootstrap/](src/app/bootstrap/) contains the startup entrypoints used by [src/index.ts](src/index.ts) and [src/deploy-commands.ts](src/deploy-commands.ts).
 - [src/app/discord/](src/app/discord/) contains the Discord runtime, interaction helpers, button router, and explicit command registry.
-- [src/dice/progression/](src/dice/progression/), [src/dice/economy/](src/dice/economy/), [src/dice/inventory/](src/dice/inventory/), [src/dice/casino/](src/dice/casino/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), and [src/dice/random-events/](src/dice/random-events/) are the main gameplay contexts.
+- [src/dice/progression/](src/dice/progression/), [src/dice/economy/](src/dice/economy/), [src/dice/inventory/](src/dice/inventory/), [src/dice/casino/](src/dice/casino/), [src/dice/pvp/](src/dice/pvp/), [src/dice/analytics/](src/dice/analytics/), [src/dice/admin/](src/dice/admin/), [src/dice/random-events/](src/dice/random-events/), and [src/dice/raids/](src/dice/raids/) are the main gameplay contexts.
 - [src/dice/\*/infrastructure/sqlite/services.ts](src/dice/progression/infrastructure/sqlite/services.ts) files are the adapter entrypoints that build use cases from SQLite repositories and shared unit-of-work wiring.
 - [src/system/self-update/](src/system/self-update/) contains the self-update application use case, infrastructure command runner, and owner-only Discord command.
 - [src/shared/](src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
