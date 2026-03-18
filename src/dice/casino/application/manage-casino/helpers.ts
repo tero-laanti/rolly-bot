@@ -47,11 +47,12 @@ export const createSessionRecord = (
   userId: string,
   bet: number,
   nowMs: number,
+  sessionToken: string = createDiceCasinoSessionToken(),
 ): DiceCasinoSession => {
   return {
     userId,
     bet,
-    state: createDefaultDiceCasinoSessionState(),
+    state: createDefaultDiceCasinoSessionState(sessionToken),
     expiresAt: new Date(nowMs + getDiceCasinoSessionTimeoutMs()).toISOString(),
     updatedAt: new Date(nowMs).toISOString(),
   };
@@ -68,12 +69,13 @@ export const refreshSession = (session: DiceCasinoSession, nowMs: number): DiceC
 export const replaceSessionRecord = (
   session: DiceCasinoSession,
   nowMs: number,
+  sessionToken: string = createDiceCasinoSessionToken(),
 ): DiceCasinoSession => {
   return {
     ...refreshSession(session, nowMs),
     state: {
       ...session.state,
-      sessionToken: createDiceCasinoSessionToken(),
+      sessionToken,
       allowLegacyActions: false,
     },
   };
@@ -84,13 +86,15 @@ export const reopenSessionRecord = ({
   requestedBet,
   availablePips,
   nowMs,
+  sessionToken,
 }: {
   session: DiceCasinoSession;
   requestedBet: number | null;
   availablePips: number;
   nowMs: number;
+  sessionToken?: string;
 }): { ok: true; session: DiceCasinoSession } | { ok: false; message: string } => {
-  const replacementSession = replaceSessionRecord(session, nowMs);
+  const replacementSession = replaceSessionRecord(session, nowMs, sessionToken);
 
   if (requestedBet === null || requestedBet === session.bet) {
     return {
