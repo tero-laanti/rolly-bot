@@ -206,6 +206,12 @@ export const createRunRollDiceUseCase = ({
 
     const achievementText = formatAchievementText(result.newlyEarned);
     const rewardText = formatRewardText(result.totalReward, hasLevelUp);
+    const multiplierFooter = buildRollModifierFooter({
+      hasActivePvpDoubleRoll: Boolean(pvpDoubleRollUntil && pvpDoubleRollUntil > nowMs),
+      hasActiveItemDoubleRoll: itemDoubleRollStatus.isActive,
+      temporaryEffectsRollSummary,
+      didChargePathWin,
+    });
     const unlockedBansAfter = getUnlockedBanSlotsFromFame(
       result.fameAfter,
       result.levelAfter,
@@ -236,6 +242,7 @@ export const createRunRollDiceUseCase = ({
 
     const content = buildDiceRollReplyContent({
       achievementText,
+      multiplierFooter,
       unlockedFooter,
       doubleRollFooter,
       prestigeFooter,
@@ -289,9 +296,75 @@ const summarizeRollPassEffects = (
   const normalizedDivisor = Math.max(1, Math.floor(divisor));
 
   return {
+    multiplier: normalizedMultiplier,
+    divisor: normalizedDivisor,
     effectiveFactor: normalizedMultiplier / normalizedDivisor,
     hasApplicableEffects,
   };
+};
+
+const buildRollModifierFooter = ({
+  hasActivePvpDoubleRoll,
+  hasActiveItemDoubleRoll,
+  temporaryEffectsRollSummary,
+  didChargePathWin,
+}: {
+  hasActivePvpDoubleRoll: boolean;
+  hasActiveItemDoubleRoll: boolean;
+  temporaryEffectsRollSummary: ReturnType<typeof summarizeRollPassEffects>;
+  didChargePathWin: boolean;
+}): string => {
+  const modifierParts: string[] = [];
+
+  if (hasActivePvpDoubleRoll) {
+    modifierParts.push("PvP double ×2");
+  }
+
+  if (hasActiveItemDoubleRoll) {
+    modifierParts.push("item double ×2");
+  }
+
+  if (temporaryEffectsRollSummary.multiplier > 1) {
+    modifierParts.push(
+      `temporary ${temporaryEffectsRollSummary.multiplier === 2 ? "buff" : "buffs"} ×${temporaryEffectsRollSummary.multiplier}`,
+    );
+  }
+
+  if (temporaryEffectsRollSummary.divisor > 1) {
+    modifierParts.push(
+      `temporary ${temporaryEffectsRollSummary.divisor === 2 ? "penalty" : "penalties"} ÷${temporaryEffectsRollSummary.divisor}`,
+    );
+  }
+
+  if (modifierParts.length < 1) {
+    return "";
+  }
+
+  if (didChargePathWin) {
+    return `Other active roll modifiers: ${modifierParts.join(" · ")}.`;
+  }
+
+  const totalFactor =
+    (hasActivePvpDoubleRoll ? 2 : 1) *
+    (hasActiveItemDoubleRoll ? 2 : 1) *
+    temporaryEffectsRollSummary.effectiveFactor;
+
+  return `Roll modifiers: ${modifierParts.join(" · ")} → effective ×${formatMultiplierFactor(totalFactor)}.`;
+};
+
+const formatMultiplierFactor = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "1";
+  }
+
+  if (Number.isInteger(value)) {
+    return value.toString();
+  }
+
+  return value
+    .toFixed(2)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*[1-9])0+$/, "$1");
 };
 
 const buildAutoRollClassification = ({
