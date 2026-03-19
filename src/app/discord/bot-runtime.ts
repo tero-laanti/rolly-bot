@@ -115,7 +115,14 @@ const startRandomEventsFoundation = (): void => {
 };
 
 const startRaidsFoundation = (): void => {
+  const raidsState = createRaidsState();
+
   if (!raidsConfig.enabled) {
+    registerRaidsAdminController({
+      config: raidsConfig,
+      state: raidsState,
+      runtime: null,
+    });
     console.log("[raids] Lifecycle runtime disabled by config.");
     return;
   }
@@ -124,7 +131,6 @@ const startRaidsFoundation = (): void => {
     return;
   }
 
-  const raidsState = createRaidsState();
   raidsLiveRuntime = createRaidsLiveRuntime({
     client,
     config: raidsConfig,

@@ -46,18 +46,26 @@ export const buildRaidAnnouncementPrompt = ({
 }): BaseMessageOptions => {
   const embed = new EmbedBuilder()
     .setColor(raidColor)
-    .setTitle("⚔️ Incoming raid")
+    .setTitle(disabled ? "⏳ Raid signup closed" : "⚔️ Incoming raid")
     .setDescription(
       [
-        `The raid begins ${formatDiscordRelativeTime(scheduledStartAtMs)}.`,
+        disabled
+          ? `Raid signup closed ${formatDiscordRelativeTime(scheduledStartAtMs)}.`
+          : `The raid begins ${formatDiscordRelativeTime(scheduledStartAtMs)}.`,
         `Start time: ${formatDiscordFullTime(scheduledStartAtMs)}.`,
-        "Join now to lock yourself in before the boss arrives.",
+        disabled
+          ? "This raid is no longer accepting new raiders."
+          : "Join now to lock yourself in before the boss arrives.",
         "",
         `**Joined raiders (${participantIds.length})**`,
         formatParticipants(participantIds),
       ].join("\n"),
     )
-    .setFooter({ text: "Joined players will be carried into the active raid state." });
+    .setFooter({
+      text: disabled
+        ? "The joined raiders shown here are already locked in."
+        : "Joined players will be carried into the active raid state.",
+    });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
