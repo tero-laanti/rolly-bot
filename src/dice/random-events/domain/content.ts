@@ -422,24 +422,60 @@ const renderTemplatedText = (template: string, selectedValues: Record<string, st
   });
 };
 
+const collectReferencedTextVariableKeys = (...templates: string[]): Set<string> => {
+  const referencedKeys = new Set<string>();
+
+  for (const template of templates) {
+    for (const match of template.matchAll(templateVariablePattern)) {
+      const key = match[1];
+      if (key) {
+        referencedKeys.add(key);
+      }
+    }
+  }
+
+  return referencedKeys;
+};
+
 const collectScenarioRenderTextVariables = (
   scenario: RandomEventScenario,
 ): RandomEventTextVariables | undefined => {
+  const referencedKeys = collectReferencedTextVariableKeys(
+    scenario.title,
+    scenario.prompt,
+    scenario.claimLabel,
+  );
+  if (referencedKeys.size < 1) {
+    return undefined;
+  }
+
+  const scenarioVariables = Object.fromEntries(
+    [...referencedKeys]
+      .map((key) => [key, scenario.textVariables?.[key]])
+      .filter(
+        (entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].length > 0,
+      ),
+  );
   const mergedOutcomeVariables: RandomEventTextVariables = {};
 
   for (const outcome of scenario.outcomes) {
-    for (const [key, values] of Object.entries(outcome.textVariables ?? {})) {
+    for (const key of referencedKeys) {
+      const values = outcome.textVariables?.[key];
+      if (!values || values.length < 1) {
+        continue;
+      }
+
       const existingValues = mergedOutcomeVariables[key] ?? [];
       mergedOutcomeVariables[key] = [...new Set([...existingValues, ...values])];
     }
   }
 
-  if (!scenario.textVariables && Object.keys(mergedOutcomeVariables).length < 1) {
+  if (Object.keys(scenarioVariables).length < 1 && Object.keys(mergedOutcomeVariables).length < 1) {
     return undefined;
   }
 
   return {
-    ...(scenario.textVariables ?? {}),
+    ...scenarioVariables,
     ...mergedOutcomeVariables,
   };
 };
@@ -478,17 +514,11 @@ export const renderRandomEventOutcome = (
   selectedOutcome: RandomEventOutcome,
   options: { random?: () => number } = {},
 ): RandomEventRenderedOutcome => {
-  const baseValues = { ...scenarioRender.textVariableValues };
-  // Remove reused keys so outcome-level variables can override the scenario selection.
-  for (const key of Object.keys(selectedOutcome.textVariables ?? {})) {
-    delete baseValues[key];
-  }
-
   const textVariableValues = selectTextVariableValues(
     scenarioRender.scenario.textVariables,
     selectedOutcome.textVariables,
     options.random,
-    baseValues,
+    scenarioRender.textVariableValues,
   );
 
   return {
