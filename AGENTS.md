@@ -78,6 +78,7 @@ When implementing a new feature:
 - Prefer additive schema changes in [src/shared/db/schema.ts](src/shared/db/schema.ts).
 - Changes to fame/pips, prestige, bans, PvP effects, analytics, temporary effects, or random-event state can affect progression and should be reviewed as game-state changes, not just refactors.
 - Real gameplay content and tuning live outside the public app repo in the private `rolly-data` repository.
+- Do not hide tunable gameplay numbers or player-facing generated content pools in source files. If designers may want to tune it, or if it affects live gameplay feel, put it in `rolly-data` with matching validation and docs.
 - Data source resolution order is `ROLLY_DATA_DIR`, then `./rolly-data`, then `./example-data/rolly-data` only when `ROLLY_ALLOW_EXAMPLE_DATA=true`.
 - The current `rolly-data` contract is `achievements.json`, `dice-balance.json`, `items.v1.json`, and `random-events.v1.json`.
 - Keep public example data safe to expose. Do not copy production achievements, tuning, or random-event content back into tracked source files or `example-data/`.
