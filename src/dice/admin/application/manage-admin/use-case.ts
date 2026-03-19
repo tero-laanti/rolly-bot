@@ -347,15 +347,25 @@ const buildRaidStatusView = (
     `- Channel: ${status.channelId ? `<#${status.channelId}>` : "not configured"}`,
     `- Join lead: ${Math.round(status.joinLeadMs / 60_000)} min`,
     `- Active duration: ${Math.round(status.activeDurationMs / 60_000)} min`,
+    `- Random raids per day: ${status.targetRaidsPerDay}`,
+    `- Min gap: ${Math.round(status.minGapMs / 60_000)} min`,
+    `- Retry delay: ${Math.round(status.retryDelayMs / 1_000)} sec`,
+    `- Quiet hours: ${status.quietHours.start}-${status.quietHours.end} (${status.quietHours.timezone})`,
     `- Live raid count: ${status.snapshot.liveRaidCount}`,
+    `- Last trigger: ${formatTimestamp(status.snapshot.lastTriggeredAt)}`,
+    `- Next scheduler check: ${formatTimestamp(status.snapshot.nextCheckAt)}`,
   ];
 
   if (status.liveRaids.length > 0) {
     lines.push("", "**Live raids**");
     for (const raid of status.liveRaids) {
-      const messageId = raid.activeMessageId ?? raid.announcementMessageId;
+      const messageId = raid.activeThreadId ?? raid.activeMessageId ?? raid.announcementMessageId;
+      const bossText = raid.boss
+        ? ` • boss: ${raid.boss.name} Lv.${raid.boss.level} HP ${raid.boss.currentHp}/${raid.boss.maxHp}`
+        : "";
+      const outcomeText = raid.outcome ? ` • outcome: ${raid.outcome}` : "";
       lines.push(
-        `- ${raid.title} [${raid.status}] • participants: ${raid.participantCount} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
+        `- ${raid.title} [${raid.status}]${outcomeText} • participants: ${raid.participantCount}${bossText} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
       );
     }
   }

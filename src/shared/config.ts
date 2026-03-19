@@ -24,6 +24,11 @@ export type RaidsConfig = {
   channelId: string | null;
   joinLeadMs: number;
   activeDurationMs: number;
+  targetRaidsPerDay: number;
+  minGapMs: number;
+  retryDelayMs: number;
+  jitterRatio: number;
+  quietHours: QuietHoursConfig;
 };
 
 const parseNumberWithFallback = (
@@ -116,6 +121,15 @@ const defaultRaidsConfig = {
   channelId: null,
   joinLeadMinutes: 30,
   activeDurationMinutes: 12,
+  targetRaidsPerDay: 0,
+  minGapMinutes: 180,
+  retryDelaySeconds: 10 * 60,
+  jitterRatio: 0.35,
+  quietHours: {
+    start: "23:00",
+    end: "08:00",
+    timezone: "Europe/Helsinki",
+  },
 };
 
 export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
@@ -189,4 +203,34 @@ export const raidsConfig: RaidsConfig = {
       1,
     ),
   ),
+  targetRaidsPerDay: parseNumberWithFallback(
+    process.env.RAIDS_TARGET_PER_DAY,
+    defaultRaidsConfig.targetRaidsPerDay,
+    0,
+  ),
+  minGapMs: minutesToMs(
+    parseNumberWithFallback(process.env.RAIDS_MIN_GAP_MINUTES, defaultRaidsConfig.minGapMinutes, 1),
+  ),
+  retryDelayMs: secondsToMs(
+    parseNumberWithFallback(
+      process.env.RAIDS_RETRY_DELAY_SECONDS,
+      defaultRaidsConfig.retryDelaySeconds,
+      15,
+    ),
+  ),
+  jitterRatio: Math.min(
+    0.95,
+    parseNumberWithFallback(process.env.RAIDS_JITTER_RATIO, defaultRaidsConfig.jitterRatio, 0),
+  ),
+  quietHours: {
+    start: parseQuietHoursValue(
+      process.env.RAIDS_QUIET_HOURS_START,
+      defaultRaidsConfig.quietHours.start,
+    ),
+    end: parseQuietHoursValue(process.env.RAIDS_QUIET_HOURS_END, defaultRaidsConfig.quietHours.end),
+    timezone: parseQuietHoursTimezone(
+      process.env.RAIDS_QUIET_HOURS_TIMEZONE,
+      defaultRaidsConfig.quietHours.timezone,
+    ),
+  },
 };

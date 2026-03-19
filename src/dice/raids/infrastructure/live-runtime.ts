@@ -1,22 +1,34 @@
 import { randomUUID } from "node:crypto";
 import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "discord.js";
 import type { RaidsConfig } from "../../../shared/config";
+import { getDatabase } from "../../../shared/db";
+import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
+import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type {
+  ApplyRaidDiceRollInput,
+  ApplyRaidDiceRollResult,
   RaidAdminLiveRaidSnapshot,
+  RaidBossSnapshot,
+  RaidOutcome,
   RaidStatus,
   TriggerRaidNowOutcome,
 } from "../application/ports";
+import { createRaidBoss, describeRaidReward } from "../domain/raid";
 import { parseRaidJoinButtonId } from "../interfaces/discord/button-ids";
 import {
+  buildRaidActivePrompt,
   buildRaidAnnouncementPrompt,
   buildRaidCancelledPrompt,
   buildRaidInterruptedPrompt,
   buildRaidResolveFailedPrompt,
   buildRaidResolvedPrompt,
   buildRaidStartFailedPrompt,
-  buildRaidStartedPrompt,
 } from "../interfaces/discord/prompt";
-import type { ActiveRaidContext, RaidsLiveRuntimeLogger } from "./live-runtime-types";
+import type {
+  ActiveRaidContext,
+  ActiveRaidRecord,
+  RaidsLiveRuntimeLogger,
+} from "./live-runtime-types";
 
 type CreateRaidsLiveRuntimeInput = {
   client: Client;
@@ -33,12 +45,15 @@ type QueueAnnouncementRenderInput = {
 export type RaidsLiveRuntime = {
   triggerRaidNow: () => Promise<TriggerRaidNowOutcome>;
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
+  applyDiceRoll: (input: ApplyRaidDiceRollInput) => ApplyRaidDiceRollResult;
   getLiveRaidsSnapshot: () => RaidAdminLiveRaidSnapshot[];
   hasBlockingRaid: () => boolean;
   stop: () => Promise<void>;
 };
 
 const raidTitle = "Dice raid";
+const raidProgressRenderThrottleMs = 1_500;
+const maxContributionLines = 5;
 
 const blockingStatuses = new Set<RaidStatus>(["joining", "starting", "active"]);
 
@@ -54,12 +69,41 @@ const currentRaidStatus = (context: ActiveRaidContext): RaidStatus => {
   return context.raid.status;
 };
 
+const buildRaidBossSnapshot = (context: ActiveRaidContext): RaidBossSnapshot | null => {
+  if (!context.raid.boss) {
+    return null;
+  }
+
+  return {
+    name: context.raid.boss.name,
+    level: context.raid.boss.level,
+    currentHp: context.raid.boss.currentHp,
+    maxHp: context.raid.boss.maxHp,
+    rewardSummary: describeRaidReward(context.raid.boss.reward),
+  };
+};
+
+const buildContributionLines = (context: ActiveRaidContext): string[] => {
+  if (!context.raid.boss) {
+    return [];
+  }
+
+  return Array.from(context.raid.boss.damageByUserId.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, maxContributionLines)
+    .map(([userId, damage]) => `<@${userId}> - ${damage} dmg`);
+};
+
 export const createRaidsLiveRuntime = ({
   client,
   config,
   logger = console,
 }: CreateRaidsLiveRuntimeInput): RaidsLiveRuntime => {
   const liveRaidsById = new Map<string, ActiveRaidContext>();
+  const liveRaidIdsByThreadId = new Map<string, string>();
+  const db = getDatabase();
+  const progression = createSqliteProgressionRepository(db);
+  const unitOfWork = createSqliteUnitOfWork(db);
   let stopping = false;
   let triggerChain: Promise<void> = Promise.resolve();
 
@@ -77,12 +121,21 @@ export const createRaidsLiveRuntime = ({
       clearTimeout(context.handles.resolveTimer);
       context.handles.resolveTimer = null;
     }
+
+    if (context.handles.activeRenderTimer) {
+      clearTimeout(context.handles.activeRenderTimer);
+      context.handles.activeRenderTimer = null;
+    }
   };
 
   const finalizeRaid = (context: ActiveRaidContext): void => {
     clearRaidTimers(context);
     if (!isCurrentContext(context)) {
       return;
+    }
+
+    if (context.raid.activeThreadId) {
+      liveRaidIdsByThreadId.delete(context.raid.activeThreadId);
     }
 
     liveRaidsById.delete(context.raid.raidId);
@@ -93,12 +146,15 @@ export const createRaidsLiveRuntime = ({
       raidId: context.raid.raidId,
       title: context.raid.title,
       status: context.raid.status,
+      outcome: context.raid.outcome,
       participantCount: context.raid.participantIds.size,
       scheduledStartAt: new Date(context.raid.scheduledStartAtMs),
       expiresAt: context.raid.expiresAtMs === null ? null : new Date(context.raid.expiresAtMs),
       channelId: context.handles.announcementMessage.channelId,
       announcementMessageId: context.handles.announcementMessage.id,
       activeMessageId: context.handles.activeMessage?.id ?? null,
+      activeThreadId: context.raid.activeThreadId,
+      boss: buildRaidBossSnapshot(context),
     };
   };
 
@@ -106,6 +162,7 @@ export const createRaidsLiveRuntime = ({
     context: ActiveRaidContext,
   ): BaseMessageOptions => {
     const participantIds = participantIdsFromContext(context);
+    const boss = context.raid.boss;
 
     switch (context.raid.status) {
       case "joining":
@@ -121,6 +178,8 @@ export const createRaidsLiveRuntime = ({
           participantIds,
           scheduledStartAtMs: context.raid.scheduledStartAtMs,
           disabled: true,
+          bossName: boss?.name ?? null,
+          threadId: context.raid.activeThreadId,
         });
       case "cancelled":
         return buildRaidCancelledPrompt({
@@ -129,46 +188,97 @@ export const createRaidsLiveRuntime = ({
       case "interrupted":
         return buildRaidInterruptedPrompt({
           participantIds,
+          bossName: boss?.name ?? null,
         });
       case "start-failed":
         return buildRaidStartFailedPrompt({
           participantIds,
         });
       case "resolved":
-        return buildRaidResolvedPrompt({
+        if (boss && context.raid.outcome) {
+          return buildRaidResolvedPrompt({
+            participantIds,
+            resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
+            outcome: context.raid.outcome,
+            bossName: boss.name,
+            bossLevel: boss.level,
+            maxHp: boss.maxHp,
+            rewardSummary: describeRaidReward(boss.reward),
+            contributionLines: buildContributionLines(context),
+          });
+        }
+
+        return buildRaidInterruptedPrompt({
           participantIds,
-          resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
         });
       case "cleanup-needed":
         return buildRaidResolveFailedPrompt({
           participantIds,
           resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
+          bossName: boss?.name ?? null,
+          outcome: context.raid.outcome,
         });
     }
   };
 
   const buildActivePromptForCurrentState = (context: ActiveRaidContext): BaseMessageOptions => {
     const participantIds = participantIdsFromContext(context);
+    const boss = context.raid.boss;
 
     switch (context.raid.status) {
       case "active":
-        return buildRaidStartedPrompt({
+        if (!boss || !context.raid.activeThreadId) {
+          return buildRaidInterruptedPrompt({
+            participantIds,
+            bossName: boss?.name ?? null,
+          });
+        }
+
+        return buildRaidActivePrompt({
           participantIds,
           startedAtMs: context.raid.startedAtMs ?? Date.now(),
           endsAtMs: context.raid.expiresAtMs ?? Date.now(),
+          threadId: context.raid.activeThreadId,
+          bossName: boss.name,
+          bossLevel: boss.level,
+          currentHp: boss.currentHp,
+          maxHp: boss.maxHp,
+          rewardSummary: describeRaidReward(boss.reward),
+          totalDamage: boss.totalDamage,
+          totalAttacks: boss.totalAttacks,
+          contributionLines: buildContributionLines(context),
         });
       case "resolved":
-        return buildRaidResolvedPrompt({
+        if (boss && context.raid.outcome) {
+          return buildRaidResolvedPrompt({
+            participantIds,
+            resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
+            outcome: context.raid.outcome,
+            bossName: boss.name,
+            bossLevel: boss.level,
+            maxHp: boss.maxHp,
+            rewardSummary: describeRaidReward(boss.reward),
+            contributionLines: buildContributionLines(context),
+          });
+        }
+
+        return buildRaidInterruptedPrompt({
           participantIds,
-          resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
+          bossName: boss?.name ?? null,
         });
       case "interrupted":
         return buildRaidInterruptedPrompt({
+          participantIds,
+          bossName: boss?.name ?? null,
+        });
+      case "start-failed":
+        return buildRaidStartFailedPrompt({
           participantIds,
         });
       default:
         return buildRaidInterruptedPrompt({
           participantIds,
+          bossName: boss?.name ?? null,
         });
     }
   };
@@ -199,9 +309,7 @@ export const createRaidsLiveRuntime = ({
     let updated = false;
 
     context.handles.announcementEditChain = context.handles.announcementEditChain
-      .catch(() => {
-        // Keep later edits usable even if an earlier edit failed.
-      })
+      .catch(() => {})
       .then(async () => {
         if (!isCurrentContext(context)) {
           return;
@@ -222,7 +330,7 @@ export const createRaidsLiveRuntime = ({
     return updated;
   };
 
-  const renderActiveMessageForCurrentState = async ({
+  const queueActiveRenderNow = async ({
     context,
     logFailureMessage,
   }: {
@@ -233,11 +341,48 @@ export const createRaidsLiveRuntime = ({
       return false;
     }
 
-    return editMessage({
-      message: context.handles.activeMessage,
-      prompt: buildActivePromptForCurrentState(context),
-      logFailureMessage,
-    });
+    let updated = false;
+    context.handles.activeEditChain = context.handles.activeEditChain
+      .catch(() => {})
+      .then(async () => {
+        if (!isCurrentContext(context)) {
+          return;
+        }
+
+        updated = await editMessage({
+          message: context.handles.activeMessage as Message,
+          prompt: buildActivePromptForCurrentState(context),
+          logFailureMessage,
+        });
+
+        if (updated) {
+          context.handles.lastActiveRenderAtMs = Date.now();
+        }
+      });
+
+    await context.handles.activeEditChain;
+    return updated;
+  };
+
+  const scheduleActiveRender = (context: ActiveRaidContext, logFailureMessage: string): void => {
+    if (!context.handles.activeMessage || currentRaidStatus(context) !== "active") {
+      return;
+    }
+
+    if (context.handles.activeRenderTimer) {
+      return;
+    }
+
+    const elapsedMs = Date.now() - context.handles.lastActiveRenderAtMs;
+    const delayMs = Math.max(0, raidProgressRenderThrottleMs - elapsedMs);
+
+    context.handles.activeRenderTimer = setTimeout(() => {
+      context.handles.activeRenderTimer = null;
+      void queueActiveRenderNow({
+        context,
+        logFailureMessage,
+      });
+    }, delayMs);
   };
 
   const queueTransition = async (
@@ -245,9 +390,7 @@ export const createRaidsLiveRuntime = ({
     transition: () => Promise<void>,
   ): Promise<void> => {
     context.handles.transitionChain = context.handles.transitionChain
-      .catch(() => {
-        // Keep later transitions usable even if an earlier one failed.
-      })
+      .catch(() => {})
       .then(async () => {
         if (!isCurrentContext(context)) {
           return;
@@ -274,7 +417,7 @@ export const createRaidsLiveRuntime = ({
     const delayMs = Math.max(0, (context.raid.expiresAtMs ?? Date.now()) - Date.now());
     context.handles.resolveTimer = setTimeout(() => {
       void queueTransition(context, async () => {
-        await runResolveTransition(context);
+        await runFailureResolveTransition(context);
       }).catch((error) => {
         logger.warn("[raids] Failed to resolve raid lifecycle.", error);
       });
@@ -283,9 +426,12 @@ export const createRaidsLiveRuntime = ({
 
   const transitionToStarting = (context: ActiveRaidContext): void => {
     context.raid.status = "starting";
+    context.raid.outcome = null;
     context.raid.startedAtMs = null;
     context.raid.expiresAtMs = null;
     context.raid.closedAtMs = null;
+    context.raid.activeThreadId = null;
+    context.raid.boss = null;
   };
 
   const transitionToActive = (
@@ -293,15 +439,23 @@ export const createRaidsLiveRuntime = ({
     {
       startedAtMs,
       expiresAtMs,
+      activeThreadId,
+      boss,
     }: {
       startedAtMs: number;
       expiresAtMs: number;
+      activeThreadId: string;
+      boss: NonNullable<ActiveRaidRecord["boss"]>;
     },
   ): void => {
     context.raid.status = "active";
+    context.raid.outcome = null;
     context.raid.startedAtMs = startedAtMs;
     context.raid.expiresAtMs = expiresAtMs;
     context.raid.closedAtMs = null;
+    context.raid.activeThreadId = activeThreadId;
+    context.raid.boss = boss;
+    liveRaidIdsByThreadId.set(activeThreadId, context.raid.raidId);
   };
 
   const transitionToTerminal = (
@@ -310,9 +464,16 @@ export const createRaidsLiveRuntime = ({
       RaidStatus,
       "cancelled" | "interrupted" | "start-failed" | "resolved" | "cleanup-needed"
     >,
-    closedAtMs = Date.now(),
+    {
+      closedAtMs = Date.now(),
+      outcome = null,
+    }: {
+      closedAtMs?: number;
+      outcome?: RaidOutcome | null;
+    } = {},
   ): void => {
     context.raid.status = status;
+    context.raid.outcome = outcome;
     context.raid.expiresAtMs = null;
     context.raid.closedAtMs = closedAtMs;
   };
@@ -320,18 +481,126 @@ export const createRaidsLiveRuntime = ({
   const closeUntrackedRaidMessage = async ({
     message,
     participantIds,
+    bossName = null,
     logFailureMessage,
   }: {
     message: Message;
     participantIds: readonly string[];
+    bossName?: string | null;
     logFailureMessage: string;
   }): Promise<void> => {
     await editMessage({
       message,
       prompt: buildRaidInterruptedPrompt({
         participantIds,
+        bossName,
       }),
       logFailureMessage,
+    });
+  };
+
+  const buildParticipantProfiles = (participantIds: readonly string[]) => {
+    return participantIds.map((participantId) => ({
+      userId: participantId,
+      level: progression.getDiceLevel(participantId),
+      prestige: progression.getActiveDicePrestige(participantId),
+      dieSides: progression.getDiceSides(participantId),
+    }));
+  };
+
+  const applyRaidRewards = (context: ActiveRaidContext): void => {
+    const boss = context.raid.boss;
+    if (!boss) {
+      return;
+    }
+
+    unitOfWork.runInTransaction(() => {
+      for (const participantId of context.raid.participantIds) {
+        if (boss.reward.type === "roll-pass-multiplier") {
+          progression.applyDiceTemporaryEffect({
+            userId: participantId,
+            effectCode: "roll-pass-multiplier",
+            kind: "positive",
+            source: `raid:${context.raid.raidId}`,
+            magnitude: boss.reward.multiplier,
+            remainingRolls: boss.reward.rolls,
+            consumeOnCommand: "dice",
+            stackGroup: "raid-reward-roll-pass-multiplier",
+            stackMode: "refresh",
+          });
+        }
+      }
+    });
+  };
+
+  const finalizeResolvedRaid = async (context: ActiveRaidContext): Promise<void> => {
+    if (!isCurrentContext(context)) {
+      return;
+    }
+
+    if (!context.handles.activeMessage) {
+      transitionToTerminal(context, "cleanup-needed", {
+        closedAtMs: context.raid.closedAtMs ?? Date.now(),
+        outcome: context.raid.outcome,
+      });
+      await queueAnnouncementRender({
+        context,
+        allowedStatuses: ["cleanup-needed"],
+        logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
+      });
+      finalizeRaid(context);
+      return;
+    }
+
+    const rendered = await queueActiveRenderNow({
+      context,
+      logFailureMessage: "[raids] Failed to update resolved raid prompt.",
+    });
+
+    if (!rendered && isCurrentContext(context) && currentRaidStatus(context) === "resolved") {
+      transitionToTerminal(context, "cleanup-needed", {
+        closedAtMs: context.raid.closedAtMs ?? Date.now(),
+        outcome: context.raid.outcome,
+      });
+      await queueAnnouncementRender({
+        context,
+        allowedStatuses: ["cleanup-needed"],
+        logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
+      });
+      finalizeRaid(context);
+      return;
+    }
+
+    await queueAnnouncementRender({
+      context,
+      allowedStatuses: ["resolved"],
+      logFailureMessage: "[raids] Failed to update resolved raid announcement.",
+    });
+    finalizeRaid(context);
+  };
+
+  const resolveRaid = (
+    context: ActiveRaidContext,
+    outcome: RaidOutcome,
+    closedAtMs = Date.now(),
+  ): void => {
+    if (!isCurrentContext(context) || context.raid.status !== "active") {
+      return;
+    }
+
+    clearRaidTimers(context);
+    transitionToTerminal(context, "resolved", {
+      closedAtMs,
+      outcome,
+    });
+    if (outcome === "success") {
+      applyRaidRewards(context);
+    }
+
+    void queueTransition(context, async () => {
+      await finalizeResolvedRaid(context);
+    }).catch((error) => {
+      logger.warn("[raids] Failed to finalize resolved raid.", error);
     });
   };
 
@@ -380,26 +649,50 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
-    const startedAtMs = Date.now();
-    const expiresAtMs = startedAtMs + config.activeDurationMs;
+    const participantIds = participantIdsFromContext(context);
+    const bossDefinition = createRaidBoss({
+      participantProfiles: buildParticipantProfiles(participantIds),
+      activeDurationMs: config.activeDurationMs,
+    });
+
     const activeMessage = await activeChannel
-      .send(
-        buildRaidStartedPrompt({
-          participantIds: participantIdsFromContext(context),
-          startedAtMs,
-          endsAtMs: expiresAtMs,
-        }),
-      )
+      .send({
+        content: "Opening raid thread...",
+      })
       .catch((error: unknown) => {
         logger.error("[raids] Failed to send active raid prompt.", error);
         return null;
       });
 
     if (!activeMessage) {
-      if (!isCurrentContext(context) || currentRaidStatus(context) !== "starting") {
-        return;
-      }
+      transitionToTerminal(context, "start-failed");
+      await queueAnnouncementRender({
+        context,
+        allowedStatuses: ["start-failed"],
+        logFailureMessage: "[raids] Failed to update failed-start raid announcement.",
+      });
+      finalizeRaid(context);
+      return;
+    }
 
+    const activeThread = await activeMessage
+      .startThread({
+        name: `${bossDefinition.name} raid`,
+        autoArchiveDuration: 60,
+      })
+      .catch((error: unknown) => {
+        logger.error("[raids] Failed to open raid thread.", error);
+        return null;
+      });
+
+    if (!activeThread) {
+      await editMessage({
+        message: activeMessage,
+        prompt: buildRaidStartFailedPrompt({
+          participantIds,
+        }),
+        logFailureMessage: "[raids] Failed to update failed-start active raid prompt.",
+      });
       transitionToTerminal(context, "start-failed");
       await queueAnnouncementRender({
         context,
@@ -413,32 +706,39 @@ export const createRaidsLiveRuntime = ({
     if (!isCurrentContext(context) || currentRaidStatus(context) !== "starting" || stopping) {
       await closeUntrackedRaidMessage({
         message: activeMessage,
-        participantIds: participantIdsFromContext(context),
+        participantIds,
+        bossName: bossDefinition.name,
         logFailureMessage: "[raids] Failed to close stale active raid message.",
       });
       return;
     }
 
+    const startedAtMs = Date.now();
+    const expiresAtMs = startedAtMs + config.activeDurationMs;
+
     context.handles.activeMessage = activeMessage;
     transitionToActive(context, {
       startedAtMs,
       expiresAtMs,
+      activeThreadId: activeThread.id,
+      boss: {
+        name: bossDefinition.name,
+        level: bossDefinition.level,
+        currentHp: bossDefinition.maxHp,
+        maxHp: bossDefinition.maxHp,
+        reward: bossDefinition.reward,
+        totalDamage: 0,
+        totalAttacks: 0,
+        damageByUserId: new Map<string, number>(),
+      },
     });
-    scheduleResolve(context);
-  };
 
-  const runResolveTransition = async (context: ActiveRaidContext): Promise<void> => {
-    if (!isCurrentContext(context) || context.raid.status !== "active") {
-      return;
-    }
-
-    clearRaidTimers(context);
-
-    const closedAtMs = Date.now();
-    transitionToTerminal(context, "resolved", closedAtMs);
-
-    if (!context.handles.activeMessage) {
-      transitionToTerminal(context, "cleanup-needed", closedAtMs);
+    const rendered = await queueActiveRenderNow({
+      context,
+      logFailureMessage: "[raids] Failed to render active raid prompt.",
+    });
+    if (!rendered) {
+      transitionToTerminal(context, "cleanup-needed");
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["cleanup-needed"],
@@ -448,21 +748,20 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
-    const resolved = await renderActiveMessageForCurrentState({
+    await queueAnnouncementRender({
       context,
-      logFailureMessage: "[raids] Failed to update resolved raid prompt.",
+      allowedStatuses: ["active"],
+      logFailureMessage: "[raids] Failed to refresh active raid announcement prompt.",
     });
+    scheduleResolve(context);
+  };
 
-    if (!resolved && isCurrentContext(context) && currentRaidStatus(context) === "resolved") {
-      transitionToTerminal(context, "cleanup-needed", closedAtMs);
-      await queueAnnouncementRender({
-        context,
-        allowedStatuses: ["cleanup-needed"],
-        logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
-      });
+  const runFailureResolveTransition = async (context: ActiveRaidContext): Promise<void> => {
+    if (!isCurrentContext(context) || context.raid.status !== "active") {
+      return;
     }
 
-    finalizeRaid(context);
+    resolveRaid(context, "failure");
   };
 
   const runInterruptTransition = async (context: ActiveRaidContext): Promise<void> => {
@@ -477,6 +776,7 @@ export const createRaidsLiveRuntime = ({
       message: context.handles.activeMessage ?? context.handles.announcementMessage,
       prompt: buildRaidInterruptedPrompt({
         participantIds: participantIdsFromContext(context),
+        bossName: context.raid.boss?.name ?? null,
       }),
       logFailureMessage: "[raids] Failed to close raid during shutdown.",
     });
@@ -559,15 +859,21 @@ export const createRaidsLiveRuntime = ({
         title: raidTitle,
         createdAtMs: Date.now(),
         status: "joining",
+        outcome: null,
         scheduledStartAtMs,
         startedAtMs: null,
         expiresAtMs: null,
         closedAtMs: null,
         participantIds: new Set<string>(),
+        activeThreadId: null,
+        boss: null,
       },
       handles: {
         announcementMessage,
         activeMessage: null,
+        activeRenderTimer: null,
+        lastActiveRenderAtMs: 0,
+        activeEditChain: Promise.resolve(),
         startTimer: null,
         resolveTimer: null,
         announcementEditChain: Promise.resolve(),
@@ -613,7 +919,7 @@ export const createRaidsLiveRuntime = ({
       Date.now() >= context.raid.scheduledStartAtMs
     ) {
       await interaction.reply({
-        content: "Too late — this raid is already closed.",
+        content: "Too late - this raid is already closed.",
         ephemeral: true,
       });
       return;
@@ -634,6 +940,79 @@ export const createRaidsLiveRuntime = ({
       allowedStatuses: ["joining"],
       logFailureMessage: "[raids] Failed to refresh raid announcement prompt.",
     });
+  };
+
+  const applyDiceRoll = ({
+    channelId,
+    userId,
+    userMention,
+    damage,
+    nowMs = Date.now(),
+  }: ApplyRaidDiceRollInput): ApplyRaidDiceRollResult => {
+    if (!channelId || damage <= 0) {
+      return { kind: "no-raid" };
+    }
+
+    const raidId = liveRaidIdsByThreadId.get(channelId);
+    if (!raidId) {
+      return { kind: "no-raid" };
+    }
+
+    const context = liveRaidsById.get(raidId);
+    if (!context || context.raid.activeThreadId !== channelId) {
+      return { kind: "no-raid" };
+    }
+
+    if (stopping || context.raid.status !== "active" || !context.raid.boss) {
+      return {
+        kind: "ignored",
+        reason: "inactive",
+        summary: "Too late - this raid is no longer active.",
+      };
+    }
+
+    if ((context.raid.expiresAtMs ?? 0) <= nowMs) {
+      resolveRaid(context, "failure", nowMs);
+      return {
+        kind: "ignored",
+        reason: "inactive",
+        summary: "Too late - the raid timer already ended.",
+      };
+    }
+
+    if (!context.raid.participantIds.has(userId)) {
+      return {
+        kind: "ignored",
+        reason: "not-joined",
+        summary: `${userMention}, this roll did not hit the boss because you did not join before the raid started.`,
+      };
+    }
+
+    context.raid.boss.currentHp = Math.max(0, context.raid.boss.currentHp - damage);
+    context.raid.boss.totalDamage += damage;
+    context.raid.boss.totalAttacks += 1;
+    context.raid.boss.damageByUserId.set(
+      userId,
+      (context.raid.boss.damageByUserId.get(userId) ?? 0) + damage,
+    );
+
+    const boss = context.raid.boss;
+    if (boss.currentHp <= 0) {
+      const rewardSummary = describeRaidReward(boss.reward);
+      resolveRaid(context, "success", nowMs);
+      return {
+        kind: "applied",
+        defeated: true,
+        summary: `Raid damage: ${damage} to ${boss.name}. Boss defeated. All joined raiders earned ${rewardSummary}.`,
+      };
+    }
+
+    scheduleActiveRender(context, "[raids] Failed to refresh active raid progress prompt.");
+    return {
+      kind: "applied",
+      defeated: false,
+      summary: `Raid damage: ${damage} to ${boss.name}. ${boss.currentHp}/${boss.maxHp} HP remaining.`,
+    };
   };
 
   const getLiveRaidsSnapshot = (): RaidAdminLiveRaidSnapshot[] => {
@@ -673,6 +1052,7 @@ export const createRaidsLiveRuntime = ({
   return {
     triggerRaidNow,
     handleButtonInteraction,
+    applyDiceRoll,
     getLiveRaidsSnapshot,
     hasBlockingRaid,
     stop,
