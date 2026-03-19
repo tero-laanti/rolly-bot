@@ -16,7 +16,6 @@ import {
 import { createRandomEventsState } from "../../dice/random-events/infrastructure/state-store";
 import { randomEventButtonPrefix } from "../../dice/random-events/interfaces/discord/button-ids";
 import { createRaidsLiveRuntime } from "../../dice/raids/infrastructure/live-runtime";
-import { createRaidsState } from "../../dice/raids/infrastructure/state-store";
 import {
   clearRaidsAdminController,
   registerRaidsAdminController,
@@ -115,12 +114,9 @@ const startRandomEventsFoundation = (): void => {
 };
 
 const startRaidsFoundation = (): void => {
-  const raidsState = createRaidsState();
-
   if (!raidsConfig.enabled) {
     registerRaidsAdminController({
       config: raidsConfig,
-      state: raidsState,
       runtime: null,
     });
     console.log("[raids] Lifecycle runtime disabled by config.");
@@ -134,13 +130,11 @@ const startRaidsFoundation = (): void => {
   raidsLiveRuntime = createRaidsLiveRuntime({
     client,
     config: raidsConfig,
-    state: raidsState,
     logger: console,
   });
 
   registerRaidsAdminController({
     config: raidsConfig,
-    state: raidsState,
     runtime: raidsLiveRuntime,
   });
 

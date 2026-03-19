@@ -347,12 +347,12 @@ const buildRaidStatusView = (
     `- Channel: ${status.channelId ? `<#${status.channelId}>` : "not configured"}`,
     `- Join lead: ${Math.round(status.joinLeadMs / 60_000)} min`,
     `- Active duration: ${Math.round(status.activeDurationMs / 60_000)} min`,
-    `- Active raid count: ${status.snapshot.activeRaidCount}`,
+    `- Live raid count: ${status.snapshot.liveRaidCount}`,
   ];
 
-  if (status.activeRaids.length > 0) {
-    lines.push("", "**Active raids**");
-    for (const raid of status.activeRaids) {
+  if (status.liveRaids.length > 0) {
+    lines.push("", "**Live raids**");
+    for (const raid of status.liveRaids) {
       const messageId = raid.activeMessageId ?? raid.announcementMessageId;
       lines.push(
         `- ${raid.title} [${raid.status}] • participants: ${raid.participantCount} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
