@@ -39,7 +39,7 @@
   },
   {
     "id": "prestige-1",
-    "name": "Prestige 1",
+    "name": "First Prestige",
     "description": "Reach Prestige 1.",
     "rule": {
       "type": "manual"
@@ -47,54 +47,6 @@
     "manualAward": {
       "type": "prestige",
       "prestige": 1
-    }
-  },
-  {
-    "id": "prestige-2",
-    "name": "Prestige 2",
-    "description": "Reach Prestige 2.",
-    "rule": {
-      "type": "manual"
-    },
-    "manualAward": {
-      "type": "prestige",
-      "prestige": 2
-    }
-  },
-  {
-    "id": "prestige-3",
-    "name": "Prestige 3",
-    "description": "Reach Prestige 3.",
-    "rule": {
-      "type": "manual"
-    },
-    "manualAward": {
-      "type": "prestige",
-      "prestige": 3
-    }
-  },
-  {
-    "id": "prestige-4",
-    "name": "Prestige 4",
-    "description": "Reach Prestige 4.",
-    "rule": {
-      "type": "manual"
-    },
-    "manualAward": {
-      "type": "prestige",
-      "prestige": 4
-    }
-  },
-  {
-    "id": "prestige-5",
-    "name": "Prestige 5",
-    "description": "Reach Prestige 5.",
-    "rule": {
-      "type": "manual"
-    },
-    "manualAward": {
-      "type": "prestige",
-      "prestige": 5
     }
   }
 ]
