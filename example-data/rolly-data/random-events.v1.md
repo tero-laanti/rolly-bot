@@ -30,6 +30,7 @@ Scenario-level fields:
 - `claimPolicy`:
   - `first-click`: one participant resolves the event.
   - `multi-user`: multiple users can join during the same event window.
+- `requiredReadyCount`: optional multi-user ready threshold. Valid values are `2` through `5`. When set, the event resolves immediately once that many players are ready; if the window expires first, the event expires instead of resolving with a smaller group.
 - `claimWindowSeconds`: base window before the global multiplier from `random-events-balance.json` is applied. Minimum is `10`.
 - `weight`: relative selection weight inside the scenario's rarity bucket. Omit it for the default weight `1`.
 - `retryPolicy`: only used on first-click events that can stay open after a failed attempt.
@@ -155,6 +156,23 @@ Example keep-open challenge:
       "id": "example-keep-open-failure",
       "resolution": "keep-open-failure",
       "message": "Example keep-open failure outcome.",
+      "effects": []
+    }
+  ]
+}
+```
+
+Example threshold-based multi-user event:
+
+```json
+{
+  "claimPolicy": "multi-user",
+  "requiredReadyCount": 3,
+  "outcomes": [
+    {
+      "id": "example-group-open",
+      "resolution": "resolve-success",
+      "message": "The vault opens the moment the third hand lands on it.",
       "effects": []
     }
   ]

@@ -166,6 +166,7 @@ export const createRandomEventsLiveRuntime = ({
         windowSnapshot?.expiresAtMs ?? context.claimWindowExpiresAtMs,
         windowSnapshot?.participants ?? [],
         context.failedAttemptLines,
+        context.selection.scenario.requiredReadyCount ?? null,
       ),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
       buttonLabel: context.selection.renderedClaimLabel,

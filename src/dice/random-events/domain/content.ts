@@ -71,6 +71,7 @@ export type RandomEventScenario = {
   claimLabel: string;
   claimPolicy: RandomEventClaimPolicy;
   claimWindowSeconds: number;
+  requiredReadyCount?: number;
   weight?: number;
   retryPolicy?: RandomEventRetryPolicy;
   textVariables?: RandomEventTextVariables;
@@ -295,6 +296,22 @@ const validateScenario = (scenario: RandomEventScenario): void => {
 
   if (scenario.claimWindowSeconds < 10) {
     throw new Error(`Random event scenario ${scenario.id} must have at least 10s claim window.`);
+  }
+
+  if (scenario.requiredReadyCount !== undefined) {
+    if (!Number.isInteger(scenario.requiredReadyCount)) {
+      throw new Error(`Scenario ${scenario.id} requiredReadyCount must be an integer.`);
+    }
+
+    if (scenario.requiredReadyCount < 2 || scenario.requiredReadyCount > 5) {
+      throw new Error(`Scenario ${scenario.id} requiredReadyCount must be between 2 and 5.`);
+    }
+
+    if (scenario.claimPolicy !== "multi-user") {
+      throw new Error(
+        `Scenario ${scenario.id} requiredReadyCount is only valid for multi-user events.`,
+      );
+    }
   }
 
   if (scenario.outcomes.length < 1) {

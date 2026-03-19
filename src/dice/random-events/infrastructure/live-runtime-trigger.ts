@@ -105,7 +105,14 @@ export const triggerRandomEventOpportunity = async ({
   const rarityPresentation = getRandomEventRarityPresentation(selection.scenario.rarity);
   const prompt = buildRandomEventClaimPrompt({
     title: getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle),
-    description: buildActiveClaimDescription(selection.renderedPrompt, null, estimatedExpiresAtMs),
+    description: buildActiveClaimDescription(
+      selection.renderedPrompt,
+      null,
+      estimatedExpiresAtMs,
+      [],
+      [],
+      selection.scenario.requiredReadyCount ?? null,
+    ),
     buttonCustomId: buildRandomEventClaimButtonId(eventId),
     buttonLabel: selection.renderedClaimLabel,
     color: rarityPresentation.color,
@@ -136,6 +143,7 @@ export const triggerRandomEventOpportunity = async ({
     windowId: eventId,
     durationMs: claimWindowDurationMs,
     policy: selection.scenario.claimPolicy,
+    maxParticipants: selection.scenario.requiredReadyCount,
     callbacks: {
       onResolved: async (context) => {
         await onResolved(eventId, context);

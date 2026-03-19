@@ -112,8 +112,17 @@ export const buildActiveClaimDescription = (
   expiresAtMs: number | null,
   participants: string[] = [],
   failedAttemptLines: string[] = [],
+  requiredReadyCount: number | null = null,
 ): string => {
   const lines = [prompt];
+
+  if (typeof requiredReadyCount === "number") {
+    const remainingPlayers = Math.max(requiredReadyCount - participants.length, 0);
+    lines.push(
+      "",
+      `**Ready now:** ${participants.length}/${requiredReadyCount}. Still waiting for ${remainingPlayers} more player${remainingPlayers === 1 ? "" : "s"}.`,
+    );
+  }
 
   if (participants.length > 0) {
     const participantLabel = participants.length === 1 ? "Participant" : "Participants";
@@ -204,19 +213,30 @@ export const buildResolvedEventEmbed = (
 export const buildExpiredEventEmbed = (
   selection: RandomEventSelectionResult,
   failedAttemptLines: string[] = [],
+  participants: string[] = [],
 ): EmbedBuilder => {
   const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
+  const requiredReadyCount = selection.scenario.requiredReadyCount;
   const descriptionLines =
-    failedAttemptLines.length > 0
+    typeof requiredReadyCount === "number" && participants.length < requiredReadyCount
       ? [
           selection.renderedPrompt,
           "",
-          "**Recent failed attempts:**",
-          ...failedAttemptLines.slice(-3),
-          "",
-          "The window closes before anyone pulls it off.",
+          `Only ${participants.length}/${requiredReadyCount} players were ready before time ran out.`,
+          ...(participants.length > 0
+            ? ["", `**Ready players:** ${formatParticipantMentions(participants)}`]
+            : []),
         ]
-      : [selection.renderedPrompt, "", "No one claimed this event in time."];
+      : failedAttemptLines.length > 0
+        ? [
+            selection.renderedPrompt,
+            "",
+            "**Recent failed attempts:**",
+            ...failedAttemptLines.slice(-3),
+            "",
+            "The window closes before anyone pulls it off.",
+          ]
+        : [selection.renderedPrompt, "", "No one claimed this event in time."];
 
   return new EmbedBuilder()
     .setTitle(getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle))
