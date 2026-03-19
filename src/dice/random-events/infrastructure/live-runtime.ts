@@ -118,6 +118,7 @@ export const createRandomEventsLiveRuntime = ({
   const contentState = createRandomEventContentState();
   const activeEventsById = new Map<string, ActiveRandomEventContext>();
   const clickCooldownByUserId = new Map<string, number>();
+  let nextSequenceChallengeSessionId = 1;
   const db = getDatabase();
   const progression = createSqliteProgressionRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
@@ -329,6 +330,7 @@ export const createRandomEventsLiveRuntime = ({
     if (attemptResolution.resolution === "keep-open-failure") {
       context.attemptedUserIds.add(userId);
       context.failedAttemptLines.push(attemptResolution.keepOpenLine);
+      clearSequenceChallengeTimer(context);
       context.sequenceChallenge = null;
 
       const reopened = await reopenFirstClickEvent(eventId);
@@ -348,7 +350,10 @@ export const createRandomEventsLiveRuntime = ({
     });
   };
 
-  const autoResolveSequenceChallenge = async (eventId: string): Promise<void> => {
+  const autoResolveSequenceChallenge = async (
+    eventId: string,
+    sequenceSessionId: number,
+  ): Promise<void> => {
     const context = activeEventsById.get(eventId);
     const sequenceContext = getSequenceChallenge(context);
     if (!context || !sequenceContext) {
@@ -356,6 +361,10 @@ export const createRandomEventsLiveRuntime = ({
     }
 
     const { challenge, session } = sequenceContext;
+    if (session.sessionId !== sequenceSessionId) {
+      return;
+    }
+
     let progress = session.progress;
     while (!progress.completed) {
       progress = advanceRollChallengeStep({
@@ -396,13 +405,16 @@ export const createRandomEventsLiveRuntime = ({
 
     const durationMs = getSequenceChallengeDurationMs(challenge);
     const expiresAtMs = Date.now() + durationMs;
+    const sessionId = nextSequenceChallengeSessionId;
+    nextSequenceChallengeSessionId += 1;
     const timer = setTimeout(() => {
-      void autoResolveSequenceChallenge(eventId).catch((error) => {
+      void autoResolveSequenceChallenge(eventId, sessionId).catch((error) => {
         logger.warn("[random-events] Failed to auto-resolve staged challenge.", error);
       });
     }, durationMs);
 
     context.sequenceChallenge = {
+      sessionId,
       userId,
       progress: createRollChallengeProgress(challenge),
       expiresAtMs,
@@ -462,7 +474,7 @@ export const createRandomEventsLiveRuntime = ({
       await interaction.deferUpdate();
 
       if (Date.now() >= session.expiresAtMs) {
-        await autoResolveSequenceChallenge(eventId);
+        await autoResolveSequenceChallenge(eventId, session.sessionId);
         return;
       }
 

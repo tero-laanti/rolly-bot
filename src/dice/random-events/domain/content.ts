@@ -310,6 +310,7 @@ const validateScenario = (scenario: RandomEventScenario): void => {
 
   const outcomeIds = new Set<string>();
   let hasKeepOpenFailure = false;
+  const keepOpenFailureOutcomeIds = new Set<string>();
   for (const outcome of scenario.outcomes) {
     if (outcome.id.trim().length < 1) {
       throw new Error(`Scenario ${scenario.id} has an outcome with empty id.`);
@@ -329,6 +330,7 @@ const validateScenario = (scenario: RandomEventScenario): void => {
 
     if (outcome.resolution === "keep-open-failure") {
       hasKeepOpenFailure = true;
+      keepOpenFailureOutcomeIds.add(outcome.id);
     }
   }
 
@@ -352,6 +354,18 @@ const validateScenario = (scenario: RandomEventScenario): void => {
     throw new Error(
       `Scenario ${scenario.id} keep-open-failure outcomes must be reachable from challengeOutcomeIds.failure.`,
     );
+  }
+
+  if (hasKeepOpenFailure) {
+    const reachableFailureOutcomeIds = new Set(scenario.challengeOutcomeIds?.failure ?? []);
+    const unreachableKeepOpenOutcomeIds = [...keepOpenFailureOutcomeIds].filter(
+      (outcomeId) => !reachableFailureOutcomeIds.has(outcomeId),
+    );
+    if (unreachableKeepOpenOutcomeIds.length > 0) {
+      throw new Error(
+        `Scenario ${scenario.id} keep-open-failure outcomes must be reachable from challengeOutcomeIds.failure: ${unreachableKeepOpenOutcomeIds.join(", ")}.`,
+      );
+    }
   }
 
   if (!hasKeepOpenFailure && scenario.retryPolicy) {

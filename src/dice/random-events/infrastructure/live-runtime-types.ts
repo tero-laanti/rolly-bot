@@ -9,6 +9,7 @@ export type RandomEventsLiveRuntimeLogger = {
 };
 
 export type ActiveRandomEventSequenceChallenge = {
+  sessionId: number;
   userId: string;
   progress: RandomEventRollChallengeProgress;
   expiresAtMs: number;
