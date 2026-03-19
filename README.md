@@ -70,6 +70,13 @@ Rolly reads configuration from `.env`. The source of truth for available variabl
 - `RAIDS_CHANNEL_ID`: Channel ID where raid announcements and active raid posts are sent.
 - `RAIDS_JOIN_LEAD_MINUTES`: Lead time between a raid announcement and the active raid start. Units: minutes. Default: `30`.
 - `RAIDS_ACTIVE_DURATION_MINUTES`: How long the active raid window remains open after the boss arrives. Units: minutes. Default: `12`.
+- `RAIDS_TARGET_PER_DAY`: Target number of randomly scheduled raids per day. Set to `0` to disable random raid scheduling while still allowing owner-triggered raids. Default: `0`.
+- `RAIDS_MIN_GAP_MINUTES`: Minimum gap between raid announcements. Units: minutes. Default: `180`.
+- `RAIDS_RETRY_DELAY_SECONDS`: Retry delay after a skipped or failed random raid trigger. Units: seconds. Default: `600`.
+- `RAIDS_JITTER_RATIO`: Random scheduling jitter ratio used by the raid scheduler. Default: `0.35`.
+- `RAIDS_QUIET_HOURS_START`: Quiet-hours start time in `HH:MM` 24-hour format for random raids. Default: `23:00`.
+- `RAIDS_QUIET_HOURS_END`: Quiet-hours end time in `HH:MM` 24-hour format for random raids. Default: `08:00`.
+- `RAIDS_QUIET_HOURS_TIMEZONE`: IANA timezone used for raid quiet hours. Default: `Europe/Helsinki`.
 
 Use placeholder values in `.env.example`, keep your real `.env` private, and do not commit real tokens or IDs you consider sensitive.
 
@@ -110,7 +117,7 @@ Expected files in a data directory:
 
 The committed files under `example-data/rolly-data` are safe examples only. They document the schema and can keep the public repo runnable when explicitly enabled, but they are not intended to match production values.
 
-In `dice-balance.json`, progression tuning includes prestige sides, charge settings, ban step, and the overall `/dice` roll-pass cap via `maxRollPassCount`.
+In `dice-balance.json`, progression tuning includes prestige sides, charge settings, ban step, the overall `/dice` roll-pass cap via `maxRollPassCount`, and raid boss/reward tuning.
 
 In `casino.v1.json`, Dice Poker always uses a five-die `d8` hand. The tunable fields there are the payout multipliers.
 
@@ -129,7 +136,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 
 ## Commands
 
-- `/dice` rolls your current dice set, handles level-ups, rewards, charge rolls, temporary effects, and achievements.
+- `/dice` rolls your current dice set, handles level-ups, rewards, charge rolls, temporary effects, and achievements. If you use it inside an active raid thread after joining the raid, the same roll also deals raid damage equal to the total pips rolled.
 - `/dice-prestige` manages prestige progression and active prestige selection.
 - `/dice-casino` opens the casino panel for Exact Roll, Push Your Luck, Blackjack, and Dice Poker.
 - `/dice-shop` lets players spend Pips on shop items and build an inventory.
@@ -140,6 +147,17 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 - `/dice-analytics` shows progression and PvP stats.
 - `/dice-admin` exposes owner-only dice admin tools, including random-event controls, raid lifecycle controls, and effect cleanup. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
 - `/self-update` pulls the latest code, optionally runs `npm install`, refreshes `rolly-data` when configured as a git checkout, rebuilds, and redeploys commands. It is Discord admin-gated and guild-only so regular users should not see it in the command picker.
+
+## Raids
+
+Raids are timed co-op server events with a signup phase and a separate combat phase.
+
+- A raid is announced in the configured raid channel before it starts.
+- Players opt in with the join button during the signup window.
+- When the timer hits zero, Rolly posts a fresh boss message and opens a thread from it.
+- Joined players attack by using normal `/dice` rolls inside that raid thread.
+- The boss HP is updated on the thread starter message, and the fight ends on kill or timeout.
+- On success, all joined raiders currently receive a temporary `x2` roll-pass buff for their next 3 `/dice` rolls, even if they joined but never attacked.
 
 ## Architecture
 
