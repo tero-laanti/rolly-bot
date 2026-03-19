@@ -156,6 +156,29 @@ export const buildRaidInterruptedPrompt = ({
   };
 };
 
+export const buildRaidStartFailedPrompt = ({
+  participantIds,
+}: {
+  participantIds: readonly string[];
+}): BaseMessageOptions => {
+  const embed = new EmbedBuilder()
+    .setColor(resolvedColor)
+    .setTitle("⚠️ Raid failed to start")
+    .setDescription(
+      [
+        "Raid signup closed, but the active raid post could not be sent.",
+        "",
+        `**Joined raiders (${participantIds.length})**`,
+        formatParticipants(participantIds),
+      ].join("\n"),
+    );
+
+  return {
+    embeds: [embed],
+    components: [],
+  };
+};
+
 export const buildRaidCancelledPrompt = ({
   scheduledStartAtMs,
 }: {
