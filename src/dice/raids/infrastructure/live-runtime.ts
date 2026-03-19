@@ -96,6 +96,10 @@ export const createRaidsLiveRuntime = ({
           return;
         }
 
+        if (!disabled && latestContext.joinWindowClosed) {
+          return;
+        }
+
         await latestContext.announcementMessage
           .edit(
             buildRaidAnnouncementPrompt({
@@ -145,6 +149,10 @@ export const createRaidsLiveRuntime = ({
     }
 
     context.startTimer = null;
+    context.joinWindowClosed = true;
+    context.status = "active";
+    context.expiresAtMs = Date.now() + config.activeDurationMs;
+    syncRaidState(context);
 
     await refreshAnnouncementPrompt(raidId, true);
 
@@ -158,9 +166,6 @@ export const createRaidsLiveRuntime = ({
       resolveActiveRaid(state, raidId);
       return;
     }
-
-    context.status = "active";
-    context.expiresAtMs = Date.now() + config.activeDurationMs;
 
     const activeChannel = context.announcementMessage.channel;
     if (!("send" in activeChannel) || typeof activeChannel.send !== "function") {
@@ -251,6 +256,7 @@ export const createRaidsLiveRuntime = ({
       startTimer: null,
       resolveTimer: null,
       announcementEditChain: Promise.resolve(),
+      joinWindowClosed: false,
     };
 
     context.startTimer = setTimeout(() => {
@@ -288,7 +294,12 @@ export const createRaidsLiveRuntime = ({
     }
 
     const context = activeRaidsById.get(raidId);
-    if (!context || context.status !== "joining" || Date.now() >= context.scheduledStartAtMs) {
+    if (
+      !context ||
+      context.status !== "joining" ||
+      context.joinWindowClosed ||
+      Date.now() >= context.scheduledStartAtMs
+    ) {
       await interaction.reply({
         content: "Too late — this raid is already closed.",
         ephemeral: true,
@@ -331,6 +342,7 @@ export const createRaidsLiveRuntime = ({
     const activeRaids = Array.from(activeRaidsById.values());
     for (const context of activeRaids) {
       clearRaidTimers(context);
+      context.joinWindowClosed = true;
 
       await refreshAnnouncementPrompt(context.raidId, true).catch((error) => {
         logger.warn("[raids] Failed to disable raid announcement during shutdown.", error);
