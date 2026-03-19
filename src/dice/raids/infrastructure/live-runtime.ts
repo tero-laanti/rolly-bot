@@ -86,18 +86,31 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
-    await context.announcementMessage
-      .edit(
-        buildRaidAnnouncementPrompt({
-          raidId,
-          participantIds: Array.from(context.participantIds),
-          scheduledStartAtMs: context.scheduledStartAtMs,
-          disabled,
-        }),
-      )
-      .catch((error) => {
-        logger.warn("[raids] Failed to refresh announcement prompt.", error);
+    context.announcementEditChain = context.announcementEditChain
+      .catch(() => {
+        // Keep the chain usable even if a prior edit failed.
+      })
+      .then(async () => {
+        const latestContext = activeRaidsById.get(raidId);
+        if (!latestContext) {
+          return;
+        }
+
+        await latestContext.announcementMessage
+          .edit(
+            buildRaidAnnouncementPrompt({
+              raidId,
+              participantIds: Array.from(latestContext.participantIds),
+              scheduledStartAtMs: latestContext.scheduledStartAtMs,
+              disabled,
+            }),
+          )
+          .catch((error) => {
+            logger.warn("[raids] Failed to refresh announcement prompt.", error);
+          });
       });
+
+    await context.announcementEditChain;
   };
 
   const resolveRaidLifecycle = async (raidId: string): Promise<void> => {
@@ -237,6 +250,7 @@ export const createRaidsLiveRuntime = ({
       participantIds: new Set<string>(),
       startTimer: null,
       resolveTimer: null,
+      announcementEditChain: Promise.resolve(),
     };
 
     context.startTimer = setTimeout(() => {
@@ -318,18 +332,9 @@ export const createRaidsLiveRuntime = ({
     for (const context of activeRaids) {
       clearRaidTimers(context);
 
-      await context.announcementMessage
-        .edit(
-          buildRaidAnnouncementPrompt({
-            raidId: context.raidId,
-            participantIds: Array.from(context.participantIds),
-            scheduledStartAtMs: context.scheduledStartAtMs,
-            disabled: true,
-          }),
-        )
-        .catch((error) => {
-          logger.warn("[raids] Failed to disable raid announcement during shutdown.", error);
-        });
+      await refreshAnnouncementPrompt(context.raidId, true).catch((error) => {
+        logger.warn("[raids] Failed to disable raid announcement during shutdown.", error);
+      });
 
       const interruptedPrompt = buildRaidInterruptedPrompt({
         participantIds: Array.from(context.participantIds),
