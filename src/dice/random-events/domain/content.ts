@@ -35,6 +35,13 @@ export type RandomEventEffect =
       durationMinutes: number;
     };
 
+export type RandomEventOutcomeResolution =
+  | "resolve-success"
+  | "resolve-failure"
+  | "keep-open-failure";
+
+export type RandomEventRetryPolicy = "once-per-user" | "allow-retry";
+
 export type RandomEventTextVariables = Record<string, string[]>;
 
 export type RandomEventClaimActivityTemplates = {
@@ -45,6 +52,7 @@ export type RandomEventClaimActivityTemplates = {
 export type RandomEventOutcome = {
   id: string;
   weight?: number;
+  resolution: RandomEventOutcomeResolution;
   message: string;
   effects: RandomEventEffect[];
   textVariables?: RandomEventTextVariables;
@@ -64,6 +72,7 @@ export type RandomEventScenario = {
   claimPolicy: RandomEventClaimPolicy;
   claimWindowSeconds: number;
   weight?: number;
+  retryPolicy?: RandomEventRetryPolicy;
   textVariables?: RandomEventTextVariables;
   rollChallenge?: RandomEventRollChallengeDefinition;
   challengeOutcomeIds?: RandomEventChallengeOutcomeIds;
@@ -71,18 +80,20 @@ export type RandomEventScenario = {
   activityTemplates?: RandomEventClaimActivityTemplates;
 };
 
-export type RandomEventRenderedText = {
+export type RandomEventScenarioRender = {
+  scenario: RandomEventScenario;
   renderedTitle: string;
   renderedPrompt: string;
   renderedClaimLabel: string;
-  renderedOutcomeMessage: string;
   textVariableValues: Record<string, string>;
 };
 
-export type RandomEventSelectionResult = {
-  scenario: RandomEventScenario;
+export type RandomEventSelectionResult = RandomEventScenarioRender;
+
+export type RandomEventRenderedOutcome = RandomEventScenarioRender & {
   selectedOutcome: RandomEventOutcome;
-} & RandomEventRenderedText;
+  renderedOutcomeMessage: string;
+};
 
 export type SelectRandomEventScenarioOptions = RandomEventVarietyOptions & {
   challengeResult?: "success" | "failure";
@@ -222,7 +233,7 @@ const validateChallengeOutcomeIds = (scenario: RandomEventScenario): void => {
     return;
   }
 
-  const outcomeIdSet = new Set(scenario.outcomes.map((outcome) => outcome.id));
+  const outcomesById = new Map(scenario.outcomes.map((outcome) => [outcome.id, outcome]));
   for (const [key, outcomeIds] of Object.entries(scenario.challengeOutcomeIds) as Array<
     ["success" | "failure", string[]]
   >) {
@@ -233,13 +244,40 @@ const validateChallengeOutcomeIds = (scenario: RandomEventScenario): void => {
     }
 
     for (const outcomeId of outcomeIds) {
-      if (!outcomeIdSet.has(outcomeId)) {
+      const outcome = outcomesById.get(outcomeId);
+      if (!outcome) {
         throw new Error(
           `Scenario ${scenario.id} challengeOutcomeIds.${key} references missing outcome '${outcomeId}'.`,
         );
       }
+
+      if (key === "success" && outcome.resolution !== "resolve-success") {
+        throw new Error(
+          `Scenario ${scenario.id} challengeOutcomeIds.success must reference only success outcomes.`,
+        );
+      }
+
+      if (key === "failure" && outcome.resolution === "resolve-success") {
+        throw new Error(
+          `Scenario ${scenario.id} challengeOutcomeIds.failure must reference only failure outcomes.`,
+        );
+      }
     }
   }
+};
+
+export const getRandomEventRetryPolicy = (
+  scenario: RandomEventScenario,
+): RandomEventRetryPolicy | null => {
+  if (!scenario.outcomes.some((outcome) => outcome.resolution === "keep-open-failure")) {
+    return null;
+  }
+
+  return scenario.retryPolicy ?? "once-per-user";
+};
+
+export const isRandomEventKeepOpenFailure = (outcome: RandomEventOutcome): boolean => {
+  return outcome.resolution === "keep-open-failure";
 };
 
 const validateScenario = (scenario: RandomEventScenario): void => {
@@ -270,20 +308,56 @@ const validateScenario = (scenario: RandomEventScenario): void => {
   validateTextVariables(`scenario ${scenario.id}`, scenario.textVariables);
   validateClaimActivityTemplates(`scenario ${scenario.id}`, scenario.activityTemplates);
 
+  const outcomeIds = new Set<string>();
+  let hasKeepOpenFailure = false;
   for (const outcome of scenario.outcomes) {
     if (outcome.id.trim().length < 1) {
       throw new Error(`Scenario ${scenario.id} has an outcome with empty id.`);
     }
+
+    if (outcomeIds.has(outcome.id)) {
+      throw new Error(`Scenario ${scenario.id} has duplicate outcome id ${outcome.id}.`);
+    }
+
+    outcomeIds.add(outcome.id);
 
     if (outcome.message.trim().length < 1) {
       throw new Error(`Scenario ${scenario.id} outcome ${outcome.id} must have a message.`);
     }
 
     validateTextVariables(`scenario ${scenario.id} outcome ${outcome.id}`, outcome.textVariables);
+
+    if (outcome.resolution === "keep-open-failure") {
+      hasKeepOpenFailure = true;
+    }
   }
 
   if (scenario.rollChallenge) {
     validateChallengeOutcomeIds(scenario);
+  }
+
+  if (hasKeepOpenFailure && scenario.claimPolicy !== "first-click") {
+    throw new Error(
+      `Scenario ${scenario.id} keep-open-failure outcomes are only supported for first-click events.`,
+    );
+  }
+
+  if (hasKeepOpenFailure && !scenario.rollChallenge) {
+    throw new Error(
+      `Scenario ${scenario.id} keep-open-failure outcomes require an explicit rollChallenge.`,
+    );
+  }
+
+  if (hasKeepOpenFailure && !scenario.challengeOutcomeIds?.failure?.length) {
+    throw new Error(
+      `Scenario ${scenario.id} keep-open-failure outcomes must be reachable from challengeOutcomeIds.failure.`,
+    );
+  }
+
+  if (!hasKeepOpenFailure && scenario.retryPolicy) {
+    throw new Error(
+      `Scenario ${scenario.id} retryPolicy is only valid for events with keep-open failures.`,
+    );
   }
 };
 
@@ -329,20 +403,38 @@ export const selectRandomEventOutcomeForScenario = (
 
 export const renderRandomEventScenario = (
   scenario: RandomEventScenario,
-  selectedOutcome: RandomEventOutcome,
-  options: { random?: () => number; textVariableValues?: Record<string, string> } = {},
-): RandomEventRenderedText => {
+  options: { random?: () => number } = {},
+): RandomEventScenarioRender => {
   const textVariableValues = selectTextVariableValues(
     scenario.textVariables,
-    selectedOutcome.textVariables,
+    undefined,
     options.random,
-    options.textVariableValues,
   );
 
   return {
+    scenario,
     renderedTitle: renderTemplatedText(scenario.title, textVariableValues),
     renderedPrompt: renderTemplatedText(scenario.prompt, textVariableValues),
     renderedClaimLabel: renderTemplatedText(scenario.claimLabel, textVariableValues),
+    textVariableValues,
+  };
+};
+
+export const renderRandomEventOutcome = (
+  scenarioRender: RandomEventScenarioRender,
+  selectedOutcome: RandomEventOutcome,
+  options: { random?: () => number } = {},
+): RandomEventRenderedOutcome => {
+  const textVariableValues = selectTextVariableValues(
+    scenarioRender.scenario.textVariables,
+    selectedOutcome.textVariables,
+    options.random,
+    scenarioRender.textVariableValues,
+  );
+
+  return {
+    ...scenarioRender,
+    selectedOutcome,
     renderedOutcomeMessage: renderTemplatedText(selectedOutcome.message, textVariableValues),
     textVariableValues,
   };
@@ -364,7 +456,7 @@ export const selectRandomEventScenario = (
   scenarios: RandomEventScenario[],
   state: RandomEventVarietyState,
   options: SelectRandomEventScenarioOptions = {},
-): RandomEventSelectionResult | null => {
+): RandomEventScenarioRender | null => {
   if (scenarios.length < 1) {
     return null;
   }
@@ -385,16 +477,7 @@ export const selectRandomEventScenario = (
     return null;
   }
 
-  const selectedOutcome = selectRandomEventOutcomeForScenario(selectedScenario, options);
-  if (!selectedOutcome) {
-    return null;
-  }
-
-  return {
-    scenario: selectedScenario,
-    selectedOutcome,
-    ...renderRandomEventScenario(selectedScenario, selectedOutcome, {
-      random: options.random,
-    }),
-  };
+  return renderRandomEventScenario(selectedScenario, {
+    random: options.random,
+  });
 };

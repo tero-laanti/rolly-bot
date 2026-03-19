@@ -1,10 +1,11 @@
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import type { DiceHostileEffectsService } from "../../progression/application/hostile-effects-service";
 import {
-  renderRandomEventScenario,
+  renderRandomEventOutcome,
   selectRandomEventOutcomeForScenario,
   type RandomEventOutcome,
-  type RandomEventScenario,
+  type RandomEventOutcomeResolution,
+  type RandomEventScenarioRender,
 } from "../domain/content";
 import {
   resolveRollChallengeImmediately,
@@ -15,12 +16,16 @@ import { buildExpiredEventEmbed, buildResolvedEventEmbed } from "./live-runtime-
 import type { ActiveRandomEventContext } from "./live-runtime-types";
 import { resolveActiveRandomEvent, type RandomEventsState } from "./state-store";
 
-type RandomEventUserResolution = {
+export type RandomEventAttemptResolution = {
   userId: string;
+  outcome: RandomEventOutcome;
   renderedOutcomeMessage: string;
   challengeRollSummary: string | null;
   effectNotes: string[];
   resolutionNote: string | null;
+  resolution: RandomEventOutcomeResolution;
+  finalLine: string;
+  keepOpenLine: string;
 };
 
 const applyOutcomeEffectsToUser = (
@@ -38,7 +43,7 @@ const applyOutcomeEffectsToUser = (
     >;
   },
   userId: string,
-  scenario: RandomEventScenario,
+  scenarioId: string,
   outcome: RandomEventOutcome,
 ): string[] => {
   const effectNotes: string[] = [];
@@ -53,7 +58,7 @@ const applyOutcomeEffectsToUser = (
         userId,
         effectCode: "roll-pass-multiplier",
         kind: "positive",
-        source: `random-event:${scenario.id}:${outcome.id}`,
+        source: `random-event:${scenarioId}:${outcome.id}`,
         magnitude: effect.multiplier,
         remainingRolls: effect.rolls,
         consumeOnCommand: "dice",
@@ -66,7 +71,7 @@ const applyOutcomeEffectsToUser = (
     if (effect.type === "temporary-roll-penalty") {
       const result = hostileEffects.applyShieldableNegativeRollPenalty({
         userId,
-        source: `random-event:${scenario.id}:${outcome.id}`,
+        source: `random-event:${scenarioId}:${outcome.id}`,
         divisor: effect.divisor,
         rolls: effect.rolls,
         stackMode: effect.stackMode,
@@ -92,6 +97,7 @@ const applyOutcomeEffectsToUser = (
 
 const formatChallengeRollSummary = (
   challengeProgress: RandomEventRollChallengeProgress | null,
+  prefix = false,
 ): string | null => {
   if (!challengeProgress || challengeProgress.stepResults.length < 1) {
     return null;
@@ -101,7 +107,112 @@ const formatChallengeRollSummary = (
     .map((stepResult) => `${stepResult.rolledValue} (d${stepResult.dieSides})`)
     .join(" → ");
 
-  return `🎲 You rolled: ${rollSummary}`;
+  return prefix ? `🎲 You rolled: ${rollSummary}` : `Rolled ${rollSummary}`;
+};
+
+const formatFinalOutcomeLine = (resolution: RandomEventAttemptResolution): string => {
+  const noteParts = [...resolution.effectNotes];
+  if (resolution.resolutionNote) {
+    noteParts.push(resolution.resolutionNote);
+  }
+
+  const noteText = noteParts.length > 0 ? ` ${noteParts.join(" ")}` : "";
+  const prefix = resolution.resolution === "resolve-success" ? "Success:" : "Fail:";
+  if (resolution.challengeRollSummary) {
+    return `<@${resolution.userId}>: ${resolution.challengeRollSummary}. ${prefix} ${resolution.renderedOutcomeMessage}${noteText}`;
+  }
+
+  return `<@${resolution.userId}>: ${prefix} ${resolution.renderedOutcomeMessage}${noteText}`;
+};
+
+const formatKeepOpenFailureLine = (resolution: RandomEventAttemptResolution): string => {
+  const noteParts = [...resolution.effectNotes];
+  if (resolution.resolutionNote) {
+    noteParts.push(resolution.resolutionNote);
+  }
+
+  const noteText = noteParts.length > 0 ? ` ${noteParts.join(" ")}` : "";
+  const challengeText = resolution.challengeRollSummary
+    ? `${resolution.challengeRollSummary}. `
+    : "";
+  return `<@${resolution.userId}> failed: ${challengeText}${resolution.renderedOutcomeMessage}${noteText} The event is still open.`;
+};
+
+export const resolveRandomEventAttempt = ({
+  progression,
+  hostileEffects,
+  selection,
+  userId,
+  challengeProgress,
+  resolutionNote,
+}: {
+  progression: Pick<
+    DiceProgressionRepository,
+    "getDiceSides" | "getDiceBans" | "applyDiceTemporaryEffect"
+  >;
+  hostileEffects: Pick<
+    DiceHostileEffectsService,
+    "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
+  >;
+  selection: RandomEventScenarioRender;
+  userId: string;
+  challengeProgress?: RandomEventRollChallengeProgress | null;
+  resolutionNote?: string | null;
+}): RandomEventAttemptResolution => {
+  const scenario = selection.scenario;
+  let resolvedChallengeProgress = challengeProgress ?? null;
+
+  if (scenario.rollChallenge && !resolvedChallengeProgress) {
+    resolvedChallengeProgress = resolveRollChallengeImmediately(
+      progression,
+      userId,
+      scenario.rollChallenge,
+    );
+  }
+
+  const challengeResult =
+    scenario.rollChallenge && resolvedChallengeProgress
+      ? resolvedChallengeProgress.succeeded
+        ? "success"
+        : "failure"
+      : undefined;
+
+  const outcome = selectRandomEventOutcomeForScenario(scenario, {
+    challengeResult,
+  });
+  if (!outcome) {
+    throw new Error(`Scenario ${scenario.id} did not produce an outcome.`);
+  }
+
+  const renderedOutcome = renderRandomEventOutcome(selection, outcome);
+  const effectNotes = applyOutcomeEffectsToUser(
+    { progression, hostileEffects },
+    userId,
+    scenario.id,
+    outcome,
+  );
+  const attemptResolution: RandomEventAttemptResolution = {
+    userId,
+    outcome,
+    renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
+    challengeRollSummary: formatChallengeRollSummary(
+      resolvedChallengeProgress,
+      outcome.resolution !== "keep-open-failure",
+    ),
+    effectNotes,
+    resolutionNote: resolutionNote ?? null,
+    resolution: outcome.resolution,
+    finalLine: "",
+    keepOpenLine: "",
+  };
+
+  attemptResolution.finalLine = formatFinalOutcomeLine(attemptResolution);
+  attemptResolution.keepOpenLine = formatKeepOpenFailureLine({
+    ...attemptResolution,
+    challengeRollSummary: formatChallengeRollSummary(resolvedChallengeProgress, false),
+  });
+
+  return attemptResolution;
 };
 
 export const resolveRandomEvent = async ({
@@ -113,6 +224,7 @@ export const resolveRandomEvent = async ({
   participants,
   challengeProgressByUserId,
   resolutionNotesByUserId,
+  attemptResolutionsByUserId,
 }: {
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
@@ -128,6 +240,7 @@ export const resolveRandomEvent = async ({
   participants: string[];
   challengeProgressByUserId?: ReadonlyMap<string, RandomEventRollChallengeProgress>;
   resolutionNotesByUserId?: ReadonlyMap<string, string>;
+  attemptResolutionsByUserId?: ReadonlyMap<string, RandomEventAttemptResolution>;
 }): Promise<void> => {
   const context = activeEventsById.get(eventId);
   if (!context) {
@@ -141,7 +254,7 @@ export const resolveRandomEvent = async ({
   if (participants.length < 1) {
     await context.message.edit({
       content: "",
-      embeds: [buildExpiredEventEmbed(context.selection).toJSON()],
+      embeds: [buildExpiredEventEmbed(context.selection, context.failedAttemptLines).toJSON()],
       components: [],
     });
     return;
@@ -152,60 +265,20 @@ export const resolveRandomEvent = async ({
       ? [participants[0] as string]
       : participants;
 
-  const userResolutions: RandomEventUserResolution[] = [];
-  for (const userId of participantsToResolve) {
-    let outcome = context.selection.selectedOutcome;
-    let challengeProgress = challengeProgressByUserId?.get(userId) ?? null;
-
-    if (context.selection.scenario.rollChallenge && !challengeProgress) {
-      challengeProgress = resolveRollChallengeImmediately(
-        progression,
-        userId,
-        context.selection.scenario.rollChallenge,
-      );
+  const lines = participantsToResolve.map((userId) => {
+    const precomputed = attemptResolutionsByUserId?.get(userId) ?? null;
+    if (precomputed) {
+      return precomputed.finalLine;
     }
 
-    if (context.selection.scenario.rollChallenge && challengeProgress) {
-      const challengeResult = challengeProgress.succeeded ? "success" : "failure";
-      const challengeOutcome = selectRandomEventOutcomeForScenario(context.selection.scenario, {
-        challengeResult,
-      });
-      if (challengeOutcome) {
-        outcome = challengeOutcome;
-      }
-    }
-
-    const renderedOutcome = renderRandomEventScenario(context.selection.scenario, outcome, {
-      textVariableValues: context.selection.textVariableValues,
-    });
-    const effectNotes = applyOutcomeEffectsToUser(
-      { progression, hostileEffects },
+    return resolveRandomEventAttempt({
+      progression,
+      hostileEffects,
+      selection: context.selection,
       userId,
-      context.selection.scenario,
-      outcome,
-    );
-
-    userResolutions.push({
-      userId,
-      renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
-      challengeRollSummary: formatChallengeRollSummary(challengeProgress),
-      effectNotes,
+      challengeProgress: challengeProgressByUserId?.get(userId) ?? null,
       resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
-    });
-  }
-
-  const lines = userResolutions.map((resolution) => {
-    const noteParts = [...resolution.effectNotes];
-    if (resolution.resolutionNote) {
-      noteParts.push(resolution.resolutionNote);
-    }
-
-    const noteText = noteParts.length > 0 ? ` ${noteParts.join(" ")}` : "";
-    if (resolution.challengeRollSummary) {
-      return `<@${resolution.userId}>: ${resolution.challengeRollSummary}. ${resolution.renderedOutcomeMessage}${noteText}`;
-    }
-
-    return `<@${resolution.userId}>: ${resolution.renderedOutcomeMessage}${noteText}`;
+    }).finalLine;
   });
 
   await context.message.edit({

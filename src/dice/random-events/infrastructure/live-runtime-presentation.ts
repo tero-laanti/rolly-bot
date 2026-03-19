@@ -111,6 +111,7 @@ export const buildActiveClaimDescription = (
   activityLine: string | null,
   expiresAtMs: number | null,
   participants: string[] = [],
+  failedAttemptLines: string[] = [],
 ): string => {
   const lines = [prompt];
 
@@ -121,6 +122,18 @@ export const buildActiveClaimDescription = (
 
   if (activityLine) {
     lines.push("", activityLine);
+  }
+
+  if (failedAttemptLines.length > 0) {
+    const maxVisibleFailures = 3;
+    const visibleFailureLines = failedAttemptLines.slice(-maxVisibleFailures);
+    const hiddenFailureCount = failedAttemptLines.length - visibleFailureLines.length;
+    lines.push("", "**Recent failed attempts:**", ...visibleFailureLines);
+    if (hiddenFailureCount > 0) {
+      lines.push(
+        `...and ${hiddenFailureCount} more failed attempt${hiddenFailureCount === 1 ? "" : "s"}.`,
+      );
+    }
   }
 
   if (typeof expiresAtMs === "number") {
@@ -188,11 +201,26 @@ export const buildResolvedEventEmbed = (
     .setFooter({ text: `${rarityPresentation.label} • Resolved` });
 };
 
-export const buildExpiredEventEmbed = (selection: RandomEventSelectionResult): EmbedBuilder => {
+export const buildExpiredEventEmbed = (
+  selection: RandomEventSelectionResult,
+  failedAttemptLines: string[] = [],
+): EmbedBuilder => {
   const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
+  const descriptionLines =
+    failedAttemptLines.length > 0
+      ? [
+          selection.renderedPrompt,
+          "",
+          "**Recent failed attempts:**",
+          ...failedAttemptLines.slice(-3),
+          "",
+          "The window closes before anyone pulls it off.",
+        ]
+      : [selection.renderedPrompt, "", "No one claimed this event in time."];
+
   return new EmbedBuilder()
     .setTitle(getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle))
-    .setDescription([selection.renderedPrompt, "", "No one claimed this event in time."].join("\n"))
+    .setDescription(descriptionLines.join("\n"))
     .setColor(rarityPresentation.color)
     .setFooter({ text: `${rarityPresentation.label} • Expired` });
 };

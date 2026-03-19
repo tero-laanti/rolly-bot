@@ -1,16 +1,17 @@
 [
   {
-    "id": "lantern-cache",
+    "id": "example-basic-event",
     "rarity": "common",
-    "title": "Lantern Cache",
-    "prompt": "A supply crate of travel lanterns has been left unlocked. Check it?",
-    "claimLabel": "Open crate",
+    "title": "Example Basic Event",
+    "prompt": "An example crate is sitting in the open. Check it?",
+    "claimLabel": "Check crate",
     "claimPolicy": "first-click",
     "claimWindowSeconds": 75,
     "outcomes": [
       {
-        "id": "steady-light",
-        "message": "The crate holds a steady-burning lantern. Your next rolls feel easier to line up.",
+        "id": "example-success",
+        "resolution": "resolve-success",
+        "message": "Example success outcome: you find a useful item and get a small roll buff.",
         "effects": [
           {
             "type": "temporary-roll-multiplier",
@@ -21,47 +22,45 @@
         ]
       },
       {
-        "id": "burnt-wick",
+        "id": "example-empty",
         "weight": 0.5,
-        "message": "Only burnt wicks remain. You leave with soot on your hands and no real gain.",
+        "resolution": "resolve-failure",
+        "message": "Example failure outcome: the crate is empty and nothing else happens.",
         "effects": []
       }
     ],
     "activityTemplates": {
-      "accepted": ["<@{userId}> opens the lantern crate.", "<@{userId}> checks the cache."],
+      "accepted": ["<@{userId}> checks the example crate.", "<@{userId}> opens the example event."],
       "alreadyReady": [
-        "<@{userId}> is already checking the cache.",
-        "<@{userId}> is already at the lantern crate."
+        "<@{userId}> is already checking the example crate.",
+        "<@{userId}> is already in this example event."
       ]
     }
   },
   {
-    "id": "bridge-wager",
+    "id": "example-keep-open-challenge",
     "rarity": "rare",
-    "title": "Bridge Wager",
-    "prompt": "A ferryman offers a risky shortcut if you can land a strong opening roll and then keep your footing on the bridge. Take the wager?",
-    "claimLabel": "Take wager",
+    "title": "Example Keep-Open Challenge",
+    "prompt": "An example challenge needs two rolls: first 5+, then 3+. Try it?",
+    "claimLabel": "Start challenge",
     "claimPolicy": "first-click",
     "claimWindowSeconds": 90,
+    "retryPolicy": "once-per-user",
     "rollChallenge": {
-      "id": "ferryman-check",
+      "id": "example-sequence-check",
       "mode": "sequence",
       "steps": [
         {
-          "id": "wager-roll",
-          "label": "Open strong with a 5+ roll",
-          "source": {
-            "type": "player-die"
-          },
+          "id": "step-one",
+          "label": "Step 1: roll 5+ on your die",
+          "source": { "type": "player-die" },
           "target": 5,
           "comparator": "gte"
         },
         {
-          "id": "bridge-balance",
-          "label": "Keep your footing with a 3+ roll",
-          "source": {
-            "type": "player-die"
-          },
+          "id": "step-two",
+          "label": "Step 2: roll 3+ on your die",
+          "source": { "type": "player-die" },
           "target": 3,
           "comparator": "gte"
         }
@@ -69,13 +68,14 @@
       "failOnFirstMiss": true
     },
     "challengeOutcomeIds": {
-      "success": ["swift-crossing"],
-      "failure": ["cold-river"]
+      "success": ["example-challenge-success"],
+      "failure": ["example-keep-open-failure"]
     },
     "outcomes": [
       {
-        "id": "swift-crossing",
-        "message": "The crossing goes smoothly and the shortcut keeps paying off for a while.",
+        "id": "example-challenge-success",
+        "resolution": "resolve-success",
+        "message": "Example success outcome: you clear the challenge and get a stronger buff.",
         "effects": [
           {
             "type": "temporary-roll-multiplier",
@@ -86,54 +86,27 @@
         ]
       },
       {
-        "id": "cold-river",
-        "message": "You misstep, end up waist-deep in river water, and lose time recovering.",
+        "id": "example-keep-open-failure",
+        "resolution": "keep-open-failure",
+        "message": "Example keep-open failure: you miss the challenge, take a penalty, and the event stays open for someone else.",
         "effects": [
           {
-            "type": "temporary-lockout",
-            "durationMinutes": 4
+            "type": "temporary-roll-penalty",
+            "divisor": 2,
+            "rolls": 1,
+            "stackMode": "no-stack"
           }
         ]
       }
     ],
     "activityTemplates": {
       "accepted": [
-        "<@{userId}> accepts the ferryman's wager.",
-        "<@{userId}> steps onto the bridge."
+        "<@{userId}> starts the example challenge.",
+        "<@{userId}> takes the example attempt."
       ],
       "alreadyReady": [
-        "<@{userId}> is already taking the wager.",
-        "<@{userId}> is already on the bridge."
-      ]
-    }
-  },
-  {
-    "id": "market-cheer",
-    "rarity": "uncommon",
-    "title": "Market Cheer",
-    "prompt": "A crowd in the square starts a call-and-response chant. Join in?",
-    "claimLabel": "Join chant",
-    "claimPolicy": "multi-user",
-    "claimWindowSeconds": 110,
-    "outcomes": [
-      {
-        "id": "shared-rhythm",
-        "message": "The crowd's rhythm catches and gives everyone a little extra momentum.",
-        "effects": [
-          {
-            "type": "temporary-roll-multiplier",
-            "multiplier": 2,
-            "rolls": 2,
-            "stackMode": "refresh"
-          }
-        ]
-      }
-    ],
-    "activityTemplates": {
-      "accepted": ["<@{userId}> joins the chant.", "<@{userId}> answers the crowd."],
-      "alreadyReady": [
-        "<@{userId}> is already in the chant.",
-        "<@{userId}> is already with the crowd."
+        "<@{userId}> is already taking this example challenge.",
+        "<@{userId}> is already in this example attempt."
       ]
     }
   }

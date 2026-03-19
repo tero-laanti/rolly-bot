@@ -9,6 +9,7 @@ import type { RandomEventVarietyState } from "../domain/variety";
 import {
   buildRandomEventClaimButtonId,
   buildRandomEventClaimPrompt,
+  type RandomEventInteractionWindowLifecycleContext,
   type RandomEventInteractionWindowManager,
 } from "../interfaces/discord/interaction-window";
 import { randomEventContentPackV1 } from "./content-pack";
@@ -54,7 +55,10 @@ export const triggerRandomEventOpportunity = async ({
   activeEventsById: Map<string, ActiveRandomEventContext>;
   windowManager: RandomEventInteractionWindowManager;
   requiredClaimPolicy?: RandomEventClaimPolicy;
-  onResolved: (eventId: string, participants: string[]) => Promise<void>;
+  onResolved: (
+    eventId: string,
+    context: RandomEventInteractionWindowLifecycleContext,
+  ) => Promise<void>;
 }): Promise<TriggerOpportunityResult> => {
   if (!config.channelId) {
     logger.warn("[random-events] RANDOM_EVENTS_CHANNEL_ID not set. Skipping trigger.");
@@ -123,6 +127,9 @@ export const triggerRandomEventOpportunity = async ({
     selection,
     message,
     sequenceChallenge: null,
+    claimWindowExpiresAtMs: estimatedExpiresAtMs,
+    attemptedUserIds: new Set(),
+    failedAttemptLines: [],
   });
 
   windowManager.openWindow({
@@ -130,8 +137,8 @@ export const triggerRandomEventOpportunity = async ({
     durationMs: claimWindowDurationMs,
     policy: selection.scenario.claimPolicy,
     callbacks: {
-      onResolved: async ({ snapshot }) => {
-        await onResolved(eventId, snapshot.participants);
+      onResolved: async (context) => {
+        await onResolved(eventId, context);
       },
     },
   });

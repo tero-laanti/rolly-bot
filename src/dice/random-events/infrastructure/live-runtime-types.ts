@@ -20,4 +20,7 @@ export type ActiveRandomEventContext = {
   selection: RandomEventSelectionResult;
   message: Message;
   sequenceChallenge: ActiveRandomEventSequenceChallenge | null;
+  claimWindowExpiresAtMs: number;
+  attemptedUserIds: Set<string>;
+  failedAttemptLines: string[];
 };
