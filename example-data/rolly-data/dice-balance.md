@@ -120,7 +120,15 @@ Raids:
         { "bossLevelAtLeast": 10, "pips": 8 },
         { "bossLevelAtLeast": 20, "pips": 12 },
         { "bossLevelAtLeast": 35, "pips": 16 }
-      ]
+      ],
+      "rollPassBuff": {
+        "multiplierPerBossLevel": 1,
+        "minimumMultiplier": 2,
+        "maximumMultiplier": 20,
+        "rollsPerBossLevelDivisor": 10,
+        "minimumRolls": 1,
+        "maximumRolls": 5
+      }
     },
     "bossNames": {
       "prefixes": ["Ashen"],
@@ -145,6 +153,10 @@ Raids:
 
 - `reward.pipsByBossLevel` is an ascending floor table. Each raider who landed at least one hit gets the full matching pip payout on a successful clear.
 - `reward.pipsByBossLevel[0].bossLevelAtLeast` must start at `1`.
+- `reward.rollPassBuff.multiplierPerBossLevel` scales the normal `/dice` roll-pass buff from boss level before clamping.
+- `reward.rollPassBuff.minimumMultiplier` and `reward.rollPassBuff.maximumMultiplier` clamp that buff magnitude.
+- `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
+- `reward.rollPassBuff.minimumRolls` and `reward.rollPassBuff.maximumRolls` clamp the rewarded roll count.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
 - `expectedRollIntervalSeconds` is the raid HP model's expected per-player `/dice` cadence.
 - `minimumHitsPerParticipant` keeps raids from collapsing to trivially low HP in short windows.

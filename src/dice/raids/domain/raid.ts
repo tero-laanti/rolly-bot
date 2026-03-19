@@ -10,8 +10,9 @@ export type RaidParticipantProfile = {
 };
 
 export type RaidRewardDefinition = {
-  type: "pips";
   pips: number;
+  rollPassMultiplier: number;
+  rollPassRolls: number;
 };
 
 export type RaidBossDefinition = {
@@ -115,19 +116,33 @@ const resolveRaidRewardPips = (bossLevel: number): number => {
   return matchedTier?.pips ?? 0;
 };
 
+const resolveRaidRewardRollPassMultiplier = (bossLevel: number): number => {
+  const { rollPassBuff } = getRaidBalance().reward;
+  const scaledMultiplier = Math.round(bossLevel * rollPassBuff.multiplierPerBossLevel);
+  return Math.max(
+    rollPassBuff.minimumMultiplier,
+    Math.min(rollPassBuff.maximumMultiplier, scaledMultiplier),
+  );
+};
+
+const resolveRaidRewardRollPassRolls = (bossLevel: number): number => {
+  const { rollPassBuff } = getRaidBalance().reward;
+  const scaledRolls = Math.ceil(bossLevel / rollPassBuff.rollsPerBossLevelDivisor);
+  return Math.max(rollPassBuff.minimumRolls, Math.min(rollPassBuff.maximumRolls, scaledRolls));
+};
+
 export const getDefaultRaidReward = (bossLevel: number): RaidRewardDefinition => {
   return {
-    type: "pips",
     pips: resolveRaidRewardPips(bossLevel),
+    rollPassMultiplier: resolveRaidRewardRollPassMultiplier(bossLevel),
+    rollPassRolls: resolveRaidRewardRollPassRolls(bossLevel),
   };
 };
 
 export const describeRaidReward = (reward: RaidRewardDefinition): string => {
-  if (reward.type === "pips") {
-    return `${reward.pips} pip${reward.pips === 1 ? "" : "s"} per eligible raider`;
-  }
-
-  return "raid reward";
+  const pipText = `${reward.pips} pip${reward.pips === 1 ? "" : "s"}`;
+  const rollBuffText = `x${reward.rollPassMultiplier} roll buff for the next ${reward.rollPassRolls} /dice roll${reward.rollPassRolls === 1 ? "" : "s"}`;
+  return `${pipText} and ${rollBuffText} per eligible raider`;
 };
 
 export const createRaidBoss = ({

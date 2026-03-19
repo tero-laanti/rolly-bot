@@ -57,7 +57,15 @@
           "bossLevelAtLeast": 35,
           "pips": 16
         }
-      ]
+      ],
+      "rollPassBuff": {
+        "multiplierPerBossLevel": 1,
+        "minimumMultiplier": 2,
+        "maximumMultiplier": 50,
+        "rollsPerBossLevelDivisor": 10,
+        "minimumRolls": 1,
+        "maximumRolls": 5
+      }
     },
     "bossNames": {
       "prefixes": [

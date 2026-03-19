@@ -529,12 +529,21 @@ export const createRaidsLiveRuntime = ({
 
     unitOfWork.runInTransaction(() => {
       for (const participantId of rewardEligibleUserIds) {
-        if (boss.reward.type === "pips") {
-          economy.applyPipsDelta({
-            userId: participantId,
-            amount: boss.reward.pips,
-          });
-        }
+        economy.applyPipsDelta({
+          userId: participantId,
+          amount: boss.reward.pips,
+        });
+        progression.applyDiceTemporaryEffect({
+          userId: participantId,
+          effectCode: "roll-pass-multiplier",
+          kind: "positive",
+          source: `raid:${context.raid.raidId}`,
+          magnitude: boss.reward.rollPassMultiplier,
+          remainingRolls: boss.reward.rollPassRolls,
+          consumeOnCommand: "dice",
+          stackGroup: "raid-reward-roll-pass-multiplier",
+          stackMode: "refresh",
+        });
       }
     });
   };
