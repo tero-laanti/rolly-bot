@@ -9,6 +9,9 @@ import type {
   DiceItemData,
   DiceItemEffect,
   DiceBalanceVarietyConfig,
+  DiceRaidBossBalanceData,
+  DiceRaidBossNamesData,
+  DiceRaidRewardData,
 } from "./types";
 import type {
   RandomEventClaimActivityTemplates,
@@ -117,6 +120,15 @@ const readStringArray = (value: unknown, label: string): string[] => {
   }
 
   return value.map((entry, index) => readNonEmptyString(entry, `${label}[${index}]`));
+};
+
+const readFiniteNumberAtLeast = (value: unknown, label: string, minValue: number): number => {
+  const parsed = readFiniteNumber(value, label);
+  if (parsed < minValue) {
+    throw new Error(`${label} must be >= ${minValue}.`);
+  }
+
+  return parsed;
 };
 
 const readIntegerArray = (value: unknown, label: string, minValue: number = 1): number[] => {
@@ -705,11 +717,80 @@ const readCasinoPushYourLuckPayout = (
   };
 };
 
+const readRaidRewardConfig = (value: unknown, label: string): DiceRaidRewardData => {
+  const record = assertRecord(value, label);
+  return {
+    rollPassMultiplier: readInteger(record.rollPassMultiplier, `${label}.rollPassMultiplier`, 1),
+    rolls: readInteger(record.rolls, `${label}.rolls`, 1),
+  };
+};
+
+const readRaidBossNamesConfig = (value: unknown, label: string): DiceRaidBossNamesData => {
+  const record = assertRecord(value, label);
+  const prefixes = readStringArray(record.prefixes, `${label}.prefixes`);
+  const suffixes = readStringArray(record.suffixes, `${label}.suffixes`);
+
+  if (prefixes.length < 1) {
+    throw new Error(`${label}.prefixes must include at least one entry.`);
+  }
+
+  if (suffixes.length < 1) {
+    throw new Error(`${label}.suffixes must include at least one entry.`);
+  }
+
+  return {
+    prefixes,
+    suffixes,
+  };
+};
+
+const readRaidBossBalanceConfig = (value: unknown, label: string): DiceRaidBossBalanceData => {
+  const record = assertRecord(value, label);
+  return {
+    expectedRollIntervalSeconds: readFiniteNumberAtLeast(
+      record.expectedRollIntervalSeconds,
+      `${label}.expectedRollIntervalSeconds`,
+      1,
+    ),
+    minimumHitsPerParticipant: readInteger(
+      record.minimumHitsPerParticipant,
+      `${label}.minimumHitsPerParticipant`,
+      1,
+    ),
+    minimumBossHp: readInteger(record.minimumBossHp, `${label}.minimumBossHp`, 1),
+    damageBudgetRatio: readFiniteNumberAtLeast(
+      record.damageBudgetRatio,
+      `${label}.damageBudgetRatio`,
+      0,
+    ),
+    baseHp: readInteger(record.baseHp, `${label}.baseHp`, 1),
+    hpPerBossLevel: readInteger(record.hpPerBossLevel, `${label}.hpPerBossLevel`, 0),
+    timeBudgetFlatHpPerMinute: readInteger(
+      record.timeBudgetFlatHpPerMinute,
+      `${label}.timeBudgetFlatHpPerMinute`,
+      0,
+    ),
+    participantPrestigeWeight: readFiniteNumberAtLeast(
+      record.participantPrestigeWeight,
+      `${label}.participantPrestigeWeight`,
+      0,
+    ),
+    participantExtraSidesDivisor: readFiniteNumberAtLeast(
+      record.participantExtraSidesDivisor,
+      `${label}.participantExtraSidesDivisor`,
+      1,
+    ),
+    baselineDieSides: readInteger(record.baselineDieSides, `${label}.baselineDieSides`, 2),
+    maxBossLevel: readInteger(record.maxBossLevel, `${label}.maxBossLevel`, 1),
+  };
+};
+
 export const parseDiceBalance = (value: unknown): DiceBalanceData => {
   const record = assertRecord(value, "diceBalance");
   const charge = assertRecord(record.charge, "diceBalance.charge");
   const pvp = assertRecord(record.pvp, "diceBalance.pvp");
   const randomEvents = assertRecord(record.randomEvents, "diceBalance.randomEvents");
+  const raids = assertRecord(record.raids, "diceBalance.raids");
 
   const parsed: DiceBalanceData = {
     prestigeSides: readIntegerArray(record.prestigeSides, "diceBalance.prestigeSides", 2),
@@ -752,6 +833,11 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
         "diceBalance.randomEvents.claimWindowDurationMultiplier",
       ),
       variety: readVarietyConfig(randomEvents.variety, "diceBalance.randomEvents.variety"),
+    },
+    raids: {
+      reward: readRaidRewardConfig(raids.reward, "diceBalance.raids.reward"),
+      bossNames: readRaidBossNamesConfig(raids.bossNames, "diceBalance.raids.bossNames"),
+      bossBalance: readRaidBossBalanceConfig(raids.bossBalance, "diceBalance.raids.bossBalance"),
     },
   };
 

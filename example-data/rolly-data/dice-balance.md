@@ -1,6 +1,6 @@
 # `dice-balance.json`
 
-This file controls progression, bans, charge behavior, PvP timing, and random-event variety tuning.
+This file controls progression, bans, charge behavior, PvP timing, random-event variety tuning, and raid balance/content knobs.
 
 Prestige progression:
 
@@ -107,3 +107,43 @@ Pity:
 - A non-rare streak means consecutive `common` or `uncommon` selections.
 - Once the streak reaches `startAfterNonRareTriggers`, the runtime boosts `rare`, `epic`, and `legendary` bucket weights.
 - Each additional non-rare trigger adds the matching step until `maxBonusMultiplier` is reached.
+
+Raids:
+
+```json
+{
+  "raids": {
+    "reward": {
+      "rollPassMultiplier": 2,
+      "rolls": 3
+    },
+    "bossNames": {
+      "prefixes": ["Ashen"],
+      "suffixes": ["Hydra"]
+    },
+    "bossBalance": {
+      "expectedRollIntervalSeconds": 10,
+      "minimumHitsPerParticipant": 12,
+      "minimumBossHp": 120,
+      "damageBudgetRatio": 0.7,
+      "baseHp": 80,
+      "hpPerBossLevel": 28,
+      "timeBudgetFlatHpPerMinute": 6,
+      "participantPrestigeWeight": 2,
+      "participantExtraSidesDivisor": 2,
+      "baselineDieSides": 6,
+      "maxBossLevel": 999
+    }
+  }
+}
+```
+
+- `reward.rollPassMultiplier` and `reward.rolls` define the current raid-clear buff.
+- `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
+- `expectedRollIntervalSeconds` is the raid HP model's expected per-player `/dice` cadence.
+- `minimumHitsPerParticipant` keeps raids from collapsing to trivially low HP in short windows.
+- `minimumBossHp` is a flat floor for the final generated HP pool.
+- `damageBudgetRatio` controls how much of the estimated total player damage budget becomes boss HP.
+- `baseHp`, `hpPerBossLevel`, and `timeBudgetFlatHpPerMinute` shape the readable HP formula.
+- `participantPrestigeWeight`, `participantExtraSidesDivisor`, and `baselineDieSides` control how player stats influence generated boss level.
+- `maxBossLevel` is a guardrail clamp, not a progression system by itself.

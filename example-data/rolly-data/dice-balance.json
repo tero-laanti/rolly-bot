@@ -33,5 +33,50 @@
         "maxBonusMultiplier": 2
       }
     }
+  },
+  "raids": {
+    "reward": {
+      "rollPassMultiplier": 2,
+      "rolls": 3
+    },
+    "bossNames": {
+      "prefixes": [
+        "Ashen",
+        "Storm",
+        "Grim",
+        "Iron",
+        "Night",
+        "Ember",
+        "Frost",
+        "Rotfang",
+        "Thunder",
+        "Void"
+      ],
+      "suffixes": [
+        "Hydra",
+        "Titan",
+        "Colossus",
+        "Wyrm",
+        "Behemoth",
+        "Golem",
+        "Leviathan",
+        "Sentinel",
+        "Matriarch",
+        "Reaper"
+      ]
+    },
+    "bossBalance": {
+      "expectedRollIntervalSeconds": 10,
+      "minimumHitsPerParticipant": 12,
+      "minimumBossHp": 120,
+      "damageBudgetRatio": 0.7,
+      "baseHp": 80,
+      "hpPerBossLevel": 28,
+      "timeBudgetFlatHpPerMinute": 6,
+      "participantPrestigeWeight": 2,
+      "participantExtraSidesDivisor": 2,
+      "baselineDieSides": 6,
+      "maxBossLevel": 999
+    }
   }
 }
