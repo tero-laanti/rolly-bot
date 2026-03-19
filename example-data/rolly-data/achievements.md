@@ -1,6 +1,6 @@
 # `achievements.json`
 
-Each entry defines one achievement. Roll-based rules are evaluated in `src/dice/progression/domain/achievements.ts`.
+Each entry defines one achievement and the rule that unlocks it.
 
 Minimal shape:
 

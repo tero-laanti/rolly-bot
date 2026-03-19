@@ -1,6 +1,6 @@
 # Example Rolly Data
 
-This directory contains example-only data for the public `rolly-bot` repository.
+This directory contains safe example data for the public `rolly-bot` repository.
 
 - The real private game data should live in a separate `rolly-data` repository.
 - The app looks for data in this order:
@@ -17,7 +17,6 @@ This directory contains example-only data for the public `rolly-bot` repository.
   - `random-events-balance.json`
   - `random-events.v1.json`
 
-These example values are intentionally safe to expose and do not need to match production.
-They are for local development only.
+These example values are safe to expose and do not need to match production.
 
 For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

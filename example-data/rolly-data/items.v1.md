@@ -26,7 +26,7 @@ Shared notes:
 
 Effect types:
 
-- `negative-effect-shield`: grants charges that block the next matching hostile effect. Current item behavior covers PvP, random events, and future hostile systems that consume the same shield effect.
+- `negative-effect-shield`: grants charges that block the next matching hostile effect. Current item behavior covers PvP and random events that consume the same shield effect.
 - `double-roll-uses`: the next `uses` `/dice` actions roll twice.
 - `double-roll-duration`: `/dice` rolls twice for the next `minutes`.
 - `trigger-random-group-event`: tries to spawn a random event immediately. If the runtime is disabled, unavailable, or already busy, the item is refunded.

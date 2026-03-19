@@ -1,6 +1,6 @@
 # Rolly
 
-Discord bot focused on rolling dice. The project is mostly written by AI but reviewed by a human.
+Discord dice game bot built around repeated rolls, progression, and server events.
 
 ## What Rolly Is
 
@@ -43,7 +43,7 @@ npm start
 
 ## Environment Variables
 
-Rolly reads configuration from `.env`. The source of truth for available variables is [.env.example](.env.example).
+Rolly reads configuration from `.env`. See [.env.example](.env.example) for the full list.
 
 ### Required
 
@@ -182,7 +182,7 @@ Rolly is a pragmatic domain-driven modular monolith.
 - `src/system/self-update/` follows the same application/infrastructure/interfaces split as the dice contexts.
 - `src/shared-kernel/` contains small, stable shared architecture primitives such as action-view models.
 - `src/shared/` contains shared infrastructure such as db, env, config, and cross-cutting helpers.
-- `src/rolly-data/` is the boundary for hidden gameplay data loading and validation.
+- `src/rolly-data/` loads and validates gameplay data.
 
 Important rules:
 
@@ -200,7 +200,7 @@ Important rules:
 - [src/system/self-update/](src/system/self-update/) contains the self-update application use case, infrastructure command runner, and owner-only Discord command.
 - [src/shared/](src/shared/) contains shared infrastructure such as db, config, env, and cross-cutting helpers.
 - [src/shared-kernel/](src/shared-kernel/) contains shared architecture primitives and types.
-- [src/rolly-data/](src/rolly-data/) is the boundary for hidden gameplay data loading and validation.
+- [src/rolly-data/](src/rolly-data/) loads and validates gameplay data.
 - [eslint.config.js](eslint.config.js) enforces the current architecture guardrails.
 
 ## Adding Features
