@@ -133,6 +133,32 @@ export const buildRaidResolvedPrompt = ({
   };
 };
 
+export const buildRaidResolveFailedPrompt = ({
+  participantIds,
+  resolvedAtMs,
+}: {
+  participantIds: readonly string[];
+  resolvedAtMs: number;
+}): BaseMessageOptions => {
+  const embed = new EmbedBuilder()
+    .setColor(resolvedColor)
+    .setTitle("⚠️ Raid ended with cleanup needed")
+    .setDescription(
+      [
+        `The raid ended ${formatDiscordRelativeTime(resolvedAtMs)}, but the live raid post could not be updated cleanly.`,
+        "A moderator may need to remove or tidy the stale raid message manually.",
+        "",
+        `**Joined raiders (${participantIds.length})**`,
+        formatParticipants(participantIds),
+      ].join("\n"),
+    );
+
+  return {
+    embeds: [embed],
+    components: [],
+  };
+};
+
 export const buildRaidInterruptedPrompt = ({
   participantIds,
 }: {
