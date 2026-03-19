@@ -5,6 +5,7 @@ import {
   selectRandomEventOutcomeForScenario,
   type RandomEventOutcome,
   type RandomEventOutcomeResolution,
+  type RandomEventRenderedOutcome,
   type RandomEventScenarioRender,
 } from "../domain/content";
 import {
@@ -27,6 +28,11 @@ export type RandomEventAttemptResolution = {
   finalLine: string;
   keepOpenLine: string;
 };
+
+type SharedRandomEventOutcomeSelection = Pick<
+  RandomEventRenderedOutcome,
+  "selectedOutcome" | "renderedOutcomeMessage"
+>;
 
 const applyOutcomeEffectsToUser = (
   {
@@ -145,6 +151,7 @@ export const resolveRandomEventAttempt = ({
   userId,
   challengeProgress,
   resolutionNote,
+  sharedOutcomeSelection,
 }: {
   progression: Pick<
     DiceProgressionRepository,
@@ -158,6 +165,7 @@ export const resolveRandomEventAttempt = ({
   userId: string;
   challengeProgress?: RandomEventRollChallengeProgress | null;
   resolutionNote?: string | null;
+  sharedOutcomeSelection?: SharedRandomEventOutcomeSelection | null;
 }): RandomEventAttemptResolution => {
   const scenario = selection.scenario;
   let resolvedChallengeProgress = challengeProgress ?? null;
@@ -177,31 +185,39 @@ export const resolveRandomEventAttempt = ({
         : "failure"
       : undefined;
 
-  const outcome = selectRandomEventOutcomeForScenario(scenario, {
-    challengeResult,
-  });
-  if (!outcome) {
-    throw new Error(`Scenario ${scenario.id} did not produce an outcome.`);
-  }
+  const renderedOutcome =
+    sharedOutcomeSelection ??
+    (() => {
+      const outcome = selectRandomEventOutcomeForScenario(scenario, {
+        challengeResult,
+      });
+      if (!outcome) {
+        throw new Error(`Scenario ${scenario.id} did not produce an outcome.`);
+      }
 
-  const renderedOutcome = renderRandomEventOutcome(selection, outcome);
+      const resolvedOutcome = renderRandomEventOutcome(selection, outcome);
+      return {
+        selectedOutcome: resolvedOutcome.selectedOutcome,
+        renderedOutcomeMessage: resolvedOutcome.renderedOutcomeMessage,
+      };
+    })();
   const effectNotes = applyOutcomeEffectsToUser(
     { progression, hostileEffects },
     userId,
     scenario.id,
-    outcome,
+    renderedOutcome.selectedOutcome,
   );
   const attemptResolution: RandomEventAttemptResolution = {
     userId,
-    outcome,
+    outcome: renderedOutcome.selectedOutcome,
     renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
     challengeRollSummary: formatChallengeRollSummary(
       resolvedChallengeProgress,
-      outcome.resolution !== "keep-open-failure",
+      renderedOutcome.selectedOutcome.resolution !== "keep-open-failure",
     ),
     effectNotes,
     resolutionNote: resolutionNote ?? null,
-    resolution: outcome.resolution,
+    resolution: renderedOutcome.selectedOutcome.resolution,
     finalLine: "",
     keepOpenLine: "",
   };
@@ -264,6 +280,25 @@ export const resolveRandomEvent = async ({
     context.selection.scenario.claimPolicy === "first-click"
       ? [participants[0] as string]
       : participants;
+  const sharedOutcomeSelection =
+    participantsToResolve.length > 1 &&
+    context.selection.scenario.claimPolicy === "multi-user" &&
+    !context.selection.scenario.challengeOutcomeIds
+      ? (() => {
+          const outcome = selectRandomEventOutcomeForScenario(context.selection.scenario);
+          if (!outcome) {
+            throw new Error(
+              `Scenario ${context.selection.scenario.id} did not produce an outcome.`,
+            );
+          }
+
+          const renderedOutcome = renderRandomEventOutcome(context.selection, outcome);
+          return {
+            selectedOutcome: renderedOutcome.selectedOutcome,
+            renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
+          };
+        })()
+      : null;
 
   const lines = participantsToResolve.map((userId) => {
     const precomputed = attemptResolutionsByUserId?.get(userId) ?? null;
@@ -278,6 +313,7 @@ export const resolveRandomEvent = async ({
       userId,
       challengeProgress: challengeProgressByUserId?.get(userId) ?? null,
       resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
+      sharedOutcomeSelection,
     }).finalLine;
   });
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { Message } from "discord.js";
 import {
   getRandomEventRetryPolicy,
   renderRandomEventOutcome,
@@ -10,7 +11,8 @@ import {
 import type { RandomEventRollChallengeProgress } from "../domain/roll-challenges";
 import type { DiceTemporaryEffect } from "../../progression/domain/temporary-effects";
 import { buildActiveClaimDescription } from "./live-runtime-presentation";
-import { resolveRandomEventAttempt } from "./live-runtime-resolution";
+import { createRandomEventsState, registerActiveRandomEvent } from "./state-store";
+import { resolveRandomEvent, resolveRandomEventAttempt } from "./live-runtime-resolution";
 
 const createChallengeScenario = (): RandomEventScenario => {
   return {
@@ -201,4 +203,90 @@ test("active event prompt truncates older failed attempts", () => {
   assert.doesNotMatch(description, /fail one/);
   assert.match(description, /fail two/);
   assert.match(description, /\.\.\.and 1 more failed attempt/);
+});
+
+test("multi-user events without challenge branching reuse one rendered outcome for all participants", async () => {
+  const scenario: RandomEventScenario = {
+    id: "shared-group-outcome",
+    rarity: "uncommon",
+    title: "Shared Group Outcome",
+    prompt: "Everyone crowds around the same shrine.",
+    claimLabel: "Gather",
+    claimPolicy: "multi-user",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "shared-outcome",
+        resolution: "resolve-success",
+        message: "The shrine answers with a ${sign}.",
+        effects: [],
+        textVariables: {
+          sign: ["bell", "mirror"],
+        },
+      },
+    ],
+  };
+
+  const selection = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const editedPayloads: Array<{ embeds?: Array<{ description?: string }> }> = [];
+  const message = {
+    edit: async (payload: { embeds?: Array<{ description?: string }> }) => {
+      editedPayloads.push(payload);
+    },
+  } as unknown as Message;
+  const activeEventsById = new Map([
+    [
+      "event-1",
+      {
+        eventId: "event-1",
+        selection,
+        message,
+        sequenceChallenge: null,
+        claimWindowExpiresAtMs: Date.now() + 60_000,
+        attemptedUserIds: new Set<string>(),
+        failedAttemptLines: [],
+      },
+    ],
+  ]);
+  const state = createRandomEventsState();
+  registerActiveRandomEvent(state, {
+    id: "event-1",
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  const originalRandom = Math.random;
+  Math.random = (() => {
+    const values = [0, 0.999];
+    let index = 0;
+    return () => values[index++] ?? 0.999;
+  })();
+
+  try {
+    await resolveRandomEvent({
+      activeEventsById,
+      state,
+      progression: {
+        getDiceSides: () => 6,
+        getDiceBans: () => new Map(),
+        applyDiceTemporaryEffect: () => null as never,
+      },
+      hostileEffects: {
+        applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      },
+      eventId: "event-1",
+      participants: ["111", "222"],
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  const description = editedPayloads[0]?.embeds?.[0]?.description;
+  assert.ok(description);
+  assert.match(description, /<@111>: Success: The shrine answers with a bell\./);
+  assert.match(description, /<@222>: Success: The shrine answers with a bell\./);
+  assert.doesNotMatch(description, /mirror/);
 });
