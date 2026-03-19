@@ -6,7 +6,7 @@ import { getRaidsStateSnapshot, type RaidsState } from "./state-store";
 type RegisteredRaidsAdminController = {
   config: RaidsConfig;
   state: RaidsState;
-  runtime: RaidsLiveRuntime;
+  runtime: RaidsLiveRuntime | null;
 };
 
 let registeredController: RegisteredRaidsAdminController | null = null;
@@ -32,7 +32,7 @@ export const getRaidsAdminStatus = (): RaidAdminStatus | null => {
     joinLeadMs: registeredController.config.joinLeadMs,
     activeDurationMs: registeredController.config.activeDurationMs,
     snapshot: getRaidsStateSnapshot(registeredController.state),
-    activeRaids: registeredController.runtime.getActiveRaidsSnapshot(),
+    activeRaids: registeredController.runtime?.getActiveRaidsSnapshot() ?? [],
   };
 };
 
@@ -43,6 +43,10 @@ export const triggerRaidNow = async (): Promise<TriggerRaidNowResult> => {
 
   if (!registeredController.config.enabled) {
     return { ok: false, reason: "disabled" };
+  }
+
+  if (!registeredController.runtime) {
+    return { ok: false, reason: "unavailable" };
   }
 
   if (manualTriggerInFlight || registeredController.state.activeRaidsById.size > 0) {
