@@ -157,7 +157,7 @@ Raids are timed co-op server events with a signup phase and a separate combat ph
 - When the timer hits zero, Rolly posts a fresh boss message and opens a thread from it.
 - Joined players attack by using normal `/dice` rolls inside that raid thread.
 - The boss HP is updated on the thread starter message, and the fight ends on kill or timeout.
-- On success, all joined raiders currently receive a temporary `x2` roll-pass buff for their next 3 `/dice` rolls, even if they joined but never attacked.
+- On success, each joined raider who landed at least one hit earns the full pip payout for that boss level. Joined raiders who never hit do not get the clear reward.
 
 ## Architecture
 
