@@ -20,6 +20,8 @@ import type {
   RandomEventClaimActivityTemplates,
   RandomEventEffect,
   RandomEventOutcome,
+  RandomEventOutcomeResolution,
+  RandomEventRetryPolicy,
   RandomEventScenario,
 } from "../dice/random-events/domain/content";
 import type {
@@ -37,6 +39,12 @@ type UnknownRecord = Record<string, unknown>;
 
 const rarityTiers = ["common", "uncommon", "rare", "epic", "legendary"] as const;
 const claimPolicies = ["first-click", "multi-user"] as const;
+const randomEventOutcomeResolutions = [
+  "resolve-success",
+  "resolve-failure",
+  "keep-open-failure",
+] as const;
+const randomEventRetryPolicies = ["once-per-user", "allow-retry"] as const;
 const achievementRuleTypes = [
   "ordered-sequence",
   "contains-all-values",
@@ -158,6 +166,34 @@ const readRarityTier = (value: unknown, label: string): RandomEventRarityTier =>
   }
 
   return parsed as RandomEventRarityTier;
+};
+
+const readRandomEventOutcomeResolution = (
+  value: unknown,
+  label: string,
+): RandomEventOutcomeResolution => {
+  const parsed = readNonEmptyString(value, label);
+  if (!randomEventOutcomeResolutions.includes(parsed as RandomEventOutcomeResolution)) {
+    throw new Error(`${label} must be one of ${randomEventOutcomeResolutions.join(", ")}.`);
+  }
+
+  return parsed as RandomEventOutcomeResolution;
+};
+
+const readRandomEventRetryPolicy = (
+  value: unknown,
+  label: string,
+): RandomEventRetryPolicy | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = readNonEmptyString(value, label);
+  if (!randomEventRetryPolicies.includes(parsed as RandomEventRetryPolicy)) {
+    throw new Error(`${label} must be one of ${randomEventRetryPolicies.join(", ")}.`);
+  }
+
+  return parsed as RandomEventRetryPolicy;
 };
 
 const readTextVariables = (value: unknown, label: string): Record<string, string[]> | undefined => {
@@ -344,6 +380,7 @@ const readRandomEventOutcome = (value: unknown, label: string): RandomEventOutco
   return {
     id: readNonEmptyString(record.id, `${label}.id`),
     weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
+    resolution: readRandomEventOutcomeResolution(record.resolution, `${label}.resolution`),
     message: readNonEmptyString(record.message, `${label}.message`),
     effects: record.effects.map((entry, index) =>
       readRandomEventEffect(entry, `${label}.effects[${index}]`),
@@ -372,6 +409,7 @@ const readRandomEventScenario = (value: unknown, label: string): RandomEventScen
     claimPolicy: readClaimPolicy(record.claimPolicy, `${label}.claimPolicy`),
     claimWindowSeconds: readInteger(record.claimWindowSeconds, `${label}.claimWindowSeconds`, 1),
     weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
+    retryPolicy: readRandomEventRetryPolicy(record.retryPolicy, `${label}.retryPolicy`),
     textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
     rollChallenge: readRollChallengeDefinition(record.rollChallenge, `${label}.rollChallenge`),
     challengeOutcomeIds:

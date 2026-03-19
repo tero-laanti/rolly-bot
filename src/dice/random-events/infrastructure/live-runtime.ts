@@ -3,12 +3,13 @@ import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
-import { createRandomEventContentState } from "../domain/content";
+import { createRandomEventContentState, getRandomEventRetryPolicy } from "../domain/content";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
 import {
   advanceRollChallengeStep,
   createRollChallengeProgress,
   type RandomEventRollChallengeDefinition,
+  type RandomEventRollChallengeProgress,
 } from "../domain/roll-challenges";
 import type { RandomEventRarityTier } from "../domain/variety";
 import {
@@ -16,6 +17,7 @@ import {
   buildRandomEventClaimPrompt,
   createRandomEventInteractionWindowManager,
   parseRandomEventClaimButtonId,
+  type RandomEventInteractionWindowLifecycleContext,
 } from "../interfaces/discord/interaction-window";
 import type { TriggerOpportunityResult } from "./foundation-scheduler";
 import {
@@ -26,7 +28,11 @@ import {
   getRandomEventEmbedTitle,
   getRandomEventRarityPresentation,
 } from "./live-runtime-presentation";
-import { resolveRandomEvent } from "./live-runtime-resolution";
+import {
+  resolveRandomEvent,
+  resolveRandomEventAttempt,
+  type RandomEventAttemptResolution,
+} from "./live-runtime-resolution";
 import { triggerRandomEventOpportunity } from "./live-runtime-trigger";
 import type {
   ActiveRandomEventContext,
@@ -63,8 +69,15 @@ export type RandomEventsLiveRuntime = {
   stop: () => void;
 };
 
+const sequenceChallengeMinDurationMs = 20_000;
+const sequenceChallengeMaxDurationMs = 60_000;
+const clickCooldownMs = 2_000;
+
 const getSequenceChallengeDurationMs = (challenge: RandomEventRollChallengeDefinition): number => {
-  return Math.min(60_000, Math.max(20_000, challenge.steps.length * 12_000));
+  return Math.min(
+    sequenceChallengeMaxDurationMs,
+    Math.max(sequenceChallengeMinDurationMs, challenge.steps.length * 12_000),
+  );
 };
 
 const getSequenceChallenge = (
@@ -104,6 +117,7 @@ export const createRandomEventsLiveRuntime = ({
 }: CreateRandomEventsLiveRuntimeInput): RandomEventsLiveRuntime => {
   const contentState = createRandomEventContentState();
   const activeEventsById = new Map<string, ActiveRandomEventContext>();
+  const clickCooldownByUserId = new Map<string, number>();
   const db = getDatabase();
   const progression = createSqliteProgressionRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
@@ -111,6 +125,17 @@ export const createRandomEventsLiveRuntime = ({
   const windowManager = createRandomEventInteractionWindowManager({
     logger,
   });
+
+  const isWithinClickCooldown = (userId: string): boolean => {
+    const lastClickAtMs = clickCooldownByUserId.get(userId) ?? 0;
+    const nowMs = Date.now();
+    if (nowMs - lastClickAtMs < clickCooldownMs) {
+      return true;
+    }
+
+    clickCooldownByUserId.set(userId, nowMs);
+    return false;
+  };
 
   const refreshActiveEventPrompt = async (
     eventId: string,
@@ -137,8 +162,9 @@ export const createRandomEventsLiveRuntime = ({
       description: buildActiveClaimDescription(
         context.selection.renderedPrompt,
         activityLine,
-        windowSnapshot?.expiresAtMs ?? null,
+        windowSnapshot?.expiresAtMs ?? context.claimWindowExpiresAtMs,
         windowSnapshot?.participants ?? [],
+        context.failedAttemptLines,
       ),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
       buttonLabel: context.selection.renderedClaimLabel,
@@ -185,11 +211,13 @@ export const createRandomEventsLiveRuntime = ({
     participants,
     challengeProgressByUserId,
     resolutionNotesByUserId,
+    attemptResolutionsByUserId,
   }: {
     eventId: string;
     participants: string[];
-    challengeProgressByUserId?: ReadonlyMap<string, ReturnType<typeof createRollChallengeProgress>>;
+    challengeProgressByUserId?: ReadonlyMap<string, RandomEventRollChallengeProgress>;
     resolutionNotesByUserId?: ReadonlyMap<string, string>;
+    attemptResolutionsByUserId?: ReadonlyMap<string, RandomEventAttemptResolution>;
   }): Promise<void> => {
     const context = activeEventsById.get(eventId);
     clearSequenceChallengeTimer(context);
@@ -206,6 +234,117 @@ export const createRandomEventsLiveRuntime = ({
       participants,
       challengeProgressByUserId,
       resolutionNotesByUserId,
+      attemptResolutionsByUserId,
+    });
+  };
+
+  const onClaimWindowResolved = async (
+    eventId: string,
+    lifecycle: RandomEventInteractionWindowLifecycleContext,
+  ): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    if (!context) {
+      return;
+    }
+
+    const participants = lifecycle.snapshot.participants;
+    if (lifecycle.reason === "expired") {
+      await resolveEvent({ eventId, participants });
+      return;
+    }
+
+    const challenge = context.selection.scenario.rollChallenge;
+    if (
+      participants.length === 1 &&
+      context.selection.scenario.claimPolicy === "first-click" &&
+      challenge?.mode === "sequence"
+    ) {
+      await startSequenceChallenge(eventId, participants[0] as string);
+      return;
+    }
+
+    if (participants.length === 1 && context.selection.scenario.claimPolicy === "first-click") {
+      await processFirstClickAttempt({
+        eventId,
+        userId: participants[0] as string,
+      });
+      return;
+    }
+
+    await resolveEvent({ eventId, participants });
+  };
+
+  const reopenFirstClickEvent = async (eventId: string): Promise<boolean> => {
+    const context = activeEventsById.get(eventId);
+    if (!context) {
+      return false;
+    }
+
+    const remainingDurationMs = context.claimWindowExpiresAtMs - Date.now();
+    if (remainingDurationMs < 1) {
+      return false;
+    }
+
+    const snapshot = windowManager.openWindow({
+      windowId: eventId,
+      durationMs: remainingDurationMs,
+      policy: "first-click",
+      callbacks: {
+        onResolved: async (lifecycle) => {
+          await onClaimWindowResolved(eventId, lifecycle);
+        },
+      },
+    });
+
+    updateActiveRandomEventExpiry(state, eventId, new Date(snapshot.expiresAtMs));
+    await refreshActiveEventPrompt(eventId, null);
+    return true;
+  };
+
+  const processFirstClickAttempt = async ({
+    eventId,
+    userId,
+    challengeProgress,
+    resolutionNote,
+  }: {
+    eventId: string;
+    userId: string;
+    challengeProgress?: RandomEventRollChallengeProgress | null;
+    resolutionNote?: string | null;
+  }): Promise<void> => {
+    const context = activeEventsById.get(eventId);
+    if (!context) {
+      return;
+    }
+
+    const attemptResolution = resolveRandomEventAttempt({
+      progression,
+      hostileEffects,
+      selection: context.selection,
+      userId,
+      challengeProgress,
+      resolutionNote,
+    });
+
+    if (attemptResolution.resolution === "keep-open-failure") {
+      context.attemptedUserIds.add(userId);
+      context.failedAttemptLines.push(attemptResolution.keepOpenLine);
+      context.sequenceChallenge = null;
+
+      const reopened = await reopenFirstClickEvent(eventId);
+      if (!reopened) {
+        await resolveEvent({
+          eventId,
+          participants: [],
+        });
+      }
+      return;
+    }
+
+    await resolveEvent({
+      eventId,
+      participants: [userId],
+      attemptResolutionsByUserId: new Map([[userId, attemptResolution]]),
     });
   };
 
@@ -232,13 +371,11 @@ export const createRandomEventsLiveRuntime = ({
       progress,
     };
 
-    await resolveEvent({
+    await processFirstClickAttempt({
       eventId,
-      participants: [session.userId],
-      challengeProgressByUserId: new Map([[session.userId, progress]]),
-      resolutionNotesByUserId: new Map([
-        [session.userId, "⏱️ The remaining rolls were resolved automatically when time ran out."],
-      ]),
+      userId: session.userId,
+      challengeProgress: progress,
+      resolutionNote: "⏱️ The remaining rolls were resolved automatically when time ran out.",
     });
   };
 
@@ -250,9 +387,9 @@ export const createRandomEventsLiveRuntime = ({
 
     const challenge = context.selection.scenario.rollChallenge;
     if (!challenge || challenge.mode !== "sequence") {
-      await resolveEvent({
+      await processFirstClickAttempt({
         eventId,
-        participants: [userId],
+        userId,
       });
       return;
     }
@@ -276,23 +413,6 @@ export const createRandomEventsLiveRuntime = ({
     await refreshSequenceChallengePrompt(eventId);
   };
 
-  const onClaimWindowResolved = async (eventId: string, participants: string[]): Promise<void> => {
-    const context = activeEventsById.get(eventId);
-    const challenge = context?.selection.scenario.rollChallenge;
-
-    if (
-      context &&
-      participants.length === 1 &&
-      context.selection.scenario.claimPolicy === "first-click" &&
-      challenge?.mode === "sequence"
-    ) {
-      await startSequenceChallenge(eventId, participants[0] as string);
-      return;
-    }
-
-    await resolveEvent({ eventId, participants });
-  };
-
   const onTriggerOpportunity = async (context: {
     now: Date;
     requiredClaimPolicy?: RandomEventClaimPolicy;
@@ -305,8 +425,8 @@ export const createRandomEventsLiveRuntime = ({
       activeEventsById,
       windowManager,
       requiredClaimPolicy: context.requiredClaimPolicy,
-      onResolved: async (eventId, participants) => {
-        await onClaimWindowResolved(eventId, participants);
+      onResolved: async (eventId, lifecycle) => {
+        await onClaimWindowResolved(eventId, lifecycle);
       },
     });
   };
@@ -315,6 +435,14 @@ export const createRandomEventsLiveRuntime = ({
     const eventId = parseRandomEventClaimButtonId(interaction.customId);
     if (!eventId) {
       await interaction.deferUpdate();
+      return;
+    }
+
+    if (isWithinClickCooldown(interaction.user.id)) {
+      await interaction.reply({
+        content: "Slow down a bit. Wait 2 seconds before clicking again.",
+        ephemeral: true,
+      });
       return;
     }
 
@@ -351,15 +479,30 @@ export const createRandomEventsLiveRuntime = ({
       };
 
       if (nextProgress.completed) {
-        await resolveEvent({
+        await processFirstClickAttempt({
           eventId,
-          participants: [session.userId],
-          challengeProgressByUserId: new Map([[session.userId, nextProgress]]),
+          userId: session.userId,
+          challengeProgress: nextProgress,
         });
         return;
       }
 
       await refreshSequenceChallengePrompt(eventId);
+      return;
+    }
+
+    const retryPolicy = activeContext
+      ? getRandomEventRetryPolicy(activeContext.selection.scenario)
+      : null;
+    if (
+      activeContext?.selection.scenario.claimPolicy === "first-click" &&
+      retryPolicy === "once-per-user" &&
+      activeContext.attemptedUserIds.has(interaction.user.id)
+    ) {
+      await interaction.reply({
+        content: "You already failed this one. Let someone else take a shot.",
+        ephemeral: true,
+      });
       return;
     }
 
@@ -386,7 +529,7 @@ export const createRandomEventsLiveRuntime = ({
 
     if (result.status === "already-claimed") {
       await interaction.reply({
-        content: "Too late — someone else got there first.",
+        content: "Too late — someone else is already attempting this.",
         ephemeral: true,
       });
       return;
@@ -418,7 +561,7 @@ export const createRandomEventsLiveRuntime = ({
             ? new Date(sequenceContext.session.expiresAtMs)
             : windowSnapshot
               ? new Date(windowSnapshot.expiresAtMs)
-              : null,
+              : new Date(context.claimWindowExpiresAtMs),
           channelId: context.message.channelId,
           messageId: context.message.id,
         };
@@ -432,6 +575,7 @@ export const createRandomEventsLiveRuntime = ({
 
   const stop = (): void => {
     windowManager.stop();
+    clickCooldownByUserId.clear();
     for (const context of activeEventsById.values()) {
       clearSequenceChallengeTimer(context);
     }
