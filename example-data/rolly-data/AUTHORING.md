@@ -1,7 +1,7 @@
 # Rolly Data Authoring Guide
 
-This directory documents the current `rolly-data` contract without changing the runtime format.
-All data files remain plain JSON.
+This directory explains the current `rolly-data` contract without changing the runtime format.
+All data files are plain JSON.
 
 Use the file-specific guides when authoring or reviewing private `rolly-data`:
 
@@ -17,6 +17,4 @@ Use the file-specific guides when authoring or reviewing private `rolly-data`:
 General rules:
 
 - Keep `id` values stable.
-- Treat the validators as the structural source of truth and these docs as the human explanation layer.
-- Documented behavior here should match the current runtime, not aspirational future behavior.
-- Tunable gameplay numbers and player-facing generated content pools belong in `rolly-data`, not hidden constants in runtime code.
+- Treat the validators as the exact structural contract. These docs explain what the fields mean when you are editing data.

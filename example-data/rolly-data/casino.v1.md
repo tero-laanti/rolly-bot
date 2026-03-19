@@ -28,7 +28,6 @@ Bet config:
 ```
 
 - `min <= default <= max` must hold.
-- Casino analytics now group by the actual clamped bet amount, so there is no separate `rolly-data` field for analytics tiers.
 
 Exact Roll:
 
