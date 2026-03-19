@@ -1,11 +1,9 @@
 import type { RaidsConfig } from "../../../shared/config";
 import type { RaidsAdminPort, RaidAdminStatus, TriggerRaidNowResult } from "../application/ports";
 import type { RaidsLiveRuntime } from "./live-runtime";
-import { getRaidsStateSnapshot, type RaidsState } from "./state-store";
 
 type RegisteredRaidsAdminController = {
   config: RaidsConfig;
-  state: RaidsState;
   runtime: RaidsLiveRuntime | null;
 };
 
@@ -26,13 +24,17 @@ export const getRaidsAdminStatus = (): RaidAdminStatus | null => {
     return null;
   }
 
+  const liveRaids = registeredController.runtime?.getLiveRaidsSnapshot() ?? [];
+
   return {
     enabled: registeredController.config.enabled,
     channelId: registeredController.config.channelId,
     joinLeadMs: registeredController.config.joinLeadMs,
     activeDurationMs: registeredController.config.activeDurationMs,
-    snapshot: getRaidsStateSnapshot(registeredController.state),
-    activeRaids: registeredController.runtime?.getActiveRaidsSnapshot() ?? [],
+    snapshot: {
+      liveRaidCount: liveRaids.length,
+    },
+    liveRaids,
   };
 };
 
@@ -49,7 +51,7 @@ export const triggerRaidNow = async (): Promise<TriggerRaidNowResult> => {
     return { ok: false, reason: "unavailable" };
   }
 
-  if (manualTriggerInFlight || registeredController.state.activeRaidsById.size > 0) {
+  if (manualTriggerInFlight || registeredController.runtime.hasBlockingRaid()) {
     return { ok: false, reason: "active-raid-exists" };
   }
 

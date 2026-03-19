@@ -7,17 +7,28 @@ export type RaidsLiveRuntimeLogger = {
   error: (...args: unknown[]) => void;
 };
 
-export type ActiveRaidContext = {
+export type ActiveRaidRecord = {
   raidId: string;
   title: string;
+  createdAtMs: number;
   status: RaidStatus;
+  scheduledStartAtMs: number;
+  startedAtMs: number | null;
+  expiresAtMs: number | null;
+  closedAtMs: number | null;
+  participantIds: Set<string>;
+};
+
+export type ActiveRaidHandles = {
   announcementMessage: Message;
   activeMessage: Message | null;
-  scheduledStartAtMs: number;
-  expiresAtMs: number | null;
-  participantIds: Set<string>;
   startTimer: ReturnType<typeof setTimeout> | null;
   resolveTimer: ReturnType<typeof setTimeout> | null;
   announcementEditChain: Promise<void>;
-  joinWindowClosed: boolean;
+  transitionChain: Promise<void>;
+};
+
+export type ActiveRaidContext = {
+  raid: ActiveRaidRecord;
+  handles: ActiveRaidHandles;
 };

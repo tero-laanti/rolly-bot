@@ -1,6 +1,14 @@
-export type RaidStatus = "joining" | "active";
+export type RaidStatus =
+  | "joining"
+  | "starting"
+  | "active"
+  | "cancelled"
+  | "interrupted"
+  | "start-failed"
+  | "resolved"
+  | "cleanup-needed";
 
-export type RaidAdminActiveRaidSnapshot = {
+export type RaidAdminLiveRaidSnapshot = {
   raidId: string;
   title: string;
   status: RaidStatus;
@@ -13,7 +21,7 @@ export type RaidAdminActiveRaidSnapshot = {
 };
 
 export type RaidAdminStateSnapshot = {
-  activeRaidCount: number;
+  liveRaidCount: number;
 };
 
 export type RaidAdminStatus = {
@@ -22,8 +30,18 @@ export type RaidAdminStatus = {
   joinLeadMs: number;
   activeDurationMs: number;
   snapshot: RaidAdminStateSnapshot;
-  activeRaids: RaidAdminActiveRaidSnapshot[];
+  liveRaids: RaidAdminLiveRaidSnapshot[];
 };
+
+export type TriggerRaidNowOutcome =
+  | {
+      created: true;
+      raidId: string;
+      scheduledStartAt: Date;
+    }
+  | {
+      created: false;
+    };
 
 export type TriggerRaidNowResult =
   | {
@@ -32,17 +50,7 @@ export type TriggerRaidNowResult =
     }
   | {
       ok: true;
-      result:
-        | {
-            created: true;
-            raidId?: string;
-            scheduledStartAt?: Date | null;
-          }
-        | {
-            created: false;
-          }
-        | null
-        | undefined;
+      result: TriggerRaidNowOutcome;
     };
 
 export type RaidsAdminPort = {
