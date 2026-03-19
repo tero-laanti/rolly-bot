@@ -109,5 +109,40 @@
         "<@{userId}> is already in this example attempt."
       ]
     }
+  },
+  {
+    "id": "example-group-threshold",
+    "rarity": "epic",
+    "title": "Example Group Threshold",
+    "prompt": "A sealed vault hums with three keyholes. Gather a team to open it?",
+    "claimLabel": "Ready up",
+    "claimPolicy": "multi-user",
+    "claimWindowSeconds": 80,
+    "requiredReadyCount": 3,
+    "outcomes": [
+      {
+        "id": "example-group-open",
+        "resolution": "resolve-success",
+        "message": "The vault opens the moment the third hand lands on it, and everyone inside catches a strong roll buff.",
+        "effects": [
+          {
+            "type": "temporary-roll-multiplier",
+            "multiplier": 5,
+            "rolls": 2,
+            "stackMode": "refresh"
+          }
+        ]
+      }
+    ],
+    "activityTemplates": {
+      "accepted": [
+        "<@{userId}> gets into position at the vault.",
+        "<@{userId}> takes one of the keyholes."
+      ],
+      "alreadyReady": [
+        "<@{userId}> is already ready at the vault.",
+        "<@{userId}> is already holding a keyhole."
+      ]
+    }
   }
 ]

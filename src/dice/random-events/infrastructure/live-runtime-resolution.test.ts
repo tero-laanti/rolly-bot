@@ -94,6 +94,21 @@ test("scenario validation rejects keep-open failures that are unreachable from c
   );
 });
 
+test("scenario validation rejects requiredReadyCount outside supported multi-user thresholds", () => {
+  const scenario = createChallengeScenario();
+  scenario.claimPolicy = "multi-user";
+  scenario.requiredReadyCount = 6;
+
+  assert.throws(() => validateRandomEventScenarios([scenario]), /between 2 and 5/i);
+});
+
+test("scenario validation rejects requiredReadyCount on first-click events", () => {
+  const scenario = createChallengeScenario();
+  scenario.requiredReadyCount = 3;
+
+  assert.throws(() => validateRandomEventScenarios([scenario]), /only valid for multi-user/i);
+});
+
 test("keep-open attempt resolution logs the user and keeps the event open", () => {
   const scenario = createChallengeScenario();
   const selection = renderRandomEventScenario(scenario);
@@ -271,7 +286,9 @@ test("multi-user events without challenge branching reuse one rendered outcome f
       progression: {
         getDiceSides: () => 6,
         getDiceBans: () => new Map(),
-        applyDiceTemporaryEffect: () => null as never,
+        applyDiceTemporaryEffect: () => {
+          throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+        },
       },
       hostileEffects: {
         applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
@@ -286,7 +303,87 @@ test("multi-user events without challenge branching reuse one rendered outcome f
 
   const description = editedPayloads[0]?.embeds?.[0]?.description;
   assert.ok(description);
-  assert.match(description, /<@111>: Success: The shrine answers with a bell\./);
-  assert.match(description, /<@222>: Success: The shrine answers with a bell\./);
-  assert.doesNotMatch(description, /mirror/);
+  const sharedOutcomeMatch = description.match(
+    /<@111>: Success: The shrine answers with a (bell|mirror)\.\n<@222>: Success: The shrine answers with a \1\./,
+  );
+  assert.ok(sharedOutcomeMatch);
+});
+
+test("threshold multi-user events expire if the required ready count is not met", async () => {
+  const scenario: RandomEventScenario = {
+    id: "threshold-expiry",
+    rarity: "rare",
+    title: "Threshold Expiry",
+    prompt: "The gate needs a team to push it open.",
+    claimLabel: "Push gate",
+    claimPolicy: "multi-user",
+    claimWindowSeconds: 60,
+    requiredReadyCount: 3,
+    outcomes: [
+      {
+        id: "gate-opens",
+        resolution: "resolve-success",
+        message: "The gate gives way.",
+        effects: [],
+      },
+    ],
+  };
+
+  const selection = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const editedPayloads: Array<{
+    embeds?: Array<{ description?: string; footer?: { text?: string } }>;
+  }> = [];
+  const message = {
+    edit: async (payload: {
+      embeds?: Array<{ description?: string; footer?: { text?: string } }>;
+    }) => {
+      editedPayloads.push(payload);
+    },
+  } as unknown as Message;
+  const activeEventsById = new Map([
+    [
+      "event-2",
+      {
+        eventId: "event-2",
+        selection,
+        message,
+        sequenceChallenge: null,
+        claimWindowExpiresAtMs: Date.now() + 60_000,
+        attemptedUserIds: new Set<string>(),
+        failedAttemptLines: [],
+      },
+    ],
+  ]);
+  const state = createRandomEventsState();
+  registerActiveRandomEvent(state, {
+    id: "event-2",
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  await resolveRandomEvent({
+    activeEventsById,
+    state,
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+    },
+    eventId: "event-2",
+    participants: ["111", "222"],
+  });
+
+  const expiredEmbed = editedPayloads[0]?.embeds?.[0];
+  assert.ok(expiredEmbed?.description);
+  assert.match(expiredEmbed.description, /Only 2\/3 players were ready before time ran out\./);
+  assert.match(expiredEmbed.description, /\*\*Ready players:\*\* <@111>, <@222>/);
+  assert.equal(expiredEmbed.footer?.text, "Rare Event • Expired");
 });

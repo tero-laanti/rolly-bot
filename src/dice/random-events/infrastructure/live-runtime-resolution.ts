@@ -270,7 +270,31 @@ export const resolveRandomEvent = async ({
   if (participants.length < 1) {
     await context.message.edit({
       content: "",
-      embeds: [buildExpiredEventEmbed(context.selection, context.failedAttemptLines).toJSON()],
+      embeds: [
+        buildExpiredEventEmbed(
+          context.selection,
+          context.failedAttemptLines,
+          participants,
+        ).toJSON(),
+      ],
+      components: [],
+    });
+    return;
+  }
+
+  if (
+    typeof context.selection.scenario.requiredReadyCount === "number" &&
+    participants.length < context.selection.scenario.requiredReadyCount
+  ) {
+    await context.message.edit({
+      content: "",
+      embeds: [
+        buildExpiredEventEmbed(
+          context.selection,
+          context.failedAttemptLines,
+          participants,
+        ).toJSON(),
+      ],
       components: [],
     });
     return;

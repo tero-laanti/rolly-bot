@@ -109,6 +109,18 @@ const readInteger = (
   return parsed;
 };
 
+const readOptionalInteger = (
+  value: unknown,
+  label: string,
+  minValue: number = Number.MIN_SAFE_INTEGER,
+): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return readInteger(value, label, minValue);
+};
+
 const readBoolean = (value: unknown, label: string): boolean => {
   if (typeof value !== "boolean") {
     throw new Error(`${label} must be a boolean.`);
@@ -408,6 +420,11 @@ const readRandomEventScenario = (value: unknown, label: string): RandomEventScen
     claimLabel: readNonEmptyString(record.claimLabel, `${label}.claimLabel`),
     claimPolicy: readClaimPolicy(record.claimPolicy, `${label}.claimPolicy`),
     claimWindowSeconds: readInteger(record.claimWindowSeconds, `${label}.claimWindowSeconds`, 1),
+    requiredReadyCount: readOptionalInteger(
+      record.requiredReadyCount,
+      `${label}.requiredReadyCount`,
+      2,
+    ),
     weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
     retryPolicy: readRandomEventRetryPolicy(record.retryPolicy, `${label}.retryPolicy`),
     textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
