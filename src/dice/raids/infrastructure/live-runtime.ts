@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { ButtonInteraction, Client } from "discord.js";
+import type { BaseMessageOptions, ButtonInteraction, Client } from "discord.js";
 import type { RaidsConfig } from "../../../shared/config";
 import { parseRaidJoinButtonId } from "../interfaces/discord/button-ids";
 import {
   buildRaidAnnouncementPrompt,
   buildRaidCancelledPrompt,
   buildRaidInterruptedPrompt,
+  buildRaidResolveFailedPrompt,
   buildRaidResolvedPrompt,
   buildRaidStartFailedPrompt,
   buildRaidStartedPrompt,
@@ -24,6 +25,13 @@ type CreateRaidsLiveRuntimeInput = {
   config: RaidsConfig;
   state: RaidsState;
   logger?: RaidsLiveRuntimeLogger;
+};
+
+type QueueAnnouncementEditInput = {
+  raidId: string;
+  logFailureMessage: string;
+  allowAfterJoinWindowClosed?: boolean;
+  createMessage: (context: ActiveRaidContext) => BaseMessageOptions;
 };
 
 export type TriggerRaidNowResult =
@@ -81,11 +89,24 @@ export const createRaidsLiveRuntime = ({
     }
   };
 
-  const refreshAnnouncementPrompt = async (raidId: string, disabled = false): Promise<void> => {
+  const forgetRaid = (raidId: string): void => {
+    clearRaidTimers(activeRaidsById.get(raidId));
+    activeRaidsById.delete(raidId);
+    resolveActiveRaid(state, raidId);
+  };
+
+  const queueAnnouncementEdit = async ({
+    raidId,
+    logFailureMessage,
+    allowAfterJoinWindowClosed = false,
+    createMessage,
+  }: QueueAnnouncementEditInput): Promise<boolean> => {
     const context = activeRaidsById.get(raidId);
     if (!context) {
-      return;
+      return false;
     }
+
+    let updated = false;
 
     context.announcementEditChain = context.announcementEditChain
       .catch(() => {
@@ -97,25 +118,103 @@ export const createRaidsLiveRuntime = ({
           return;
         }
 
-        if (!disabled && latestContext.joinWindowClosed) {
+        if (!allowAfterJoinWindowClosed && latestContext.joinWindowClosed) {
           return;
         }
 
-        await latestContext.announcementMessage
-          .edit(
-            buildRaidAnnouncementPrompt({
-              raidId,
-              participantIds: Array.from(latestContext.participantIds),
-              scheduledStartAtMs: latestContext.scheduledStartAtMs,
-              disabled,
-            }),
-          )
+        updated = await latestContext.announcementMessage
+          .edit(createMessage(latestContext))
+          .then(() => true)
           .catch((error) => {
-            logger.warn("[raids] Failed to refresh announcement prompt.", error);
+            logger.warn(logFailureMessage, error);
+            return false;
           });
       });
 
     await context.announcementEditChain;
+    return updated;
+  };
+
+  const refreshAnnouncementPrompt = async (raidId: string, disabled = false): Promise<boolean> => {
+    return queueAnnouncementEdit({
+      raidId,
+      logFailureMessage: "[raids] Failed to refresh announcement prompt.",
+      allowAfterJoinWindowClosed: disabled,
+      createMessage: (context) =>
+        buildRaidAnnouncementPrompt({
+          raidId,
+          participantIds: Array.from(context.participantIds),
+          scheduledStartAtMs: context.scheduledStartAtMs,
+          disabled,
+        }),
+    });
+  };
+
+  const renderCancelledAnnouncement = async (raidId: string): Promise<boolean> => {
+    return queueAnnouncementEdit({
+      raidId,
+      logFailureMessage: "[raids] Failed to update cancelled raid prompt.",
+      allowAfterJoinWindowClosed: true,
+      createMessage: (context) =>
+        buildRaidCancelledPrompt({
+          scheduledStartAtMs: context.scheduledStartAtMs,
+        }),
+    });
+  };
+
+  const renderStartFailedAnnouncement = async (raidId: string): Promise<boolean> => {
+    return queueAnnouncementEdit({
+      raidId,
+      logFailureMessage: "[raids] Failed to update failed-start raid prompt.",
+      allowAfterJoinWindowClosed: true,
+      createMessage: (context) =>
+        buildRaidStartFailedPrompt({
+          participantIds: Array.from(context.participantIds),
+        }),
+    });
+  };
+
+  const renderResolveFailedAnnouncement = async (raidId: string): Promise<boolean> => {
+    return queueAnnouncementEdit({
+      raidId,
+      logFailureMessage: "[raids] Failed to update failed-resolution raid prompt.",
+      allowAfterJoinWindowClosed: true,
+      createMessage: (context) =>
+        buildRaidResolveFailedPrompt({
+          participantIds: Array.from(context.participantIds),
+          resolvedAtMs: Date.now(),
+        }),
+    });
+  };
+
+  const closeRaidDuringShutdown = async (context: ActiveRaidContext): Promise<void> => {
+    context.joinWindowClosed = true;
+
+    await refreshAnnouncementPrompt(context.raidId, true);
+
+    const interruptedPrompt = buildRaidInterruptedPrompt({
+      participantIds: Array.from(context.participantIds),
+    });
+
+    const targetMessage = context.activeMessage ?? context.announcementMessage;
+    const closed = await targetMessage
+      .edit(interruptedPrompt)
+      .then(() => true)
+      .catch((error) => {
+        logger.warn("[raids] Failed to close raid during shutdown.", error);
+        return false;
+      });
+
+    if (!closed && context.activeMessage) {
+      await queueAnnouncementEdit({
+        raidId: context.raidId,
+        logFailureMessage: "[raids] Failed to update interrupted raid announcement.",
+        allowAfterJoinWindowClosed: true,
+        createMessage: () => interruptedPrompt,
+      });
+    }
+
+    forgetRaid(context.raidId);
   };
 
   const resolveRaidLifecycle = async (raidId: string): Promise<void> => {
@@ -141,12 +240,11 @@ export const createRaidsLiveRuntime = ({
         });
 
       if (!resolved) {
-        return;
+        await renderResolveFailedAnnouncement(raidId);
       }
     }
 
-    activeRaidsById.delete(raidId);
-    resolveActiveRaid(state, raidId);
+    forgetRaid(raidId);
   };
 
   const startRaid = async (raidId: string): Promise<void> => {
@@ -164,21 +262,16 @@ export const createRaidsLiveRuntime = ({
     await refreshAnnouncementPrompt(raidId, true);
 
     if (context.participantIds.size < 1) {
-      await context.announcementMessage
-        .edit(buildRaidCancelledPrompt({ scheduledStartAtMs: context.scheduledStartAtMs }))
-        .catch((error) => {
-          logger.warn("[raids] Failed to update cancelled raid prompt.", error);
-        });
-      activeRaidsById.delete(raidId);
-      resolveActiveRaid(state, raidId);
+      await renderCancelledAnnouncement(raidId);
+      forgetRaid(raidId);
       return;
     }
 
     const activeChannel = context.announcementMessage.channel;
     if (!("send" in activeChannel) || typeof activeChannel.send !== "function") {
       logger.error("[raids] Active raid channel is not writable.");
-      activeRaidsById.delete(raidId);
-      resolveActiveRaid(state, raidId);
+      await renderStartFailedAnnouncement(raidId);
+      forgetRaid(raidId);
       return;
     }
 
@@ -196,17 +289,8 @@ export const createRaidsLiveRuntime = ({
       });
 
     if (!activeMessage) {
-      await context.announcementMessage
-        .edit(
-          buildRaidStartFailedPrompt({
-            participantIds: Array.from(context.participantIds),
-          }),
-        )
-        .catch((error) => {
-          logger.warn("[raids] Failed to update failed-start raid prompt.", error);
-        });
-      activeRaidsById.delete(raidId);
-      resolveActiveRaid(state, raidId);
+      await renderStartFailedAnnouncement(raidId);
+      forgetRaid(raidId);
       return;
     }
 
@@ -357,26 +441,8 @@ export const createRaidsLiveRuntime = ({
   const stop = async (): Promise<void> => {
     const activeRaids = Array.from(activeRaidsById.values());
     for (const context of activeRaids) {
-      clearRaidTimers(context);
-      context.joinWindowClosed = true;
-
-      await refreshAnnouncementPrompt(context.raidId, true).catch((error) => {
-        logger.warn("[raids] Failed to disable raid announcement during shutdown.", error);
-      });
-
-      const interruptedPrompt = buildRaidInterruptedPrompt({
-        participantIds: Array.from(context.participantIds),
-      });
-
-      const targetMessage = context.activeMessage ?? context.announcementMessage;
-      await targetMessage.edit(interruptedPrompt).catch((error) => {
-        logger.warn("[raids] Failed to close raid during shutdown.", error);
-      });
-
-      resolveActiveRaid(state, context.raidId);
+      await closeRaidDuringShutdown(context);
     }
-
-    activeRaidsById.clear();
   };
 
   return {
