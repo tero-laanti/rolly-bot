@@ -18,4 +18,5 @@ export type ActiveRaidContext = {
   participantIds: Set<string>;
   startTimer: ReturnType<typeof setTimeout> | null;
   resolveTimer: ReturnType<typeof setTimeout> | null;
+  announcementEditChain: Promise<void>;
 };
