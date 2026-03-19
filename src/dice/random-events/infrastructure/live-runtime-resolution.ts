@@ -1,6 +1,7 @@
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import type { DiceHostileEffectsService } from "../../progression/application/hostile-effects-service";
 import {
+  hasRandomEventChallengeOutcomeBranching,
   renderRandomEventOutcome,
   selectRandomEventOutcomeForScenario,
   type RandomEventOutcome,
@@ -300,20 +301,17 @@ export const resolveRandomEvent = async ({
     return;
   }
 
+  const scenario = context.selection.scenario;
   const participantsToResolve =
-    context.selection.scenario.claimPolicy === "first-click"
-      ? [participants[0] as string]
-      : participants;
+    scenario.claimPolicy === "first-click" ? [participants[0] as string] : participants;
   const sharedOutcomeSelection =
     participantsToResolve.length > 1 &&
-    context.selection.scenario.claimPolicy === "multi-user" &&
-    !context.selection.scenario.challengeOutcomeIds
+    scenario.claimPolicy === "multi-user" &&
+    !hasRandomEventChallengeOutcomeBranching(scenario)
       ? (() => {
-          const outcome = selectRandomEventOutcomeForScenario(context.selection.scenario);
+          const outcome = selectRandomEventOutcomeForScenario(scenario);
           if (!outcome) {
-            throw new Error(
-              `Scenario ${context.selection.scenario.id} did not produce an outcome.`,
-            );
+            throw new Error(`Scenario ${scenario.id} did not produce an outcome.`);
           }
 
           const renderedOutcome = renderRandomEventOutcome(context.selection, outcome);

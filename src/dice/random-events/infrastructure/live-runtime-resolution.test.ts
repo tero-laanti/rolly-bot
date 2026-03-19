@@ -359,28 +359,9 @@ test("expired event history does not reuse open-state retry wording", () => {
   assert.match(description, /The window closes before anyone pulls it off\./);
 });
 
-test("multi-user events without challenge branching reuse one rendered outcome for all participants", async () => {
-  const scenario: RandomEventScenario = {
-    id: "shared-group-outcome",
-    rarity: "uncommon",
-    title: "Shared Group Outcome",
-    prompt: "Everyone crowds around the same shrine.",
-    claimLabel: "Gather",
-    claimPolicy: "multi-user",
-    claimWindowSeconds: 60,
-    outcomes: [
-      {
-        id: "shared-outcome",
-        resolution: "resolve-success",
-        message: "The shrine answers with a ${sign}.",
-        effects: [],
-        textVariables: {
-          sign: ["bell", "mirror"],
-        },
-      },
-    ],
-  };
-
+const resolveMultiUserScenarioDescription = async (
+  scenario: RandomEventScenario,
+): Promise<string | undefined> => {
   const selection = renderRandomEventScenario(scenario, {
     random: () => 0,
   });
@@ -440,7 +421,68 @@ test("multi-user events without challenge branching reuse one rendered outcome f
     Math.random = originalRandom;
   }
 
-  const description = editedPayloads[0]?.embeds?.[0]?.description;
+  return editedPayloads[0]?.embeds?.[0]?.description;
+};
+
+test("multi-user events without challenge branching reuse one rendered outcome for all participants", async () => {
+  const scenario: RandomEventScenario = {
+    id: "shared-group-outcome",
+    rarity: "uncommon",
+    title: "Shared Group Outcome",
+    prompt: "Everyone crowds around the same shrine.",
+    claimLabel: "Gather",
+    claimPolicy: "multi-user",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "shared-outcome",
+        resolution: "resolve-success",
+        message: "The shrine answers with a ${sign}.",
+        effects: [],
+        textVariables: {
+          sign: ["bell", "mirror"],
+        },
+      },
+    ],
+  };
+
+  const description = await resolveMultiUserScenarioDescription(scenario);
+
+  assert.ok(description);
+  const sharedOutcomeMatch = description.match(
+    /<@111>: Success: The shrine answers with a (bell|mirror)\.\n<@222>: Success: The shrine answers with a \1\./,
+  );
+  assert.ok(sharedOutcomeMatch);
+});
+
+test("multi-user events ignore stray challengeOutcomeIds when there is no roll challenge", async () => {
+  const scenario: RandomEventScenario = {
+    id: "shared-outcome-stray-branching",
+    rarity: "uncommon",
+    title: "Shared Outcome Stray Branching",
+    prompt: "Everyone crowds around the same shrine.",
+    claimLabel: "Gather",
+    claimPolicy: "multi-user",
+    claimWindowSeconds: 60,
+    challengeOutcomeIds: {
+      success: ["shared-outcome"],
+      failure: ["shared-outcome"],
+    },
+    outcomes: [
+      {
+        id: "shared-outcome",
+        resolution: "resolve-success",
+        message: "The shrine answers with a ${sign}.",
+        effects: [],
+        textVariables: {
+          sign: ["bell", "mirror"],
+        },
+      },
+    ],
+  };
+
+  const description = await resolveMultiUserScenarioDescription(scenario);
+
   assert.ok(description);
   const sharedOutcomeMatch = description.match(
     /<@111>: Success: The shrine answers with a (bell|mirror)\.\n<@222>: Success: The shrine answers with a \1\./,

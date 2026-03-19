@@ -16,13 +16,14 @@ import type {
   DiceRaidData,
   DiceRaidRewardData,
 } from "./types";
-import type {
-  RandomEventClaimActivityTemplates,
-  RandomEventEffect,
-  RandomEventOutcome,
-  RandomEventOutcomeResolution,
-  RandomEventRetryPolicy,
-  RandomEventScenario,
+import {
+  validateRandomEventScenarios,
+  type RandomEventClaimActivityTemplates,
+  type RandomEventEffect,
+  type RandomEventOutcome,
+  type RandomEventOutcomeResolution,
+  type RandomEventRetryPolicy,
+  type RandomEventScenario,
 } from "../dice/random-events/domain/content";
 import type {
   RandomEventRollChallengeDefinition,
@@ -551,92 +552,6 @@ const readRarityNumberRecord = (
   };
 };
 
-const validateParsedRollChallengeDefinition = (
-  challenge: RandomEventRollChallengeDefinition,
-): void => {
-  if (challenge.id.trim().length < 1) {
-    throw new Error("Roll challenge id cannot be empty.");
-  }
-
-  if (challenge.steps.length < 1) {
-    throw new Error(`Roll challenge ${challenge.id} must include at least one step.`);
-  }
-
-  const ids = new Set<string>();
-  for (const step of challenge.steps) {
-    if (ids.has(step.id)) {
-      throw new Error(`Roll challenge ${challenge.id} has duplicate step id ${step.id}.`);
-    }
-
-    ids.add(step.id);
-  }
-
-  if (challenge.mode === "single-step" && challenge.steps.length !== 1) {
-    throw new Error(
-      `Roll challenge ${challenge.id} single-step mode must define exactly one step.`,
-    );
-  }
-};
-
-const validateParsedRandomEventScenario = (scenario: RandomEventScenario): void => {
-  if (scenario.id.trim().length < 1) {
-    throw new Error("Random event scenario id cannot be empty.");
-  }
-
-  if (scenario.title.trim().length < 1) {
-    throw new Error(`Random event scenario ${scenario.id} must have a title.`);
-  }
-
-  if (scenario.prompt.trim().length < 1) {
-    throw new Error(`Random event scenario ${scenario.id} must have a prompt.`);
-  }
-
-  if (scenario.claimWindowSeconds < 10) {
-    throw new Error(`Random event scenario ${scenario.id} must have at least 10s claim window.`);
-  }
-
-  if (scenario.outcomes.length < 1) {
-    throw new Error(`Random event scenario ${scenario.id} must define at least one outcome.`);
-  }
-
-  if (scenario.rollChallenge) {
-    validateParsedRollChallengeDefinition(scenario.rollChallenge);
-  }
-
-  if (scenario.challengeOutcomeIds) {
-    const outcomeIdSet = new Set(scenario.outcomes.map((outcome) => outcome.id));
-    for (const [key, outcomeIds] of Object.entries(scenario.challengeOutcomeIds) as Array<
-      ["success" | "failure", string[]]
-    >) {
-      if (outcomeIds.length < 1) {
-        throw new Error(
-          `Scenario ${scenario.id} challengeOutcomeIds.${key} must have at least one id.`,
-        );
-      }
-
-      for (const outcomeId of outcomeIds) {
-        if (!outcomeIdSet.has(outcomeId)) {
-          throw new Error(
-            `Scenario ${scenario.id} challengeOutcomeIds.${key} references missing outcome '${outcomeId}'.`,
-          );
-        }
-      }
-    }
-  }
-};
-
-const validateParsedRandomEventScenarios = (scenarios: RandomEventScenario[]): void => {
-  const ids = new Set<string>();
-  for (const scenario of scenarios) {
-    validateParsedRandomEventScenario(scenario);
-    if (ids.has(scenario.id)) {
-      throw new Error(`Duplicate random event scenario id: ${scenario.id}`);
-    }
-
-    ids.add(scenario.id);
-  }
-};
-
 const readPityConfig = (value: unknown, label: string): RandomEventVarietyPityConfig => {
   const record = assertRecord(value, label);
   if (typeof record.enabled !== "boolean") {
@@ -1157,7 +1072,7 @@ export const parseRandomEventScenarios = (value: unknown): RandomEventScenario[]
   const parsed = value.map((entry, index) =>
     readRandomEventScenario(entry, `randomEventsV1[${index}]`),
   );
-  validateParsedRandomEventScenarios(parsed);
+  validateRandomEventScenarios(parsed);
   return parsed;
 };
 
