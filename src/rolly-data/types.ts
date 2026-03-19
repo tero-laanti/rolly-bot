@@ -77,8 +77,18 @@ export type DiceRaidPipRewardTierData = {
   pips: number;
 };
 
+export type DiceRaidRollPassRewardData = {
+  multiplierPerBossLevel: number;
+  minimumMultiplier: number;
+  maximumMultiplier: number;
+  rollsPerBossLevelDivisor: number;
+  minimumRolls: number;
+  maximumRolls: number;
+};
+
 export type DiceRaidRewardData = {
   pipsByBossLevel: DiceRaidPipRewardTierData[];
+  rollPassBuff: DiceRaidRollPassRewardData;
 };
 
 export type DiceRaidBossNamesData = {

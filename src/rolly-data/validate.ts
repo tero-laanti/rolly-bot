@@ -757,8 +757,43 @@ const readRaidRewardConfig = (value: unknown, label: string): DiceRaidRewardData
     }
   }
 
+  const rollPassBuff = assertRecord(record.rollPassBuff, `${label}.rollPassBuff`);
+  const parsedRollPassBuff = {
+    multiplierPerBossLevel: readFiniteNumberAtLeast(
+      rollPassBuff.multiplierPerBossLevel,
+      `${label}.rollPassBuff.multiplierPerBossLevel`,
+      0,
+    ),
+    minimumMultiplier: readInteger(
+      rollPassBuff.minimumMultiplier,
+      `${label}.rollPassBuff.minimumMultiplier`,
+      1,
+    ),
+    maximumMultiplier: readInteger(
+      rollPassBuff.maximumMultiplier,
+      `${label}.rollPassBuff.maximumMultiplier`,
+      1,
+    ),
+    rollsPerBossLevelDivisor: readFiniteNumberAtLeast(
+      rollPassBuff.rollsPerBossLevelDivisor,
+      `${label}.rollPassBuff.rollsPerBossLevelDivisor`,
+      1,
+    ),
+    minimumRolls: readInteger(rollPassBuff.minimumRolls, `${label}.rollPassBuff.minimumRolls`, 1),
+    maximumRolls: readInteger(rollPassBuff.maximumRolls, `${label}.rollPassBuff.maximumRolls`, 1),
+  };
+
+  if (parsedRollPassBuff.maximumMultiplier < parsedRollPassBuff.minimumMultiplier) {
+    throw new Error(`${label}.rollPassBuff.maximumMultiplier must be at least minimumMultiplier.`);
+  }
+
+  if (parsedRollPassBuff.maximumRolls < parsedRollPassBuff.minimumRolls) {
+    throw new Error(`${label}.rollPassBuff.maximumRolls must be at least minimumRolls.`);
+  }
+
   return {
     pipsByBossLevel: rewardTiers,
+    rollPassBuff: parsedRollPassBuff,
   };
 };
 
