@@ -365,7 +365,7 @@ const buildRaidStatusView = (
         : "";
       const outcomeText = raid.outcome ? ` • outcome: ${raid.outcome}` : "";
       lines.push(
-        `- ${raid.title} [${raid.status}]${outcomeText} • participants: ${raid.participantCount}${bossText} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
+        `- ${raid.title} [${raid.status}]${outcomeText} • participants: ${raid.participantCount} • eligible: ${raid.eligibleParticipantCount}${bossText} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
       );
     }
   }
