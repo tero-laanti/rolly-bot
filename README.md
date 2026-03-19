@@ -34,7 +34,8 @@ And much more!
 nvm use
 npm install
 cp .env.example .env
-# fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_OWNER_ID
+# fill in DISCORD_TOKEN and DISCORD_OWNER_ID
+# also set DISCORD_CLIENT_ID before running deploy:commands
 # optional: set DISCORD_GUILD_ID for faster command updates
 npm run deploy:commands
 npm run dev
@@ -50,12 +51,17 @@ If you do not have a private `rolly-data` checkout, the app falls back to the pu
 
 ## Environment Variables
 
-At minimum, set these before running `npm run deploy:commands` or starting the bot:
+Set these before running `npm run deploy:commands` or starting the bot:
 
 ```bash
 DISCORD_TOKEN=your_bot_token
-DISCORD_CLIENT_ID=your_application_id
 DISCORD_OWNER_ID=your_discord_user_id
+```
+
+Also set this before running `npm run deploy:commands`:
+
+```bash
+DISCORD_CLIENT_ID=your_application_id
 ```
 
 For local development, you will usually also want:
@@ -69,11 +75,11 @@ Rolly reads configuration from `.env`. See [.env.example](.env.example) for the 
 ### Required
 
 - `DISCORD_TOKEN`: Bot token from the Discord Developer Portal.
-- `DISCORD_CLIENT_ID`: Application ID for the Discord bot.
 - `DISCORD_OWNER_ID`: Your Discord user ID. Required for owner-only commands such as `/self-update` and `/dice-admin`.
 
 ### Optional
 
+- `DISCORD_CLIENT_ID`: Application ID for the Discord bot. Required for `npm run deploy:commands`, but not for normal bot startup.
 - `DISCORD_GUILD_ID`: Development guild/server ID for fast slash-command iteration. If omitted, commands are deployed globally.
 - `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and then falls back to `./example-data/rolly-data`. Expected files include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - `RANDOM_EVENTS_CHANNEL_ID`: Channel ID where random events are posted. Random events are inactive by default and start only when this is set.
