@@ -10,6 +10,7 @@ type QuietHoursConfig = {
 
 export type RandomEventsFoundationConfig = {
   enabled: boolean;
+  inactiveReason: string | null;
   channelId: string | null;
   targetEventsPerDay: number;
   minGapMs: number;
@@ -21,6 +22,7 @@ export type RandomEventsFoundationConfig = {
 
 export type RaidsConfig = {
   enabled: boolean;
+  inactiveReason: string | null;
   channelId: string | null;
   joinLeadMs: number;
   activeDurationMs: number;
@@ -46,23 +48,6 @@ const parseNumberWithFallback = (
   }
 
   return Math.max(minValue, parsed);
-};
-
-const parseBooleanWithFallback = (rawValue: string | undefined, fallback: boolean): boolean => {
-  if (!rawValue) {
-    return fallback;
-  }
-
-  const normalized = rawValue.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
-  }
-
-  if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
-  }
-
-  return fallback;
 };
 
 const parseQuietHoursValue = (rawValue: string | undefined, fallback: string): string => {
@@ -101,9 +86,27 @@ const parseOptionalString = (rawValue: string | undefined): string | null => {
   return normalized.length > 0 ? normalized : null;
 };
 
+const resolveFeatureActivation = ({
+  channelId,
+  channelEnvName,
+}: {
+  channelId: string | null;
+  channelEnvName: string;
+}): { enabled: boolean; inactiveReason: string | null } => {
+  if (!channelId) {
+    return {
+      enabled: false,
+      inactiveReason: `${channelEnvName} is not set.`,
+    };
+  }
+
+  return {
+    enabled: true,
+    inactiveReason: null,
+  };
+};
+
 const defaultRandomEventsConfig = {
-  enabled: true,
-  channelId: null,
   targetEventsPerDay: 10,
   minGapMinutes: 45,
   maxActiveEvents: 1,
@@ -117,8 +120,6 @@ const defaultRandomEventsConfig = {
 };
 
 const defaultRaidsConfig = {
-  enabled: false,
-  channelId: null,
   joinLeadMinutes: 30,
   activeDurationMinutes: 12,
   targetRaidsPerDay: 0,
@@ -132,12 +133,16 @@ const defaultRaidsConfig = {
   },
 };
 
+const randomEventsChannelId = parseOptionalString(process.env.RANDOM_EVENTS_CHANNEL_ID);
+const randomEventsActivation = resolveFeatureActivation({
+  channelId: randomEventsChannelId,
+  channelEnvName: "RANDOM_EVENTS_CHANNEL_ID",
+});
+
 export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
-  enabled: parseBooleanWithFallback(
-    process.env.RANDOM_EVENTS_ENABLED,
-    defaultRandomEventsConfig.enabled,
-  ),
-  channelId: parseOptionalString(process.env.RANDOM_EVENTS_CHANNEL_ID),
+  enabled: randomEventsActivation.enabled,
+  inactiveReason: randomEventsActivation.inactiveReason,
+  channelId: randomEventsChannelId,
   targetEventsPerDay: parseNumberWithFallback(
     process.env.RANDOM_EVENTS_TARGET_PER_DAY,
     defaultRandomEventsConfig.targetEventsPerDay,
@@ -186,9 +191,16 @@ export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
   },
 };
 
+const raidsChannelId = parseOptionalString(process.env.RAIDS_CHANNEL_ID);
+const raidsActivation = resolveFeatureActivation({
+  channelId: raidsChannelId,
+  channelEnvName: "RAIDS_CHANNEL_ID",
+});
+
 export const raidsConfig: RaidsConfig = {
-  enabled: parseBooleanWithFallback(process.env.RAIDS_ENABLED, defaultRaidsConfig.enabled),
-  channelId: parseOptionalString(process.env.RAIDS_CHANNEL_ID),
+  enabled: raidsActivation.enabled,
+  inactiveReason: raidsActivation.inactiveReason,
+  channelId: raidsChannelId,
   joinLeadMs: minutesToMs(
     parseNumberWithFallback(
       process.env.RAIDS_JOIN_LEAD_MINUTES,

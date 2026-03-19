@@ -79,7 +79,7 @@ When implementing a new feature:
 - Changes to fame/pips, prestige, bans, PvP effects, analytics, temporary effects, or random-event state can affect progression and should be reviewed as game-state changes, not just refactors.
 - Real gameplay content and tuning live outside the public app repo in the private `rolly-data` repository.
 - If designers may want to tune a gameplay number or player-facing content pool, keep it in `rolly-data` with matching validation and docs.
-- Data source resolution order is `ROLLY_DATA_DIR`, then `./rolly-data`, then `./example-data/rolly-data` only when `ROLLY_ALLOW_EXAMPLE_DATA=true`.
+- Data source resolution order is `ROLLY_DATA_DIR`, then `./rolly-data`, then `./example-data/rolly-data`.
 - The current `rolly-data` contract is `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - Keep public example data safe to expose. Do not copy production achievements, tuning, or random-event content back into tracked source files or `example-data/`.
 - Do not publish exact private repository URLs, clone commands, or other private infrastructure identifiers in public docs.
