@@ -1,8 +1,8 @@
 [
   {
-    "id": "bad-luck-umbrella",
-    "name": "Bad Luck Umbrella",
-    "description": "Negates the next negative effect that would hit you from PvP, random events, or future hostile systems.",
+    "id": "example-negative-shield",
+    "name": "Example Negative Shield",
+    "description": "Example item: blocks the next matching negative effect.",
     "pricePips": 30,
     "consumable": true,
     "effect": {
@@ -11,9 +11,9 @@
     }
   },
   {
-    "id": "dice-revolver",
-    "name": "Dice Revolver",
-    "description": "Your next 6 /dice uses roll twice.",
+    "id": "example-double-roll-uses",
+    "name": "Example Double Roll Uses",
+    "description": "Example item: your next 6 /dice uses roll twice.",
     "pricePips": 5,
     "consumable": true,
     "effect": {
@@ -22,9 +22,9 @@
     }
   },
   {
-    "id": "longburn-spring",
-    "name": "Longburn Spring",
-    "description": "Your /dice uses roll twice for 5 minutes.",
+    "id": "example-double-roll-duration",
+    "name": "Example Double Roll Duration",
+    "description": "Example item: /dice rolls twice for 5 minutes.",
     "pricePips": 30,
     "consumable": true,
     "effect": {
@@ -33,9 +33,9 @@
     }
   },
   {
-    "id": "chaos-flare",
-    "name": "Chaos Flare",
-    "description": "Triggers a random group event immediately, if the event system can legally spawn one right now.",
+    "id": "example-trigger-random-event",
+    "name": "Example Trigger Random Event",
+    "description": "Example item: tries to spawn a random group event immediately.",
     "pricePips": 30,
     "consumable": true,
     "effect": {
@@ -43,9 +43,9 @@
     }
   },
   {
-    "id": "clockwork-croupier",
-    "name": "Clockwork Croupier",
-    "description": "Rolls for you every 5 seconds for 5 minutes, then posts a summary when finished.",
+    "id": "example-auto-roll-session",
+    "name": "Example Auto Roll Session",
+    "description": "Example item: rolls for you every 5 seconds for 5 minutes.",
     "pricePips": 100,
     "consumable": true,
     "effect": {
@@ -55,9 +55,9 @@
     }
   },
   {
-    "id": "cleanse-salt",
-    "name": "Cleanse Salt",
-    "description": "Removes all active negative effects and clears lockout.",
+    "id": "example-cleanse-negative-effects",
+    "name": "Example Cleanse Negative Effects",
+    "description": "Example item: removes active negative effects and clears lockout.",
     "pricePips": 50,
     "consumable": true,
     "effect": {

@@ -6,9 +6,9 @@ Minimal shape:
 
 ```json
 {
-  "id": "pair",
-  "name": "Pair",
-  "description": "Roll at least one pair.",
+  "id": "example-pair",
+  "name": "Example Pair",
+  "description": "Example achievement: roll at least one pair.",
   "rule": {
     "type": "at-least-of-a-kind",
     "count": 2
