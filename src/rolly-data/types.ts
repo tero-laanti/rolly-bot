@@ -72,9 +72,13 @@ export type DiceBalanceVarietyConfig = {
   pity: RandomEventVarietyPityConfig;
 };
 
+export type DiceRaidPipRewardTierData = {
+  bossLevelAtLeast: number;
+  pips: number;
+};
+
 export type DiceRaidRewardData = {
-  rollPassMultiplier: number;
-  rolls: number;
+  pipsByBossLevel: DiceRaidPipRewardTierData[];
 };
 
 export type DiceRaidBossNamesData = {

@@ -30,6 +30,7 @@ export type RaidAdminLiveRaidSnapshot = {
   status: RaidStatus;
   outcome: RaidOutcome | null;
   participantCount: number;
+  eligibleParticipantCount: number;
   scheduledStartAt: Date;
   expiresAt: Date | null;
   channelId: string;

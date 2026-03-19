@@ -138,6 +138,7 @@ export const buildRaidAnnouncementPrompt = ({
 
 export const buildRaidActivePrompt = ({
   participantIds,
+  eligibleParticipantCount,
   startedAtMs,
   endsAtMs,
   threadId,
@@ -151,6 +152,7 @@ export const buildRaidActivePrompt = ({
   contributionLines,
 }: {
   participantIds: readonly string[];
+  eligibleParticipantCount: number;
   startedAtMs: number;
   endsAtMs: number;
   threadId: string;
@@ -171,9 +173,11 @@ export const buildRaidActivePrompt = ({
         `Fight in <#${threadId}>.`,
         `Raid opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
         "Only joined raiders using /dice in this thread deal damage.",
+        "Land at least one hit in this thread to qualify for the clear reward.",
         "",
         `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
         `Total damage: **${totalDamage}** across ${totalAttacks} hit${totalAttacks === 1 ? "" : "s"}.`,
+        `Reward-eligible raiders: **${eligibleParticipantCount}**.`,
         `Reward on success: **${rewardSummary}**.`,
         "",
         `**Joined raiders (${participantIds.length})**`,
@@ -193,6 +197,7 @@ export const buildRaidActivePrompt = ({
 
 export const buildRaidResolvedPrompt = ({
   participantIds,
+  eligibleParticipantCount,
   resolvedAtMs,
   outcome,
   bossName,
@@ -202,6 +207,7 @@ export const buildRaidResolvedPrompt = ({
   contributionLines,
 }: {
   participantIds: readonly string[];
+  eligibleParticipantCount: number;
   resolvedAtMs: number;
   outcome: RaidOutcome;
   bossName: string;
@@ -212,7 +218,9 @@ export const buildRaidResolvedPrompt = ({
 }): BaseMessageOptions => {
   const presentation = getOutcomePresentation(outcome);
   const rewardLine =
-    outcome === "success" ? `Reward applied to all joined raiders: **${rewardSummary}**.` : "";
+    outcome === "success"
+      ? `Reward applied to ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
+      : "";
 
   const embed = new EmbedBuilder()
     .setColor(presentation.color)

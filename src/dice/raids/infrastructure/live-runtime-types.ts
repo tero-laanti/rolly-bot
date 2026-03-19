@@ -30,6 +30,7 @@ export type ActiveRaidRecord = {
   expiresAtMs: number | null;
   closedAtMs: number | null;
   participantIds: Set<string>;
+  rewardEligibleUserIds: Set<string>;
   activeThreadId: string | null;
   boss: ActiveRaidBossRecord | null;
 };

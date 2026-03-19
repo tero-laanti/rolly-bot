@@ -719,9 +719,46 @@ const readCasinoPushYourLuckPayout = (
 
 const readRaidRewardConfig = (value: unknown, label: string): DiceRaidRewardData => {
   const record = assertRecord(value, label);
+  if (!Array.isArray(record.pipsByBossLevel)) {
+    throw new Error(`${label}.pipsByBossLevel must be an array.`);
+  }
+
+  const rewardTiers = record.pipsByBossLevel.map((entry, index) => {
+    const tierRecord = assertRecord(entry, `${label}.pipsByBossLevel[${index}]`);
+    return {
+      bossLevelAtLeast: readInteger(
+        tierRecord.bossLevelAtLeast,
+        `${label}.pipsByBossLevel[${index}].bossLevelAtLeast`,
+        1,
+      ),
+      pips: readInteger(tierRecord.pips, `${label}.pipsByBossLevel[${index}].pips`, 0),
+    };
+  });
+
+  if (rewardTiers.length < 1) {
+    throw new Error(`${label}.pipsByBossLevel must include at least one entry.`);
+  }
+
+  if (rewardTiers[0]?.bossLevelAtLeast !== 1) {
+    throw new Error(`${label}.pipsByBossLevel must start at bossLevelAtLeast = 1.`);
+  }
+
+  for (let index = 1; index < rewardTiers.length; index += 1) {
+    const previousTier = rewardTiers[index - 1];
+    const currentTier = rewardTiers[index];
+    if (!previousTier || !currentTier) {
+      continue;
+    }
+
+    if (currentTier.bossLevelAtLeast <= previousTier.bossLevelAtLeast) {
+      throw new Error(
+        `${label}.pipsByBossLevel must be sorted by ascending bossLevelAtLeast with no duplicates.`,
+      );
+    }
+  }
+
   return {
-    rollPassMultiplier: readInteger(record.rollPassMultiplier, `${label}.rollPassMultiplier`, 1),
-    rolls: readInteger(record.rolls, `${label}.rolls`, 1),
+    pipsByBossLevel: rewardTiers,
   };
 };
 
