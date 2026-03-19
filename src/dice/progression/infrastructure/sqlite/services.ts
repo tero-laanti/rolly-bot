@@ -3,6 +3,7 @@ import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite
 import { createSqliteAnalyticsRepository } from "../../../analytics/infrastructure/sqlite/analytics-repository";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
+import { raidsDiceRollPort } from "../../../raids/infrastructure/admin-controller";
 import { createSqliteDiceItemEffectsService } from "../../../inventory/infrastructure/sqlite/item-effects-service";
 import { createDiceBansUseCase } from "../../application/manage-bans/use-case";
 import { createDicePrestigeUseCase } from "../../application/manage-prestige/use-case";
@@ -53,6 +54,7 @@ export const createSqliteRollDiceUseCase = (db: SqliteDatabase) => {
     itemEffects,
     progression,
     pvp,
+    raids: raidsDiceRollPort,
     unitOfWork,
   });
 };

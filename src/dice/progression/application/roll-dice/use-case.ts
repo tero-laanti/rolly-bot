@@ -17,6 +17,7 @@ import { rollDieWithBans } from "../../../progression/domain/bans";
 import { getDiceChargeMultiplier } from "../../../progression/domain/charge";
 import type { DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
+import type { RaidDiceRollPort } from "../../../raids/application/ports";
 import {
   buildDiceRollReplyContent,
   formatAchievementText,
@@ -58,6 +59,7 @@ type ResolvedRollPassState = {
 type RunRollDiceUseCaseInput = {
   userId: string;
   userMention: string;
+  raidThreadId?: string | null;
   nowMs?: number;
 };
 
@@ -83,6 +85,7 @@ type RunRollDiceDependencies = {
     | "setLastDiceRollAt"
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
+  raids?: Pick<RaidDiceRollPort, "applyDiceRoll">;
   unitOfWork: UnitOfWork;
 };
 
@@ -95,9 +98,15 @@ export const createRunRollDiceUseCase = ({
   itemEffects,
   progression,
   pvp,
+  raids,
   unitOfWork,
 }: RunRollDiceDependencies) => {
-  return ({ userId, userMention, nowMs = Date.now() }: RunRollDiceUseCaseInput): DiceRollResult => {
+  return ({
+    userId,
+    userMention,
+    raidThreadId = null,
+    nowMs = Date.now(),
+  }: RunRollDiceUseCaseInput): DiceRollResult => {
     const lockoutUntil = pvp.getActiveDiceLockout(userId, nowMs);
     if (lockoutUntil) {
       const content = `${userMention}, you can play again ${formatDiscordRelativeTime(lockoutUntil)}.`;
@@ -245,7 +254,7 @@ export const createRunRollDiceUseCase = ({
         ? "Prestige is now available. Use /dice-prestige to advance."
         : "";
 
-    const content = buildDiceRollReplyContent({
+    const baseContent = buildDiceRollReplyContent({
       achievementText,
       multiplierFooter,
       unlockedFooter,
@@ -259,6 +268,24 @@ export const createRunRollDiceUseCase = ({
       matchCount: allSameCount,
       rewardText,
     });
+    const raidDamage = rollPasses.reduce(
+      (total, rolls) => total + rolls.reduce((rollTotal, roll) => rollTotal + roll, 0),
+      0,
+    );
+    const raidResult =
+      raidDamage > 0
+        ? (raids?.applyDiceRoll({
+            channelId: raidThreadId,
+            userId,
+            userMention,
+            damage: raidDamage,
+            nowMs,
+          }) ?? null)
+        : null;
+    const content =
+      raidResult && raidResult.kind !== "no-raid"
+        ? `${baseContent}\n\n${raidResult.summary}`
+        : baseContent;
 
     return {
       content,
