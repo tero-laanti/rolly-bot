@@ -34,10 +34,11 @@ import {
   type RandomEventAttemptResolution,
 } from "./live-runtime-resolution";
 import {
-  getActiveRandomEventLiveExpiryDate,
-  getActiveRandomEventLiveExpiryMs,
-  getActiveRandomEventRemainingLiveDurationMs,
-  syncActiveRandomEventLiveExpiryMs,
+  getActiveRandomEventCappedCurrentPhaseExpiryMs,
+  getActiveRandomEventCurrentPhaseExpiryDate,
+  getActiveRandomEventCurrentPhaseExpiryMs,
+  getActiveRandomEventRemainingCurrentPhaseDurationMs,
+  syncActiveRandomEventCurrentPhaseExpiryMs,
 } from "./live-runtime-expiry";
 import { triggerRandomEventOpportunity } from "./live-runtime-trigger";
 import type {
@@ -169,7 +170,7 @@ export const createRandomEventsLiveRuntime = ({
       description: buildActiveClaimDescription(
         context.selection.renderedPrompt,
         activityLine,
-        getActiveRandomEventLiveExpiryMs(context),
+        getActiveRandomEventCurrentPhaseExpiryMs(context),
         windowSnapshot?.participants ?? [],
         context.failedAttemptLines,
         context.selection.scenario.requiredReadyCount ?? null,
@@ -201,7 +202,7 @@ export const createRandomEventsLiveRuntime = ({
         userId: session.userId,
         challenge,
         progress: session.progress,
-        expiresAtMs: getActiveRandomEventLiveExpiryMs(context),
+        expiresAtMs: getActiveRandomEventCurrentPhaseExpiryMs(context),
       }),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
       buttonLabel: buildSequenceChallengeButtonLabel(session.progress, challenge.steps.length),
@@ -288,7 +289,7 @@ export const createRandomEventsLiveRuntime = ({
       return false;
     }
 
-    const remainingDurationMs = getActiveRandomEventRemainingLiveDurationMs(context);
+    const remainingDurationMs = getActiveRandomEventRemainingCurrentPhaseDurationMs(context);
     if (remainingDurationMs < 1) {
       return false;
     }
@@ -304,7 +305,7 @@ export const createRandomEventsLiveRuntime = ({
       },
     });
 
-    syncActiveRandomEventLiveExpiryMs(state, context, snapshot.expiresAtMs);
+    syncActiveRandomEventCurrentPhaseExpiryMs(state, context, snapshot.expiresAtMs);
     await refreshActiveEventPrompt(eventId, null);
     return true;
   };
@@ -357,6 +358,31 @@ export const createRandomEventsLiveRuntime = ({
     });
   };
 
+  const sequenceChallengeTimeoutResolutionNote =
+    "⏱️ The remaining rolls were resolved automatically when time ran out.";
+
+  const completeSequenceChallengeProgress = ({
+    challenge,
+    progress,
+    userId,
+  }: {
+    challenge: RandomEventRollChallengeDefinition;
+    progress: RandomEventRollChallengeProgress;
+    userId: string;
+  }): RandomEventRollChallengeProgress => {
+    let nextProgress = progress;
+    while (!nextProgress.completed) {
+      nextProgress = advanceRollChallengeStep({
+        playerDice: progression,
+        userId,
+        challenge,
+        progress: nextProgress,
+      });
+    }
+
+    return nextProgress;
+  };
+
   const autoResolveSequenceChallenge = async (
     eventId: string,
     sequenceSessionId: number,
@@ -372,15 +398,11 @@ export const createRandomEventsLiveRuntime = ({
       return;
     }
 
-    let progress = session.progress;
-    while (!progress.completed) {
-      progress = advanceRollChallengeStep({
-        playerDice: progression,
-        userId: session.userId,
-        challenge,
-        progress,
-      });
-    }
+    const progress = completeSequenceChallengeProgress({
+      challenge,
+      progress: session.progress,
+      userId: session.userId,
+    });
 
     context.sequenceChallenge = {
       ...session,
@@ -391,7 +413,7 @@ export const createRandomEventsLiveRuntime = ({
       eventId,
       userId: session.userId,
       challengeProgress: progress,
-      resolutionNote: "⏱️ The remaining rolls were resolved automatically when time ran out.",
+      resolutionNote: sequenceChallengeTimeoutResolutionNote,
     });
   };
 
@@ -410,8 +432,29 @@ export const createRandomEventsLiveRuntime = ({
       return;
     }
 
-    const durationMs = getSequenceChallengeDurationMs(challenge);
-    const expiresAtMs = Date.now() + durationMs;
+    const progress = createRollChallengeProgress(challenge);
+    const nowMs = Date.now();
+    const expiresAtMs = getActiveRandomEventCappedCurrentPhaseExpiryMs(
+      context,
+      getSequenceChallengeDurationMs(challenge),
+      nowMs,
+    );
+
+    if (expiresAtMs === null) {
+      await processFirstClickAttempt({
+        eventId,
+        userId,
+        challengeProgress: completeSequenceChallengeProgress({
+          challenge,
+          progress,
+          userId,
+        }),
+        resolutionNote: sequenceChallengeTimeoutResolutionNote,
+      });
+      return;
+    }
+
+    const durationMs = expiresAtMs - nowMs;
     const sessionId = nextSequenceChallengeSessionId;
     nextSequenceChallengeSessionId += 1;
     const timer = setTimeout(() => {
@@ -423,11 +466,11 @@ export const createRandomEventsLiveRuntime = ({
     context.sequenceChallenge = {
       sessionId,
       userId,
-      progress: createRollChallengeProgress(challenge),
+      progress,
       timer,
     };
 
-    syncActiveRandomEventLiveExpiryMs(state, context, expiresAtMs);
+    syncActiveRandomEventCurrentPhaseExpiryMs(state, context, expiresAtMs);
     await refreshSequenceChallengePrompt(eventId);
   };
 
@@ -479,7 +522,7 @@ export const createRandomEventsLiveRuntime = ({
 
       await interaction.deferUpdate();
 
-      if (Date.now() >= getActiveRandomEventLiveExpiryMs(activeContext)) {
+      if (Date.now() >= getActiveRandomEventCurrentPhaseExpiryMs(activeContext)) {
         await autoResolveSequenceChallenge(eventId, session.sessionId);
         return;
       }
@@ -575,7 +618,7 @@ export const createRandomEventsLiveRuntime = ({
           rarity: context.selection.scenario.rarity,
           claimPolicy: context.selection.scenario.claimPolicy,
           participantCount: sequenceContext ? 1 : (windowSnapshot?.participants.length ?? 0),
-          expiresAt: getActiveRandomEventLiveExpiryDate(context),
+          expiresAt: getActiveRandomEventCurrentPhaseExpiryDate(context),
           channelId: context.message.channelId,
           messageId: context.message.id,
         };
