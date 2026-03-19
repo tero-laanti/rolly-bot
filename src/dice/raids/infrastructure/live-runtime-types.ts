@@ -19,4 +19,5 @@ export type ActiveRaidContext = {
   startTimer: ReturnType<typeof setTimeout> | null;
   resolveTimer: ReturnType<typeof setTimeout> | null;
   announcementEditChain: Promise<void>;
+  joinWindowClosed: boolean;
 };
