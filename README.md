@@ -28,22 +28,48 @@ And much more!
 
 ## Quick Start
 
+### Local setup
+
 ```bash
 nvm use
 npm install
 cp .env.example .env
-# Optional but recommended for real gameplay data.
-# Without private data, startup stays fail-closed unless
-# ROLLY_ALLOW_EXAMPLE_DATA=true is set intentionally.
-# git clone <your-private-rolly-data-url> ./rolly-data
-npm run build
+# fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_OWNER_ID, and DISCORD_GUILD_ID
+npm run dev:local
+```
+
+### Real setup with private gameplay data
+
+```bash
+nvm use
+npm install
+cp .env.example .env
+git clone <your-private-rolly-data-url> ./rolly-data
+# fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, and DISCORD_OWNER_ID
+# optional: set DISCORD_GUILD_ID for faster command updates
 npm run deploy:commands
 npm start
 ```
 
+`npm run dev:local` uses the example data automatically, deploys commands to `DISCORD_GUILD_ID`, and starts the bot in watch mode.
+
 ## Environment Variables
 
-Rolly reads configuration from `.env`. See [.env.example](.env.example) for the full list.
+At minimum, set these before running `npm run deploy:commands` or starting the bot:
+
+```bash
+DISCORD_TOKEN=your_bot_token
+DISCORD_CLIENT_ID=your_application_id
+DISCORD_OWNER_ID=your_discord_user_id
+```
+
+For local development, you will usually also want:
+
+```bash
+DISCORD_GUILD_ID=your_dev_server_id
+```
+
+Rolly reads configuration from `.env`. See [.env.example](.env.example) for the full reference.
 
 ### Required
 
@@ -79,16 +105,6 @@ Rolly reads configuration from `.env`. See [.env.example](.env.example) for the 
 - `RAIDS_QUIET_HOURS_TIMEZONE`: IANA timezone used for raid quiet hours. Default: `Europe/Helsinki`.
 
 Use placeholder values in `.env.example`, keep your real `.env` private, and do not commit real tokens or IDs you consider sensitive.
-
-Example:
-
-```bash
-DISCORD_TOKEN=your_bot_token
-DISCORD_CLIENT_ID=your_application_id
-DISCORD_GUILD_ID=your_dev_server_id
-DISCORD_OWNER_ID=your_discord_user_id
-RANDOM_EVENTS_CHANNEL_ID=channel_for_random_events
-```
 
 ## Data Storage
 
@@ -131,15 +147,6 @@ In `raids.json`, raid rewards, boss naming, and boss-balance knobs live separate
 In `casino.v1.json`, Dice Poker always uses a five-die `d8` hand. The tunable fields there are the payout multipliers.
 
 By default, the app refuses to start on `example-data`. If you intentionally want to run the public sample data for local development, set `ROLLY_ALLOW_EXAMPLE_DATA=true`.
-
-Recommended setup for a real deployment:
-
-```bash
-git clone https://github.com/tero-laanti/rolly-bot.git
-cd rolly-bot
-git clone <your-private-rolly-data-url> ./rolly-data
-cp .env.example .env
-```
 
 If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` will pull that repo too before rebuilding.
 
