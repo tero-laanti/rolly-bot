@@ -10,6 +10,9 @@ import type {
   DiceCasinoData,
   DiceBalanceData,
   DiceItemData,
+  DicePvpData,
+  DiceRandomEventBalanceData,
+  DiceRaidData,
   LoadedRollyData,
   RollyDataSource,
 } from "./types";
@@ -17,7 +20,10 @@ import {
   parseDiceAchievements,
   parseDiceCasinoData,
   parseDiceBalance,
+  parseDicePvpData,
   parseDiceItems,
+  parseDiceRaidsData,
+  parseRandomEventBalance,
   parseRandomEventScenarios,
 } from "./validate";
 import type { RandomEventScenario } from "../dice/random-events/domain/content";
@@ -26,6 +32,9 @@ const achievementsFileName = "achievements.json";
 const casinoV1FileName = "casino.v1.json";
 const diceBalanceFileName = "dice-balance.json";
 const itemsV1FileName = "items.v1.json";
+const pvpFileName = "pvp.json";
+const raidsFileName = "raids.json";
+const randomEventBalanceFileName = "random-events-balance.json";
 const randomEventsV1FileName = "random-events.v1.json";
 const allowExampleDataEnvName = "ROLLY_ALLOW_EXAMPLE_DATA";
 
@@ -73,6 +82,9 @@ const loadRollyData = (): LoadedRollyData => {
     casinoV1: parseDiceCasinoData(readJsonFile(source, casinoV1FileName)),
     diceBalance: parseDiceBalance(readJsonFile(source, diceBalanceFileName)),
     itemsV1: parseDiceItems(readJsonFile(source, itemsV1FileName)),
+    pvp: parseDicePvpData(readJsonFile(source, pvpFileName)),
+    randomEventBalance: parseRandomEventBalance(readJsonFile(source, randomEventBalanceFileName)),
+    raids: parseDiceRaidsData(readJsonFile(source, raidsFileName)),
     randomEventsV1: parseRandomEventScenarios(readJsonFile(source, randomEventsV1FileName)),
   };
 };
@@ -92,6 +104,18 @@ export const getDiceAchievementsData = (): DiceAchievementData[] => {
 
 export const getDiceBalanceData = (): DiceBalanceData => {
   return getRollyData().diceBalance;
+};
+
+export const getDicePvpData = (): DicePvpData => {
+  return getRollyData().pvp;
+};
+
+export const getRandomEventBalanceData = (): DiceRandomEventBalanceData => {
+  return getRollyData().randomEventBalance;
+};
+
+export const getDiceRaidData = (): DiceRaidData => {
+  return getRollyData().raids;
 };
 
 export const getDiceCasinoData = (): DiceCasinoData => {

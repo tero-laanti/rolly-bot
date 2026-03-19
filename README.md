@@ -54,7 +54,7 @@ Rolly reads configuration from `.env`. The source of truth for available variabl
 ### Optional
 
 - `DISCORD_GUILD_ID`: Development guild/server ID for fast slash-command iteration. If omitted, commands are deployed globally.
-- `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and only falls back to `./example-data/rolly-data` when `ROLLY_ALLOW_EXAMPLE_DATA=true`. Expected files include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, and `random-events.v1.json`.
+- `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and only falls back to `./example-data/rolly-data` when `ROLLY_ALLOW_EXAMPLE_DATA=true`. Expected files include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - `ROLLY_ALLOW_EXAMPLE_DATA`: Development-only flag. Set to `true` only if you intentionally want to run against the public example data. Default: disabled.
 - `RANDOM_EVENTS_CHANNEL_ID`: Channel ID where random events are posted. If random events are enabled but this is unset, no event messages can be posted.
 - `RANDOM_EVENTS_ENABLED`: Enables or disables the random-event scheduler. Default: `true`.
@@ -113,11 +113,20 @@ Expected files in a data directory:
 - `casino.v1.json`
 - `dice-balance.json`
 - `items.v1.json`
+- `pvp.json`
+- `raids.json`
+- `random-events-balance.json`
 - `random-events.v1.json`
 
 The committed files under `example-data/rolly-data` are safe examples only. They document the schema and can keep the public repo runnable when explicitly enabled, but they are not intended to match production values.
 
-In `dice-balance.json`, progression tuning includes prestige sides, charge settings, ban step, the overall `/dice` roll-pass cap via `maxRollPassCount`, and raid boss/reward tuning.
+In `dice-balance.json`, progression tuning includes prestige sides, charge settings, ban step, and the overall `/dice` roll-pass cap via `maxRollPassCount`.
+
+In `pvp.json`, duel timing and base winner/loser effect durations are tuned separately from core progression.
+
+In `random-events-balance.json`, global claim-window scaling and variety-selection tuning are configured separately from the event content pack.
+
+In `raids.json`, raid rewards, boss naming, and boss-balance knobs live separately from core dice progression.
 
 In `casino.v1.json`, Dice Poker always uses a five-die `d8` hand. The tunable fields there are the payout multipliers.
 

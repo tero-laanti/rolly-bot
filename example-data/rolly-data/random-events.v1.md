@@ -29,7 +29,7 @@ Scenario-level fields:
 - `claimPolicy`:
   - `first-click`: one participant resolves the event.
   - `multi-user`: multiple users can join during the same event window.
-- `claimWindowSeconds`: base window before the global multiplier from `dice-balance.json` is applied. Minimum is `10`.
+- `claimWindowSeconds`: base window before the global multiplier from `random-events-balance.json` is applied. Minimum is `10`.
 - `weight`: relative selection weight inside the scenario's rarity bucket. Omit it for the default weight `1`.
 
 Text variables:

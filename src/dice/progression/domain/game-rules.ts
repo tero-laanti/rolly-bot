@@ -1,4 +1,4 @@
-import { getDiceBalanceData } from "../../../rolly-data/load";
+import { getDiceBalanceData, getDicePvpData } from "../../../rolly-data/load";
 import { minuteMs } from "../../../shared/time";
 
 const getDicePrestigeSides = (): number[] => {
@@ -10,11 +10,11 @@ const getBanStep = (): number => {
 };
 
 const getDuelPunishmentBaseMs = (): number => {
-  return getDiceBalanceData().pvp.loserLockoutBaseMinutes * minuteMs;
+  return getDicePvpData().loserLockoutBaseMinutes * minuteMs;
 };
 
 const getDuelRewardBaseMs = (): number => {
-  return getDiceBalanceData().pvp.winnerBuffBaseMinutes * minuteMs;
+  return getDicePvpData().winnerBuffBaseMinutes * minuteMs;
 };
 
 export const getMaxDicePrestige = (): number => {
@@ -26,7 +26,7 @@ export const getMaxDicePvpTier = (): number => {
 };
 
 export const getDicePvpChallengeExpireMs = (): number => {
-  return getDiceBalanceData().pvp.challengeExpireMinutes * minuteMs;
+  return getDicePvpData().challengeExpireMinutes * minuteMs;
 };
 
 export const getDicePrestigeBaseLevel = (): number => {

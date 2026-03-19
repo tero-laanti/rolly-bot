@@ -72,6 +72,17 @@ export type DiceBalanceVarietyConfig = {
   pity: RandomEventVarietyPityConfig;
 };
 
+export type DicePvpData = {
+  challengeExpireMinutes: number;
+  loserLockoutBaseMinutes: number;
+  winnerBuffBaseMinutes: number;
+};
+
+export type DiceRandomEventBalanceData = {
+  claimWindowDurationMultiplier: number;
+  variety: DiceBalanceVarietyConfig;
+};
+
 export type DiceRaidPipRewardTierData = {
   bossLevelAtLeast: number;
   pips: number;
@@ -120,20 +131,12 @@ export type DiceBalanceData = {
     startAfterMinutes: number;
     maxMultiplier: number;
   };
-  pvp: {
-    challengeExpireMinutes: number;
-    loserLockoutBaseMinutes: number;
-    winnerBuffBaseMinutes: number;
-  };
-  randomEvents: {
-    claimWindowDurationMultiplier: number;
-    variety: DiceBalanceVarietyConfig;
-  };
-  raids: {
-    reward: DiceRaidRewardData;
-    bossNames: DiceRaidBossNamesData;
-    bossBalance: DiceRaidBossBalanceData;
-  };
+};
+
+export type DiceRaidData = {
+  reward: DiceRaidRewardData;
+  bossNames: DiceRaidBossNamesData;
+  bossBalance: DiceRaidBossBalanceData;
 };
 
 export type DiceCasinoPayoutRatio = {
@@ -227,6 +230,9 @@ export type LoadedRollyData = {
   achievements: DiceAchievementData[];
   casinoV1: DiceCasinoData;
   diceBalance: DiceBalanceData;
+  pvp: DicePvpData;
+  randomEventBalance: DiceRandomEventBalanceData;
+  raids: DiceRaidData;
   itemsV1: DiceItemData[];
   randomEventsV1: RandomEventScenario[];
 };

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Client } from "discord.js";
-import { getDiceBalanceData } from "../../../rolly-data/load";
+import { getRandomEventBalanceData } from "../../../rolly-data/load";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { secondMs } from "../../../shared/time";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
@@ -76,7 +76,7 @@ export const triggerRandomEventOpportunity = async ({
     return { created: false };
   }
 
-  const randomEventBalance = getDiceBalanceData().randomEvents;
+  const randomEventBalance = getRandomEventBalanceData();
   const candidateVarietyState = cloneVarietyState(contentState);
   const candidateScenarios =
     requiredClaimPolicy === undefined

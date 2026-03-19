@@ -1,0 +1,5 @@
+{
+  "challengeExpireMinutes": 3,
+  "loserLockoutBaseMinutes": 30,
+  "winnerBuffBaseMinutes": 3
+}

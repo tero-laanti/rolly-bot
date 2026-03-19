@@ -80,10 +80,10 @@ When implementing a new feature:
 - Real gameplay content and tuning live outside the public app repo in the private `rolly-data` repository.
 - Do not hide tunable gameplay numbers or player-facing generated content pools in source files. If designers may want to tune it, or if it affects live gameplay feel, put it in `rolly-data` with matching validation and docs.
 - Data source resolution order is `ROLLY_DATA_DIR`, then `./rolly-data`, then `./example-data/rolly-data` only when `ROLLY_ALLOW_EXAMPLE_DATA=true`.
-- The current `rolly-data` contract is `achievements.json`, `dice-balance.json`, `items.v1.json`, and `random-events.v1.json`.
+- The current `rolly-data` contract is `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - Keep public example data safe to expose. Do not copy production achievements, tuning, or random-event content back into tracked source files or `example-data/`.
 - Do not publish exact private repository URLs, clone commands, or other private infrastructure identifiers in public docs.
-- If the `rolly-data` schema or loader behavior changes, update `src/rolly-data/`, `example-data/rolly-data/*.json`, the matching `example-data/rolly-data/*.md` authoring docs, `.env.example`, and `README.md` together.
+- If the `rolly-data` schema or loader behavior changes, update `src/rolly-data/`, `rolly-data/`, `example-data/rolly-data/*.json`, the matching `example-data/rolly-data/*.md` authoring docs, `.env.example`, and `README.md` together.
 - If a command name, description, or options change, update the command deployment flow and remind the user to run `npm run deploy:commands`.
 
 ## TypeScript
