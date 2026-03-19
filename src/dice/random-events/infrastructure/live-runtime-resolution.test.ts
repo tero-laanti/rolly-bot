@@ -72,6 +72,25 @@ test("scenario validation rejects success mappings that point at failure outcome
   assert.throws(() => validateRandomEventScenarios([scenario]), /success outcomes/i);
 });
 
+test("scenario validation rejects keep-open failures that are unreachable from challenge failures", () => {
+  const scenario = createChallengeScenario();
+  scenario.outcomes.push({
+    id: "hard-fail",
+    resolution: "resolve-failure",
+    message: "The bridge collapses.",
+    effects: [],
+  });
+  scenario.challengeOutcomeIds = {
+    success: ["clean-crossing"],
+    failure: ["hard-fail"],
+  };
+
+  assert.throws(
+    () => validateRandomEventScenarios([scenario]),
+    /keep-open-failure outcomes must be reachable/i,
+  );
+});
+
 test("keep-open attempt resolution logs the user and keeps the event open", () => {
   const scenario = createChallengeScenario();
   const selection = renderRandomEventScenario(scenario);
