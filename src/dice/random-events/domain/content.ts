@@ -168,11 +168,20 @@ const pickWeightedOutcome = (
   return candidates[candidates.length - 1]?.outcome ?? null;
 };
 
+export const hasRandomEventChallengeOutcomeBranching = (
+  scenario: RandomEventScenario,
+): scenario is RandomEventScenario & {
+  rollChallenge: RandomEventRollChallengeDefinition;
+  challengeOutcomeIds: RandomEventChallengeOutcomeIds;
+} => {
+  return Boolean(scenario.rollChallenge && scenario.challengeOutcomeIds);
+};
+
 const getOutcomeCandidates = (
   scenario: RandomEventScenario,
   challengeResult: "success" | "failure" | undefined,
 ): RandomEventOutcome[] => {
-  if (!scenario.rollChallenge || !challengeResult || !scenario.challengeOutcomeIds) {
+  if (!hasRandomEventChallengeOutcomeBranching(scenario) || !challengeResult) {
     return scenario.outcomes;
   }
 
@@ -322,6 +331,12 @@ const validateScenario = (scenario: RandomEventScenario): void => {
     validateRollChallengeDefinition(scenario.rollChallenge);
   }
 
+  if (scenario.challengeOutcomeIds && !scenario.rollChallenge) {
+    throw new Error(
+      `Scenario ${scenario.id} challengeOutcomeIds require an explicit rollChallenge.`,
+    );
+  }
+
   validateTextVariables(`scenario ${scenario.id}`, scenario.textVariables);
   validateClaimActivityTemplates(`scenario ${scenario.id}`, scenario.activityTemplates);
 
@@ -351,7 +366,7 @@ const validateScenario = (scenario: RandomEventScenario): void => {
     }
   }
 
-  if (scenario.rollChallenge) {
+  if (hasRandomEventChallengeOutcomeBranching(scenario)) {
     validateChallengeOutcomeIds(scenario);
   }
 
