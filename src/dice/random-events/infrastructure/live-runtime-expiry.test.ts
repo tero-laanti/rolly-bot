@@ -3,8 +3,9 @@ import test from "node:test";
 import type { Message } from "discord.js";
 import { renderRandomEventScenario, type RandomEventScenario } from "../domain/content";
 import {
-  getActiveRandomEventRemainingLiveDurationMs,
-  syncActiveRandomEventLiveExpiryMs,
+  getActiveRandomEventCappedCurrentPhaseExpiryMs,
+  getActiveRandomEventRemainingCurrentPhaseDurationMs,
+  syncActiveRandomEventCurrentPhaseExpiryMs,
 } from "./live-runtime-expiry";
 import type { ActiveRandomEventContext } from "./live-runtime-types";
 import { createRandomEventsState, registerActiveRandomEvent } from "./state-store";
@@ -38,31 +39,52 @@ const createContext = (): ActiveRandomEventContext => {
       channelId: "channel-1",
     } as unknown as Message,
     sequenceChallenge: null,
-    liveExpiresAtMs: 2_000,
+    currentPhaseExpiresAtMs: 2_000,
     attemptedUserIds: new Set<string>(),
     failedAttemptLines: [],
   };
 };
 
-test("syncActiveRandomEventLiveExpiryMs keeps context and state on the same live deadline", () => {
+test("syncActiveRandomEventCurrentPhaseExpiryMs keeps context and state on the same deadline", () => {
   const context = createContext();
   const state = createRandomEventsState();
   registerActiveRandomEvent(state, {
     id: context.eventId,
     createdAt: new Date(1_000),
-    expiresAt: new Date(context.liveExpiresAtMs),
+    expiresAt: new Date(context.currentPhaseExpiresAtMs),
   });
 
-  syncActiveRandomEventLiveExpiryMs(state, context, 9_000);
+  syncActiveRandomEventCurrentPhaseExpiryMs(state, context, 9_000);
 
-  assert.equal(context.liveExpiresAtMs, 9_000);
+  assert.equal(context.currentPhaseExpiresAtMs, 9_000);
   assert.equal(state.activeEventsById.get(context.eventId)?.expiresAtMs, 9_000);
 });
 
-test("remaining live duration is based on the current live expiry", () => {
+test("remaining current phase duration is based on the authoritative phase expiry", () => {
   const context = createContext();
-  context.liveExpiresAtMs = 7_500;
+  context.currentPhaseExpiresAtMs = 7_500;
 
-  assert.equal(getActiveRandomEventRemainingLiveDurationMs(context, 7_000), 500);
-  assert.equal(getActiveRandomEventRemainingLiveDurationMs(context, 8_000), 0);
+  assert.equal(getActiveRandomEventRemainingCurrentPhaseDurationMs(context, 7_000), 500);
+  assert.equal(getActiveRandomEventRemainingCurrentPhaseDurationMs(context, 8_000), 0);
+});
+
+test("capped current phase expiry never extends an existing event deadline", () => {
+  const context = createContext();
+  context.currentPhaseExpiresAtMs = 12_000;
+
+  assert.equal(getActiveRandomEventCappedCurrentPhaseExpiryMs(context, 20_000, 10_000), 12_000);
+});
+
+test("capped current phase expiry uses the nominal duration when it fits inside the event budget", () => {
+  const context = createContext();
+  context.currentPhaseExpiresAtMs = 40_000;
+
+  assert.equal(getActiveRandomEventCappedCurrentPhaseExpiryMs(context, 5_000, 10_000), 15_000);
+});
+
+test("capped current phase expiry returns null when the event budget is already exhausted", () => {
+  const context = createContext();
+  context.currentPhaseExpiresAtMs = 10_000;
+
+  assert.equal(getActiveRandomEventCappedCurrentPhaseExpiryMs(context, 5_000, 10_000), null);
 });

@@ -1,33 +1,50 @@
 import type { ActiveRandomEventContext } from "./live-runtime-types";
 import { updateActiveRandomEventExpiry, type RandomEventsState } from "./state-store";
 
-export const getActiveRandomEventLiveExpiryMs = (context: ActiveRandomEventContext): number => {
-  return context.liveExpiresAtMs;
+export const getActiveRandomEventCurrentPhaseExpiryMs = (
+  context: ActiveRandomEventContext,
+): number => {
+  return context.currentPhaseExpiresAtMs;
 };
 
-export const getActiveRandomEventLiveExpiryDate = (context: ActiveRandomEventContext): Date => {
-  return new Date(getActiveRandomEventLiveExpiryMs(context));
+export const getActiveRandomEventCurrentPhaseExpiryDate = (
+  context: ActiveRandomEventContext,
+): Date => {
+  return new Date(getActiveRandomEventCurrentPhaseExpiryMs(context));
 };
 
-export const setActiveRandomEventLiveExpiryMs = (
+export const setActiveRandomEventCurrentPhaseExpiryMs = (
   context: ActiveRandomEventContext,
   expiresAtMs: number,
 ): void => {
-  context.liveExpiresAtMs = expiresAtMs;
+  context.currentPhaseExpiresAtMs = expiresAtMs;
 };
 
-export const syncActiveRandomEventLiveExpiryMs = (
+export const syncActiveRandomEventCurrentPhaseExpiryMs = (
   state: RandomEventsState,
   context: ActiveRandomEventContext,
   expiresAtMs: number,
 ): void => {
-  setActiveRandomEventLiveExpiryMs(context, expiresAtMs);
+  setActiveRandomEventCurrentPhaseExpiryMs(context, expiresAtMs);
   updateActiveRandomEventExpiry(state, context.eventId, new Date(expiresAtMs));
 };
 
-export const getActiveRandomEventRemainingLiveDurationMs = (
+export const getActiveRandomEventRemainingCurrentPhaseDurationMs = (
   context: ActiveRandomEventContext,
   nowMs: number = Date.now(),
 ): number => {
-  return Math.max(0, getActiveRandomEventLiveExpiryMs(context) - nowMs);
+  return Math.max(0, getActiveRandomEventCurrentPhaseExpiryMs(context) - nowMs);
+};
+
+export const getActiveRandomEventCappedCurrentPhaseExpiryMs = (
+  context: ActiveRandomEventContext,
+  nominalDurationMs: number,
+  nowMs: number = Date.now(),
+): number | null => {
+  const currentPhaseExpiresAtMs = getActiveRandomEventCurrentPhaseExpiryMs(context);
+  if (currentPhaseExpiresAtMs <= nowMs) {
+    return null;
+  }
+
+  return Math.min(currentPhaseExpiresAtMs, nowMs + nominalDurationMs);
 };
