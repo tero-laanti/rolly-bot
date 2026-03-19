@@ -12,7 +12,6 @@ export type ActiveRandomEventSequenceChallenge = {
   sessionId: number;
   userId: string;
   progress: RandomEventRollChallengeProgress;
-  expiresAtMs: number;
   timer: ReturnType<typeof setTimeout>;
 };
 
@@ -21,7 +20,7 @@ export type ActiveRandomEventContext = {
   selection: RandomEventSelectionResult;
   message: Message;
   sequenceChallenge: ActiveRandomEventSequenceChallenge | null;
-  claimWindowExpiresAtMs: number;
+  liveExpiresAtMs: number;
   attemptedUserIds: Set<string>;
   failedAttemptLines: string[];
 };

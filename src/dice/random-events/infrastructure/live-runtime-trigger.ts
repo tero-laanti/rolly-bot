@@ -146,7 +146,7 @@ export const triggerRandomEventOpportunity = async ({
     selection,
     message,
     sequenceChallenge: null,
-    claimWindowExpiresAtMs: openedWindow.expiresAtMs,
+    liveExpiresAtMs: openedWindow.expiresAtMs,
     attemptedUserIds: new Set(),
     failedAttemptLines: [],
   });
