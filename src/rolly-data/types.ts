@@ -72,6 +72,30 @@ export type DiceBalanceVarietyConfig = {
   pity: RandomEventVarietyPityConfig;
 };
 
+export type DiceRaidRewardData = {
+  rollPassMultiplier: number;
+  rolls: number;
+};
+
+export type DiceRaidBossNamesData = {
+  prefixes: string[];
+  suffixes: string[];
+};
+
+export type DiceRaidBossBalanceData = {
+  expectedRollIntervalSeconds: number;
+  minimumHitsPerParticipant: number;
+  minimumBossHp: number;
+  damageBudgetRatio: number;
+  baseHp: number;
+  hpPerBossLevel: number;
+  timeBudgetFlatHpPerMinute: number;
+  participantPrestigeWeight: number;
+  participantExtraSidesDivisor: number;
+  baselineDieSides: number;
+  maxBossLevel: number;
+};
+
 export type DiceBalanceData = {
   prestigeSides: number[];
   lowerPrestigeBaseLevel: number;
@@ -90,6 +114,11 @@ export type DiceBalanceData = {
   randomEvents: {
     claimWindowDurationMultiplier: number;
     variety: DiceBalanceVarietyConfig;
+  };
+  raids: {
+    reward: DiceRaidRewardData;
+    bossNames: DiceRaidBossNamesData;
+    bossBalance: DiceRaidBossBalanceData;
   };
 };
 
