@@ -34,24 +34,19 @@ And much more!
 nvm use
 npm install
 cp .env.example .env
-# fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_OWNER_ID, and DISCORD_GUILD_ID
-npm run dev:local
-```
-
-### Real setup with private gameplay data
-
-```bash
-nvm use
-npm install
-cp .env.example .env
-git clone <your-private-rolly-data-url> ./rolly-data
-# fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, and DISCORD_OWNER_ID
+# fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_OWNER_ID
 # optional: set DISCORD_GUILD_ID for faster command updates
 npm run deploy:commands
-npm start
+npm run dev
 ```
 
-`npm run dev:local` uses the example data automatically, deploys commands to `DISCORD_GUILD_ID`, and starts the bot in watch mode.
+#### To add your own custom gameplay data
+
+```bash
+git clone <your-private-rolly-data-url> ./rolly-data
+```
+
+If you do not have a private `rolly-data` checkout, the app falls back to the public example data automatically and prints a warning at startup.
 
 ## Environment Variables
 
@@ -80,10 +75,8 @@ Rolly reads configuration from `.env`. See [.env.example](.env.example) for the 
 ### Optional
 
 - `DISCORD_GUILD_ID`: Development guild/server ID for fast slash-command iteration. If omitted, commands are deployed globally.
-- `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and only falls back to `./example-data/rolly-data` when `ROLLY_ALLOW_EXAMPLE_DATA=true`. Expected files include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
-- `ROLLY_ALLOW_EXAMPLE_DATA`: Development-only flag. Set to `true` only if you intentionally want to run against the public example data. Default: disabled.
-- `RANDOM_EVENTS_CHANNEL_ID`: Channel ID where random events are posted. If random events are enabled but this is unset, no event messages can be posted.
-- `RANDOM_EVENTS_ENABLED`: Enables or disables the random-event scheduler. Default: `true`.
+- `ROLLY_DATA_DIR`: Absolute or repo-relative path to your private `rolly-data` checkout. If omitted, the app tries `./rolly-data` and then falls back to `./example-data/rolly-data`. Expected files include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
+- `RANDOM_EVENTS_CHANNEL_ID`: Channel ID where random events are posted. Random events are inactive by default and start only when this is set.
 - `RANDOM_EVENTS_TARGET_PER_DAY`: Target number of random events per day. Default: `10`.
 - `RANDOM_EVENTS_MIN_GAP_MINUTES`: Minimum time between random-event opportunities. Units: minutes. Default: `45`.
 - `RANDOM_EVENTS_MAX_ACTIVE`: Maximum number of active random events at once. Default: `1`.
@@ -92,8 +85,7 @@ Rolly reads configuration from `.env`. See [.env.example](.env.example) for the 
 - `RANDOM_EVENTS_QUIET_HOURS_START`: Quiet-hours start time in `HH:MM` 24-hour format. Default: `23:00`.
 - `RANDOM_EVENTS_QUIET_HOURS_END`: Quiet-hours end time in `HH:MM` 24-hour format. Default: `08:00`.
 - `RANDOM_EVENTS_QUIET_HOURS_TIMEZONE`: IANA timezone used for quiet hours. Default: `Europe/Helsinki`.
-- `RAIDS_ENABLED`: Enables or disables the raid lifecycle runtime. Default: `false`.
-- `RAIDS_CHANNEL_ID`: Channel ID where raid announcements and active raid posts are sent.
+- `RAIDS_CHANNEL_ID`: Channel ID where raid announcements and active raid posts are sent. Raids stay inactive until this is set.
 - `RAIDS_JOIN_LEAD_MINUTES`: Lead time between a raid announcement and the active raid start. Units: minutes. Default: `30`.
 - `RAIDS_ACTIVE_DURATION_MINUTES`: How long the active raid window remains open after the boss arrives. Units: minutes. Default: `12`.
 - `RAIDS_TARGET_PER_DAY`: Target number of randomly scheduled raids per day. Set to `0` to disable random raid scheduling while still allowing owner-triggered raids. Default: `0`.
@@ -121,7 +113,7 @@ At startup, the bot loads gameplay data in this order:
 
 1. `ROLLY_DATA_DIR`
 2. `./rolly-data`
-3. `./example-data/rolly-data` only when `ROLLY_ALLOW_EXAMPLE_DATA=true`
+3. `./example-data/rolly-data`
 
 Expected files in a data directory:
 
@@ -146,7 +138,9 @@ In `raids.json`, raid rewards, boss naming, and boss-balance knobs live separate
 
 In `casino.v1.json`, Dice Poker always uses a five-die `d8` hand. The tunable fields there are the payout multipliers.
 
-By default, the app refuses to start on `example-data`. If you intentionally want to run the public sample data for local development, set `ROLLY_ALLOW_EXAMPLE_DATA=true`.
+If the app falls back to `example-data`, it starts normally and prints a warning so you can tell you are not using private gameplay data.
+
+Random events and raids are inactive by default. Each feature starts only after its channel ID is configured.
 
 If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` will pull that repo too before rebuilding.
 

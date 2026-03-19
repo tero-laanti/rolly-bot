@@ -82,7 +82,9 @@ const registerDiscordButtonHandlers = (): void => {
 
 const startRandomEventsFoundation = (): void => {
   if (!randomEventsFoundationConfig.enabled) {
-    console.log("[random-events] Foundation scheduler disabled by config.");
+    console.log(
+      `[random-events] Foundation scheduler inactive. ${randomEventsFoundationConfig.inactiveReason ?? "No activation reason provided."}`,
+    );
     return;
   }
 
@@ -124,7 +126,9 @@ const startRaidsFoundation = (): void => {
       state: null,
       scheduler: null,
     });
-    console.log("[raids] Lifecycle runtime disabled by config.");
+    console.log(
+      `[raids] Lifecycle runtime inactive. ${raidsConfig.inactiveReason ?? "No activation reason provided."}`,
+    );
     return;
   }
 
@@ -277,7 +281,7 @@ const initializeRollyData = (): void => {
   const sourceDescription = getRollyDataSourceDescription();
   if (loaded.source.kind === "example") {
     console.warn(`[rolly-data] Loaded public example data from ${sourceDescription}.`);
-    console.warn("[rolly-data] Example data mode is for local development only.");
+    console.warn("[rolly-data] Example data is for local development only.");
     return;
   }
 

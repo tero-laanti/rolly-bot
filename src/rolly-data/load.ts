@@ -1,10 +1,5 @@
 import fs from "node:fs";
-import {
-  describeRollyDataSource,
-  getExampleRollyDataDir,
-  getRollyDataFilePath,
-  resolveRollyDataSource,
-} from "./paths";
+import { describeRollyDataSource, getRollyDataFilePath, resolveRollyDataSource } from "./paths";
 import type {
   DiceAchievementData,
   DiceCasinoData,
@@ -36,14 +31,8 @@ const pvpFileName = "pvp.json";
 const raidsFileName = "raids.json";
 const randomEventBalanceFileName = "random-events-balance.json";
 const randomEventsV1FileName = "random-events.v1.json";
-const allowExampleDataEnvName = "ROLLY_ALLOW_EXAMPLE_DATA";
 
 let cachedRollyData: LoadedRollyData | null = null;
-
-const isExampleDataAllowed = (): boolean => {
-  const rawValue = process.env[allowExampleDataEnvName]?.trim().toLowerCase();
-  return rawValue === "1" || rawValue === "true" || rawValue === "yes" || rawValue === "on";
-};
 
 const readJsonFile = (source: RollyDataSource, fileName: string): unknown => {
   const filePath = getRollyDataFilePath(source, fileName);
@@ -67,15 +56,6 @@ const readJsonFile = (source: RollyDataSource, fileName: string): unknown => {
 
 const loadRollyData = (): LoadedRollyData => {
   const source = resolveRollyDataSource();
-  if (
-    (source.kind === "example" || source.dir === getExampleRollyDataDir()) &&
-    !isExampleDataAllowed()
-  ) {
-    throw new Error(
-      `Refusing to start with public example data from ${source.dir}. Set ${allowExampleDataEnvName}=true only for local development, or provide private game data via ROLLY_DATA_DIR or ./rolly-data.`,
-    );
-  }
-
   return {
     source,
     achievements: parseDiceAchievements(readJsonFile(source, achievementsFileName)),
