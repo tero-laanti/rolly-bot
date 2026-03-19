@@ -114,8 +114,13 @@ Raids:
 {
   "raids": {
     "reward": {
-      "rollPassMultiplier": 2,
-      "rolls": 3
+      "pipsByBossLevel": [
+        { "bossLevelAtLeast": 1, "pips": 4 },
+        { "bossLevelAtLeast": 5, "pips": 6 },
+        { "bossLevelAtLeast": 10, "pips": 8 },
+        { "bossLevelAtLeast": 20, "pips": 12 },
+        { "bossLevelAtLeast": 35, "pips": 16 }
+      ]
     },
     "bossNames": {
       "prefixes": ["Ashen"],
@@ -138,7 +143,8 @@ Raids:
 }
 ```
 
-- `reward.rollPassMultiplier` and `reward.rolls` define the current raid-clear buff.
+- `reward.pipsByBossLevel` is an ascending floor table. Each raider who landed at least one hit gets the full matching pip payout on a successful clear.
+- `reward.pipsByBossLevel[0].bossLevelAtLeast` must start at `1`.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
 - `expectedRollIntervalSeconds` is the raid HP model's expected per-player `/dice` cadence.
 - `minimumHitsPerParticipant` keeps raids from collapsing to trivially low HP in short windows.

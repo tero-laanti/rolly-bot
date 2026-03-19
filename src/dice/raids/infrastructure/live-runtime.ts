@@ -3,6 +3,7 @@ import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "dis
 import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
+import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type {
   ApplyRaidDiceRollInput,
@@ -102,6 +103,7 @@ export const createRaidsLiveRuntime = ({
   const liveRaidsById = new Map<string, ActiveRaidContext>();
   const liveRaidIdsByThreadId = new Map<string, string>();
   const db = getDatabase();
+  const economy = createSqliteEconomyRepository(db);
   const progression = createSqliteProgressionRepository(db);
   const unitOfWork = createSqliteUnitOfWork(db);
   let stopping = false;
@@ -148,6 +150,7 @@ export const createRaidsLiveRuntime = ({
       status: context.raid.status,
       outcome: context.raid.outcome,
       participantCount: context.raid.participantIds.size,
+      eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
       scheduledStartAt: new Date(context.raid.scheduledStartAtMs),
       expiresAt: context.raid.expiresAtMs === null ? null : new Date(context.raid.expiresAtMs),
       channelId: context.handles.announcementMessage.channelId,
@@ -198,6 +201,7 @@ export const createRaidsLiveRuntime = ({
         if (boss && context.raid.outcome) {
           return buildRaidResolvedPrompt({
             participantIds,
+            eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
             resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
             outcome: context.raid.outcome,
             bossName: boss.name,
@@ -236,6 +240,7 @@ export const createRaidsLiveRuntime = ({
 
         return buildRaidActivePrompt({
           participantIds,
+          eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
           startedAtMs: context.raid.startedAtMs ?? Date.now(),
           endsAtMs: context.raid.expiresAtMs ?? Date.now(),
           threadId: context.raid.activeThreadId,
@@ -252,6 +257,7 @@ export const createRaidsLiveRuntime = ({
         if (boss && context.raid.outcome) {
           return buildRaidResolvedPrompt({
             participantIds,
+            eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
             resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
             outcome: context.raid.outcome,
             bossName: boss.name,
@@ -431,6 +437,7 @@ export const createRaidsLiveRuntime = ({
     context.raid.expiresAtMs = null;
     context.raid.closedAtMs = null;
     context.raid.activeThreadId = null;
+    context.raid.rewardEligibleUserIds.clear();
     context.raid.boss = null;
   };
 
@@ -454,6 +461,7 @@ export const createRaidsLiveRuntime = ({
     context.raid.expiresAtMs = expiresAtMs;
     context.raid.closedAtMs = null;
     context.raid.activeThreadId = activeThreadId;
+    context.raid.rewardEligibleUserIds.clear();
     context.raid.boss = boss;
     liveRaidIdsByThreadId.set(activeThreadId, context.raid.raidId);
   };
@@ -514,19 +522,17 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
+    const rewardEligibleUserIds = Array.from(context.raid.rewardEligibleUserIds);
+    if (rewardEligibleUserIds.length < 1) {
+      return;
+    }
+
     unitOfWork.runInTransaction(() => {
-      for (const participantId of context.raid.participantIds) {
-        if (boss.reward.type === "roll-pass-multiplier") {
-          progression.applyDiceTemporaryEffect({
+      for (const participantId of rewardEligibleUserIds) {
+        if (boss.reward.type === "pips") {
+          economy.applyPipsDelta({
             userId: participantId,
-            effectCode: "roll-pass-multiplier",
-            kind: "positive",
-            source: `raid:${context.raid.raidId}`,
-            magnitude: boss.reward.multiplier,
-            remainingRolls: boss.reward.rolls,
-            consumeOnCommand: "dice",
-            stackGroup: "raid-reward-roll-pass-multiplier",
-            stackMode: "refresh",
+            amount: boss.reward.pips,
           });
         }
       }
@@ -865,6 +871,7 @@ export const createRaidsLiveRuntime = ({
         expiresAtMs: null,
         closedAtMs: null,
         participantIds: new Set<string>(),
+        rewardEligibleUserIds: new Set<string>(),
         activeThreadId: null,
         boss: null,
       },
@@ -995,15 +1002,17 @@ export const createRaidsLiveRuntime = ({
       userId,
       (context.raid.boss.damageByUserId.get(userId) ?? 0) + damage,
     );
+    context.raid.rewardEligibleUserIds.add(userId);
 
     const boss = context.raid.boss;
     if (boss.currentHp <= 0) {
       const rewardSummary = describeRaidReward(boss.reward);
+      const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
       resolveRaid(context, "success", nowMs);
       return {
         kind: "applied",
         defeated: true,
-        summary: `Raid damage: ${damage} to ${boss.name}. Boss defeated. All joined raiders earned ${rewardSummary}.`,
+        summary: `Raid damage: ${damage} to ${boss.name}. Boss defeated. ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"} earned ${rewardSummary}.`,
       };
     }
 

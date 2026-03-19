@@ -10,9 +10,8 @@ export type RaidParticipantProfile = {
 };
 
 export type RaidRewardDefinition = {
-  type: "roll-pass-multiplier";
-  multiplier: number;
-  rolls: number;
+  type: "pips";
+  pips: number;
 };
 
 export type RaidBossDefinition = {
@@ -101,21 +100,34 @@ const pickBossName = (random: () => number): string => {
   return `${prefix} ${suffix}`;
 };
 
-export const getDefaultRaidReward = (): RaidRewardDefinition => {
-  const { reward } = getRaidBalance();
+const resolveRaidRewardPips = (bossLevel: number): number => {
+  const rewardTiers = getRaidBalance().reward.pipsByBossLevel;
+  let matchedTier = rewardTiers[0];
+
+  for (const rewardTier of rewardTiers) {
+    if (rewardTier.bossLevelAtLeast > bossLevel) {
+      break;
+    }
+
+    matchedTier = rewardTier;
+  }
+
+  return matchedTier?.pips ?? 0;
+};
+
+export const getDefaultRaidReward = (bossLevel: number): RaidRewardDefinition => {
   return {
-    type: "roll-pass-multiplier",
-    multiplier: reward.rollPassMultiplier,
-    rolls: reward.rolls,
+    type: "pips",
+    pips: resolveRaidRewardPips(bossLevel),
   };
 };
 
 export const describeRaidReward = (reward: RaidRewardDefinition): string => {
-  if (reward.type === "roll-pass-multiplier") {
-    return `x${reward.multiplier} roll buff for the next ${reward.rolls} /dice rolls`;
+  if (reward.type === "pips") {
+    return `${reward.pips} pip${reward.pips === 1 ? "" : "s"} per eligible raider`;
   }
 
-  return "temporary raid reward";
+  return "raid reward";
 };
 
 export const createRaidBoss = ({
@@ -128,7 +140,7 @@ export const createRaidBoss = ({
   random?: () => number;
 }): RaidBossDefinition => {
   const level = calculateBossLevel(participantProfiles);
-  const reward = getDefaultRaidReward();
+  const reward = getDefaultRaidReward(level);
 
   return {
     name: pickBossName(random),
