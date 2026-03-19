@@ -1,5 +1,8 @@
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
-import { formatDiscordRelativeTime } from "../../../../shared/discord";
+import {
+  discordMessageCharacterLimit,
+  formatDiscordRelativeTime,
+} from "../../../../shared/discord";
 import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
@@ -284,7 +287,7 @@ export const createRunRollDiceUseCase = ({
         : null;
     const content =
       raidResult && raidResult.kind !== "no-raid"
-        ? `${baseContent}\n\n${raidResult.summary}`
+        ? appendRaidSummaryWithinLimit(baseContent, raidResult.summary)
         : baseContent;
 
     return {
@@ -490,6 +493,23 @@ const buildAutoRollClassification = ({
 const summarizeAutoRollText = (content: string): string => {
   const singleLine = content.replace(/\s+/g, " ").trim();
   return truncateWithSuffix(singleLine, 220, "...");
+};
+
+const appendRaidSummaryWithinLimit = (baseContent: string, raidSummary: string): string => {
+  const separator = "\n\n";
+  const combined = `${baseContent}${separator}${raidSummary}`;
+  if (combined.length <= discordMessageCharacterLimit) {
+    return combined;
+  }
+
+  const normalizedSummary = truncateWithSuffix(raidSummary, discordMessageCharacterLimit, "...");
+  const maxBaseLength = discordMessageCharacterLimit - normalizedSummary.length - separator.length;
+  if (maxBaseLength <= 0) {
+    return normalizedSummary;
+  }
+
+  const truncatedBase = truncateWithSuffix(baseContent, maxBaseLength, "...");
+  return `${truncatedBase}${separator}${normalizedSummary}`;
 };
 
 const formatRemainingTime = (durationMs: number): string => {
