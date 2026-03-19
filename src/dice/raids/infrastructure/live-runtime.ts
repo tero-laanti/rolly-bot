@@ -61,6 +61,7 @@ export const createRaidsLiveRuntime = ({
 }: CreateRaidsLiveRuntimeInput): RaidsLiveRuntime => {
   const liveRaidsById = new Map<string, ActiveRaidContext>();
   let stopping = false;
+  let triggerChain: Promise<void> = Promise.resolve();
 
   const isCurrentContext = (context: ActiveRaidContext): boolean => {
     return liveRaidsById.get(context.raid.raidId) === context;
@@ -491,7 +492,7 @@ export const createRaidsLiveRuntime = ({
     finalizeRaid(context);
   };
 
-  const triggerRaidNow = async (): Promise<TriggerRaidNowOutcome> => {
+  const triggerRaidNowInternal = async (): Promise<TriggerRaidNowOutcome> => {
     if (stopping) {
       return { created: false };
     }
@@ -584,6 +585,19 @@ export const createRaidsLiveRuntime = ({
     };
   };
 
+  const triggerRaidNow = async (): Promise<TriggerRaidNowOutcome> => {
+    let result: TriggerRaidNowOutcome = { created: false };
+
+    triggerChain = triggerChain
+      .catch(() => {})
+      .then(async () => {
+        result = await triggerRaidNowInternal();
+      });
+
+    await triggerChain;
+    return result;
+  };
+
   const handleButtonInteraction = async (interaction: ButtonInteraction): Promise<void> => {
     const raidId = parseRaidJoinButtonId(interaction.customId);
     if (!raidId) {
@@ -640,6 +654,7 @@ export const createRaidsLiveRuntime = ({
     }
 
     stopping = true;
+    await triggerChain.catch(() => {});
 
     const liveRaids = Array.from(liveRaidsById.values());
     for (const context of liveRaids) {
