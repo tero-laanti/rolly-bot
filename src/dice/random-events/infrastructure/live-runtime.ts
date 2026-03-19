@@ -33,13 +33,19 @@ import {
   resolveRandomEventAttempt,
   type RandomEventAttemptResolution,
 } from "./live-runtime-resolution";
+import {
+  getActiveRandomEventLiveExpiryDate,
+  getActiveRandomEventLiveExpiryMs,
+  getActiveRandomEventRemainingLiveDurationMs,
+  syncActiveRandomEventLiveExpiryMs,
+} from "./live-runtime-expiry";
 import { triggerRandomEventOpportunity } from "./live-runtime-trigger";
 import type {
   ActiveRandomEventContext,
   ActiveRandomEventSequenceChallenge,
   RandomEventsLiveRuntimeLogger,
 } from "./live-runtime-types";
-import { type RandomEventsState, updateActiveRandomEventExpiry } from "./state-store";
+import type { RandomEventsState } from "./state-store";
 
 type CreateRandomEventsLiveRuntimeInput = {
   client: Client;
@@ -163,7 +169,7 @@ export const createRandomEventsLiveRuntime = ({
       description: buildActiveClaimDescription(
         context.selection.renderedPrompt,
         activityLine,
-        windowSnapshot?.expiresAtMs ?? context.claimWindowExpiresAtMs,
+        getActiveRandomEventLiveExpiryMs(context),
         windowSnapshot?.participants ?? [],
         context.failedAttemptLines,
         context.selection.scenario.requiredReadyCount ?? null,
@@ -195,7 +201,7 @@ export const createRandomEventsLiveRuntime = ({
         userId: session.userId,
         challenge,
         progress: session.progress,
-        expiresAtMs: session.expiresAtMs,
+        expiresAtMs: getActiveRandomEventLiveExpiryMs(context),
       }),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
       buttonLabel: buildSequenceChallengeButtonLabel(session.progress, challenge.steps.length),
@@ -282,7 +288,7 @@ export const createRandomEventsLiveRuntime = ({
       return false;
     }
 
-    const remainingDurationMs = context.claimWindowExpiresAtMs - Date.now();
+    const remainingDurationMs = getActiveRandomEventRemainingLiveDurationMs(context);
     if (remainingDurationMs < 1) {
       return false;
     }
@@ -298,7 +304,7 @@ export const createRandomEventsLiveRuntime = ({
       },
     });
 
-    updateActiveRandomEventExpiry(state, eventId, new Date(snapshot.expiresAtMs));
+    syncActiveRandomEventLiveExpiryMs(state, context, snapshot.expiresAtMs);
     await refreshActiveEventPrompt(eventId, null);
     return true;
   };
@@ -418,11 +424,10 @@ export const createRandomEventsLiveRuntime = ({
       sessionId,
       userId,
       progress: createRollChallengeProgress(challenge),
-      expiresAtMs,
       timer,
     };
 
-    updateActiveRandomEventExpiry(state, eventId, new Date(expiresAtMs));
+    syncActiveRandomEventLiveExpiryMs(state, context, expiresAtMs);
     await refreshSequenceChallengePrompt(eventId);
   };
 
@@ -474,7 +479,7 @@ export const createRandomEventsLiveRuntime = ({
 
       await interaction.deferUpdate();
 
-      if (Date.now() >= session.expiresAtMs) {
+      if (Date.now() >= getActiveRandomEventLiveExpiryMs(activeContext)) {
         await autoResolveSequenceChallenge(eventId, session.sessionId);
         return;
       }
@@ -570,11 +575,7 @@ export const createRandomEventsLiveRuntime = ({
           rarity: context.selection.scenario.rarity,
           claimPolicy: context.selection.scenario.claimPolicy,
           participantCount: sequenceContext ? 1 : (windowSnapshot?.participants.length ?? 0),
-          expiresAt: sequenceContext
-            ? new Date(sequenceContext.session.expiresAtMs)
-            : windowSnapshot
-              ? new Date(windowSnapshot.expiresAtMs)
-              : new Date(context.claimWindowExpiresAtMs),
+          expiresAt: getActiveRandomEventLiveExpiryDate(context),
           channelId: context.message.channelId,
           messageId: context.message.id,
         };
