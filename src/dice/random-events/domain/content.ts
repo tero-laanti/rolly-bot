@@ -439,11 +439,17 @@ export const renderRandomEventOutcome = (
   selectedOutcome: RandomEventOutcome,
   options: { random?: () => number } = {},
 ): RandomEventRenderedOutcome => {
+  const baseValues = { ...scenarioRender.textVariableValues };
+  // Remove reused keys so outcome-level variables can override the scenario selection.
+  for (const key of Object.keys(selectedOutcome.textVariables ?? {})) {
+    delete baseValues[key];
+  }
+
   const textVariableValues = selectTextVariableValues(
     scenarioRender.scenario.textVariables,
     selectedOutcome.textVariables,
     options.random,
-    scenarioRender.textVariableValues,
+    baseValues,
   );
 
   return {
