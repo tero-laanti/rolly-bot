@@ -250,9 +250,12 @@ export const startRaidsFoundationScheduler = ({
 
     try {
       const triggerResult = await onTriggerOpportunity?.({ now });
-      if (triggerResult?.created) {
-        setLastRaidTriggeredAt(state, now);
+      if (!triggerResult?.created) {
+        scheduleNextRun(config.retryDelayMs);
+        return;
       }
+
+      setLastRaidTriggeredAt(state, now);
     } catch (error) {
       logger?.error("[raids] Trigger opportunity failed.", error);
       scheduleNextRun(config.retryDelayMs);
