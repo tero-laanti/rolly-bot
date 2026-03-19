@@ -136,13 +136,11 @@ export const createRandomEventsLiveRuntime = ({
 
   const isWithinClickCooldown = (userId: string): boolean => {
     const lastClickAtMs = clickCooldownByUserId.get(userId) ?? 0;
-    const nowMs = Date.now();
-    if (nowMs - lastClickAtMs < clickCooldownMs) {
-      return true;
-    }
+    return Date.now() - lastClickAtMs < clickCooldownMs;
+  };
 
-    clickCooldownByUserId.set(userId, nowMs);
-    return false;
+  const startClickCooldown = (userId: string): void => {
+    clickCooldownByUserId.set(userId, Date.now());
   };
 
   const refreshActiveEventPrompt = async (
@@ -520,6 +518,7 @@ export const createRandomEventsLiveRuntime = ({
         return;
       }
 
+      startClickCooldown(interaction.user.id);
       await interaction.deferUpdate();
 
       if (Date.now() >= getActiveRandomEventCurrentPhaseExpiryMs(activeContext)) {
@@ -569,6 +568,7 @@ export const createRandomEventsLiveRuntime = ({
 
     const result = windowManager.claim(eventId, interaction.user.id);
     if (result.status === "accepted") {
+      startClickCooldown(interaction.user.id);
       await interaction.deferUpdate();
 
       if (!result.becameResolved) {
