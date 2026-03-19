@@ -7,6 +7,7 @@ import {
   buildRaidCancelledPrompt,
   buildRaidInterruptedPrompt,
   buildRaidResolvedPrompt,
+  buildRaidStartFailedPrompt,
   buildRaidStartedPrompt,
 } from "../interfaces/discord/prompt";
 import type { RaidAdminActiveRaidSnapshot } from "../application/ports";
@@ -126,16 +127,22 @@ export const createRaidsLiveRuntime = ({
     clearRaidTimers(context);
 
     if (context.activeMessage) {
-      await context.activeMessage
-        .edit(
-          buildRaidResolvedPrompt({
-            participantIds: Array.from(context.participantIds),
-            resolvedAtMs: Date.now(),
-          }),
-        )
+      const resolvedPrompt = buildRaidResolvedPrompt({
+        participantIds: Array.from(context.participantIds),
+        resolvedAtMs: Date.now(),
+      });
+
+      const resolved = await context.activeMessage
+        .edit(resolvedPrompt)
+        .then(() => true)
         .catch((error) => {
           logger.warn("[raids] Failed to update resolved raid prompt.", error);
+          return false;
         });
+
+      if (!resolved) {
+        return;
+      }
     }
 
     activeRaidsById.delete(raidId);
@@ -189,6 +196,15 @@ export const createRaidsLiveRuntime = ({
       });
 
     if (!activeMessage) {
+      await context.announcementMessage
+        .edit(
+          buildRaidStartFailedPrompt({
+            participantIds: Array.from(context.participantIds),
+          }),
+        )
+        .catch((error) => {
+          logger.warn("[raids] Failed to update failed-start raid prompt.", error);
+        });
       activeRaidsById.delete(raidId);
       resolveActiveRaid(state, raidId);
       return;
