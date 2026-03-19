@@ -1,4 +1,4 @@
-import { getDiceBalanceData } from "../../../rolly-data/load";
+import { getDiceRaidData } from "../../../rolly-data/load";
 import { getBaseRollPassCount } from "../../progression/domain/game-rules";
 import { minuteMs } from "../../../shared/time";
 
@@ -23,7 +23,7 @@ export type RaidBossDefinition = {
 };
 
 const getRaidBalance = () => {
-  return getDiceBalanceData().raids;
+  return getDiceRaidData();
 };
 
 const getExpectedDamagePerRoll = (participant: RaidParticipantProfile): number => {

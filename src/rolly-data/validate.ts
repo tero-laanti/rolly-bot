@@ -6,11 +6,14 @@ import type {
   DiceCasinoPushYourLuckPayoutData,
   DiceAchievementRule,
   DiceBalanceData,
+  DicePvpData,
   DiceItemData,
   DiceItemEffect,
   DiceBalanceVarietyConfig,
+  DiceRandomEventBalanceData,
   DiceRaidBossBalanceData,
   DiceRaidBossNamesData,
+  DiceRaidData,
   DiceRaidRewardData,
 } from "./types";
 import type {
@@ -860,9 +863,6 @@ const readRaidBossBalanceConfig = (value: unknown, label: string): DiceRaidBossB
 export const parseDiceBalance = (value: unknown): DiceBalanceData => {
   const record = assertRecord(value, "diceBalance");
   const charge = assertRecord(record.charge, "diceBalance.charge");
-  const pvp = assertRecord(record.pvp, "diceBalance.pvp");
-  const randomEvents = assertRecord(record.randomEvents, "diceBalance.randomEvents");
-  const raids = assertRecord(record.raids, "diceBalance.raids");
 
   const parsed: DiceBalanceData = {
     prestigeSides: readIntegerArray(record.prestigeSides, "diceBalance.prestigeSides", 2),
@@ -882,35 +882,6 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
       ),
       maxMultiplier: readInteger(charge.maxMultiplier, "diceBalance.charge.maxMultiplier", 1),
     },
-    pvp: {
-      challengeExpireMinutes: readInteger(
-        pvp.challengeExpireMinutes,
-        "diceBalance.pvp.challengeExpireMinutes",
-        1,
-      ),
-      loserLockoutBaseMinutes: readInteger(
-        pvp.loserLockoutBaseMinutes,
-        "diceBalance.pvp.loserLockoutBaseMinutes",
-        1,
-      ),
-      winnerBuffBaseMinutes: readInteger(
-        pvp.winnerBuffBaseMinutes,
-        "diceBalance.pvp.winnerBuffBaseMinutes",
-        1,
-      ),
-    },
-    randomEvents: {
-      claimWindowDurationMultiplier: readFiniteNumber(
-        randomEvents.claimWindowDurationMultiplier,
-        "diceBalance.randomEvents.claimWindowDurationMultiplier",
-      ),
-      variety: readVarietyConfig(randomEvents.variety, "diceBalance.randomEvents.variety"),
-    },
-    raids: {
-      reward: readRaidRewardConfig(raids.reward, "diceBalance.raids.reward"),
-      bossNames: readRaidBossNamesConfig(raids.bossNames, "diceBalance.raids.bossNames"),
-      bossBalance: readRaidBossBalanceConfig(raids.bossBalance, "diceBalance.raids.bossBalance"),
-    },
   };
 
   if (parsed.prestigeSides.length < 2) {
@@ -918,6 +889,47 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
   }
 
   return parsed;
+};
+
+export const parseDicePvpData = (value: unknown): DicePvpData => {
+  const record = assertRecord(value, "pvp");
+  return {
+    challengeExpireMinutes: readInteger(
+      record.challengeExpireMinutes,
+      "pvp.challengeExpireMinutes",
+      1,
+    ),
+    loserLockoutBaseMinutes: readInteger(
+      record.loserLockoutBaseMinutes,
+      "pvp.loserLockoutBaseMinutes",
+      1,
+    ),
+    winnerBuffBaseMinutes: readInteger(
+      record.winnerBuffBaseMinutes,
+      "pvp.winnerBuffBaseMinutes",
+      1,
+    ),
+  };
+};
+
+export const parseRandomEventBalance = (value: unknown): DiceRandomEventBalanceData => {
+  const record = assertRecord(value, "randomEventBalance");
+  return {
+    claimWindowDurationMultiplier: readFiniteNumber(
+      record.claimWindowDurationMultiplier,
+      "randomEventBalance.claimWindowDurationMultiplier",
+    ),
+    variety: readVarietyConfig(record.variety, "randomEventBalance.variety"),
+  };
+};
+
+export const parseDiceRaidsData = (value: unknown): DiceRaidData => {
+  const record = assertRecord(value, "raids");
+  return {
+    reward: readRaidRewardConfig(record.reward, "raids.reward"),
+    bossNames: readRaidBossNamesConfig(record.bossNames, "raids.bossNames"),
+    bossBalance: readRaidBossBalanceConfig(record.bossBalance, "raids.bossBalance"),
+  };
 };
 
 export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {

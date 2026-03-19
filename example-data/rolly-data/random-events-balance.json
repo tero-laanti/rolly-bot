@@ -1,0 +1,21 @@
+{
+  "claimWindowDurationMultiplier": 1.5,
+  "variety": {
+    "antiRepeatCooldownTriggers": 2,
+    "rarityChances": {
+      "common": 0.45,
+      "uncommon": 0.28,
+      "rare": 0.17,
+      "epic": 0.08,
+      "legendary": 0.02
+    },
+    "pity": {
+      "enabled": true,
+      "startAfterNonRareTriggers": 5,
+      "rareWeightStep": 0.1,
+      "epicWeightStep": 0.15,
+      "legendaryWeightStep": 0.2,
+      "maxBonusMultiplier": 2
+    }
+  }
+}
