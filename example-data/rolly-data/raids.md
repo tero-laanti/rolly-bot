@@ -22,8 +22,8 @@ This file controls raid rewards, boss naming, and raid boss-balance tuning.
     }
   },
   "bossNames": {
-    "prefixes": ["Ashen"],
-    "suffixes": ["Hydra"]
+    "prefixes": ["Example"],
+    "suffixes": ["Boss"]
   },
   "bossBalance": {
     "expectedRollIntervalSeconds": 10,

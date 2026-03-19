@@ -6,9 +6,9 @@ Minimal shape:
 
 ```json
 {
-  "id": "dice-revolver",
-  "name": "Dice Revolver",
-  "description": "Your next 6 /dice uses roll twice.",
+  "id": "example-double-roll-uses",
+  "name": "Example Double Roll Uses",
+  "description": "Example item: your next 6 /dice uses roll twice.",
   "pricePips": 5,
   "consumable": true,
   "effect": {

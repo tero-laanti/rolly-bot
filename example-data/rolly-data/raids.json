@@ -32,30 +32,8 @@
     }
   },
   "bossNames": {
-    "prefixes": [
-      "Ashen",
-      "Storm",
-      "Grim",
-      "Iron",
-      "Night",
-      "Ember",
-      "Frost",
-      "Rotfang",
-      "Thunder",
-      "Void"
-    ],
-    "suffixes": [
-      "Hydra",
-      "Titan",
-      "Colossus",
-      "Wyrm",
-      "Behemoth",
-      "Golem",
-      "Leviathan",
-      "Sentinel",
-      "Matriarch",
-      "Reaper"
-    ]
+    "prefixes": ["Example", "Sample", "Placeholder", "Demo", "Training"],
+    "suffixes": ["Boss", "Guardian", "Construct", "Champion", "Sentinel"]
   },
   "bossBalance": {
     "expectedRollIntervalSeconds": 10,
