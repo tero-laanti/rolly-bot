@@ -143,6 +143,8 @@ export const buildActiveClaimDescription = (
         `...and ${hiddenFailureCount} more failed attempt${hiddenFailureCount === 1 ? "" : "s"}.`,
       );
     }
+
+    lines.push("", "The event is still open.");
   }
 
   if (typeof expiresAtMs === "number") {

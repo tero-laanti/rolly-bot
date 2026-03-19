@@ -26,7 +26,7 @@ export type RandomEventAttemptResolution = {
   resolutionNote: string | null;
   resolution: RandomEventOutcomeResolution;
   finalLine: string;
-  keepOpenLine: string;
+  failedAttemptLine: string;
 };
 
 type SharedRandomEventOutcomeSelection = Pick<
@@ -131,7 +131,7 @@ const formatFinalOutcomeLine = (resolution: RandomEventAttemptResolution): strin
   return `<@${resolution.userId}>: ${prefix} ${resolution.renderedOutcomeMessage}${noteText}`;
 };
 
-const formatKeepOpenFailureLine = (resolution: RandomEventAttemptResolution): string => {
+const formatFailedAttemptLine = (resolution: RandomEventAttemptResolution): string => {
   const noteParts = [...resolution.effectNotes];
   if (resolution.resolutionNote) {
     noteParts.push(resolution.resolutionNote);
@@ -141,7 +141,7 @@ const formatKeepOpenFailureLine = (resolution: RandomEventAttemptResolution): st
   const challengeText = resolution.challengeRollSummary
     ? `${resolution.challengeRollSummary}. `
     : "";
-  return `<@${resolution.userId}> failed: ${challengeText}${resolution.renderedOutcomeMessage}${noteText} The event is still open.`;
+  return `<@${resolution.userId}> failed: ${challengeText}${resolution.renderedOutcomeMessage}${noteText}`;
 };
 
 export const resolveRandomEventAttempt = ({
@@ -219,11 +219,11 @@ export const resolveRandomEventAttempt = ({
     resolutionNote: resolutionNote ?? null,
     resolution: renderedOutcome.selectedOutcome.resolution,
     finalLine: "",
-    keepOpenLine: "",
+    failedAttemptLine: "",
   };
 
   attemptResolution.finalLine = formatFinalOutcomeLine(attemptResolution);
-  attemptResolution.keepOpenLine = formatKeepOpenFailureLine({
+  attemptResolution.failedAttemptLine = formatFailedAttemptLine({
     ...attemptResolution,
     challengeRollSummary: formatChallengeRollSummary(resolvedChallengeProgress, false),
   });

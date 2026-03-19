@@ -10,7 +10,7 @@ import {
 } from "../domain/content";
 import type { RandomEventRollChallengeProgress } from "../domain/roll-challenges";
 import type { DiceTemporaryEffect } from "../../progression/domain/temporary-effects";
-import { buildActiveClaimDescription } from "./live-runtime-presentation";
+import { buildActiveClaimDescription, buildExpiredEventEmbed } from "./live-runtime-presentation";
 import { createRandomEventsState, registerActiveRandomEvent } from "./state-store";
 import { resolveRandomEvent, resolveRandomEventAttempt } from "./live-runtime-resolution";
 
@@ -109,7 +109,7 @@ test("scenario validation rejects requiredReadyCount on first-click events", () 
   assert.throws(() => validateRandomEventScenarios([scenario]), /only valid for multi-user/i);
 });
 
-test("keep-open attempt resolution logs the user and keeps the event open", () => {
+test("keep-open attempt resolution logs a neutral failed-attempt history line", () => {
   const scenario = createChallengeScenario();
   const selection = renderRandomEventScenario(scenario);
   const challengeProgress: RandomEventRollChallengeProgress = {
@@ -162,9 +162,9 @@ test("keep-open attempt resolution logs the user and keeps the event open", () =
   });
 
   assert.equal(attempt.resolution, "keep-open-failure");
-  assert.match(attempt.keepOpenLine, /<@123> failed:/);
-  assert.match(attempt.keepOpenLine, /Rolled 2 \(d6\)/);
-  assert.match(attempt.keepOpenLine, /still open/);
+  assert.match(attempt.failedAttemptLine, /<@123> failed:/);
+  assert.match(attempt.failedAttemptLine, /Rolled 2 \(d6\)/);
+  assert.doesNotMatch(attempt.failedAttemptLine, /still open/);
 });
 
 test("outcome text variables override scenario text variables for the same key", () => {
@@ -240,6 +240,95 @@ test("scenario placeholders can be satisfied by outcome-only text variables", ()
   assert.equal(renderedOutcome.renderedOutcomeMessage, "You pocket the relic.");
 });
 
+test("outcome rendering keeps open-state placeholders stable when outcomes disagree", () => {
+  const scenario: RandomEventScenario = {
+    id: "stable-placeholder-test",
+    rarity: "common",
+    title: "A ${thing} appears",
+    prompt: "The ${thing} pulses with light.",
+    claimLabel: "Grab ${thing}",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "first-outcome",
+        resolution: "resolve-success",
+        message: "You grab the ${thing} before it fades.",
+        effects: [],
+        textVariables: {
+          thing: ["orb"],
+        },
+      },
+      {
+        id: "second-outcome",
+        resolution: "resolve-success",
+        message: "The ${thing} slips into your pack.",
+        effects: [],
+        textVariables: {
+          thing: ["relic"],
+        },
+      },
+    ],
+  };
+
+  const scenarioRender = renderRandomEventScenario(scenario, {
+    random: () => 0.999,
+  });
+  const renderedOutcome = renderRandomEventOutcome(scenarioRender, scenario.outcomes[0]!, {
+    random: () => 0,
+  });
+
+  assert.equal(scenarioRender.renderedTitle, "A relic appears");
+  assert.equal(scenarioRender.renderedPrompt, "The relic pulses with light.");
+  assert.equal(scenarioRender.renderedClaimLabel, "Grab relic");
+  assert.equal(renderedOutcome.renderedOutcomeMessage, "You grab the relic before it fades.");
+});
+
+test("outcome-only placeholders outside the open prompt resolve from the selected outcome", () => {
+  const scenario: RandomEventScenario = {
+    id: "outcome-only-resolution-test",
+    rarity: "common",
+    title: "A sealed chest waits",
+    prompt: "The lock looks fragile.",
+    claimLabel: "Open it",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    textVariables: {
+      reward: ["dust"],
+    },
+    outcomes: [
+      {
+        id: "coins",
+        resolution: "resolve-success",
+        message: "You find ${reward} inside.",
+        effects: [],
+        textVariables: {
+          reward: ["coins"],
+        },
+      },
+      {
+        id: "gems",
+        resolution: "resolve-success",
+        message: "You find ${reward} inside.",
+        effects: [],
+        textVariables: {
+          reward: ["gems"],
+        },
+      },
+    ],
+  };
+
+  const scenarioRender = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const renderedOutcome = renderRandomEventOutcome(scenarioRender, scenario.outcomes[1]!, {
+    random: () => 0,
+  });
+
+  assert.equal(scenarioRender.renderedPrompt, "The lock looks fragile.");
+  assert.equal(renderedOutcome.renderedOutcomeMessage, "You find gems inside.");
+});
+
 test("active event prompt truncates older failed attempts", () => {
   const description = buildActiveClaimDescription(
     "Test prompt",
@@ -253,6 +342,21 @@ test("active event prompt truncates older failed attempts", () => {
   assert.doesNotMatch(description, /fail one/);
   assert.match(description, /fail two/);
   assert.match(description, /\.\.\.and 1 more failed attempt/);
+  assert.match(description, /The event is still open\./);
+});
+
+test("expired event history does not reuse open-state retry wording", () => {
+  const selection = renderRandomEventScenario(createChallengeScenario(), {
+    random: () => 0,
+  });
+  const description = buildExpiredEventEmbed(selection, [
+    "<@123> failed: Rolled 2 (d6). You slip on the first plank and back away.",
+  ]).toJSON().description;
+
+  assert.ok(description);
+  assert.match(description, /Recent failed attempts/);
+  assert.doesNotMatch(description, /still open/);
+  assert.match(description, /The window closes before anyone pulls it off\./);
 });
 
 test("multi-user events without challenge branching reuse one rendered outcome for all participants", async () => {

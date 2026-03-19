@@ -330,7 +330,7 @@ export const createRandomEventsLiveRuntime = ({
 
     if (attemptResolution.resolution === "keep-open-failure") {
       context.attemptedUserIds.add(userId);
-      context.failedAttemptLines.push(attemptResolution.keepOpenLine);
+      context.failedAttemptLines.push(attemptResolution.failedAttemptLine);
       clearSequenceChallengeTimer(context);
       context.sequenceChallenge = null;
 
