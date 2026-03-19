@@ -16,11 +16,13 @@ import {
 import { createRandomEventsState } from "../../dice/random-events/infrastructure/state-store";
 import { randomEventButtonPrefix } from "../../dice/random-events/interfaces/discord/button-ids";
 import { createRaidsLiveRuntime } from "../../dice/raids/infrastructure/live-runtime";
+import { startRaidsFoundationScheduler } from "../../dice/raids/infrastructure/foundation-scheduler";
 import {
   clearRaidsAdminController,
   registerRaidsAdminController,
 } from "../../dice/raids/infrastructure/admin-controller";
 import { raidJoinButtonPrefix } from "../../dice/raids/interfaces/discord/button-ids";
+import { createRaidsState } from "../../dice/raids/infrastructure/state-store";
 
 const token = requireEnv("DISCORD_TOKEN");
 
@@ -43,6 +45,7 @@ const registerDiscordCommands = (): void => {
 let randomEventsLiveRuntime: ReturnType<typeof createRandomEventsLiveRuntime> | null = null;
 let stopRandomEventsScheduler: (() => void) | null = null;
 let raidsLiveRuntime: ReturnType<typeof createRaidsLiveRuntime> | null = null;
+let stopRaidsScheduler: (() => void) | null = null;
 
 const handleRandomEventButton = async (interaction: ButtonInteraction): Promise<void> => {
   if (!randomEventsLiveRuntime) {
@@ -118,27 +121,45 @@ const startRaidsFoundation = (): void => {
     registerRaidsAdminController({
       config: raidsConfig,
       runtime: null,
+      state: null,
+      scheduler: null,
     });
     console.log("[raids] Lifecycle runtime disabled by config.");
     return;
   }
 
-  if (raidsLiveRuntime) {
+  if (raidsLiveRuntime || stopRaidsScheduler) {
     return;
   }
 
+  const raidsState = createRaidsState();
   raidsLiveRuntime = createRaidsLiveRuntime({
     client,
     config: raidsConfig,
     logger: console,
   });
 
+  const raidsScheduler = startRaidsFoundationScheduler({
+    config: raidsConfig,
+    state: raidsState,
+    hasBlockingRaid: raidsLiveRuntime.hasBlockingRaid,
+    onTriggerOpportunity: async () => raidsLiveRuntime?.triggerRaidNow() ?? { created: false },
+    logger: console,
+  });
+  stopRaidsScheduler = raidsScheduler.stop;
+
   registerRaidsAdminController({
     config: raidsConfig,
     runtime: raidsLiveRuntime,
+    state: raidsState,
+    scheduler: raidsScheduler,
   });
 
-  console.log("[raids] Lifecycle runtime started.");
+  console.log(
+    raidsConfig.targetRaidsPerDay > 0
+      ? "[raids] Lifecycle runtime and scheduler started."
+      : "[raids] Lifecycle runtime started. Random scheduling is off.",
+  );
 };
 
 const stopBackgroundSchedulers = async (): Promise<void> => {
@@ -153,6 +174,11 @@ const stopBackgroundSchedulers = async (): Promise<void> => {
   if (randomEventsLiveRuntime) {
     randomEventsLiveRuntime.stop();
     randomEventsLiveRuntime = null;
+  }
+
+  if (stopRaidsScheduler) {
+    stopRaidsScheduler();
+    stopRaidsScheduler = null;
   }
 
   if (raidsLiveRuntime) {
