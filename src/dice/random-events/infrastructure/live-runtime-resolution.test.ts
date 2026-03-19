@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getRandomEventRetryPolicy,
+  renderRandomEventOutcome,
   renderRandomEventScenario,
   validateRandomEventScenarios,
   type RandomEventScenario,
@@ -147,6 +148,44 @@ test("keep-open attempt resolution logs the user and keeps the event open", () =
   assert.match(attempt.keepOpenLine, /<@123> failed:/);
   assert.match(attempt.keepOpenLine, /Rolled 2 \(d6\)/);
   assert.match(attempt.keepOpenLine, /still open/);
+});
+
+test("outcome text variables override scenario text variables for the same key", () => {
+  const scenario: RandomEventScenario = {
+    id: "override-test",
+    rarity: "common",
+    title: "Override Test",
+    prompt: "A ${thing} is here.",
+    claimLabel: "Inspect ${thing}",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    textVariables: {
+      thing: ["crate"],
+      mood: ["quiet"],
+    },
+    outcomes: [
+      {
+        id: "override-outcome",
+        resolution: "resolve-success",
+        message: "The ${thing} opens with a ${mood} click.",
+        effects: [],
+        textVariables: {
+          thing: ["chest"],
+        },
+      },
+    ],
+  };
+
+  const scenarioRender = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const renderedOutcome = renderRandomEventOutcome(scenarioRender, scenario.outcomes[0]!, {
+    random: () => 0,
+  });
+
+  assert.equal(scenarioRender.renderedPrompt, "A crate is here.");
+  assert.equal(scenarioRender.renderedClaimLabel, "Inspect crate");
+  assert.equal(renderedOutcome.renderedOutcomeMessage, "The chest opens with a quiet click.");
 });
 
 test("active event prompt truncates older failed attempts", () => {
