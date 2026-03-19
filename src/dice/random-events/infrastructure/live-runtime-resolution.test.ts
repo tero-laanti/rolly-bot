@@ -200,9 +200,44 @@ test("outcome text variables override scenario text variables for the same key",
     random: () => 0,
   });
 
-  assert.equal(scenarioRender.renderedPrompt, "A crate is here.");
-  assert.equal(scenarioRender.renderedClaimLabel, "Inspect crate");
+  assert.equal(scenarioRender.renderedPrompt, "A chest is here.");
+  assert.equal(scenarioRender.renderedClaimLabel, "Inspect chest");
   assert.equal(renderedOutcome.renderedOutcomeMessage, "The chest opens with a quiet click.");
+});
+
+test("scenario placeholders can be satisfied by outcome-only text variables", () => {
+  const scenario: RandomEventScenario = {
+    id: "outcome-placeholder-test",
+    rarity: "common",
+    title: "A ${thing} appears",
+    prompt: "The ${thing} hums quietly.",
+    claimLabel: "Inspect ${thing}",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "outcome-placeholder",
+        resolution: "resolve-success",
+        message: "You pocket the ${thing}.",
+        effects: [],
+        textVariables: {
+          thing: ["relic"],
+        },
+      },
+    ],
+  };
+
+  const scenarioRender = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const renderedOutcome = renderRandomEventOutcome(scenarioRender, scenario.outcomes[0]!, {
+    random: () => 0,
+  });
+
+  assert.equal(scenarioRender.renderedTitle, "A relic appears");
+  assert.equal(scenarioRender.renderedPrompt, "The relic hums quietly.");
+  assert.equal(scenarioRender.renderedClaimLabel, "Inspect relic");
+  assert.equal(renderedOutcome.renderedOutcomeMessage, "You pocket the relic.");
 });
 
 test("active event prompt truncates older failed attempts", () => {

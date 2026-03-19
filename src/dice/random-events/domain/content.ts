@@ -422,6 +422,28 @@ const renderTemplatedText = (template: string, selectedValues: Record<string, st
   });
 };
 
+const collectScenarioRenderTextVariables = (
+  scenario: RandomEventScenario,
+): RandomEventTextVariables | undefined => {
+  const mergedOutcomeVariables: RandomEventTextVariables = {};
+
+  for (const outcome of scenario.outcomes) {
+    for (const [key, values] of Object.entries(outcome.textVariables ?? {})) {
+      const existingValues = mergedOutcomeVariables[key] ?? [];
+      mergedOutcomeVariables[key] = [...new Set([...existingValues, ...values])];
+    }
+  }
+
+  if (!scenario.textVariables && Object.keys(mergedOutcomeVariables).length < 1) {
+    return undefined;
+  }
+
+  return {
+    ...(scenario.textVariables ?? {}),
+    ...mergedOutcomeVariables,
+  };
+};
+
 export const selectRandomEventOutcomeForScenario = (
   scenario: RandomEventScenario,
   options: SelectRandomEventScenarioOptions = {},
@@ -437,7 +459,7 @@ export const renderRandomEventScenario = (
   options: { random?: () => number } = {},
 ): RandomEventScenarioRender => {
   const textVariableValues = selectTextVariableValues(
-    scenario.textVariables,
+    collectScenarioRenderTextVariables(scenario),
     undefined,
     options.random,
   );

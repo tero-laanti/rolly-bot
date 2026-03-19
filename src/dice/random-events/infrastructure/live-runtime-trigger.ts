@@ -128,18 +128,7 @@ export const triggerRandomEventOpportunity = async ({
     return { created: false };
   }
 
-  copyVarietyState(contentState, candidateVarietyState);
-  activeEventsById.set(eventId, {
-    eventId,
-    selection,
-    message,
-    sequenceChallenge: null,
-    claimWindowExpiresAtMs: estimatedExpiresAtMs,
-    attemptedUserIds: new Set(),
-    failedAttemptLines: [],
-  });
-
-  windowManager.openWindow({
+  const openedWindow = windowManager.openWindow({
     windowId: eventId,
     durationMs: claimWindowDurationMs,
     policy: selection.scenario.claimPolicy,
@@ -151,11 +140,20 @@ export const triggerRandomEventOpportunity = async ({
     },
   });
 
-  const openedWindow = windowManager.getWindow(eventId);
+  copyVarietyState(contentState, candidateVarietyState);
+  activeEventsById.set(eventId, {
+    eventId,
+    selection,
+    message,
+    sequenceChallenge: null,
+    claimWindowExpiresAtMs: openedWindow.expiresAtMs,
+    attemptedUserIds: new Set(),
+    failedAttemptLines: [],
+  });
 
   return {
     created: true,
     eventId,
-    expiresAt: openedWindow ? new Date(openedWindow.expiresAtMs) : new Date(estimatedExpiresAtMs),
+    expiresAt: new Date(openedWindow.expiresAtMs),
   };
 };
