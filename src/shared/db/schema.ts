@@ -1,5 +1,22 @@
 import type { SqliteDatabase } from "../db";
 
+type TableInfoRow = {
+  name: string;
+};
+
+const ensureBalancesLastDailyPipRewardColumn = (db: SqliteDatabase): void => {
+  const columns = db.prepare("PRAGMA table_info(balances)").all() as TableInfoRow[];
+  const hasLastDailyPipRewardAt = columns.some(
+    (column) => column.name === "last_daily_pip_reward_at",
+  );
+
+  if (hasLastDailyPipRewardAt) {
+    return;
+  }
+
+  db.exec("ALTER TABLE balances ADD COLUMN last_daily_pip_reward_at TEXT");
+};
+
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS balances (
@@ -216,4 +233,6 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL
     );
   `);
+
+  ensureBalancesLastDailyPipRewardColumn(db);
 };
