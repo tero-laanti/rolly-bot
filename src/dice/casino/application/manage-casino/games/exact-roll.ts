@@ -22,6 +22,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -174,7 +175,7 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "exact-face-win" } : undefined,
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -188,9 +189,12 @@ const handleExactRollAction = (
             ...session.state,
             exactRollFace: action.face,
             exactRollMode: "exact-face",
-            lastOutcome: resolution.won
-              ? `Exact Face hit. You picked ${action.face} and rolled ${rolledFace}. Paid ${resolution.payout} pips total.`
-              : `Exact Face missed. You picked ${action.face} and rolled ${rolledFace}.`,
+            lastOutcome: appendAchievementUnlockText(
+              resolution.won
+                ? `Exact Face hit. You picked ${action.face} and rolled ${rolledFace}. Paid ${resolution.payout} pips total.`
+                : `Exact Face missed. You picked ${action.face} and rolled ${rolledFace}.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,
@@ -230,7 +234,7 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "high-low-win" } : undefined,
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -244,9 +248,12 @@ const handleExactRollAction = (
             ...session.state,
             exactRollHighLowChoice: action.choice,
             exactRollMode: "high-low",
-            lastOutcome: resolution.won
-              ? `High / Low hit. You picked ${capitalize(action.choice)} and rolled ${rolledFace}. Paid ${resolution.payout} pips total.`
-              : `High / Low missed. You picked ${capitalize(action.choice)} and rolled ${rolledFace}.`,
+            lastOutcome: appendAchievementUnlockText(
+              resolution.won
+                ? `High / Low hit. You picked ${capitalize(action.choice)} and rolled ${rolledFace}. Paid ${resolution.payout} pips total.`
+                : `High / Low missed. You picked ${capitalize(action.choice)} and rolled ${rolledFace}.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,

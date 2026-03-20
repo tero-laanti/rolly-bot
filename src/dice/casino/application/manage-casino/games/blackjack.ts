@@ -24,6 +24,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -127,7 +128,7 @@ const startBlackjackRound = ({
           ? { type: "blackjack-push" }
           : undefined,
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -140,9 +141,12 @@ const startBlackjackRound = ({
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
-              resolution.playerHand,
-            )}.`,
+            lastOutcome: appendAchievementUnlockText(
+              `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
+                resolution.playerHand,
+              )}.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,
@@ -210,7 +214,7 @@ const handleBlackjackAction = (
             ? { type: "blackjack-hit-to-21-win" }
             : undefined,
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -223,9 +227,12 @@ const handleBlackjackAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
-              resolution.playerHand,
-            )}.`,
+            lastOutcome: appendAchievementUnlockText(
+              `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
+                resolution.playerHand,
+              )}.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,
@@ -260,7 +267,7 @@ const handleBlackjackAction = (
       outcome,
       achievementEvent: outcome === "push" ? { type: "blackjack-push" } : undefined,
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -273,9 +280,12 @@ const handleBlackjackAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
-              resolution.playerHand,
-            )}.`,
+            lastOutcome: appendAchievementUnlockText(
+              `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
+                resolution.playerHand,
+              )}.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,

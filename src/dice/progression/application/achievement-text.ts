@@ -25,3 +25,16 @@ export const formatAchievementUnlockText = (
   const label = entries.length === 1 ? "Achievement" : "Achievements";
   return `${label} unlocked: ${entries.join(", ")}.`;
 };
+
+export const appendAchievementUnlockText = (
+  content: string,
+  achievementIds: readonly DiceAchievementId[],
+  separator = "\n",
+): string => {
+  const achievementText = formatAchievementUnlockText(achievementIds);
+  if (!achievementText) {
+    return content;
+  }
+
+  return `${content}${separator}${achievementText}`;
+};

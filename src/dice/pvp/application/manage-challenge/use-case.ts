@@ -9,6 +9,7 @@ import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
+import { formatAchievementUnlockText } from "../../../progression/application/achievement-text";
 import {
   getDicePvpDieLabel,
   getDuelPunishmentMs,
@@ -338,7 +339,7 @@ const handleChallengeAccept = (
         duelTier: challenge.duelTier,
         result: "draw",
       });
-      awardManualDiceAchievements(
+      const challengerNewlyEarned = awardManualDiceAchievements(
         progression,
         resolvedChallenge.challengerId,
         getDicePvpAchievementIds(
@@ -346,7 +347,7 @@ const handleChallengeAccept = (
           challengerPvpStats,
         ),
       );
-      awardManualDiceAchievements(
+      const opponentNewlyEarned = awardManualDiceAchievements(
         progression,
         resolvedChallenge.opponentId,
         getDicePvpAchievementIds(
@@ -357,6 +358,8 @@ const handleChallengeAccept = (
       return {
         resolved: true as const,
         type: "draw" as const,
+        challengerNewlyEarned,
+        opponentNewlyEarned,
       };
     }
 
@@ -393,12 +396,12 @@ const handleChallengeAccept = (
       duelTier: challenge.duelTier,
       result: "loss",
     });
-    awardManualDiceAchievements(
+    const winnerNewlyEarned = awardManualDiceAchievements(
       progression,
       winnerId,
       getDicePvpAchievementIds(analytics.getDiceAnalytics(winnerId), winnerPvpStats),
     );
-    awardManualDiceAchievements(
+    const loserNewlyEarned = awardManualDiceAchievements(
       progression,
       loserId,
       getDicePvpAchievementIds(analytics.getDiceAnalytics(loserId), loserPvpStats),
@@ -412,6 +415,8 @@ const handleChallengeAccept = (
       winnerDoubleRollUntilMs,
       loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
       loserBlockedByShield: loserLockoutResult.blockedByShield,
+      winnerNewlyEarned,
+      loserNewlyEarned,
     };
   });
 
@@ -421,7 +426,14 @@ const handleChallengeAccept = (
 
   if (outcome.type === "draw") {
     return updateMessage(
-      buildDrawResultContent(resolvedChallenge, challengerRoll, opponentRoll, duelDieSides),
+      buildDrawResultContent(
+        resolvedChallenge,
+        challengerRoll,
+        opponentRoll,
+        duelDieSides,
+        outcome.challengerNewlyEarned,
+        outcome.opponentNewlyEarned,
+      ),
       true,
     );
   }
@@ -437,6 +449,8 @@ const handleChallengeAccept = (
       outcome.winnerDoubleRollUntilMs,
       outcome.loserLockoutUntilMs,
       outcome.loserBlockedByShield,
+      outcome.winnerNewlyEarned,
+      outcome.loserNewlyEarned,
     ),
     true,
   );
@@ -588,6 +602,8 @@ const buildDrawResultContent = (
   challengerRoll: number,
   opponentRoll: number,
   duelDieSides: number,
+  challengerNewlyEarned: string[],
+  opponentNewlyEarned: string[],
 ): string => {
   return [
     "Duel ended in a draw.",
@@ -595,7 +611,11 @@ const buildDrawResultContent = (
     `<@${challenge.challengerId}> rolled ${challengerRoll}.`,
     `<@${challenge.opponentId}> rolled ${opponentRoll}.`,
     "No effects were applied.",
-  ].join("\n");
+    formatUserAchievementUnlockLine(challenge.challengerId, challengerNewlyEarned),
+    formatUserAchievementUnlockLine(challenge.opponentId, opponentNewlyEarned),
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 };
 
 const buildWinResultContent = (
@@ -608,6 +628,8 @@ const buildWinResultContent = (
   winnerDoubleRollUntilMs: number,
   loserLockoutUntilMs: number | null,
   loserBlockedByShield: boolean,
+  winnerNewlyEarned: string[],
+  loserNewlyEarned: string[],
 ): string => {
   return [
     "Duel complete.",
@@ -619,7 +641,11 @@ const buildWinResultContent = (
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
       : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
     `<@${winnerId}> has double buff on /dice. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
-  ].join("\n");
+    formatUserAchievementUnlockLine(winnerId, winnerNewlyEarned),
+    formatUserAchievementUnlockLine(loserId, loserNewlyEarned),
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 };
 
 const buildLockoutCancellationContent = (lockedUserId: string, lockoutUntil: number): string => {
@@ -684,6 +710,14 @@ const formatMinutesOrHours = (durationMs: number): string => {
   }
 
   return `${minutes}m`;
+};
+
+const formatUserAchievementUnlockLine = (
+  userId: string,
+  achievementIds: readonly string[],
+): string => {
+  const achievementText = formatAchievementUnlockText(achievementIds);
+  return achievementText ? `<@${userId}>: ${achievementText}` : "";
 };
 
 const replyMessage = (content: string, ephemeral: boolean): DicePvpResult => {

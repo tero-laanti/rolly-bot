@@ -18,6 +18,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -191,7 +192,7 @@ const handleDicePokerAction = (
               handKind: rerollResult.result.kind,
             },
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -204,9 +205,12 @@ const handleDicePokerAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `Final hand ${formatDice(rerollResult.finalRoll)}. ${describePokerResult(
-              rerollResult.result,
-            )}`,
+            lastOutcome: appendAchievementUnlockText(
+              `Final hand ${formatDice(rerollResult.finalRoll)}. ${describePokerResult(
+                rerollResult.result,
+              )}`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,
@@ -229,7 +233,7 @@ const handleDicePokerAction = (
       payout: 0,
       outcome: "loss",
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -242,7 +246,10 @@ const handleDicePokerAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: "Dice Poker hand cancelled. Bet forfeited.",
+            lastOutcome: appendAchievementUnlockText(
+              "Dice Poker hand cancelled. Bet forfeited.",
+              newlyEarned,
+            ),
           },
         },
         pips,

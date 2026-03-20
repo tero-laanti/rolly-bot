@@ -263,7 +263,7 @@ export const resolveRandomEvent = async ({
     userId: string;
     attemptResolution: RandomEventAttemptResolution;
     hadKeepOpenFailureBeforeSuccess: boolean;
-  }) => void;
+  }) => string | null | undefined;
 }): Promise<void> => {
   const context = activeEventsById.get(eventId);
   if (!context) {
@@ -340,13 +340,15 @@ export const resolveRandomEvent = async ({
         resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
         sharedOutcomeSelection,
       });
-    onAttemptResolved?.({
+    const achievementText = onAttemptResolved?.({
       userId,
       attemptResolution,
       hadKeepOpenFailureBeforeSuccess:
         attemptResolution.resolution === "resolve-success" && context.failedAttemptLines.length > 0,
     });
-    return attemptResolution.finalLine;
+    return achievementText
+      ? `${attemptResolution.finalLine} ${achievementText}`
+      : attemptResolution.finalLine;
   });
 
   await context.message.edit({

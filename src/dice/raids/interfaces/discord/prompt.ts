@@ -205,6 +205,7 @@ export const buildRaidResolvedPrompt = ({
   maxHp,
   rewardSummary,
   contributionLines,
+  achievementLines = [],
 }: {
   participantIds: readonly string[];
   eligibleParticipantCount: number;
@@ -215,6 +216,7 @@ export const buildRaidResolvedPrompt = ({
   maxHp: number;
   rewardSummary: string;
   contributionLines: readonly string[];
+  achievementLines?: readonly string[];
 }): BaseMessageOptions => {
   const presentation = getOutcomePresentation(outcome);
   const rewardLine =
@@ -233,6 +235,9 @@ export const buildRaidResolvedPrompt = ({
         "",
         `**Joined raiders (${participantIds.length})**`,
         formatParticipants(participantIds),
+        ...(achievementLines.length > 0
+          ? ["", "**Achievements unlocked**", ...achievementLines]
+          : []),
         "",
         "**Damage leaders**",
         buildContributionBlock(contributionLines),
