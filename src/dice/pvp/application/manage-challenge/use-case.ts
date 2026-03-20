@@ -8,6 +8,7 @@ import { formatDiscordRelativeTime } from "../../../../shared/discord";
 import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
 import { formatAchievementUnlockText } from "../../../progression/application/achievement-text";
 import {
@@ -35,6 +36,7 @@ export type DicePvpAction =
       ownerId: string;
       opponentId: string | null;
       duelTier: number;
+      wagerPips: number;
     }
   | {
       type: "accept";
@@ -51,6 +53,7 @@ type PublishChallenge = (view: ActionView<DicePvpAction>) => Promise<{ url: stri
 
 type ManageChallengeDependencies = {
   analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics" | "updateDicePvpStats">;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
   hostileEffects: Pick<DiceHostileEffectsService, "applyShieldableNegativeLockout">;
   progression: Pick<DiceProgressionRepository, "awardAchievements" | "getDicePrestige">;
   pvp: Pick<
@@ -65,19 +68,23 @@ type ManageChallengeDependencies = {
     | "setDicePvpChallengeStatusFromPending"
     | "setDicePvpEffects"
   >;
+  random?: () => number;
   unitOfWork: UnitOfWork;
 };
 
 export const createDicePvpUseCase = ({
   analytics,
+  economy,
   hostileEffects,
   progression,
   pvp,
+  random = Math.random,
   unitOfWork,
 }: ManageChallengeDependencies) => {
   const createDicePvpSetupReply = (
     challengerId: string,
     opponent: { id: string; bot: boolean } | null,
+    wagerPips: number = 0,
     nowMs: number = Date.now(),
   ): DicePvpResult => {
     const lockoutUntil = pvp.getActiveDiceLockout(challengerId, nowMs);
@@ -95,12 +102,23 @@ export const createDicePvpUseCase = ({
       }
     }
 
+    if (!Number.isInteger(wagerPips) || wagerPips < 0 || wagerPips > 100) {
+      return replyMessage("Wager must be an integer between 0 and 100.", true);
+    }
+
+    if (economy.getPips(challengerId) < wagerPips) {
+      return replyMessage(
+        `You need ${wagerPips} pips to post that wager. Current balance: ${economy.getPips(challengerId)} pips.`,
+        true,
+      );
+    }
+
     const maxTier = getUnlockedDicePvpTierFromPrestige(progression.getDicePrestige(challengerId));
     return {
       kind: "reply",
       payload: {
         type: "view",
-        view: buildSetupView(challengerId, opponent?.id ?? null, maxTier),
+        view: buildSetupView(challengerId, opponent?.id ?? null, maxTier, wagerPips),
         ephemeral: true,
       },
     };
@@ -115,8 +133,10 @@ export const createDicePvpUseCase = ({
     if (action.type === "pick") {
       return handleTierPick(
         {
+          economy,
           progression,
           pvp,
+          unitOfWork,
         },
         actorId,
         action,
@@ -129,10 +149,12 @@ export const createDicePvpUseCase = ({
       return handleChallengeAccept(
         {
           analytics,
+          economy,
           hostileEffects,
           progression,
           pvp,
           unitOfWork,
+          random,
         },
         actorId,
         action.challengeId,
@@ -140,7 +162,7 @@ export const createDicePvpUseCase = ({
       );
     }
 
-    return handleChallengeDecline({ pvp }, actorId, action.challengeId, nowMs);
+    return handleChallengeDecline({ economy, pvp, unitOfWork }, actorId, action.challengeId, nowMs);
   };
 
   return {
@@ -150,7 +172,12 @@ export const createDicePvpUseCase = ({
 };
 
 const handleTierPick = async (
-  { progression, pvp }: Pick<ManageChallengeDependencies, "progression" | "pvp">,
+  {
+    economy,
+    progression,
+    pvp,
+    unitOfWork,
+  }: Pick<ManageChallengeDependencies, "economy" | "progression" | "pvp" | "unitOfWork">,
   actorId: string,
   action: Extract<DicePvpAction, { type: "pick" }>,
   publishChallenge: PublishChallenge | null,
@@ -162,6 +189,10 @@ const handleTierPick = async (
 
   if (!Number.isInteger(action.duelTier)) {
     return replyMessage("Invalid duel die.", true);
+  }
+
+  if (!Number.isInteger(action.wagerPips) || action.wagerPips < 0 || action.wagerPips > 100) {
+    return replyMessage("Invalid wager.", true);
   }
 
   const opponentId = action.opponentId ?? dicePvpOpenOpponentId;
@@ -193,14 +224,45 @@ const handleTierPick = async (
   const expiresAtMs = nowMs + getDicePvpChallengeExpireMs();
   const expiresAtIso = new Date(expiresAtMs).toISOString();
 
-  const createResult = pvp.createDicePvpChallengeIfUsersAvailable({
-    id: challengeId,
-    challengerId: action.ownerId,
-    opponentId,
-    duelTier: action.duelTier,
-    expiresAt: expiresAtIso,
-    nowMs,
+  const createResult = unitOfWork.runInTransaction(() => {
+    if (economy.getPips(action.ownerId) < action.wagerPips) {
+      return {
+        created: false as const,
+        reason: "insufficient-pips" as const,
+        currentPips: economy.getPips(action.ownerId),
+      };
+    }
+
+    const result = pvp.createDicePvpChallengeIfUsersAvailable({
+      id: challengeId,
+      challengerId: action.ownerId,
+      opponentId,
+      duelTier: action.duelTier,
+      wagerPips: action.wagerPips,
+      expiresAt: expiresAtIso,
+      nowMs,
+    });
+    if (!result.created) {
+      return result;
+    }
+
+    if (action.wagerPips > 0) {
+      economy.applyPipsDelta({
+        userId: action.ownerId,
+        amount: -action.wagerPips,
+      });
+    }
+
+    return result;
   });
+
+  if ("reason" in createResult) {
+    return updateMessage(
+      `You need ${action.wagerPips} pips to post that wager. Current balance: ${createResult.currentPips} pips.`,
+      true,
+    );
+  }
+
   if (!createResult.created) {
     return updateMessage(
       buildPendingConflictContent(createResult, action.ownerId, opponentId),
@@ -210,18 +272,47 @@ const handleTierPick = async (
 
   try {
     const challengeMessage = await publishChallenge(
-      buildChallengeView(challengeId, action.ownerId, opponentId, action.duelTier, expiresAtMs),
+      buildChallengeView(
+        challengeId,
+        action.ownerId,
+        opponentId,
+        action.duelTier,
+        action.wagerPips,
+        expiresAtMs,
+      ),
     );
 
     return updateMessage(`Challenge created: ${challengeMessage.url}`, true);
   } catch {
-    pvp.setDicePvpChallengeStatusFromPending(challengeId, "cancelled");
-    return updateMessage("Failed to post the challenge in this channel.", true);
+    unitOfWork.runInTransaction(() => {
+      if (!pvp.setDicePvpChallengeStatusFromPending(challengeId, "cancelled")) {
+        return;
+      }
+
+      if (action.wagerPips > 0) {
+        economy.applyPipsDelta({
+          userId: action.ownerId,
+          amount: action.wagerPips,
+        });
+      }
+    });
+    return updateMessage(
+      buildFailedPublishChallengeContent(action.ownerId, action.wagerPips),
+      true,
+    );
   }
 };
 
 const handleChallengeAccept = (
-  { analytics, hostileEffects, progression, pvp, unitOfWork }: ManageChallengeDependencies,
+  {
+    analytics,
+    economy,
+    hostileEffects,
+    progression,
+    pvp,
+    random = Math.random,
+    unitOfWork,
+  }: ManageChallengeDependencies,
   actorId: string,
   challengeId: string,
   nowMs: number,
@@ -236,8 +327,13 @@ const handleChallengeAccept = (
   }
 
   if (isDicePvpChallengeExpired(challenge, nowMs)) {
-    const markedExpired = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "expired");
-    if (!markedExpired) {
+    const expired = expireChallenge({
+      challenge,
+      economy,
+      pvp,
+      unitOfWork,
+    });
+    if (!expired) {
       return alreadyHandledReply();
     }
 
@@ -259,10 +355,12 @@ const handleChallengeAccept = (
   const challengerLockoutUntil = pvp.getActiveDiceLockout(challenge.challengerId, nowMs);
   if (challengerLockoutUntil) {
     return cancelChallengeForLockout(
+      economy,
       pvp,
       challenge,
       challenge.challengerId,
       challengerLockoutUntil,
+      unitOfWork,
     );
   }
 
@@ -275,19 +373,32 @@ const handleChallengeAccept = (
       );
     }
 
-    return cancelChallengeForLockout(pvp, challenge, opponentIdForDuel, opponentLockoutUntil);
+    return cancelChallengeForLockout(
+      economy,
+      pvp,
+      challenge,
+      opponentIdForDuel,
+      opponentLockoutUntil,
+      unitOfWork,
+    );
   }
 
   const challengerTier = getUnlockedDicePvpTierFromPrestige(
     progression.getDicePrestige(challenge.challengerId),
   );
   if (challengerTier < challenge.duelTier) {
-    const cancelled = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "cancelled");
+    const cancelled = cancelPendingChallenge({
+      challenge,
+      economy,
+      pvp,
+      status: "cancelled",
+      unitOfWork,
+    });
     if (!cancelled) {
       return alreadyHandledReply();
     }
 
-    return cancelledByTierUpdate();
+    return cancelledByTierUpdate(challenge);
   }
 
   const opponentTier = getUnlockedDicePvpTierFromPrestige(
@@ -298,19 +409,18 @@ const handleChallengeAccept = (
       return replyMessage("You do not have this duel die unlocked yet.", true);
     }
 
-    const cancelled = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "cancelled");
+    const cancelled = cancelPendingChallenge({
+      challenge,
+      economy,
+      pvp,
+      status: "cancelled",
+      unitOfWork,
+    });
     if (!cancelled) {
       return alreadyHandledReply();
     }
 
-    return cancelledByTierUpdate();
-  }
-
-  if (isOpenChallenge) {
-    const claimed = pvp.setDicePvpChallengeOpponentFromOpen(challenge.id, opponentIdForDuel);
-    if (!claimed) {
-      return alreadyHandledReply();
-    }
+    return cancelledByTierUpdate(challenge);
   }
 
   const resolvedChallenge = isOpenChallenge
@@ -318,15 +428,53 @@ const handleChallengeAccept = (
     : challenge;
 
   const duelDieSides = getDicePvpDieSidesForTier(challenge.duelTier);
-  const challengerRoll = rollDie(duelDieSides);
-  const opponentRoll = rollDie(duelDieSides);
+  const challengerRoll = rollDie(duelDieSides, random);
+  const opponentRoll = rollDie(duelDieSides, random);
 
   const outcome = unitOfWork.runInTransaction(() => {
+    if (challenge.wagerPips > 0 && economy.getPips(opponentIdForDuel) < challenge.wagerPips) {
+      return {
+        resolved: false as const,
+        reason: "insufficient-pips" as const,
+        currentPips: economy.getPips(opponentIdForDuel),
+      };
+    }
+
+    if (isOpenChallenge) {
+      const claimed = pvp.setDicePvpChallengeOpponentFromOpen(challenge.id, opponentIdForDuel);
+      if (!claimed) {
+        return { resolved: false as const, reason: "already-handled" as const };
+      }
+    }
+
+    if (challenge.wagerPips > 0) {
+      economy.applyPipsDelta({
+        userId: opponentIdForDuel,
+        amount: -challenge.wagerPips,
+      });
+    }
+
     if (!pvp.setDicePvpChallengeStatusFromPending(challenge.id, "resolved")) {
-      return { resolved: false as const };
+      if (challenge.wagerPips > 0) {
+        economy.applyPipsDelta({
+          userId: opponentIdForDuel,
+          amount: challenge.wagerPips,
+        });
+      }
+      return { resolved: false as const, reason: "already-handled" as const };
     }
 
     if (challengerRoll === opponentRoll) {
+      if (challenge.wagerPips > 0) {
+        economy.applyPipsDelta({
+          userId: resolvedChallenge.challengerId,
+          amount: challenge.wagerPips,
+        });
+        economy.applyPipsDelta({
+          userId: resolvedChallenge.opponentId,
+          amount: challenge.wagerPips,
+        });
+      }
       analytics.updateDicePvpStats({ userId: resolvedChallenge.challengerId, draws: 1 });
       analytics.updateDicePvpStats({ userId: resolvedChallenge.opponentId, draws: 1 });
       const challengerPvpStats = pvp.recordResolvedDuel({
@@ -369,6 +517,15 @@ const handleChallengeAccept = (
       winnerId === resolvedChallenge.challengerId
         ? resolvedChallenge.opponentId
         : resolvedChallenge.challengerId;
+    const burnPips = getWagerBurnPips(challenge.wagerPips);
+    const payoutPips = getWagerWinnerPayoutPips(challenge.wagerPips);
+
+    if (payoutPips > 0) {
+      economy.applyPipsDelta({
+        userId: winnerId,
+        amount: payoutPips,
+      });
+    }
 
     const punishmentMs = getDuelPunishmentMs(challenge.duelTier);
     const rewardMs = getDuelRewardMs(challenge.duelTier);
@@ -412,6 +569,8 @@ const handleChallengeAccept = (
       type: "win" as const,
       winnerId,
       loserId,
+      burnPips,
+      payoutPips,
       winnerDoubleRollUntilMs,
       loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
       loserBlockedByShield: loserLockoutResult.blockedByShield,
@@ -421,6 +580,13 @@ const handleChallengeAccept = (
   });
 
   if (!outcome.resolved) {
+    if (outcome.reason === "insufficient-pips") {
+      return replyMessage(
+        `<@${opponentIdForDuel}> needs ${challenge.wagerPips} pips to accept this wager. Current balance: ${outcome.currentPips} pips.`,
+        true,
+      );
+    }
+
     return alreadyHandledReply();
   }
 
@@ -431,6 +597,7 @@ const handleChallengeAccept = (
         challengerRoll,
         opponentRoll,
         duelDieSides,
+        challenge.wagerPips,
         outcome.challengerNewlyEarned,
         outcome.opponentNewlyEarned,
       ),
@@ -444,6 +611,9 @@ const handleChallengeAccept = (
       challengerRoll,
       opponentRoll,
       duelDieSides,
+      challenge.wagerPips,
+      outcome.burnPips,
+      outcome.payoutPips,
       outcome.winnerId,
       outcome.loserId,
       outcome.winnerDoubleRollUntilMs,
@@ -457,7 +627,11 @@ const handleChallengeAccept = (
 };
 
 const handleChallengeDecline = (
-  { pvp }: Pick<ManageChallengeDependencies, "pvp">,
+  {
+    economy,
+    pvp,
+    unitOfWork,
+  }: Pick<ManageChallengeDependencies, "economy" | "pvp" | "unitOfWork">,
   actorId: string,
   challengeId: string,
   nowMs: number,
@@ -472,8 +646,13 @@ const handleChallengeDecline = (
   }
 
   if (isDicePvpChallengeExpired(challenge, nowMs)) {
-    const markedExpired = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "expired");
-    if (!markedExpired) {
+    const expired = expireChallenge({
+      challenge,
+      economy,
+      pvp,
+      unitOfWork,
+    });
+    if (!expired) {
       return alreadyHandledReply();
     }
 
@@ -491,21 +670,36 @@ const handleChallengeDecline = (
   const challengerLockoutUntil = pvp.getActiveDiceLockout(challenge.challengerId, nowMs);
   if (challengerLockoutUntil) {
     return cancelChallengeForLockout(
+      economy,
       pvp,
       challenge,
       challenge.challengerId,
       challengerLockoutUntil,
+      unitOfWork,
     );
   }
 
   if (challenge.opponentId !== dicePvpOpenOpponentId) {
     const opponentLockoutUntil = pvp.getActiveDiceLockout(challenge.opponentId, nowMs);
     if (opponentLockoutUntil) {
-      return cancelChallengeForLockout(pvp, challenge, challenge.opponentId, opponentLockoutUntil);
+      return cancelChallengeForLockout(
+        economy,
+        pvp,
+        challenge,
+        challenge.opponentId,
+        opponentLockoutUntil,
+        unitOfWork,
+      );
     }
   }
 
-  const declined = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "declined");
+  const declined = cancelPendingChallenge({
+    challenge,
+    economy,
+    pvp,
+    status: "declined",
+    unitOfWork,
+  });
   if (!declined) {
     return alreadyHandledReply();
   }
@@ -517,6 +711,7 @@ const buildSetupView = (
   ownerId: string,
   opponentId: string | null,
   maxTier: number,
+  wagerPips: number,
 ): ActionView<DicePvpAction> => {
   const tierButtons = Array.from({ length: maxTier }, (_, index) => {
     const duelTier = index + 1;
@@ -526,6 +721,7 @@ const buildSetupView = (
         ownerId,
         opponentId,
         duelTier,
+        wagerPips,
       } as const,
       label: getDicePvpDieLabel(duelTier),
       style: "primary" as const,
@@ -533,7 +729,7 @@ const buildSetupView = (
   });
 
   return {
-    content: buildSetupContent(opponentId),
+    content: buildSetupContent(opponentId, wagerPips),
     components: chunkActionButtons(tierButtons, 4),
   };
 };
@@ -543,10 +739,11 @@ const buildChallengeView = (
   challengerId: string,
   opponentId: string,
   duelTier: number,
+  wagerPips: number,
   expiresAtMs: number,
 ): ActionView<DicePvpAction> => {
   return {
-    content: buildChallengeContent(challengerId, opponentId, duelTier, expiresAtMs),
+    content: buildChallengeContent(challengerId, opponentId, duelTier, wagerPips, expiresAtMs),
     components: [
       [
         {
@@ -564,18 +761,23 @@ const buildChallengeView = (
   };
 };
 
-const buildSetupContent = (opponentId: string | null): string => {
+const buildSetupContent = (opponentId: string | null, wagerPips: number): string => {
   const targetLine =
     opponentId === null
       ? "Set up an open challenge (any eligible player can accept)."
       : `Set up your challenge against <@${opponentId}>.`;
-  return [targetLine, "Pick a duel die (higher dice require higher prestige)."].join("\n");
+  return [
+    targetLine,
+    `Wager: ${formatChallengeWagerText(wagerPips)}.`,
+    "Pick a duel die (higher dice require higher prestige).",
+  ].join("\n");
 };
 
 const buildChallengeContent = (
   challengerId: string,
   opponentId: string,
   duelTier: number,
+  wagerPips: number,
   expiresAtMs: number,
 ): string => {
   const openChallenge = opponentId === dicePvpOpenOpponentId;
@@ -587,6 +789,8 @@ const buildChallengeContent = (
   return [
     title,
     `Duel die: ${duelDieLabel}.`,
+    buildChallengeStakeLine(wagerPips),
+    buildChallengeBurnLine(wagerPips),
     "",
     openChallenge
       ? `Anyone can accept if they have ${duelDieLabel} unlocked.`
@@ -602,15 +806,19 @@ const buildDrawResultContent = (
   challengerRoll: number,
   opponentRoll: number,
   duelDieSides: number,
+  wagerPips: number,
   challengerNewlyEarned: string[],
   opponentNewlyEarned: string[],
 ): string => {
   return [
     "Duel ended in a draw.",
     `Duel die: D${duelDieSides}.`,
+    `Wager: ${formatChallengeWagerText(wagerPips)}.`,
     `<@${challenge.challengerId}> rolled ${challengerRoll}.`,
     `<@${challenge.opponentId}> rolled ${opponentRoll}.`,
-    "No effects were applied.",
+    wagerPips > 0
+      ? `Draw refund: both players get ${wagerPips} pip${wagerPips === 1 ? "" : "s"} back.`
+      : "No effects were applied.",
     formatUserAchievementUnlockLine(challenge.challengerId, challengerNewlyEarned),
     formatUserAchievementUnlockLine(challenge.opponentId, opponentNewlyEarned),
   ]
@@ -623,6 +831,9 @@ const buildWinResultContent = (
   challengerRoll: number,
   opponentRoll: number,
   duelDieSides: number,
+  wagerPips: number,
+  burnPips: number,
+  payoutPips: number,
   winnerId: string,
   loserId: string,
   winnerDoubleRollUntilMs: number,
@@ -634,9 +845,16 @@ const buildWinResultContent = (
   return [
     "Duel complete.",
     `Duel die: D${duelDieSides}.`,
+    `Wager: ${formatChallengeWagerText(wagerPips)}.`,
     `<@${challenge.challengerId}> rolled ${challengerRoll}.`,
     `<@${challenge.opponentId}> rolled ${opponentRoll}.`,
     `<@${winnerId}> is the winner.`,
+    ...(wagerPips > 0
+      ? [
+          `<@${winnerId}> receives ${payoutPips} pip${payoutPips === 1 ? "" : "s"}.`,
+          `${burnPips} pip${burnPips === 1 ? "" : "s"} burned from the pot.`,
+        ]
+      : []),
     loserBlockedByShield
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
       : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
@@ -674,16 +892,42 @@ const buildPendingConflictContent = (
 
 const buildExpiredChallengeContent = (challenge: DicePvpChallenge): string => {
   if (challenge.opponentId === dicePvpOpenOpponentId) {
-    return `The open challenge from <@${challenge.challengerId}> has expired.`;
+    return [
+      `The open challenge from <@${challenge.challengerId}> has expired.`,
+      formatChallengeRefundLine(challenge),
+    ]
+      .filter((line) => line.length > 0)
+      .join("\n");
   }
 
-  return `The challenge between <@${challenge.challengerId}> and <@${challenge.opponentId}> has expired.`;
+  return [
+    `The challenge between <@${challenge.challengerId}> and <@${challenge.opponentId}> has expired.`,
+    formatChallengeRefundLine(challenge),
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 };
 
 const buildDeclinedChallengeContent = (challenge: DicePvpChallenge): string => {
-  return challenge.opponentId === dicePvpOpenOpponentId
-    ? `<@${challenge.challengerId}> cancelled their open challenge.`
-    : `<@${challenge.opponentId}> declined <@${challenge.challengerId}>'s challenge.`;
+  const message =
+    challenge.opponentId === dicePvpOpenOpponentId
+      ? `<@${challenge.challengerId}> cancelled their open challenge.`
+      : `<@${challenge.opponentId}> declined <@${challenge.challengerId}>'s challenge.`;
+
+  return [message, formatChallengeRefundLine(challenge)]
+    .filter((line) => line.length > 0)
+    .join("\n");
+};
+
+const buildFailedPublishChallengeContent = (challengerId: string, wagerPips: number): string => {
+  return [
+    "Failed to post the challenge in this channel.",
+    wagerPips > 0
+      ? `<@${challengerId}> was refunded ${wagerPips} pip${wagerPips === 1 ? "" : "s"}.`
+      : "",
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 };
 
 const getOtherParticipantId = (challenge: DicePvpChallenge, userId: string): string => {
@@ -701,6 +945,34 @@ const formatChallengeExpiry = (expiresAt: string): string => {
 
 const formatChallengeUserLabel = (userId: string): string => {
   return userId === dicePvpOpenOpponentId ? "anyone" : `<@${userId}>`;
+};
+
+const formatChallengeWagerText = (wagerPips: number): string => {
+  return wagerPips > 0
+    ? `${wagerPips} pip${wagerPips === 1 ? "" : "s"} per player`
+    : "no wager";
+};
+
+const buildChallengeStakeLine = (wagerPips: number): string => {
+  return `Stake: ${formatChallengeWagerText(wagerPips)}.`;
+};
+
+const buildChallengeBurnLine = (wagerPips: number): string => {
+  if (wagerPips < 1) {
+    return "Burn on decisive result: none.";
+  }
+
+  const burnPips = getWagerBurnPips(wagerPips);
+  const payoutPips = getWagerWinnerPayoutPips(wagerPips);
+  return `Decisive payout: ${payoutPips} pips to the winner, ${burnPips} pip${burnPips === 1 ? "" : "s"} burned.`;
+};
+
+const formatChallengeRefundLine = (challenge: DicePvpChallenge): string => {
+  if (challenge.wagerPips < 1) {
+    return "";
+  }
+
+  return `<@${challenge.challengerId}> was refunded ${challenge.wagerPips} pip${challenge.wagerPips === 1 ? "" : "s"}.`;
 };
 
 const formatMinutesOrHours = (durationMs: number): string => {
@@ -746,25 +1018,116 @@ const alreadyHandledReply = (): DicePvpResult => {
   return replyMessage("This challenge was already handled.", true);
 };
 
-const cancelledByTierUpdate = (): DicePvpResult => {
+const cancelledByTierUpdate = (challenge: DicePvpChallenge): DicePvpResult => {
   return updateMessage(
-    "Challenge cancelled. Both players must have the selected duel die unlocked at acceptance time.",
+    [
+      "Challenge cancelled. Both players must have the selected duel die unlocked at acceptance time.",
+      formatChallengeRefundLine(challenge),
+    ]
+      .filter((line) => line.length > 0)
+      .join("\n"),
     true,
   );
 };
 
+const refundChallengeChallenger = (
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">,
+  challenge: DicePvpChallenge,
+): void => {
+  if (challenge.wagerPips < 1) {
+    return;
+  }
+
+  economy.applyPipsDelta({
+    userId: challenge.challengerId,
+    amount: challenge.wagerPips,
+  });
+};
+
+const cancelPendingChallenge = ({
+  challenge,
+  economy,
+  pvp,
+  status,
+  unitOfWork,
+}: {
+  challenge: DicePvpChallenge;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  pvp: Pick<DicePvpRepository, "setDicePvpChallengeStatusFromPending">;
+  status: "declined" | "expired" | "cancelled";
+  unitOfWork: UnitOfWork;
+}): boolean => {
+  return unitOfWork.runInTransaction(() => {
+    if (!pvp.setDicePvpChallengeStatusFromPending(challenge.id, status)) {
+      return false;
+    }
+
+    refundChallengeChallenger(economy, challenge);
+    return true;
+  });
+};
+
+const expireChallenge = ({
+  challenge,
+  economy,
+  pvp,
+  unitOfWork,
+}: {
+  challenge: DicePvpChallenge;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  pvp: Pick<DicePvpRepository, "setDicePvpChallengeStatusFromPending">;
+  unitOfWork: UnitOfWork;
+}): boolean => {
+  return cancelPendingChallenge({
+    challenge,
+    economy,
+    pvp,
+    status: "expired",
+    unitOfWork,
+  });
+};
+
 const cancelChallengeForLockout = (
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">,
   pvp: Pick<DicePvpRepository, "setDicePvpChallengeStatusFromPending">,
   challenge: DicePvpChallenge,
   lockedUserId: string,
   lockoutUntil: number,
+  unitOfWork: UnitOfWork,
 ): DicePvpResult => {
-  const cancelled = pvp.setDicePvpChallengeStatusFromPending(challenge.id, "cancelled");
+  const cancelled = cancelPendingChallenge({
+    challenge,
+    economy,
+    pvp,
+    status: "cancelled",
+    unitOfWork,
+  });
   if (!cancelled) {
     return alreadyHandledReply();
   }
 
-  return updateMessage(buildLockoutCancellationContent(lockedUserId, lockoutUntil), true);
+  return updateMessage(
+    [buildLockoutCancellationContent(lockedUserId, lockoutUntil), formatChallengeRefundLine(challenge)]
+      .filter((line) => line.length > 0)
+      .join("\n"),
+    true,
+  );
+};
+
+const getWagerBurnPips = (wagerPips: number): number => {
+  if (wagerPips < 1) {
+    return 0;
+  }
+
+  return Math.max(1, Math.min(5, Math.floor(wagerPips * 0.1)));
+};
+
+const getWagerWinnerPayoutPips = (wagerPips: number): number => {
+  if (wagerPips < 1) {
+    return 0;
+  }
+
+  return wagerPips * 2 - getWagerBurnPips(wagerPips);
 };
 
 const extendEffect = (currentUntil: string | null, durationMs: number, nowMs: number): number => {
@@ -773,6 +1136,6 @@ const extendEffect = (currentUntil: string | null, durationMs: number, nowMs: nu
   return base + durationMs;
 };
 
-const rollDie = (dieSides: number): number => {
-  return Math.floor(Math.random() * dieSides) + 1;
+const rollDie = (dieSides: number, random: () => number): number => {
+  return Math.floor(random() * dieSides) + 1;
 };

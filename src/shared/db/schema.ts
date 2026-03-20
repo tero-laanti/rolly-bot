@@ -1,5 +1,23 @@
 import type { SqliteDatabase } from "../db";
 
+const hasColumn = (db: SqliteDatabase, tableName: string, columnName: string): boolean => {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as { name: string }[];
+  return rows.some((row) => row.name === columnName);
+};
+
+const addColumnIfMissing = (
+  db: SqliteDatabase,
+  tableName: string,
+  columnName: string,
+  columnDefinition: string,
+): void => {
+  if (hasColumn(db, tableName, columnName)) {
+    return;
+  }
+
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
+};
+
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS balances (
@@ -66,6 +84,7 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       challenger_id TEXT NOT NULL,
       opponent_id TEXT NOT NULL,
       duel_tier INTEGER NOT NULL,
+      wager_pips INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL,
       created_at TEXT NOT NULL,
       expires_at TEXT NOT NULL,
@@ -216,4 +235,7 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL
     );
   `);
+
+  addColumnIfMissing(db, "balances", "last_daily_pip_reward_at", "TEXT");
+  addColumnIfMissing(db, "dice_pvp_challenges", "wager_pips", "INTEGER NOT NULL DEFAULT 0");
 };

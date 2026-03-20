@@ -21,6 +21,7 @@ type DicePvpChallengeCreate = {
   challengerId: string;
   opponentId: string;
   duelTier: number;
+  wagerPips: number;
   expiresAt: string;
 };
 
@@ -42,6 +43,7 @@ type DicePvpChallengeRow = {
   challenger_id: string;
   opponent_id: string;
   duel_tier: number;
+  wager_pips: number;
   status: string;
   created_at: string;
   expires_at: string;
@@ -54,6 +56,7 @@ const mapDicePvpChallengeRow = (row: DicePvpChallengeRow): DicePvpChallenge => {
     challengerId: row.challenger_id,
     opponentId: row.opponent_id,
     duelTier: row.duel_tier,
+    wagerPips: row.wager_pips,
     status: row.status as DicePvpChallengeStatus,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
@@ -132,7 +135,7 @@ const getActiveDoubleRoll = (
 
 const createDicePvpChallenge = (
   db: SqliteDatabase,
-  { id, challengerId, opponentId, duelTier, expiresAt }: DicePvpChallengeCreate,
+  { id, challengerId, opponentId, duelTier, wagerPips, expiresAt }: DicePvpChallengeCreate,
 ): void => {
   const nowIso = new Date().toISOString();
 
@@ -143,18 +146,30 @@ const createDicePvpChallenge = (
       challenger_id,
       opponent_id,
       duel_tier,
+      wager_pips,
       status,
       created_at,
       expires_at,
       updated_at
     )
-    VALUES (@id, @challengerId, @opponentId, @duelTier, 'pending', @createdAt, @expiresAt, @updatedAt)
+    VALUES (
+      @id,
+      @challengerId,
+      @opponentId,
+      @duelTier,
+      @wagerPips,
+      'pending',
+      @createdAt,
+      @expiresAt,
+      @updatedAt
+    )
   `,
   ).run({
     id,
     challengerId,
     opponentId,
     duelTier: normalizeDicePvpTier(duelTier),
+    wagerPips: Math.max(0, Math.floor(wagerPips)),
     createdAt: nowIso,
     expiresAt,
     updatedAt: nowIso,
@@ -168,7 +183,16 @@ const getDicePvpChallenge = (
   const row = db
     .prepare(
       `
-      SELECT id, challenger_id, opponent_id, duel_tier, status, created_at, expires_at, updated_at
+      SELECT
+        id,
+        challenger_id,
+        opponent_id,
+        duel_tier,
+        wager_pips,
+        status,
+        created_at,
+        expires_at,
+        updated_at
       FROM dice_pvp_challenges
       WHERE id = ?
     `,
@@ -178,23 +202,31 @@ const getDicePvpChallenge = (
   return row ? mapDicePvpChallengeRow(row) : undefined;
 };
 
-const getPendingDicePvpChallengeByUser = (
+const getPendingDicePvpChallengesByUser = (
   db: SqliteDatabase,
   userId: string,
-): DicePvpChallenge | undefined => {
-  const row = db
+): DicePvpChallenge[] => {
+  const rows = db
     .prepare(
       `
-      SELECT id, challenger_id, opponent_id, duel_tier, status, created_at, expires_at, updated_at
+      SELECT
+        id,
+        challenger_id,
+        opponent_id,
+        duel_tier,
+        wager_pips,
+        status,
+        created_at,
+        expires_at,
+        updated_at
       FROM dice_pvp_challenges
       WHERE status = 'pending' AND (challenger_id = ? OR opponent_id = ?)
       ORDER BY created_at DESC
-      LIMIT 1
     `,
     )
-    .get(userId, userId) as DicePvpChallengeRow | undefined;
+    .all(userId, userId) as DicePvpChallengeRow[];
 
-  return row ? mapDicePvpChallengeRow(row) : undefined;
+  return rows.map(mapDicePvpChallengeRow);
 };
 
 const setDicePvpChallengeStatusFromPending = (
@@ -228,21 +260,12 @@ const getActivePendingDicePvpChallengeForUser = (
   userId: string,
   nowMs: number,
 ): DicePvpChallenge | undefined => {
-  let pending = getPendingDicePvpChallengeByUser(db, userId);
-  while (pending) {
+  for (const pending of getPendingDicePvpChallengesByUser(db, userId)) {
     if (isDicePvpChallengeExpired(pending, nowMs)) {
-      if (!setDicePvpChallengeStatusFromPending(db, pending.id, "expired")) {
-        return pending;
-      }
-      pending = getPendingDicePvpChallengeByUser(db, userId);
       continue;
     }
 
     if (hasLockedParticipant(db, pending, nowMs)) {
-      if (!setDicePvpChallengeStatusFromPending(db, pending.id, "cancelled")) {
-        return pending;
-      }
-      pending = getPendingDicePvpChallengeByUser(db, userId);
       continue;
     }
 
@@ -256,38 +279,28 @@ const createDicePvpChallengeIfUsersAvailable = (
   db: SqliteDatabase,
   { nowMs = Date.now(), ...challenge }: DicePvpChallengeCreateIfAvailable,
 ): DicePvpChallengeCreateResult => {
-  return db.transaction(() => {
-    const challengerPending = getActivePendingDicePvpChallengeForUser(
-      db,
-      challenge.challengerId,
-      nowMs,
-    );
-    if (challengerPending) {
+  const challengerPending = getActivePendingDicePvpChallengeForUser(db, challenge.challengerId, nowMs);
+  if (challengerPending) {
+    return {
+      created: false as const,
+      conflict: "challenger-has-pending" as const,
+      challenge: challengerPending,
+    };
+  }
+
+  if (challenge.opponentId !== dicePvpOpenOpponentId) {
+    const opponentPending = getActivePendingDicePvpChallengeForUser(db, challenge.opponentId, nowMs);
+    if (opponentPending) {
       return {
         created: false as const,
-        conflict: "challenger-has-pending" as const,
-        challenge: challengerPending,
+        conflict: "opponent-has-pending" as const,
+        challenge: opponentPending,
       };
     }
+  }
 
-    if (challenge.opponentId !== dicePvpOpenOpponentId) {
-      const opponentPending = getActivePendingDicePvpChallengeForUser(
-        db,
-        challenge.opponentId,
-        nowMs,
-      );
-      if (opponentPending) {
-        return {
-          created: false as const,
-          conflict: "opponent-has-pending" as const,
-          challenge: opponentPending,
-        };
-      }
-    }
-
-    createDicePvpChallenge(db, challenge);
-    return { created: true as const };
-  })();
+  createDicePvpChallenge(db, challenge);
+  return { created: true as const };
 };
 
 const setDicePvpChallengeOpponentFromOpen = (

@@ -45,14 +45,25 @@ export const data = new SlashCommandBuilder()
   .setDescription("Challenge another user to a dice duel.")
   .addUserOption((option) =>
     option.setName("opponent").setDescription("The user you want to challenge.").setRequired(false),
+  )
+  .addIntegerOption((option) =>
+    option
+      .setName("wager")
+      .setDescription("Optional pip wager per player.")
+      .setMinValue(0)
+      .setMaxValue(100)
+      .setRequired(false),
   );
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const pvpUseCase = createSqliteDicePvpUseCase(getDatabase());
   const opponent = interaction.options.getUser("opponent");
+  const wager = interaction.options.getInteger("wager") ?? 0;
   await applyChatInputResult(
     interaction,
-    renderDicePvpResult(pvpUseCase.createDicePvpSetupReply(interaction.user.id, opponent)),
+    renderDicePvpResult(
+      pvpUseCase.createDicePvpSetupReply(interaction.user.id, opponent, wager),
+    ),
   );
 };
 
