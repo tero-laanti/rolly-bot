@@ -3,8 +3,6 @@ import { renderActionResult } from "../../../../../app/discord/render-action-res
 import type { DiceAchievementsResult } from "../../../application/query-achievements/use-case";
 import { encodeDiceAchievementsAction } from "../buttons/achievements-buttons";
 
-export const renderDiceAchievementsResult = (
-  result: DiceAchievementsResult,
-): InteractionResult => {
+export const renderDiceAchievementsResult = (result: DiceAchievementsResult): InteractionResult => {
   return renderActionResult(result, encodeDiceAchievementsAction);
 };

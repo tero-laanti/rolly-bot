@@ -338,7 +338,14 @@ const recordDiceCasinoRoundStarted = (
 
 const recordDiceCasinoRoundCompleted = (
   db: SqliteDatabase,
-  { userId, game, betTier, wagered, payout, outcome, achievementEvent }: DiceCasinoAnalyticsCompletion,
+  {
+    userId,
+    game,
+    betTier,
+    payout,
+    outcome,
+    achievementEvent,
+  }: DiceCasinoAnalyticsCompletion,
 ): DiceCasinoAchievementStats => {
   const nowIso = new Date().toISOString();
   db.prepare(
@@ -397,16 +404,14 @@ const recordDiceCasinoRoundCompleted = (
     roundsCompletedTotal: stats.rounds_completed_total + 1,
     totalWagered: Math.max(stats.total_wagered, 0),
     highestPayout: Math.max(stats.highest_payout, payout),
-    exactFaceWins:
-      stats.exact_face_wins + Number(achievementEvent?.type === "exact-face-win"),
+    exactFaceWins: stats.exact_face_wins + Number(achievementEvent?.type === "exact-face-win"),
     highLowWins: stats.high_low_wins + Number(achievementEvent?.type === "high-low-win"),
     pushCashouts: stats.push_cashouts + Number(achievementEvent?.type === "push-cashout"),
     pushPerfectRuns:
       stats.push_perfect_runs + Number(achievementEvent?.type === "push-perfect-run"),
     blackjackNaturals:
       stats.blackjack_naturals + Number(achievementEvent?.type === "blackjack-natural"),
-    blackjackPushes:
-      stats.blackjack_pushes + Number(achievementEvent?.type === "blackjack-push"),
+    blackjackPushes: stats.blackjack_pushes + Number(achievementEvent?.type === "blackjack-push"),
     blackjackHitTo21Wins:
       stats.blackjack_hit_to_21_wins + Number(achievementEvent?.type === "blackjack-hit-to-21-win"),
     pokerStraights:

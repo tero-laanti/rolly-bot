@@ -191,7 +191,11 @@ const handleDicePokerAction = (
               handKind: rerollResult.result.kind,
             },
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(
@@ -225,7 +229,11 @@ const handleDicePokerAction = (
       payout: 0,
       outcome: "loss",
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(

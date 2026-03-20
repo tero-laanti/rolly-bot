@@ -89,16 +89,18 @@ const getOrCreateStatsRow = (
   `,
   ).run({ userId, updatedAt });
 
-  return getStatsRow(db, userId) ?? {
-    user_id: userId,
-    roll_commands_total: 0,
-    near_levelup_rolls_total: 0,
-    highest_charge_multiplier: 1,
-    highest_roll_pass_count: 1,
-    level_ups_total: 0,
-    first_ban_at: null,
-    updated_at: updatedAt,
-  };
+  return (
+    getStatsRow(db, userId) ?? {
+      user_id: userId,
+      roll_commands_total: 0,
+      near_levelup_rolls_total: 0,
+      highest_charge_multiplier: 1,
+      highest_roll_pass_count: 1,
+      level_ups_total: 0,
+      first_ban_at: null,
+      updated_at: updatedAt,
+    }
+  );
 };
 
 const getDiceProgressionAchievementStats = (
@@ -184,7 +186,9 @@ export const createSqliteProgressionAchievementStatsRepository = (
   db: SqliteDatabase,
 ): Pick<
   DiceProgressionRepository,
-  "getDiceProgressionAchievementStats" | "recordDiceProgressionAchievementStats" | "markFirstDiceBan"
+  | "getDiceProgressionAchievementStats"
+  | "recordDiceProgressionAchievementStats"
+  | "markFirstDiceBan"
 > => {
   return {
     getDiceProgressionAchievementStats: (userId) => getDiceProgressionAchievementStats(db, userId),

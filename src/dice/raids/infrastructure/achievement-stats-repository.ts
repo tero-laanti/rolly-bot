@@ -86,10 +86,7 @@ const mapStats = (row: DiceRaidAchievementStatsRow): DiceRaidAchievementStats =>
   };
 };
 
-export const recordRaidJoin = (
-  db: SqliteDatabase,
-  userId: string,
-): DiceRaidAchievementStats => {
+export const recordRaidJoin = (db: SqliteDatabase, userId: string): DiceRaidAchievementStats => {
   const stats = getOrCreateStatsRow(db, userId);
   const updatedAt = new Date().toISOString();
 

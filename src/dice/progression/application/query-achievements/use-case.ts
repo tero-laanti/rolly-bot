@@ -153,7 +153,10 @@ const buildAchievementBrowserPage = (
   const totalPages = Math.max(1, Math.ceil(filteredAchievements.length / achievementsPageSize));
   const currentPage = clampPage(state.page, totalPages);
   const startIndex = currentPage * achievementsPageSize;
-  const visibleAchievements = filteredAchievements.slice(startIndex, startIndex + achievementsPageSize);
+  const visibleAchievements = filteredAchievements.slice(
+    startIndex,
+    startIndex + achievementsPageSize,
+  );
   const visibleLines =
     visibleAchievements.length > 0
       ? visibleAchievements.map((achievement) =>

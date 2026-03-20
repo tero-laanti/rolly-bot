@@ -393,11 +393,12 @@ const recordResolvedDuel = (
   },
 ) => {
   const stats = getOrCreateAchievementStatsRow(db, userId);
-  const nextCurrentWinStreak =
-    result === "win" ? stats.current_win_streak + 1 : 0;
+  const nextCurrentWinStreak = result === "win" ? stats.current_win_streak + 1 : 0;
   const nextHighestWinStreak = Math.max(stats.highest_win_streak, nextCurrentWinStreak);
   const nextHighestTierWin =
-    result === "win" ? Math.max(stats.highest_tier_win, normalizeDicePvpTier(duelTier)) : stats.highest_tier_win;
+    result === "win"
+      ? Math.max(stats.highest_tier_win, normalizeDicePvpTier(duelTier))
+      : stats.highest_tier_win;
   const updatedAt = new Date().toISOString();
 
   db.prepare(

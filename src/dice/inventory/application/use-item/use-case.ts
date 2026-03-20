@@ -37,10 +37,7 @@ export type UseDiceItemResult =
 type UseDiceItemDependencies = {
   inventory: Pick<
     DiceInventoryRepository,
-    | "consumeInventoryItem"
-    | "getInventoryQuantity"
-    | "grantInventoryItem"
-    | "recordItemUse"
+    "consumeInventoryItem" | "getInventoryQuantity" | "grantInventoryItem" | "recordItemUse"
   >;
   itemEffects: DiceItemEffectsService;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "setDicePvpEffects">;

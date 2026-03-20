@@ -1,6 +1,4 @@
-import {
-  getPrestigeAchievementId,
-} from "../../../progression/domain/achievements";
+import { getPrestigeAchievementId } from "../../../progression/domain/achievements";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import {
   getDicePrestigeBaseLevel,

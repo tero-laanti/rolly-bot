@@ -30,12 +30,7 @@ export type DiceInventoryRepository = {
   consumeInventoryItem: (input: { userId: string; itemId: string }) => ConsumeInventoryItemResult;
   getItemAchievementStats: (userId: string) => DiceItemAchievementStats;
   recordShopPurchase: (userId: string) => DiceItemAchievementStats;
-  recordItemUse: (
-    input: {
-      userId: string;
-      itemId: string;
-    },
-  ) => DiceItemAchievementStats;
+  recordItemUse: (input: { userId: string; itemId: string }) => DiceItemAchievementStats;
 };
 
 export type DiceShopCatalog = {

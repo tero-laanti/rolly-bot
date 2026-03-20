@@ -2,7 +2,9 @@ import type { DiceAchievementId } from "../domain/achievements";
 import { isManualDiceAchievement } from "../domain/achievements";
 import type { DiceProgressionRepository } from "./ports";
 
-const toUniqueAchievementIds = (achievementIds: readonly DiceAchievementId[]): DiceAchievementId[] => {
+const toUniqueAchievementIds = (
+  achievementIds: readonly DiceAchievementId[],
+): DiceAchievementId[] => {
   return [...new Set(achievementIds)];
 };
 
