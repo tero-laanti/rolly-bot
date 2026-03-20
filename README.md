@@ -121,7 +121,7 @@ At startup, the bot loads gameplay data in this order:
 2. `./rolly-data`
 3. `./example-data/rolly-data`
 
-Expected files in a data directory:
+A valid data directory is expected to contain these files:
 
 - `achievements.json`
 - `casino.v1.json`
@@ -132,19 +132,13 @@ Expected files in a data directory:
 - `random-events-balance.json`
 - `random-events.v1.json`
 
-The committed files under `example-data/rolly-data` are safe examples only. They document the schema and can keep the public repo runnable when explicitly enabled, but they are not intended to match production values.
+The committed files under [example-data/rolly-data/](example-data/rolly-data/) are safe public examples only. They keep the repo understandable, document the current data shape, and let the bot run locally when you intentionally use example data, but they are not meant to mirror production values.
 
-In `dice-balance.json`, progression tuning includes prestige sides, charge settings, ban step, and the overall `/dice` roll-pass cap via `maxRollPassCount`.
+This README only covers how gameplay data is discovered and used at runtime. For the file-by-file data contract and authoring details, start here instead:
 
-In `pvp.json`, duel timing and base winner/loser effect durations are tuned separately from core progression.
-
-In `random-events-balance.json`, global claim-window scaling and variety-selection tuning are configured separately from the event content pack.
-
-In `random-events.v1.json`, each outcome now declares whether it resolves the event as a success, resolves it as a failure, or applies a failure while keeping the event open. First-click events that can reopen after a failed attempt can also declare a retry policy, and multi-user events can optionally declare `requiredReadyCount` with a threshold from `2` to `5` so they resolve immediately once enough players join. Text placeholders used in the open prompt are resolved once when the event appears and stay stable through resolution; if an outcome needs its own variable value, use a placeholder key that only appears in the outcome message.
-
-In `raids.json`, raid rewards, boss naming, and boss-balance knobs live separately from core dice progression.
-
-In `casino.v1.json`, Dice Poker always uses a five-die `d8` hand. The tunable fields there are the payout multipliers.
+- [example-data/rolly-data/README.md](example-data/rolly-data/README.md) for the high-level layout
+- [example-data/rolly-data/AUTHORING.md](example-data/rolly-data/AUTHORING.md) for the authoring guide
+- `example-data/rolly-data/*.md` for per-file docs
 
 If the app falls back to `example-data`, it starts normally and prints a warning so you can tell you are not using private gameplay data.
 
