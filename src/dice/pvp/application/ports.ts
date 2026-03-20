@@ -16,6 +16,7 @@ export type DicePvpChallengeCreate = {
   challengerId: string;
   opponentId: string;
   duelTier: number;
+  wagerPips: number;
   expiresAt: string;
 };
 

@@ -13,6 +13,7 @@ export const encodeDicePvpAction = (action: DicePvpAction): string => {
       action.ownerId,
       action.opponentId ?? openOpponentToken,
       action.duelTier,
+      action.wagerPips,
     );
   }
 
@@ -25,7 +26,7 @@ export const parseDicePvpAction = (customId: string): DicePvpAction | null => {
     return null;
   }
 
-  const [action, firstPart, secondPart, thirdPart] = parsed;
+  const [action, firstPart, secondPart, thirdPart, fourthPart] = parsed;
 
   if ((action === "accept" || action === "decline") && firstPart) {
     return {
@@ -39,7 +40,8 @@ export const parseDicePvpAction = (customId: string): DicePvpAction | null => {
   }
 
   const duelTier = Number.parseInt(thirdPart ?? "", 10);
-  if (!Number.isInteger(duelTier)) {
+  const wagerPips = Number.parseInt(fourthPart ?? "0", 10);
+  if (!Number.isInteger(duelTier) || !Number.isInteger(wagerPips)) {
     return null;
   }
 
@@ -48,5 +50,6 @@ export const parseDicePvpAction = (customId: string): DicePvpAction | null => {
     ownerId: firstPart,
     opponentId: secondPart === openOpponentToken ? null : secondPart,
     duelTier,
+    wagerPips,
   };
 };
