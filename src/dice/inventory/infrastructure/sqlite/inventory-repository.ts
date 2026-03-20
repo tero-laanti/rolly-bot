@@ -17,6 +17,16 @@ type InventoryQuantitySelectRow = {
   quantity: number;
 };
 
+type DiceItemAchievementStatsRow = {
+  user_id: string;
+  shop_purchase_count: number;
+  item_use_count: number;
+  used_trigger_random_group_event: number;
+  used_auto_roll_item: number;
+  used_cleanse_item: number;
+  updated_at: string;
+};
+
 const normalizeQuantity = (quantity: number): number => {
   return Math.max(0, Math.floor(quantity));
 };
@@ -156,6 +166,153 @@ const consumeInventoryItem = (
   })();
 };
 
+const getItemAchievementStatsRow = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceItemAchievementStatsRow | undefined => {
+  return db
+    .prepare(
+      `
+      SELECT
+        user_id,
+        shop_purchase_count,
+        item_use_count,
+        used_trigger_random_group_event,
+        used_auto_roll_item,
+        used_cleanse_item,
+        updated_at
+      FROM dice_item_achievement_stats
+      WHERE user_id = ?
+    `,
+    )
+    .get(userId) as DiceItemAchievementStatsRow | undefined;
+};
+
+const getOrCreateItemAchievementStatsRow = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceItemAchievementStatsRow => {
+  const existing = getItemAchievementStatsRow(db, userId);
+  if (existing) {
+    return existing;
+  }
+
+  const updatedAt = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO dice_item_achievement_stats (
+      user_id,
+      shop_purchase_count,
+      item_use_count,
+      used_trigger_random_group_event,
+      used_auto_roll_item,
+      used_cleanse_item,
+      updated_at
+    )
+    VALUES (@userId, 0, 0, 0, 0, 0, @updatedAt)
+    ON CONFLICT(user_id)
+    DO NOTHING
+  `,
+  ).run({
+    userId,
+    updatedAt,
+  });
+
+  const created = getItemAchievementStatsRow(db, userId);
+  if (!created) {
+    throw new Error(`Failed to initialize item achievement stats for user ${userId}`);
+  }
+
+  return created;
+};
+
+const mapItemAchievementStats = (row: DiceItemAchievementStatsRow) => {
+  return {
+    shopPurchaseCount: row.shop_purchase_count,
+    itemUseCount: row.item_use_count,
+    usedTriggerRandomGroupEvent: row.used_trigger_random_group_event > 0,
+    usedAutoRollItem: row.used_auto_roll_item > 0,
+    usedCleanseItem: row.used_cleanse_item > 0,
+  };
+};
+
+const getItemAchievementStats = (db: SqliteDatabase, userId: string) => {
+  return mapItemAchievementStats(getOrCreateItemAchievementStatsRow(db, userId));
+};
+
+const recordShopPurchase = (db: SqliteDatabase, userId: string) => {
+  const stats = getOrCreateItemAchievementStatsRow(db, userId);
+  const updatedAt = new Date().toISOString();
+
+  db.prepare(
+    `
+    UPDATE dice_item_achievement_stats
+    SET
+      shop_purchase_count = @shopPurchaseCount,
+      updated_at = @updatedAt
+    WHERE user_id = @userId
+  `,
+  ).run({
+    userId,
+    shopPurchaseCount: stats.shop_purchase_count + 1,
+    updatedAt,
+  });
+
+  return {
+    shopPurchaseCount: stats.shop_purchase_count + 1,
+    itemUseCount: stats.item_use_count,
+    usedTriggerRandomGroupEvent: stats.used_trigger_random_group_event > 0,
+    usedAutoRollItem: stats.used_auto_roll_item > 0,
+    usedCleanseItem: stats.used_cleanse_item > 0,
+  };
+};
+
+const recordItemUse = (
+  db: SqliteDatabase,
+  {
+    userId,
+    itemId,
+  }: {
+    userId: string;
+    itemId: string;
+  },
+) => {
+  const stats = getOrCreateItemAchievementStatsRow(db, userId);
+  const updatedAt = new Date().toISOString();
+  const usedTriggerRandomGroupEvent =
+    stats.used_trigger_random_group_event > 0 || itemId === "chaos-flare";
+  const usedAutoRollItem = stats.used_auto_roll_item > 0 || itemId === "clockwork-croupier";
+  const usedCleanseItem = stats.used_cleanse_item > 0 || itemId === "cleanse-salt";
+
+  db.prepare(
+    `
+    UPDATE dice_item_achievement_stats
+    SET
+      item_use_count = @itemUseCount,
+      used_trigger_random_group_event = @usedTriggerRandomGroupEvent,
+      used_auto_roll_item = @usedAutoRollItem,
+      used_cleanse_item = @usedCleanseItem,
+      updated_at = @updatedAt
+    WHERE user_id = @userId
+  `,
+  ).run({
+    userId,
+    itemUseCount: stats.item_use_count + 1,
+    usedTriggerRandomGroupEvent: Number(usedTriggerRandomGroupEvent),
+    usedAutoRollItem: Number(usedAutoRollItem),
+    usedCleanseItem: Number(usedCleanseItem),
+    updatedAt,
+  });
+
+  return {
+    shopPurchaseCount: stats.shop_purchase_count,
+    itemUseCount: stats.item_use_count + 1,
+    usedTriggerRandomGroupEvent,
+    usedAutoRollItem,
+    usedCleanseItem,
+  };
+};
+
 export const createSqliteInventoryRepository = (db: SqliteDatabase): DiceInventoryRepository => {
   return {
     getInventoryQuantities: (userId) => getInventoryQuantities(db, userId),
@@ -163,6 +320,9 @@ export const createSqliteInventoryRepository = (db: SqliteDatabase): DiceInvento
     getOwnedInventoryEntries: (userId) => getOwnedInventoryEntries(db, userId),
     grantInventoryItem: (input) => grantInventoryItem(db, input),
     consumeInventoryItem: (input) => consumeInventoryItem(db, input),
+    getItemAchievementStats: (userId) => getItemAchievementStats(db, userId),
+    recordShopPurchase: (userId) => recordShopPurchase(db, userId),
+    recordItemUse: (input) => recordItemUse(db, input),
   };
 };
 

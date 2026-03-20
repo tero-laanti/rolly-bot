@@ -4,6 +4,7 @@ import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
+import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type {
   ApplyRaidDiceRollInput,
@@ -14,6 +15,7 @@ import type {
   RaidStatus,
   TriggerRaidNowOutcome,
 } from "../application/ports";
+import { getDiceRaidAchievementIds } from "../application/achievement-rules";
 import { createRaidBoss, describeRaidReward } from "../domain/raid";
 import { parseRaidJoinButtonId } from "../interfaces/discord/button-ids";
 import {
@@ -30,6 +32,11 @@ import type {
   ActiveRaidRecord,
   RaidsLiveRuntimeLogger,
 } from "./live-runtime-types";
+import {
+  recordRaidHit,
+  recordRaidJoin,
+  recordRaidSuccessResolution,
+} from "./achievement-stats-repository";
 
 type CreateRaidsLiveRuntimeInput = {
   client: Client;
@@ -523,9 +530,17 @@ export const createRaidsLiveRuntime = ({
     }
 
     const rewardEligibleUserIds = Array.from(context.raid.rewardEligibleUserIds);
+    const participantIds = Array.from(context.raid.participantIds);
     if (rewardEligibleUserIds.length < 1) {
       return;
     }
+
+    const topDamage = Math.max(...boss.damageByUserId.values(), 0);
+    const topDamageUserIds = new Set(
+      Array.from(boss.damageByUserId.entries())
+        .filter(([, dealtDamage]) => dealtDamage === topDamage && dealtDamage > 0)
+        .map(([userId]) => userId),
+    );
 
     unitOfWork.runInTransaction(() => {
       for (const participantId of rewardEligibleUserIds) {
@@ -544,6 +559,39 @@ export const createRaidsLiveRuntime = ({
           stackGroup: "raid-reward-roll-pass-multiplier",
           stackMode: "refresh",
         });
+        awardManualDiceAchievements(
+          progression,
+          participantId,
+          getDiceRaidAchievementIds(
+            recordRaidSuccessResolution(db, {
+              userId: participantId,
+              bossLevel: boss.level,
+              rewardEligible: true,
+              topDamage: topDamageUserIds.has(participantId),
+              tourist: false,
+            }),
+          ),
+        );
+      }
+
+      for (const participantId of participantIds) {
+        if (context.raid.rewardEligibleUserIds.has(participantId)) {
+          continue;
+        }
+
+        awardManualDiceAchievements(
+          progression,
+          participantId,
+          getDiceRaidAchievementIds(
+            recordRaidSuccessResolution(db, {
+              userId: participantId,
+              bossLevel: boss.level,
+              rewardEligible: false,
+              topDamage: false,
+              tourist: true,
+            }),
+          ),
+        );
       }
     });
   };
@@ -950,6 +998,11 @@ export const createRaidsLiveRuntime = ({
     }
 
     context.raid.participantIds.add(interaction.user.id);
+    awardManualDiceAchievements(
+      progression,
+      interaction.user.id,
+      getDiceRaidAchievementIds(recordRaidJoin(db, interaction.user.id)),
+    );
     await interaction.deferUpdate();
     await queueAnnouncementRender({
       context,
@@ -1012,9 +1065,15 @@ export const createRaidsLiveRuntime = ({
       (context.raid.boss.damageByUserId.get(userId) ?? 0) + damage,
     );
     context.raid.rewardEligibleUserIds.add(userId);
+    awardManualDiceAchievements(
+      progression,
+      userId,
+      getDiceRaidAchievementIds(recordRaidHit(db, { userId, damage })),
+    );
 
     const boss = context.raid.boss;
     if (boss.currentHp <= 0) {
+      awardManualDiceAchievements(progression, userId, ["raid-kill-shot"]);
       const rewardSummary = describeRaidReward(boss.reward);
       const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
       resolveRaid(context, "success", nowMs);

@@ -1,8 +1,10 @@
 import type { ButtonInteraction, Client } from "discord.js";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
+import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
+import { getRandomEventAchievementIds } from "../application/achievement-rules";
 import { createRandomEventContentState, getRandomEventRetryPolicy } from "../domain/content";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
 import {
@@ -33,6 +35,7 @@ import {
   resolveRandomEventAttempt,
   type RandomEventAttemptResolution,
 } from "./live-runtime-resolution";
+import { recordRandomEventAchievementStats } from "./achievement-stats-repository";
 import {
   getActiveRandomEventCappedCurrentPhaseExpiryMs,
   getActiveRandomEventCurrentPhaseExpiryDate,
@@ -242,6 +245,26 @@ export const createRandomEventsLiveRuntime = ({
       challengeProgressByUserId,
       resolutionNotesByUserId,
       attemptResolutionsByUserId,
+      onAttemptResolved: ({ userId, attemptResolution, hadKeepOpenFailureBeforeSuccess }) => {
+        if (!context) {
+          return;
+        }
+
+        const randomEventAchievementResult = recordRandomEventAchievementStats(db, {
+          selection: context.selection,
+          userId,
+          attemptResolution,
+          hadKeepOpenFailureBeforeSuccess,
+          nowMs: Date.now(),
+        });
+        awardManualDiceAchievements(
+          progression,
+          userId,
+          getRandomEventAchievementIds(randomEventAchievementResult.stats, {
+            cursedEvening: randomEventAchievementResult.cursedEvening,
+          }),
+        );
+      },
     });
   };
 

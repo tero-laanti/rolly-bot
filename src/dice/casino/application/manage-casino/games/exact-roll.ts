@@ -21,6 +21,8 @@ import {
   replyMutation,
   viewMutation,
 } from "../helpers";
+import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
   DiceCasinoActionRow,
@@ -121,7 +123,7 @@ const startExactRollRound = (): MutateSessionResult => {
 };
 
 const handleExactRollAction = (
-  { analytics, economy, pips, session }: DiceCasinoMutationContext,
+  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "exact-mode") {
@@ -163,13 +165,16 @@ const handleExactRollAction = (
       betTier: getDiceCasinoBetTier(session.bet),
       wagered: session.bet,
     });
-    analytics.recordRoundCompleted({
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "exact-roll",
       betTier: getDiceCasinoBetTier(session.bet),
+      wagered: session.bet,
       payout: resolution.payout,
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
+      achievementEvent: resolution.won ? { type: "exact-face-win" } : undefined,
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(
@@ -212,13 +217,16 @@ const handleExactRollAction = (
       betTier: getDiceCasinoBetTier(session.bet),
       wagered: session.bet,
     });
-    analytics.recordRoundCompleted({
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "exact-roll",
       betTier: getDiceCasinoBetTier(session.bet),
+      wagered: session.bet,
       payout: resolution.payout,
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
+      achievementEvent: resolution.won ? { type: "high-low-win" } : undefined,
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(

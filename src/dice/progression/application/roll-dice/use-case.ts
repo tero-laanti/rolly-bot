@@ -18,7 +18,7 @@ import {
 } from "../../../progression/domain/game-rules";
 import { rollDieWithBans } from "../../../progression/domain/bans";
 import { getDiceChargeMultiplier } from "../../../progression/domain/charge";
-import type { DiceProgressionRepository } from "../ports";
+import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { RaidDiceRollPort } from "../../../raids/application/ports";
 import {
@@ -77,6 +77,7 @@ type RunRollDiceDependencies = {
     DiceProgressionRepository,
     | "awardAchievements"
     | "consumeDiceTemporaryEffectsForRoll"
+    | "recordDiceProgressionAchievementStats"
     | "getActiveDiceTemporaryEffects"
     | "getDiceBans"
     | "getDiceLevel"
@@ -184,7 +185,17 @@ export const createRunRollDiceUseCase = ({
     const earnedAchievements = rollPassAchievementIds.flatMap((achievementIds) => achievementIds);
 
     const result = unitOfWork.runInTransaction(() => {
-      const newlyEarned = progression.awardAchievements(userId, earnedAchievements);
+      const progressionAchievementStats = progression.recordDiceProgressionAchievementStats({
+        userId,
+        nearLevelupRollCount,
+        chargeMultiplier,
+        rollPassCount,
+        levelUpsGained: levelIncrease,
+      });
+      const newlyEarned = progression.awardAchievements(userId, [
+        ...earnedAchievements,
+        ...getManualProgressionAchievementIds(progressionAchievementStats),
+      ]);
       const levelAfter = level + levelIncrease;
       if (hasLevelUp) {
         progression.setDiceLevel({ userId, level: levelAfter });
@@ -305,6 +316,55 @@ export const createRunRollDiceUseCase = ({
       }),
     };
   };
+};
+
+const getManualProgressionAchievementIds = (
+  stats: DiceProgressionAchievementStats,
+): string[] => {
+  const achievementIds: string[] = [];
+
+  if (stats.rollCommandsTotal >= 1) {
+    achievementIds.push("first-roll");
+  }
+
+  if (stats.levelUpsTotal >= 1) {
+    achievementIds.push("first-level-up");
+  }
+
+  if (stats.nearLevelupRollsTotal >= 1) {
+    achievementIds.push("near-level-up-1");
+  }
+  if (stats.nearLevelupRollsTotal >= 10) {
+    achievementIds.push("near-level-up-10");
+  }
+  if (stats.nearLevelupRollsTotal >= 25) {
+    achievementIds.push("near-level-up-25");
+  }
+  if (stats.nearLevelupRollsTotal >= 100) {
+    achievementIds.push("near-level-up-100");
+  }
+
+  if (stats.highestChargeMultiplier >= 2) {
+    achievementIds.push("charge-2");
+  }
+  if (stats.highestChargeMultiplier >= 50) {
+    achievementIds.push("charge-50");
+  }
+  if (stats.highestChargeMultiplier >= 100) {
+    achievementIds.push("charge-100");
+  }
+
+  if (stats.highestRollPassCount >= 2) {
+    achievementIds.push("peak-goblin");
+  }
+  if (stats.highestRollPassCount >= 10) {
+    achievementIds.push("roll-pass-10");
+  }
+  if (stats.highestRollPassCount >= 25) {
+    achievementIds.push("roll-pass-25");
+  }
+
+  return achievementIds;
 };
 
 const summarizeRollPassEffects = (

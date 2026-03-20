@@ -10,6 +10,7 @@ import {
   getBlackjackWinPayoutMultiplier,
   getDiceCasinoBetTier,
   hitBlackjackRound,
+  isBlackjackNatural,
   resolveBlackjackOpening,
   standBlackjackRound,
 } from "../../../domain/game-rules";
@@ -22,6 +23,8 @@ import {
   normalizeSessionBet,
   viewMutation,
 } from "../helpers";
+import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
   DiceCasinoActionRow,
@@ -87,6 +90,7 @@ const buildBlackjackComponentRows = ({
 const startBlackjackRound = ({
   analytics,
   economy,
+  progression,
   pips,
   session,
 }: DiceCasinoMutationContext): MutateSessionResult => {
@@ -109,13 +113,21 @@ const startBlackjackRound = ({
       nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
     }
 
-    analytics.recordRoundCompleted({
+    const openingOutcome = getOutcomeFromPayout(session.bet, resolution.payout);
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "blackjack",
       betTier: getDiceCasinoBetTier(session.bet),
+      wagered: session.bet,
       payout: resolution.payout,
-      outcome: getOutcomeFromPayout(session.bet, resolution.payout),
+      outcome: openingOutcome,
+      achievementEvent: isBlackjackNatural(resolution.playerHand)
+        ? { type: "blackjack-natural" }
+        : openingOutcome === "push"
+          ? { type: "blackjack-push" }
+          : undefined,
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(
@@ -149,7 +161,7 @@ const startBlackjackRound = ({
 };
 
 const handleBlackjackAction = (
-  { analytics, economy, pips, session }: DiceCasinoMutationContext,
+  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "blackjack-hit") {
@@ -178,13 +190,23 @@ const handleBlackjackAction = (
       nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
     }
 
-    analytics.recordRoundCompleted({
+    const playerTotal = getBlackjackHandTotals(resolution.playerHand).total;
+    const outcome = getOutcomeFromPayout(round.bet, resolution.payout);
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "blackjack",
       betTier: getDiceCasinoBetTier(round.bet),
+      wagered: round.bet,
       payout: resolution.payout,
-      outcome: getOutcomeFromPayout(round.bet, resolution.payout),
+      outcome,
+      achievementEvent:
+        outcome === "push"
+          ? { type: "blackjack-push" }
+          : outcome === "win" && playerTotal === 21
+            ? { type: "blackjack-hit-to-21-win" }
+            : undefined,
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(
@@ -220,13 +242,17 @@ const handleBlackjackAction = (
       nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
     }
 
-    analytics.recordRoundCompleted({
+    const outcome = getOutcomeFromPayout(round.bet, resolution.payout);
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "blackjack",
       betTier: getDiceCasinoBetTier(round.bet),
+      wagered: round.bet,
       payout: resolution.payout,
-      outcome: getOutcomeFromPayout(round.bet, resolution.payout),
+      outcome,
+      achievementEvent: outcome === "push" ? { type: "blackjack-push" } : undefined,
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(

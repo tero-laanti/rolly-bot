@@ -7,6 +7,9 @@ import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-w
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
 import type { DiceShopItem } from "../../../inventory/domain/shop";
+import type { DiceProgressionRepository } from "../../../progression/application/ports";
+import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
+import { getDiceItemAchievementIds } from "../achievement-rules";
 
 export type DiceShopAction =
   | {
@@ -23,7 +26,11 @@ export type DiceShopResult = ActionResult<DiceShopAction>;
 
 type ManageShopDependencies = {
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getEconomySnapshot" | "getPips">;
-  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities" | "grantInventoryItem">;
+  inventory: Pick<
+    DiceInventoryRepository,
+    "getInventoryQuantities" | "grantInventoryItem" | "recordShopPurchase"
+  >;
+  progression: Pick<DiceProgressionRepository, "awardAchievements">;
   shopCatalog: DiceShopCatalog;
   unitOfWork: UnitOfWork;
 };
@@ -31,6 +38,7 @@ type ManageShopDependencies = {
 export const createDiceShopUseCase = ({
   economy,
   inventory,
+  progression,
   shopCatalog,
   unitOfWork,
 }: ManageShopDependencies) => {
@@ -98,6 +106,12 @@ export const createDiceShopUseCase = ({
         itemId: item.id,
         quantity: 1,
       });
+      const itemAchievementStats = inventory.recordShopPurchase(action.ownerId);
+      awardManualDiceAchievements(
+        progression,
+        action.ownerId,
+        getDiceItemAchievementIds(itemAchievementStats),
+      );
 
       return {
         item,

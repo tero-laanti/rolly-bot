@@ -1,6 +1,7 @@
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "../../../progression/domain/bans";
 import type { DiceProgressionRepository } from "../ports";
+import { awardManualDiceAchievements } from "../achievement-awards";
 import {
   chunkActionButtons,
   type ActionResult,
@@ -51,6 +52,8 @@ type ManageBansDependencies = {
     DiceProgressionRepository,
     | "clearDiceBan"
     | "clearSingleDiceBan"
+    | "markFirstDiceBan"
+    | "awardAchievements"
     | "getDiceBans"
     | "getDiceLevel"
     | "getDiceSides"
@@ -276,6 +279,9 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
         dieIndex: action.dieIndex,
         bannedValue: action.value,
       });
+      if (progression.markFirstDiceBan(action.ownerId)) {
+        awardManualDiceAchievements(progression, action.ownerId, ["first-ban"]);
+      }
     }
 
     const bans = progression.getDiceBans(action.ownerId);
