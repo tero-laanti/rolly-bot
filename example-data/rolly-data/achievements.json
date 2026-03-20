@@ -14,6 +14,7 @@
     "name": "Example Pair",
     "description": "Example achievement: roll at least one pair.",
     "category": "roll",
+    "pipReward": 3,
     "rule": {
       "type": "at-least-of-a-kind",
       "count": 2
@@ -46,6 +47,7 @@
     "name": "Example Manual Prestige",
     "description": "Example achievement: reach Prestige 1 through application logic.",
     "category": "progression",
+    "pipReward": 20,
     "rule": {
       "type": "manual"
     },

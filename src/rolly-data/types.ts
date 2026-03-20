@@ -74,6 +74,7 @@ export type DiceAchievementData = {
   description: string;
   category: DiceAchievementCategory;
   rule: DiceAchievementRule;
+  pipReward?: number;
   manualAward?: DiceAchievementManualAward;
   unlockReasonText?: string;
 };

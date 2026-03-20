@@ -7,7 +7,10 @@ import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceItemEffectsService } from "../../../inventory/application/item-effects-service";
-import { getDiceAchievementsForRoll } from "../../../progression/domain/achievements-store";
+import {
+  getAchievementPipRewardTotal,
+  getDiceAchievementsForRoll,
+} from "../../../progression/domain/achievements-store";
 import {
   getBaseRollPassCount,
   getDiceLevelUpReward,
@@ -71,7 +74,7 @@ type RunRollDiceDependencies = {
     DiceAnalyticsRepository,
     "recordDiceRollAnalytics" | "resetDiceLevelAnalyticsProgress"
   >;
-  economy: Pick<DiceEconomyRepository, "applyFameDelta" | "getFame">;
+  economy: Pick<DiceEconomyRepository, "applyFameDelta" | "getFame" | "grantDailyPipsIfEligible">;
   itemEffects: Pick<DiceItemEffectsService, "consumeOneDoubleRollUse" | "getItemDoubleRollStatus">;
   progression: Pick<
     DiceProgressionRepository,
@@ -94,6 +97,7 @@ type RunRollDiceDependencies = {
 };
 
 const spamWindowMs = 2_000;
+const firstDailyRollPipReward = 5;
 const diceSpamTracker = new Map<string, number>();
 
 export const createRunRollDiceUseCase = ({
@@ -196,14 +200,22 @@ export const createRunRollDiceUseCase = ({
         ...earnedAchievements,
         ...getManualProgressionAchievementIds(progressionAchievementStats),
       ]);
+      const achievementPipReward = getAchievementPipRewardTotal(newlyEarned);
       const levelAfter = level + levelIncrease;
       if (hasLevelUp) {
         progression.setDiceLevel({ userId, level: levelAfter });
       }
 
-      const totalReward = newlyEarned.length + levelIncrease * getDiceLevelUpReward();
+      const fameReward = newlyEarned.length + levelIncrease * getDiceLevelUpReward();
       const fameAfter =
-        totalReward > 0 ? economy.applyFameDelta({ userId, amount: totalReward }) : fameBefore;
+        fameReward > 0 ? economy.applyFameDelta({ userId, amount: fameReward }) : fameBefore;
+      const dailyPipGrant = economy.grantDailyPipsIfEligible({
+        userId,
+        amount: firstDailyRollPipReward,
+        nowMs,
+      });
+      const dailyPipReward = dailyPipGrant.awarded ? firstDailyRollPipReward : 0;
+      const pipReward = achievementPipReward + dailyPipReward;
 
       analytics.recordDiceRollAnalytics({
         userId,
@@ -231,12 +243,16 @@ export const createRunRollDiceUseCase = ({
       }
       progression.setLastDiceRollAt(nowMs);
 
-      return { newlyEarned, totalReward, levelAfter, fameAfter };
+      return { newlyEarned, fameReward, pipReward, levelAfter, fameAfter };
     });
 
     const achievementText = formatAchievementText(result.newlyEarned);
     const chargeFactorText = formatMultiplierFactor(resolvedRollPassState.effectiveFactor);
-    const rewardText = formatRewardText(result.totalReward, hasLevelUp);
+    const rewardText = formatRewardText({
+      fameReward: result.fameReward,
+      pipReward: result.pipReward,
+      hasLevelUp,
+    });
     const multiplierFooter = buildRollModifierFooter(resolvedRollPassState);
     const unlockedBansAfter = getUnlockedBanSlotsFromFame(
       result.fameAfter,

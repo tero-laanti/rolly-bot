@@ -1,5 +1,6 @@
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import type { DiceHostileEffectsService } from "../../progression/application/hostile-effects-service";
+import type { DiceEconomyRepository } from "../../economy/application/ports";
 import type { DicePvpRepository } from "../../pvp/application/ports";
 import {
   hasRandomEventChallengeOutcomeBranching,
@@ -34,6 +35,7 @@ export type RandomEventAttemptResolution = {
   renderedOutcomeMessage: string;
   challengeRollSummary: string | null;
   effectNotes: string[];
+  pipReward: number;
   appliedNegativeEffects: RandomEventAppliedNegativeEffect[];
   hadActiveNegativeEffectBeforeAttempt: boolean;
   resolutionNote: string | null;
@@ -53,31 +55,49 @@ type RandomEventResolutionProgression = Pick<
 > &
   Partial<Pick<DiceProgressionRepository, "getActiveDiceTemporaryEffects">>;
 
+const getRandomIntInclusive = (min: number, max: number, random: () => number): number => {
+  const lower = Math.min(min, max);
+  const upper = Math.max(min, max);
+  return Math.floor(random() * (upper - lower + 1)) + lower;
+};
+
 const applyOutcomeEffectsToUser = (
   {
+    economy,
     progression,
     hostileEffects,
     nowMs,
+    random,
   }: {
+    economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
     progression: RandomEventResolutionProgression;
     hostileEffects: Pick<
       DiceHostileEffectsService,
       "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
     >;
     nowMs: number;
+    random: () => number;
   },
   userId: string,
   scenarioId: string,
   outcome: RandomEventOutcome,
 ): {
   effectNotes: string[];
+  pipReward: number;
   appliedNegativeEffects: RandomEventAppliedNegativeEffect[];
 } => {
   const effectNotes: string[] = [];
+  let pipReward = 0;
   const appliedNegativeEffects: RandomEventAppliedNegativeEffect[] = [];
 
   for (const effect of outcome.effects) {
     if (effect.type === "currency") {
+      const amount = getRandomIntInclusive(effect.minAmount, effect.maxAmount, random);
+      if (amount > 0) {
+        economy?.applyPipsDelta({ userId, amount });
+        pipReward += amount;
+        effectNotes.push(`Gained ${amount} pip${amount === 1 ? "" : "s"}.`);
+      }
       continue;
     }
 
@@ -131,6 +151,7 @@ const applyOutcomeEffectsToUser = (
 
   return {
     effectNotes,
+    pipReward,
     appliedNegativeEffects,
   };
 };
@@ -179,6 +200,7 @@ const formatFailedAttemptLine = (resolution: RandomEventAttemptResolution): stri
 };
 
 export const resolveRandomEventAttempt = ({
+  economy,
   progression,
   hostileEffects,
   pvp,
@@ -187,7 +209,9 @@ export const resolveRandomEventAttempt = ({
   challengeProgress,
   resolutionNote,
   sharedOutcomeSelection,
+  random = Math.random,
 }: {
+  economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
   progression: RandomEventResolutionProgression;
   hostileEffects: Pick<
     DiceHostileEffectsService,
@@ -199,6 +223,7 @@ export const resolveRandomEventAttempt = ({
   challengeProgress?: RandomEventRollChallengeProgress | null;
   resolutionNote?: string | null;
   sharedOutcomeSelection?: SharedRandomEventOutcomeSelection | null;
+  random?: () => number;
 }): RandomEventAttemptResolution => {
   const scenario = selection.scenario;
   let resolvedChallengeProgress = challengeProgress ?? null;
@@ -243,8 +268,8 @@ export const resolveRandomEventAttempt = ({
       })
       ?.some((effect) => effect.kind === "negative") === true ||
     (pvp?.getActiveDiceLockout(userId, nowMs) ?? null) !== null;
-  const { effectNotes, appliedNegativeEffects } = applyOutcomeEffectsToUser(
-    { progression, hostileEffects, nowMs },
+  const { effectNotes, pipReward, appliedNegativeEffects } = applyOutcomeEffectsToUser(
+    { economy, progression, hostileEffects, nowMs, random },
     userId,
     scenario.id,
     renderedOutcome.selectedOutcome,
@@ -258,6 +283,7 @@ export const resolveRandomEventAttempt = ({
       renderedOutcome.selectedOutcome.resolution !== "keep-open-failure",
     ),
     effectNotes,
+    pipReward,
     appliedNegativeEffects,
     hadActiveNegativeEffectBeforeAttempt,
     resolutionNote: resolutionNote ?? null,
@@ -278,6 +304,7 @@ export const resolveRandomEventAttempt = ({
 export const resolveRandomEvent = async ({
   activeEventsById,
   state,
+  economy,
   progression,
   hostileEffects,
   pvp,
@@ -290,6 +317,7 @@ export const resolveRandomEvent = async ({
 }: {
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
+  economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
   progression: RandomEventResolutionProgression;
   hostileEffects: Pick<
     DiceHostileEffectsService,
@@ -374,6 +402,7 @@ export const resolveRandomEvent = async ({
     const attemptResolution =
       attemptResolutionsByUserId?.get(userId) ??
       resolveRandomEventAttempt({
+        economy,
         progression,
         hostileEffects,
         pvp,

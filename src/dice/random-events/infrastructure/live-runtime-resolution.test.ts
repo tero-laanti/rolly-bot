@@ -218,6 +218,62 @@ test("shield-blocked negative outcomes report no applied negative effects", () =
   assert.deepEqual(attempt.effectNotes, ["Bad Luck Umbrella blocked a negative event effect."]);
 });
 
+test("currency outcomes award pip amounts within the configured range", () => {
+  const scenario: RandomEventScenario = {
+    id: "currency-test",
+    rarity: "common",
+    title: "Currency Test",
+    prompt: "You spot a loose pouch.",
+    claimLabel: "Grab it",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "coins",
+        resolution: "resolve-success",
+        message: "You catch the pouch before it falls.",
+        effects: [
+          {
+            type: "currency",
+            minAmount: 2,
+            maxAmount: 4,
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario);
+  const awarded: number[] = [];
+
+  const attempt = resolveRandomEventAttempt({
+    economy: {
+      applyPipsDelta: ({ amount }) => {
+        awarded.push(amount);
+        return amount;
+      },
+    },
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+    },
+    selection,
+    userId: "123",
+    random: () => 0.999,
+  });
+
+  assert.deepEqual(awarded, [4]);
+  assert.equal(attempt.pipReward, 4);
+  assert.match(attempt.finalLine, /Gained 4 pips\./);
+});
+
 test("attempt resolution detects an already-active negative effect before applying a new curse", () => {
   const scenario: RandomEventScenario = {
     id: "overlap-negative-test",
@@ -717,6 +773,7 @@ test("keep-open comeback progress only counts when the same user failed before s
     renderedOutcomeMessage: "The gate opens.",
     challengeRollSummary: null,
     effectNotes: [],
+    pipReward: 0,
     appliedNegativeEffects: [],
     hadActiveNegativeEffectBeforeAttempt: false,
     resolutionNote: null,

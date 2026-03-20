@@ -6,6 +6,7 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       user_id TEXT PRIMARY KEY,
       fame INTEGER NOT NULL DEFAULT 0,
       pips INTEGER NOT NULL DEFAULT 0,
+      last_daily_pip_reward_at TEXT,
       updated_at TEXT NOT NULL
     );
 

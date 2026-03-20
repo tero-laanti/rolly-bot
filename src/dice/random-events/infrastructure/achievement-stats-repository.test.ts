@@ -30,6 +30,7 @@ const createAttemptResolution = ({
   renderedOutcomeMessage: "bad luck",
   challengeRollSummary: null,
   effectNotes: [],
+  pipReward: 0,
   appliedNegativeEffects,
   hadActiveNegativeEffectBeforeAttempt,
   resolutionNote: null,
