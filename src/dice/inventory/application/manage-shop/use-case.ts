@@ -9,6 +9,7 @@ import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
 import type { DiceShopItem } from "../../../inventory/domain/shop";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
+import { appendAchievementUnlockText } from "../../../progression/application/achievement-text";
 import { getDiceItemAchievementIds } from "../achievement-rules";
 
 export type DiceShopAction =
@@ -107,7 +108,7 @@ export const createDiceShopUseCase = ({
         quantity: 1,
       });
       const itemAchievementStats = inventory.recordShopPurchase(action.ownerId);
-      awardManualDiceAchievements(
+      const newlyEarned = awardManualDiceAchievements(
         progression,
         action.ownerId,
         getDiceItemAchievementIds(itemAchievementStats),
@@ -117,6 +118,7 @@ export const createDiceShopUseCase = ({
         item,
         quantity,
         remainingPips: economy.getPips(action.ownerId),
+        newlyEarned,
       };
     });
 
@@ -129,7 +131,10 @@ export const createDiceShopUseCase = ({
           inventory,
           shopCatalog,
           action.ownerId,
-          `Purchased ${purchase.item.name}. Remaining pips: ${purchase.remainingPips}. Owned: ${purchase.quantity}.`,
+          appendAchievementUnlockText(
+            `Purchased ${purchase.item.name}. Remaining pips: ${purchase.remainingPips}. Owned: ${purchase.quantity}.`,
+            purchase.newlyEarned,
+          ),
         ),
       },
     };

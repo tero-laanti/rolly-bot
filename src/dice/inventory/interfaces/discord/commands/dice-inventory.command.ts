@@ -40,10 +40,13 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
   });
 
   if (outcome.autoRollStart) {
+    const content = outcome.autoRollStart.achievementText
+      ? `${buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation)}\n${outcome.autoRollStart.achievementText}`
+      : buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation);
     await applyButtonResult(interaction, {
       kind: "update",
       payload: {
-        content: buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation),
+        content,
         components: [],
       },
     });

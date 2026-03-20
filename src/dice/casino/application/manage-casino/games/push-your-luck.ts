@@ -20,6 +20,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -155,7 +156,7 @@ const handlePushYourLuckAction = (
         payout: 0,
         outcome: "loss",
       });
-      awardManualDiceAchievements(
+      const newlyEarned = awardManualDiceAchievements(
         progression,
         session.userId,
         getCasinoAchievementIds(achievementStats),
@@ -168,7 +169,10 @@ const handlePushYourLuckAction = (
             state: {
               ...session.state,
               activeRound: null,
-              lastOutcome: `Bust. You repeated ${rollResult.rolledValue} and lost the round.`,
+              lastOutcome: appendAchievementUnlockText(
+                `Bust. You repeated ${rollResult.rolledValue} and lost the round.`,
+                newlyEarned,
+              ),
             },
           },
           pips,
@@ -187,7 +191,7 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, rollResult.payout),
       achievementEvent: { type: "push-perfect-run" },
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -200,7 +204,10 @@ const handlePushYourLuckAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `Perfect run. Rolled ${rollResult.rolledValue} for ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips total.`,
+            lastOutcome: appendAchievementUnlockText(
+              `Perfect run. Rolled ${rollResult.rolledValue} for ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips total.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,
@@ -226,7 +233,7 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, payout),
       achievementEvent: { type: "push-cashout" },
     });
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
       getCasinoAchievementIds(achievementStats),
@@ -239,7 +246,10 @@ const handlePushYourLuckAction = (
           state: {
             ...session.state,
             activeRound: null,
-            lastOutcome: `Cashed out after ${round.uniqueValues.length} uniques for ${payout} pips total.`,
+            lastOutcome: appendAchievementUnlockText(
+              `Cashed out after ${round.uniqueValues.length} uniques for ${payout} pips total.`,
+              newlyEarned,
+            ),
           },
         },
         nextPips,

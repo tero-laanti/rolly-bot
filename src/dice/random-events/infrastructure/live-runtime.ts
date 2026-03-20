@@ -2,6 +2,7 @@ import type { ButtonInteraction, Client } from "discord.js";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
+import { formatAchievementUnlockText } from "../../progression/application/achievement-text";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import { getRandomEventAchievementIds } from "../application/achievement-rules";
@@ -257,13 +258,14 @@ export const createRandomEventsLiveRuntime = ({
           hadKeepOpenFailureBeforeSuccess,
           nowMs: Date.now(),
         });
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           userId,
           getRandomEventAchievementIds(randomEventAchievementResult.stats, {
             cursedEvening: randomEventAchievementResult.cursedEvening,
           }),
         );
+        return formatAchievementUnlockText(newlyEarned) || null;
       },
     });
   };

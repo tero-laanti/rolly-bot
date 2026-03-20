@@ -5,6 +5,10 @@ import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
+import {
+  appendAchievementUnlockText,
+  formatAchievementUnlockText,
+} from "../../progression/application/achievement-text";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type {
   ApplyRaidDiceRollInput,
@@ -100,6 +104,11 @@ const buildContributionLines = (context: ActiveRaidContext): string[] => {
     .sort((left, right) => right[1] - left[1])
     .slice(0, maxContributionLines)
     .map(([userId, damage]) => `<@${userId}> - ${damage} dmg`);
+};
+
+const formatRaidAchievementLine = (userId: string, achievementIds: readonly string[]): string => {
+  const achievementText = formatAchievementUnlockText(achievementIds);
+  return achievementText ? `<@${userId}>: ${achievementText}` : "";
 };
 
 export const createRaidsLiveRuntime = ({
@@ -215,6 +224,7 @@ export const createRaidsLiveRuntime = ({
             bossLevel: boss.level,
             maxHp: boss.maxHp,
             rewardSummary: describeRaidReward(boss.reward),
+            achievementLines: context.raid.achievementLines,
             contributionLines: buildContributionLines(context),
           });
         }
@@ -271,6 +281,7 @@ export const createRaidsLiveRuntime = ({
             bossLevel: boss.level,
             maxHp: boss.maxHp,
             rewardSummary: describeRaidReward(boss.reward),
+            achievementLines: context.raid.achievementLines,
             contributionLines: buildContributionLines(context),
           });
         }
@@ -543,6 +554,8 @@ export const createRaidsLiveRuntime = ({
     );
 
     unitOfWork.runInTransaction(() => {
+      const achievementLines: string[] = [];
+
       for (const participantId of rewardEligibleUserIds) {
         economy.applyPipsDelta({
           userId: participantId,
@@ -559,7 +572,7 @@ export const createRaidsLiveRuntime = ({
           stackGroup: "raid-reward-roll-pass-multiplier",
           stackMode: "refresh",
         });
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           participantId,
           getDiceRaidAchievementIds(
@@ -572,6 +585,10 @@ export const createRaidsLiveRuntime = ({
             }),
           ),
         );
+        const achievementLine = formatRaidAchievementLine(participantId, newlyEarned);
+        if (achievementLine) {
+          achievementLines.push(achievementLine);
+        }
       }
 
       for (const participantId of participantIds) {
@@ -579,7 +596,7 @@ export const createRaidsLiveRuntime = ({
           continue;
         }
 
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           participantId,
           getDiceRaidAchievementIds(
@@ -592,7 +609,13 @@ export const createRaidsLiveRuntime = ({
             }),
           ),
         );
+        const achievementLine = formatRaidAchievementLine(participantId, newlyEarned);
+        if (achievementLine) {
+          achievementLines.push(achievementLine);
+        }
       }
+
+      context.raid.achievementLines = achievementLines;
     });
   };
 
@@ -929,6 +952,7 @@ export const createRaidsLiveRuntime = ({
         closedAtMs: null,
         participantIds: new Set<string>(),
         rewardEligibleUserIds: new Set<string>(),
+        achievementLines: [],
         activeThreadId: null,
         boss: null,
       },
@@ -998,12 +1022,19 @@ export const createRaidsLiveRuntime = ({
     }
 
     context.raid.participantIds.add(interaction.user.id);
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       interaction.user.id,
       getDiceRaidAchievementIds(recordRaidJoin(db, interaction.user.id)),
     );
     await interaction.deferUpdate();
+    const achievementText = formatAchievementUnlockText(newlyEarned);
+    if (achievementText) {
+      await interaction.followUp({
+        content: achievementText,
+        ephemeral: true,
+      });
+    }
     await queueAnnouncementRender({
       context,
       allowedStatuses: ["joining"],
@@ -1065,7 +1096,7 @@ export const createRaidsLiveRuntime = ({
       (context.raid.boss.damageByUserId.get(userId) ?? 0) + damage,
     );
     context.raid.rewardEligibleUserIds.add(userId);
-    awardManualDiceAchievements(
+    const hitAchievements = awardManualDiceAchievements(
       progression,
       userId,
       getDiceRaidAchievementIds(recordRaidHit(db, { userId, damage })),
@@ -1073,14 +1104,22 @@ export const createRaidsLiveRuntime = ({
 
     const boss = context.raid.boss;
     if (boss.currentHp <= 0) {
-      awardManualDiceAchievements(progression, userId, ["raid-kill-shot"]);
+      const killShotAchievements = awardManualDiceAchievements(progression, userId, [
+        "raid-kill-shot",
+      ]);
       const rewardSummary = describeRaidReward(boss.reward);
       const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
       resolveRaid(context, "success", nowMs);
       return {
         kind: "applied",
         defeated: true,
-        summary: `Raid damage: ${damage} to ${boss.name}. Boss defeated. ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"} earned ${rewardSummary}.`,
+        summary: appendAchievementUnlockText(
+          appendAchievementUnlockText(
+            `Raid damage: ${damage} to ${boss.name}. Boss defeated. ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"} earned ${rewardSummary}.`,
+            hitAchievements,
+          ),
+          killShotAchievements,
+        ),
       };
     }
 
@@ -1088,7 +1127,10 @@ export const createRaidsLiveRuntime = ({
     return {
       kind: "applied",
       defeated: false,
-      summary: `Raid damage: ${damage} to ${boss.name}. ${boss.currentHp}/${boss.maxHp} HP remaining.`,
+      summary: appendAchievementUnlockText(
+        `Raid damage: ${damage} to ${boss.name}. ${boss.currentHp}/${boss.maxHp} HP remaining.`,
+        hitAchievements,
+      ),
     };
   };
 

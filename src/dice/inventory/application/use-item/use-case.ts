@@ -11,6 +11,10 @@ import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
 import { getDiceItemAchievementIds } from "../achievement-rules";
+import {
+  appendAchievementUnlockText,
+  formatAchievementUnlockText,
+} from "../../../progression/application/achievement-text";
 
 export type ReserveAutoRollSession = (input: {
   userId: string;
@@ -31,6 +35,7 @@ export type UseDiceItemResult =
       item: DiceShopItem;
       remainingQuantity: number;
       statusMessage: string;
+      achievementText?: string;
       autoRollReservation?: AutoRollSessionReservation;
     };
 
@@ -104,17 +109,22 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           charges: effect.charges,
         });
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           userId,
           getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
         );
+        const achievementText = formatAchievementUnlockText(newlyEarned);
 
         return {
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: `${item.name} opened. The next negative effect will be blocked.`,
+          statusMessage: appendAchievementUnlockText(
+            `${item.name} opened. The next negative effect will be blocked.`,
+            newlyEarned,
+          ),
+          achievementText: achievementText || undefined,
         };
       });
     }
@@ -135,17 +145,22 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           uses: effect.uses,
         });
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           userId,
           getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
         );
+        const achievementText = formatAchievementUnlockText(newlyEarned);
 
         return {
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: `${item.name} loaded. Your next ${effect.uses} /dice uses roll twice.`,
+          statusMessage: appendAchievementUnlockText(
+            `${item.name} loaded. Your next ${effect.uses} /dice uses roll twice.`,
+            newlyEarned,
+          ),
+          achievementText: achievementText || undefined,
         };
       });
     }
@@ -166,17 +181,22 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           minutes: effect.minutes,
         });
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           userId,
           getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
         );
+        const achievementText = formatAchievementUnlockText(newlyEarned);
 
         return {
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: `${item.name} activated. Your /dice uses roll twice for ${effect.minutes} minutes.`,
+          statusMessage: appendAchievementUnlockText(
+            `${item.name} activated. Your /dice uses roll twice for ${effect.minutes} minutes.`,
+            newlyEarned,
+          ),
+          achievementText: achievementText || undefined,
         };
       });
     }
@@ -203,11 +223,12 @@ export const createUseDiceItemUseCase = ({
         if (!consumed.ok) {
           throw new Error(`Failed to consume ${item.id} after cleanse.`);
         }
-        awardManualDiceAchievements(
+        const newlyEarned = awardManualDiceAchievements(
           progression,
           userId,
           getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
         );
+        const achievementText = formatAchievementUnlockText(newlyEarned);
 
         const clearedParts: string[] = [];
         if (clearedTemporaryEffects > 0) {
@@ -223,7 +244,11 @@ export const createUseDiceItemUseCase = ({
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: `${item.name} removed ${clearedParts.join(" and ")}.`,
+          statusMessage: appendAchievementUnlockText(
+            `${item.name} removed ${clearedParts.join(" and ")}.`,
+            newlyEarned,
+          ),
+          achievementText: achievementText || undefined,
         };
       });
     }
@@ -255,17 +280,22 @@ export const createUseDiceItemUseCase = ({
         };
       }
 
-      awardManualDiceAchievements(
+      const newlyEarned = awardManualDiceAchievements(
         progression,
         userId,
         getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
       );
+      const achievementText = formatAchievementUnlockText(newlyEarned);
 
       return {
         ok: true,
         item,
         remainingQuantity: consumed.remainingQuantity,
-        statusMessage: `Chaos Flare triggered a random group event.`,
+        statusMessage: appendAchievementUnlockText(
+          "Chaos Flare triggered a random group event.",
+          newlyEarned,
+        ),
+        achievementText: achievementText || undefined,
       };
     }
 
@@ -289,17 +319,19 @@ export const createUseDiceItemUseCase = ({
         message: `You do not have any ${item.name} to use.`,
       };
     }
-    awardManualDiceAchievements(
+    const newlyEarned = awardManualDiceAchievements(
       progression,
       userId,
       getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
     );
+    const achievementText = formatAchievementUnlockText(newlyEarned);
 
     return {
       ok: true,
       item,
       remainingQuantity: consumed.remainingQuantity,
-      statusMessage: `${item.name} engaged.`,
+      statusMessage: appendAchievementUnlockText(`${item.name} engaged.`, newlyEarned),
+      achievementText: achievementText || undefined,
       autoRollReservation: reservation,
     };
   };
