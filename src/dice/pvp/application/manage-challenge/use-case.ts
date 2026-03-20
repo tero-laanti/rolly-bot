@@ -62,6 +62,7 @@ type ManageChallengeDependencies = {
   pvp: Pick<
     DicePvpRepository,
     | "createDicePvpChallengeIfUsersAvailable"
+    | "expireExpiredPendingDicePvpChallengesForUser"
     | "recordResolvedDuel"
     | "getActiveDiceLockout"
     | "getDicePvpAchievementStats"
@@ -91,6 +92,15 @@ export const createDicePvpUseCase = ({
     wagerPips: number = 0,
     nowMs: number = Date.now(),
   ): DicePvpResult => {
+    unitOfWork.runInTransaction(() => {
+      expireExpiredPendingChallengesForUsers({
+        economy,
+        pvp,
+        userIds: [challengerId],
+        nowMs,
+      });
+    });
+
     const lockoutUntil = pvp.getActiveDiceLockout(challengerId, nowMs);
     if (lockoutUntil) {
       return replyMessage(`You can play again ${formatDiscordRelativeTime(lockoutUntil)}.`, true);
@@ -230,11 +240,20 @@ const handleTierPick = async (
   const expiresAtIso = new Date(expiresAtMs).toISOString();
 
   const createResult = unitOfWork.runInTransaction(() => {
-    if (economy.getPips(action.ownerId) < action.wagerPips) {
+    expireExpiredPendingChallengesForUsers({
+      economy,
+      pvp,
+      userIds:
+        opponentId === dicePvpOpenOpponentId ? [action.ownerId] : [action.ownerId, opponentId],
+      nowMs,
+    });
+
+    const currentPips = economy.getPips(action.ownerId);
+    if (currentPips < action.wagerPips) {
       return {
         created: false as const,
         reason: "insufficient-pips" as const,
-        currentPips: economy.getPips(action.ownerId),
+        currentPips,
       };
     }
 
@@ -1032,6 +1051,30 @@ const cancelledByTierUpdate = (challenge: DicePvpChallenge): DicePvpResult => {
       .join("\n"),
     true,
   );
+};
+
+const expireExpiredPendingChallengesForUsers = ({
+  economy,
+  pvp,
+  userIds,
+  nowMs,
+}: {
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  pvp: Pick<DicePvpRepository, "expireExpiredPendingDicePvpChallengesForUser">;
+  userIds: string[];
+  nowMs: number;
+}): void => {
+  const expiredChallenges = new Map<string, DicePvpChallenge>();
+
+  for (const userId of new Set(userIds)) {
+    for (const challenge of pvp.expireExpiredPendingDicePvpChallengesForUser(userId, nowMs)) {
+      expiredChallenges.set(challenge.id, challenge);
+    }
+  }
+
+  for (const challenge of expiredChallenges.values()) {
+    refundChallengeChallenger(economy, challenge);
+  }
 };
 
 const refundChallengeChallenger = (

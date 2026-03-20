@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiceAnalytics } from "../../../analytics/domain/analytics";
-import type { DicePvpChallenge, DicePvpEffects } from "../../domain/pvp";
+import {
+  isDicePvpChallengeExpired,
+  type DicePvpChallenge,
+  type DicePvpEffects,
+} from "../../domain/pvp";
 import { createDicePvpUseCase } from "./use-case";
 
 type Harness = ReturnType<typeof createHarness>;
@@ -107,6 +111,29 @@ const createHarness = ({
           updatedAt: new Date().toISOString(),
         });
         return { created: true };
+      },
+      expireExpiredPendingDicePvpChallengesForUser: (userId, nowMs = Date.now()) => {
+        const expiredChallenges: DicePvpChallenge[] = [];
+
+        for (const challenge of challenges.values()) {
+          if (
+            challenge.status !== "pending" ||
+            (challenge.challengerId !== userId && challenge.opponentId !== userId) ||
+            !isDicePvpChallengeExpired(challenge, nowMs)
+          ) {
+            continue;
+          }
+
+          const expiredChallenge = {
+            ...challenge,
+            status: "expired" as const,
+            updatedAt: new Date().toISOString(),
+          };
+          challenges.set(challenge.id, expiredChallenge);
+          expiredChallenges.push(expiredChallenge);
+        }
+
+        return expiredChallenges;
       },
       recordResolvedDuel: ({ userId, duelTier, result }) => {
         const current = getStats(userId);
@@ -276,6 +303,67 @@ test("expired challenges refund the challenger stake", async () => {
   assert.equal(harness.challenges.get(challenge.id)?.status, "expired");
   assert.equal(result.payload.type, "message");
   assert.match(result.payload.content, /refunded 6 pips/);
+});
+
+test("creating PvP setup auto-expires stale pending escrow before balance checks", async () => {
+  const harness = createHarness({
+    pips: { challenger: 5, opponent: 20 },
+  });
+  const createdAt = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+  const firstChallenge = await createChallenge({
+    harness,
+    wagerPips: 5,
+    nowMs: createdAt,
+  });
+
+  const result = harness.useCase.createDicePvpSetupReply(
+    "challenger",
+    { id: "opponent", bot: false },
+    5,
+    createdAt + 10 * 60 * 1000,
+  );
+
+  assert.equal(result.payload.type, "view");
+  assert.equal(harness.balances.get("challenger"), 5);
+  assert.equal(harness.challenges.get(firstChallenge.id)?.status, "expired");
+});
+
+test("creating a new wagered challenge auto-expires stale pending escrow", async () => {
+  const harness = createHarness({
+    pips: { challenger: 5, opponent: 20 },
+  });
+  const createdAt = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+  const firstChallenge = await createChallenge({
+    harness,
+    wagerPips: 5,
+    nowMs: createdAt,
+  });
+
+  const result = await harness.useCase.handleDicePvpAction(
+    "challenger",
+    {
+      type: "pick",
+      ownerId: "challenger",
+      opponentId: "opponent",
+      duelTier: 1,
+      wagerPips: 5,
+    },
+    async () => ({ url: "https://example.test/challenge-2" }),
+    createdAt + 10 * 60 * 1000,
+  );
+
+  const challenges = Array.from(harness.challenges.values());
+  const latestChallenge = challenges.at(-1);
+
+  assert.equal(result.payload.type, "message");
+  assert.match(result.payload.content, /Challenge created:/);
+  assert.equal(harness.balances.get("challenger"), 0);
+  assert.equal(harness.challenges.get(firstChallenge.id)?.status, "expired");
+  assert.equal(challenges.length, 2);
+  assert.equal(latestChallenge?.status, "pending");
+  assert.notEqual(latestChallenge?.id, firstChallenge.id);
 });
 
 test("accept rejects players who cannot cover the wager and keeps the challenge pending", async () => {

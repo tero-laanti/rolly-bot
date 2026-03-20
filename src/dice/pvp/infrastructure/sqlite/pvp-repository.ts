@@ -255,6 +255,31 @@ const hasLockedParticipant = (
   );
 };
 
+const expireExpiredPendingDicePvpChallengesForUser = (
+  db: SqliteDatabase,
+  userId: string,
+  nowMs: number = Date.now(),
+): DicePvpChallenge[] => {
+  const expiredChallenges: DicePvpChallenge[] = [];
+
+  for (const pending of getPendingDicePvpChallengesByUser(db, userId)) {
+    if (!isDicePvpChallengeExpired(pending, nowMs)) {
+      continue;
+    }
+
+    if (!setDicePvpChallengeStatusFromPending(db, pending.id, "expired")) {
+      continue;
+    }
+
+    expiredChallenges.push({
+      ...pending,
+      status: "expired",
+    });
+  }
+
+  return expiredChallenges;
+};
+
 const getActivePendingDicePvpChallengeForUser = (
   db: SqliteDatabase,
   userId: string,
@@ -458,6 +483,8 @@ export const createSqlitePvpRepository = (db: SqliteDatabase): DicePvpRepository
     getActiveDoubleRoll: (userId, nowMs) => getActiveDoubleRoll(db, userId, nowMs),
     createDicePvpChallengeIfUsersAvailable: (challenge) =>
       createDicePvpChallengeIfUsersAvailable(db, challenge),
+    expireExpiredPendingDicePvpChallengesForUser: (userId, nowMs) =>
+      expireExpiredPendingDicePvpChallengesForUser(db, userId, nowMs),
     getDicePvpChallenge: (challengeId) => getDicePvpChallenge(db, challengeId),
     setDicePvpChallengeOpponentFromOpen: (challengeId, opponentId) =>
       setDicePvpChallengeOpponentFromOpen(db, challengeId, opponentId),
