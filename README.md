@@ -138,6 +138,7 @@ This README only covers how gameplay data is discovered and used at runtime. For
 
 - [example-data/rolly-data/README.md](example-data/rolly-data/README.md) for the high-level layout
 - [example-data/rolly-data/AUTHORING.md](example-data/rolly-data/AUTHORING.md) for the authoring guide
+- [example-data/rolly-data/achievements.md](example-data/rolly-data/achievements.md) for achievement fields such as optional one-time `pipReward`
 - `example-data/rolly-data/*.md` for per-file docs
 
 If the app falls back to `example-data`, it starts normally and prints a warning so you can tell you are not using private gameplay data.

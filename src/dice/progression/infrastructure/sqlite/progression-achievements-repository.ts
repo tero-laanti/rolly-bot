@@ -2,6 +2,26 @@ import type { SqliteDatabase } from "../../../../shared/db";
 import type { DiceProgressionRepository } from "../../application/ports";
 import { getDiceAchievement, type DiceAchievementId } from "../../domain/achievements";
 
+const applyPipsDelta = (
+  db: SqliteDatabase,
+  userId: string,
+  amount: number,
+  updatedAt: string,
+): void => {
+  db.prepare(
+    `
+    INSERT INTO balances (user_id, pips, updated_at)
+    VALUES (@userId, @amount, @updatedAt)
+    ON CONFLICT(user_id)
+    DO UPDATE SET pips = balances.pips + excluded.pips, updated_at = excluded.updated_at
+  `,
+  ).run({
+    userId,
+    amount,
+    updatedAt,
+  });
+};
+
 export const createSqliteProgressionAchievementsRepository = (
   db: SqliteDatabase,
 ): Pick<
@@ -25,15 +45,23 @@ export const createSqliteProgressionAchievementsRepository = (
     );
 
     const newlyEarned: DiceAchievementId[] = [];
+    let totalPipReward = 0;
+
     for (const achievementId of achievementIds) {
-      if (!getDiceAchievement(achievementId)) {
+      const achievement = getDiceAchievement(achievementId);
+      if (!achievement) {
         continue;
       }
 
       const result = insert.run({ userId, achievementId, earnedAt });
       if (result.changes > 0) {
         newlyEarned.push(achievementId);
+        totalPipReward += achievement.pipReward;
       }
+    }
+
+    if (totalPipReward > 0) {
+      applyPipsDelta(db, userId, totalPipReward, earnedAt);
     }
 
     return newlyEarned;
