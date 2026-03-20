@@ -1,6 +1,7 @@
 import type { ButtonInteraction, Client } from "discord.js";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
+import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import { formatAchievementUnlockText } from "../../progression/application/achievement-text";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
@@ -132,6 +133,7 @@ export const createRandomEventsLiveRuntime = ({
   const clickCooldownByUserId = new Map<string, number>();
   let nextSequenceChallengeSessionId = 1;
   const db = getDatabase();
+  const economy = createSqliteEconomyRepository(db);
   const progression = createSqliteProgressionRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
   const pvp = createSqlitePvpRepository(db);
@@ -274,6 +276,7 @@ export const createRandomEventsLiveRuntime = ({
     await resolveRandomEvent({
       activeEventsById,
       state,
+      economy,
       progression,
       hostileEffects,
       pvp,
@@ -366,6 +369,7 @@ export const createRandomEventsLiveRuntime = ({
     }
 
     const attemptResolution = resolveRandomEventAttempt({
+      economy,
       progression,
       hostileEffects,
       pvp,

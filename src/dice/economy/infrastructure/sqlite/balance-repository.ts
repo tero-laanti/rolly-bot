@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { DiceEconomyRepository } from "../../application/ports";
-import type { EconomyChange, EconomySnapshot } from "../../domain/balance";
+import type { DailyPipGrantResult, EconomyChange, EconomySnapshot } from "../../domain/balance";
 
 const getEconomySnapshot = (db: SqliteDatabase, userId: string): EconomySnapshot => {
   const row = db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get(userId) as
@@ -11,6 +11,18 @@ const getEconomySnapshot = (db: SqliteDatabase, userId: string): EconomySnapshot
     fame: row?.fame ?? 0,
     pips: row?.pips ?? 0,
   };
+};
+
+const getLastDailyPipRewardAt = (db: SqliteDatabase, userId: string): string | null => {
+  const row = db
+    .prepare("SELECT last_daily_pip_reward_at FROM balances WHERE user_id = ?")
+    .get(userId) as
+    | {
+        last_daily_pip_reward_at: string | null;
+      }
+    | undefined;
+
+  return row?.last_daily_pip_reward_at ?? null;
 };
 
 const getFame = (db: SqliteDatabase, userId: string): number => {
@@ -59,12 +71,84 @@ const applyPipsDelta = (db: SqliteDatabase, { userId, amount }: EconomyChange): 
   })();
 };
 
+const getUtcDayKey = (value: string): string => {
+  return value.slice(0, 10);
+};
+
+const grantDailyPipsIfEligible = (
+  db: SqliteDatabase,
+  {
+    userId,
+    amount,
+    nowMs = Date.now(),
+  }: {
+    userId: string;
+    amount: number;
+    nowMs?: number;
+  },
+): DailyPipGrantResult => {
+  const claimedAt = new Date(nowMs).toISOString();
+  const todayKey = getUtcDayKey(claimedAt);
+  const select = db.prepare(
+    "SELECT pips, last_daily_pip_reward_at FROM balances WHERE user_id = ?",
+  );
+  const insert = db.prepare(
+    `
+    INSERT INTO balances (user_id, pips, last_daily_pip_reward_at, updated_at)
+    VALUES (@userId, @amount, @claimedAt, @updatedAt)
+    ON CONFLICT(user_id)
+    DO UPDATE SET
+      pips = balances.pips + excluded.pips,
+      last_daily_pip_reward_at = excluded.last_daily_pip_reward_at,
+      updated_at = excluded.updated_at
+  `,
+  );
+
+  return db.transaction(() => {
+    const existing = select.get(userId) as
+      | {
+          pips: number;
+          last_daily_pip_reward_at: string | null;
+        }
+      | undefined;
+    const lastClaimedAt = existing?.last_daily_pip_reward_at ?? null;
+    if (lastClaimedAt && getUtcDayKey(lastClaimedAt) === todayKey) {
+      return {
+        awarded: false,
+        pips: existing?.pips ?? 0,
+        lastDailyPipRewardAt: lastClaimedAt,
+      };
+    }
+
+    insert.run({
+      userId,
+      amount,
+      claimedAt,
+      updatedAt: claimedAt,
+    });
+    const updated = select.get(userId) as
+      | {
+          pips: number;
+          last_daily_pip_reward_at: string | null;
+        }
+      | undefined;
+
+    return {
+      awarded: true,
+      pips: updated?.pips ?? amount,
+      lastDailyPipRewardAt: updated?.last_daily_pip_reward_at ?? claimedAt,
+    };
+  })();
+};
+
 export const createSqliteEconomyRepository = (db: SqliteDatabase): DiceEconomyRepository => {
   return {
     getEconomySnapshot: (userId) => getEconomySnapshot(db, userId),
     getFame: (userId) => getFame(db, userId),
     getPips: (userId) => getPips(db, userId),
+    getLastDailyPipRewardAt: (userId) => getLastDailyPipRewardAt(db, userId),
     applyFameDelta: (change) => applyFameDelta(db, change),
     applyPipsDelta: (change) => applyPipsDelta(db, change),
+    grantDailyPipsIfEligible: (input) => grantDailyPipsIfEligible(db, input),
   };
 };

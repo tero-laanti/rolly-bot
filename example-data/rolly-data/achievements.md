@@ -61,6 +61,7 @@ Metadata:
 
 - `category` groups the achievement for the in-app browser.
 - Supported categories are `progression`, `roll`, `casino`, `pvp`, `random-events`, `raids`, `items`, and `meta`.
+- `pipReward` is optional. When present, the user earns that many pips the first time the achievement unlocks.
 - `unlockReasonText` is optional. It appears in the immediate unlock message, not in the browser.
 
 Manual prestige awards:

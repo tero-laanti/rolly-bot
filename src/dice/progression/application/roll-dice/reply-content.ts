@@ -35,10 +35,21 @@ export const formatAchievementText = (achievementIds: DiceAchievementId[]): stri
   return formatAchievementUnlockText(achievementIds);
 };
 
-export const formatRewardText = (totalReward: number, hasLevelUp: boolean): string => {
+export const formatRewardText = ({
+  fameReward,
+  pipReward,
+  hasLevelUp,
+}: {
+  fameReward: number;
+  pipReward: number;
+  hasLevelUp: boolean;
+}): string => {
   const rewardParts: string[] = [];
-  if (totalReward > 0) {
-    rewardParts.push(`${totalReward} Fame`);
+  if (fameReward > 0) {
+    rewardParts.push(`${fameReward} Fame`);
+  }
+  if (pipReward > 0) {
+    rewardParts.push(`${pipReward} Pip${pipReward === 1 ? "" : "s"}`);
   }
   if (hasLevelUp) {
     rewardParts.push("a new die");

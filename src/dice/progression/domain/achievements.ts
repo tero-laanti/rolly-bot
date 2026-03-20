@@ -6,6 +6,7 @@ type DiceAchievementDefinition = {
   name: string;
   description: string;
   category: DiceAchievementCategory;
+  pipReward: number;
   unlockReasonText?: string;
   rule: DiceAchievementRule;
   evaluate: (context: RollContext) => boolean;
@@ -74,6 +75,7 @@ export const diceAchievements: DiceAchievementDefinition[] = getDiceAchievements
     name: achievement.name,
     description: achievement.description,
     category: achievement.category,
+    pipReward: achievement.pipReward ?? 0,
     unlockReasonText: achievement.unlockReasonText,
     rule: achievement.rule,
     evaluate: (context) => evaluateAchievementRule(achievement.rule, context),
@@ -98,6 +100,10 @@ export const getDiceAchievement = (
 
 export const isManualDiceAchievement = (id: DiceAchievementId): boolean => {
   return getDiceAchievement(id)?.rule.type === "manual";
+};
+
+export const getDiceAchievementPipReward = (id: DiceAchievementId): number => {
+  return getDiceAchievement(id)?.pipReward ?? 0;
 };
 
 export const getPrestigeAchievementId = (prestige: number): DiceAchievementId | undefined => {

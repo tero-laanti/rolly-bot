@@ -7,11 +7,15 @@ const formatAchievementUnlockEntry = (achievementId: DiceAchievementId): string 
     return achievementId;
   }
 
+  const rewardText =
+    achievement.pipReward > 0
+      ? `, +${achievement.pipReward} pip${achievement.pipReward === 1 ? "" : "s"}`
+      : "";
   if (!achievement.unlockReasonText) {
-    return achievement.name;
+    return `${achievement.name}${rewardText}`;
   }
 
-  return `${achievement.name} (${achievement.unlockReasonText})`;
+  return `${achievement.name} (${achievement.unlockReasonText}${rewardText})`;
 };
 
 export const formatAchievementUnlockText = (

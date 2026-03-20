@@ -362,10 +362,16 @@ const readRandomEventEffect = (value: unknown, label: string): RandomEventEffect
   const type = readNonEmptyString(record.type, `${label}.type`);
 
   if (type === "currency") {
+    const minAmount = readInteger(record.minAmount, `${label}.minAmount`, 0);
+    const maxAmount = readInteger(record.maxAmount, `${label}.maxAmount`, 0);
+    if (minAmount > maxAmount) {
+      throw new Error(`${label}.minAmount must be less than or equal to ${label}.maxAmount.`);
+    }
+
     return {
       type,
-      minAmount: readInteger(record.minAmount, `${label}.minAmount`, 0),
-      maxAmount: readInteger(record.maxAmount, `${label}.maxAmount`, 0),
+      minAmount,
+      maxAmount,
     };
   }
 
@@ -673,6 +679,10 @@ export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => 
       description: readNonEmptyString(record.description, `achievements[${index}].description`),
       category: readAchievementCategory(record.category, `achievements[${index}].category`),
       rule: readAchievementRule(record.rule, `achievements[${index}].rule`),
+      pipReward:
+        record.pipReward === undefined
+          ? undefined
+          : readInteger(record.pipReward, `achievements[${index}].pipReward`, 0),
       manualAward: readManualAward(record.manualAward, `achievements[${index}].manualAward`),
       unlockReasonText: readOptionalNonEmptyString(
         record.unlockReasonText,

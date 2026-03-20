@@ -29,7 +29,7 @@ Fame and bans:
 
 Level-up and roll-pass tuning:
 
-- `levelUpReward`: pips granted on level-up.
+- `levelUpReward`: Fame granted on level-up.
 - `maxRollPassCount`: hard cap for total roll passes after charge or other roll-pass modifiers are applied.
 
 ```json

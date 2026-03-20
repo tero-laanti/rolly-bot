@@ -1,4 +1,9 @@
-import { createRollContext, diceAchievements, type DiceAchievementId } from "./achievements";
+import {
+  createRollContext,
+  diceAchievements,
+  getDiceAchievementPipReward,
+  type DiceAchievementId,
+} from "./achievements";
 
 export const getDiceAchievementsForRoll = (
   rolls: number[],
@@ -12,4 +17,12 @@ export const getDiceAchievementsForRoll = (
   return diceAchievements
     .filter((achievement) => achievement.evaluate(context))
     .map((achievement) => achievement.id);
+};
+
+export const getAchievementPipRewardTotal = (
+  achievementIds: readonly DiceAchievementId[],
+): number => {
+  return achievementIds.reduce((total, achievementId) => {
+    return total + getDiceAchievementPipReward(achievementId);
+  }, 0);
 };
