@@ -17,6 +17,29 @@ const autoRollItem: DiceShopItem = {
   },
 };
 
+const umbrellaItem: DiceShopItem = {
+  id: "bad-luck-umbrella",
+  name: "Bad Luck Umbrella",
+  description: "Blocks the next negative effect.",
+  pricePips: 8,
+  consumable: true,
+  effect: {
+    type: "negative-effect-shield",
+    charges: 1,
+  },
+};
+
+const cleanseSaltItem: DiceShopItem = {
+  id: "cleanse-salt",
+  name: "Cleanse Salt",
+  description: "Clears active negative effects.",
+  pricePips: 15,
+  consumable: true,
+  effect: {
+    type: "cleanse-all-negative-effects",
+  },
+};
+
 const createItemEffectsStub = (): DiceItemEffectsService => ({
   getItemDoubleRollStatus: () => ({
     isActive: false,
@@ -44,6 +67,7 @@ test("auto-roll item use defers achievement writes until startup is finalized", 
 
   const useDiceItem = createUseDiceItemUseCase({
     inventory: {
+      getInventoryQuantities: () => new Map(),
       getInventoryQuantity: () => 1,
       consumeInventoryItem: () => ({
         ok: true,
@@ -110,6 +134,7 @@ test("finalizing auto-roll item use records item-use progress inside a transacti
         item: autoRollItem,
         remainingQuantity: 0,
       }),
+      getInventoryQuantities: () => new Map(),
       getInventoryQuantity: () => 1,
       grantInventoryItem: () => 1,
       recordItemUse: ({ userId, itemId }) => {
@@ -142,6 +167,117 @@ test("finalizing auto-roll item use records item-use progress inside a transacti
     itemId: autoRollItem.id,
   });
 
-  assert.deepEqual(calls, ["transaction", `record:user-1:${autoRollItem.id}`]);
+  assert.deepEqual(calls, ["transaction", `record:user-1:${autoRollItem.id}`, "award"]);
   assert.equal(result.achievementText, undefined);
+});
+
+test("umbrella harness adds one extra Bad Luck Umbrella charge", async () => {
+  const grantedCharges: number[] = [];
+  const useDiceItem = createUseDiceItemUseCase({
+    inventory: {
+      consumeInventoryItem: () => ({
+        ok: true,
+        item: umbrellaItem,
+        remainingQuantity: 0,
+      }),
+      getInventoryQuantities: () => new Map([["umbrella-harness", 1]]),
+      getInventoryQuantity: () => 1,
+      grantInventoryItem: () => 1,
+      recordItemUse: () => ({
+        shopPurchaseCount: 0,
+        itemUseCount: 1,
+        usedTriggerRandomGroupEvent: false,
+        usedAutoRollItem: false,
+        usedCleanseItem: false,
+      }),
+    },
+    itemEffects: {
+      ...createItemEffectsStub(),
+      grantNegativeEffectShield: ({ charges = 1 }) => {
+        grantedCharges.push(charges);
+      },
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      setDicePvpEffects: () => undefined,
+    },
+    progression: {
+      awardAchievements: () => [],
+    },
+    shopCatalog: {
+      getDiceShopItem: () => umbrellaItem,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = await useDiceItem({
+    userId: "user-1",
+    itemId: umbrellaItem.id,
+    reserveAutoRollSession: () => null,
+    triggerRandomGroupEvent: async () => ({ ok: false, reason: "disabled" }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(grantedCharges, [2]);
+  if (result.ok) {
+    assert.match(result.statusMessage, /next 2 negative effects will be blocked/);
+  }
+});
+
+test("clean room kit grants a Bad Luck Umbrella charge when using Cleanse Salt", async () => {
+  const grantedCharges: number[] = [];
+  const useDiceItem = createUseDiceItemUseCase({
+    inventory: {
+      consumeInventoryItem: () => ({
+        ok: true,
+        item: cleanseSaltItem,
+        remainingQuantity: 0,
+      }),
+      getInventoryQuantities: () => new Map([["clean-room-kit", 1]]),
+      getInventoryQuantity: () => 1,
+      grantInventoryItem: () => 1,
+      recordItemUse: () => ({
+        shopPurchaseCount: 0,
+        itemUseCount: 1,
+        usedTriggerRandomGroupEvent: false,
+        usedAutoRollItem: false,
+        usedCleanseItem: true,
+      }),
+    },
+    itemEffects: {
+      ...createItemEffectsStub(),
+      grantNegativeEffectShield: ({ charges = 1 }) => {
+        grantedCharges.push(charges);
+      },
+      clearAllNegativeTemporaryEffects: () => 1,
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      setDicePvpEffects: () => undefined,
+    },
+    progression: {
+      awardAchievements: () => [],
+    },
+    shopCatalog: {
+      getDiceShopItem: () => cleanseSaltItem,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = await useDiceItem({
+    userId: "user-1",
+    itemId: cleanseSaltItem.id,
+    reserveAutoRollSession: () => null,
+    triggerRandomGroupEvent: async () => ({ ok: false, reason: "disabled" }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(grantedCharges, [1]);
+  if (result.ok) {
+    assert.match(result.statusMessage, /Clean Room Kit also granted 1 Bad Luck Umbrella charge/);
+  }
 });

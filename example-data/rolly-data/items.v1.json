@@ -1,9 +1,9 @@
 [
   {
-    "id": "example-negative-shield",
-    "name": "Example Negative Shield",
-    "description": "Example item: blocks the next matching negative effect.",
-    "pricePips": 30,
+    "id": "bad-luck-umbrella",
+    "name": "Bad Luck Umbrella",
+    "description": "Negates the next negative effect that would hit you from PvP, random events, or future hostile systems.",
+    "pricePips": 8,
     "consumable": true,
     "effect": {
       "type": "negative-effect-shield",
@@ -11,10 +11,10 @@
     }
   },
   {
-    "id": "example-double-roll-uses",
-    "name": "Example Double Roll Uses",
-    "description": "Example item: your next 6 /dice uses roll twice.",
-    "pricePips": 5,
+    "id": "dice-revolver",
+    "name": "Dice Revolver",
+    "description": "Your next 6 /dice uses roll twice.",
+    "pricePips": 6,
     "consumable": true,
     "effect": {
       "type": "double-roll-uses",
@@ -22,10 +22,10 @@
     }
   },
   {
-    "id": "example-double-roll-duration",
-    "name": "Example Double Roll Duration",
-    "description": "Example item: /dice rolls twice for 5 minutes.",
-    "pricePips": 30,
+    "id": "longburn-spring",
+    "name": "Longburn Spring",
+    "description": "Your /dice uses roll twice for 5 minutes.",
+    "pricePips": 12,
     "consumable": true,
     "effect": {
       "type": "double-roll-duration",
@@ -33,20 +33,20 @@
     }
   },
   {
-    "id": "example-trigger-random-event",
-    "name": "Example Trigger Random Event",
-    "description": "Example item: tries to spawn a random group event immediately.",
-    "pricePips": 30,
+    "id": "chaos-flare",
+    "name": "Chaos Flare",
+    "description": "Triggers a random group event immediately, if the event system can legally spawn one right now.",
+    "pricePips": 18,
     "consumable": true,
     "effect": {
       "type": "trigger-random-group-event"
     }
   },
   {
-    "id": "example-auto-roll-session",
-    "name": "Example Auto Roll Session",
-    "description": "Example item: rolls for you every 5 seconds for 5 minutes.",
-    "pricePips": 100,
+    "id": "clockwork-croupier",
+    "name": "Clockwork Croupier",
+    "description": "Rolls for you every 5 seconds for 5 minutes, then posts a summary when finished.",
+    "pricePips": 30,
     "consumable": true,
     "effect": {
       "type": "auto-roll-session",
@@ -55,13 +55,47 @@
     }
   },
   {
-    "id": "example-cleanse-negative-effects",
-    "name": "Example Cleanse Negative Effects",
-    "description": "Example item: removes active negative effects and clears lockout.",
-    "pricePips": 50,
+    "id": "cleanse-salt",
+    "name": "Cleanse Salt",
+    "description": "Removes all active negative effects and clears lockout.",
+    "pricePips": 15,
     "consumable": true,
     "effect": {
       "type": "cleanse-all-negative-effects"
+    }
+  },
+  {
+    "id": "umbrella-harness",
+    "name": "Umbrella Harness",
+    "description": "Passive upgrade: Bad Luck Umbrella grants +1 extra shield charge when used.",
+    "pricePips": 250,
+    "consumable": false,
+    "effect": {
+      "type": "passive-extra-shield-on-umbrella",
+      "extraCharges": 1
+    }
+  },
+  {
+    "id": "padded-bracers",
+    "name": "Padded Bracers",
+    "description": "Passive upgrade: reduce PvP loser lockout by 15%, but never below 15 minutes.",
+    "pricePips": 900,
+    "consumable": false,
+    "effect": {
+      "type": "passive-pvp-loser-lockout-reduction",
+      "reductionPercent": 0.15,
+      "minimumMinutes": 15
+    }
+  },
+  {
+    "id": "clean-room-kit",
+    "name": "Clean Room Kit",
+    "description": "Passive upgrade: using Cleanse Salt also grants 1 Bad Luck Umbrella charge.",
+    "pricePips": 1800,
+    "consumable": false,
+    "effect": {
+      "type": "passive-cleanse-grants-negative-effect-shield",
+      "charges": 1
     }
   }
 ]

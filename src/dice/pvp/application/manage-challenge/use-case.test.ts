@@ -7,9 +7,11 @@ import { createDicePvpUseCase } from "./use-case";
 type Harness = ReturnType<typeof createHarness>;
 
 const createHarness = ({
+  inventoryQuantities = {},
   pips = {},
   randomValues = [0],
 }: {
+  inventoryQuantities?: Record<string, Record<string, number>>;
   pips?: Record<string, number>;
   randomValues?: number[];
 } = {}) => {
@@ -87,6 +89,10 @@ const createHarness = ({
           lockoutUntilMs: Date.parse(lockoutUntil),
         };
       },
+    },
+    inventory: {
+      getInventoryQuantities: (userId) =>
+        new Map(Object.entries(inventoryQuantities[userId] ?? {})),
     },
     progression: {
       getDicePrestige: () => 0,
@@ -171,6 +177,7 @@ const createHarness = ({
   return {
     balances,
     challenges,
+    effects,
     useCase,
   };
 };
@@ -382,4 +389,34 @@ test("failed challenge publishing cancels the challenge and refunds the challeng
   assert.equal(harness.balances.get("challenger"), 20);
   assert.equal(result.payload.type, "message");
   assert.match(result.payload.content, /refunded 9 pips/);
+});
+
+test("padded bracers reduce PvP loser lockout duration", async () => {
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const harness = createHarness({
+    inventoryQuantities: {
+      opponent: {
+        "padded-bracers": 1,
+      },
+    },
+    pips: { challenger: 20, opponent: 20 },
+    randomValues: [0.9, 0],
+  });
+  const challenge = await createChallenge({
+    harness,
+    wagerPips: 0,
+    nowMs,
+  });
+
+  await harness.useCase.handleDicePvpAction(
+    "opponent",
+    { type: "accept", challengeId: challenge.id },
+    null,
+    nowMs,
+  );
+
+  assert.equal(harness.challenges.get(challenge.id)?.status, "resolved");
+  const loserEffectsLockout = harness.effects.get("opponent")?.lockoutUntil;
+  assert.ok(loserEffectsLockout);
+  assert.equal(Date.parse(loserEffectsLockout) - nowMs, 51 * 60 * 1000);
 });

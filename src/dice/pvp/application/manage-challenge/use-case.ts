@@ -9,6 +9,7 @@ import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
+import type { DiceInventoryRepository } from "../../../inventory/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
 import { formatAchievementUnlockText } from "../../../progression/application/achievement-text";
 import {
@@ -29,6 +30,7 @@ import {
   type DicePvpChallengeCreateResult,
 } from "../../../pvp/domain/pvp";
 import type { DicePvpRepository } from "../ports";
+import { applyPvpLoserLockoutReduction } from "../../../inventory/domain/passive-items";
 
 export type DicePvpAction =
   | {
@@ -55,6 +57,7 @@ type ManageChallengeDependencies = {
   analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics" | "updateDicePvpStats">;
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
   hostileEffects: Pick<DiceHostileEffectsService, "applyShieldableNegativeLockout">;
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">;
   progression: Pick<DiceProgressionRepository, "awardAchievements" | "getDicePrestige">;
   pvp: Pick<
     DicePvpRepository,
@@ -76,6 +79,7 @@ export const createDicePvpUseCase = ({
   analytics,
   economy,
   hostileEffects,
+  inventory,
   progression,
   pvp,
   random = Math.random,
@@ -151,6 +155,7 @@ export const createDicePvpUseCase = ({
           analytics,
           economy,
           hostileEffects,
+          inventory,
           progression,
           pvp,
           unitOfWork,
@@ -308,6 +313,7 @@ const handleChallengeAccept = (
     analytics,
     economy,
     hostileEffects,
+    inventory,
     progression,
     pvp,
     random = Math.random,
@@ -528,12 +534,16 @@ const handleChallengeAccept = (
     }
 
     const punishmentMs = getDuelPunishmentMs(challenge.duelTier);
+    const reducedPunishmentMs = applyPvpLoserLockoutReduction(
+      punishmentMs,
+      inventory.getInventoryQuantities(loserId),
+    );
     const rewardMs = getDuelRewardMs(challenge.duelTier);
     const winnerEffects = pvp.getDicePvpEffects(winnerId);
     const winnerDoubleRollUntilMs = extendEffect(winnerEffects.doubleRollUntil, rewardMs, nowMs);
     const loserLockoutResult = hostileEffects.applyShieldableNegativeLockout({
       userId: loserId,
-      durationMs: punishmentMs,
+      durationMs: reducedPunishmentMs,
       nowMs,
     });
 
@@ -627,11 +637,7 @@ const handleChallengeAccept = (
 };
 
 const handleChallengeDecline = (
-  {
-    economy,
-    pvp,
-    unitOfWork,
-  }: Pick<ManageChallengeDependencies, "economy" | "pvp" | "unitOfWork">,
+  { economy, pvp, unitOfWork }: Pick<ManageChallengeDependencies, "economy" | "pvp" | "unitOfWork">,
   actorId: string,
   challengeId: string,
   nowMs: number,
@@ -948,9 +954,7 @@ const formatChallengeUserLabel = (userId: string): string => {
 };
 
 const formatChallengeWagerText = (wagerPips: number): string => {
-  return wagerPips > 0
-    ? `${wagerPips} pip${wagerPips === 1 ? "" : "s"} per player`
-    : "no wager";
+  return wagerPips > 0 ? `${wagerPips} pip${wagerPips === 1 ? "" : "s"} per player` : "no wager";
 };
 
 const buildChallengeStakeLine = (wagerPips: number): string => {
@@ -1107,7 +1111,10 @@ const cancelChallengeForLockout = (
   }
 
   return updateMessage(
-    [buildLockoutCancellationContent(lockedUserId, lockoutUntil), formatChallengeRefundLine(challenge)]
+    [
+      buildLockoutCancellationContent(lockedUserId, lockoutUntil),
+      formatChallengeRefundLine(challenge),
+    ]
       .filter((line) => line.length > 0)
       .join("\n"),
     true,

@@ -35,10 +35,7 @@
       }
     ],
     "activityTemplates": {
-      "accepted": [
-        "<@{userId}> checks the example crate.",
-        "<@{userId}> opens the example event."
-      ],
+      "accepted": ["<@{userId}> checks the example crate.", "<@{userId}> opens the example event."],
       "alreadyReady": [
         "<@{userId}> is already checking the example crate.",
         "<@{userId}> is already in this example event."
@@ -80,12 +77,8 @@
       "failOnFirstMiss": true
     },
     "challengeOutcomeIds": {
-      "success": [
-        "example-challenge-success"
-      ],
-      "failure": [
-        "example-keep-open-failure"
-      ]
+      "success": ["example-challenge-success"],
+      "failure": ["example-keep-open-failure"]
     },
     "outcomes": [
       {

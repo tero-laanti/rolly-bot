@@ -664,6 +664,32 @@ const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
     return { type };
   }
 
+  if (type === "passive-extra-shield-on-umbrella") {
+    return {
+      type,
+      extraCharges: readInteger(record.extraCharges, `${label}.extraCharges`, 1),
+    };
+  }
+
+  if (type === "passive-pvp-loser-lockout-reduction") {
+    return {
+      type,
+      reductionPercent: readFiniteNumberAtLeast(
+        record.reductionPercent,
+        `${label}.reductionPercent`,
+        0,
+      ),
+      minimumMinutes: readInteger(record.minimumMinutes, `${label}.minimumMinutes`, 1),
+    };
+  }
+
+  if (type === "passive-cleanse-grants-negative-effect-shield") {
+    return {
+      type,
+      charges: readInteger(record.charges, `${label}.charges`, 1),
+    };
+  }
+
   throw new Error(`${label}.type is invalid.`);
 };
 
