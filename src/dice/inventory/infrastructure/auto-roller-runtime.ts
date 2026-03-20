@@ -116,6 +116,16 @@ export const startReservedAutoRollSession = async (
   return true;
 };
 
+export const cancelActiveAutoRollSession = (userId: string): boolean => {
+  const session = activeSessionsByUserId.get(userId);
+  if (!session) {
+    return false;
+  }
+
+  stopSession(session);
+  return true;
+};
+
 const scheduleNextTick = (session: AutoRollSession): void => {
   session.timer = setTimeout(() => {
     void runAutoRollTick(session);

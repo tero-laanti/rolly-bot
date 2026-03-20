@@ -51,6 +51,60 @@ type UseDiceItemDependencies = {
   unitOfWork: UnitOfWork;
 };
 
+export type FinalizeAutoRollItemUseResult = {
+  achievementText?: string;
+};
+
+const recordDiceItemUseAchievements = ({
+  inventory,
+  progression,
+  userId,
+  itemId,
+}: {
+  inventory: Pick<DiceInventoryRepository, "recordItemUse">;
+  progression: Pick<DiceProgressionRepository, "awardAchievements">;
+  userId: string;
+  itemId: string;
+}) => {
+  const newlyEarned = awardManualDiceAchievements(
+    progression,
+    userId,
+    getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId })),
+  );
+
+  return {
+    newlyEarned,
+    achievementText: formatAchievementUnlockText(newlyEarned) || undefined,
+  };
+};
+
+export const createFinalizeAutoRollItemUseUseCase = ({
+  inventory,
+  progression,
+  unitOfWork,
+}: Pick<UseDiceItemDependencies, "inventory" | "progression" | "unitOfWork">) => {
+  return ({
+    userId,
+    itemId,
+  }: {
+    userId: string;
+    itemId: string;
+  }): FinalizeAutoRollItemUseResult => {
+    return unitOfWork.runInTransaction(() => {
+      const { achievementText } = recordDiceItemUseAchievements({
+        inventory,
+        progression,
+        userId,
+        itemId,
+      });
+
+      return {
+        achievementText,
+      };
+    });
+  };
+};
+
 export const createUseDiceItemUseCase = ({
   inventory,
   itemEffects,
@@ -109,12 +163,12 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           charges: effect.charges,
         });
-        const newlyEarned = awardManualDiceAchievements(
+        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+          inventory,
           progression,
           userId,
-          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
-        );
-        const achievementText = formatAchievementUnlockText(newlyEarned);
+          itemId: item.id,
+        });
 
         return {
           ok: true as const,
@@ -145,12 +199,12 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           uses: effect.uses,
         });
-        const newlyEarned = awardManualDiceAchievements(
+        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+          inventory,
           progression,
           userId,
-          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
-        );
-        const achievementText = formatAchievementUnlockText(newlyEarned);
+          itemId: item.id,
+        });
 
         return {
           ok: true as const,
@@ -181,12 +235,12 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           minutes: effect.minutes,
         });
-        const newlyEarned = awardManualDiceAchievements(
+        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+          inventory,
           progression,
           userId,
-          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
-        );
-        const achievementText = formatAchievementUnlockText(newlyEarned);
+          itemId: item.id,
+        });
 
         return {
           ok: true as const,
@@ -223,12 +277,12 @@ export const createUseDiceItemUseCase = ({
         if (!consumed.ok) {
           throw new Error(`Failed to consume ${item.id} after cleanse.`);
         }
-        const newlyEarned = awardManualDiceAchievements(
+        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+          inventory,
           progression,
           userId,
-          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
-        );
-        const achievementText = formatAchievementUnlockText(newlyEarned);
+          itemId: item.id,
+        });
 
         const clearedParts: string[] = [];
         if (clearedTemporaryEffects > 0) {
@@ -280,12 +334,12 @@ export const createUseDiceItemUseCase = ({
         };
       }
 
-      const newlyEarned = awardManualDiceAchievements(
+      const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+        inventory,
         progression,
         userId,
-        getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
-      );
-      const achievementText = formatAchievementUnlockText(newlyEarned);
+        itemId: item.id,
+      });
 
       return {
         ok: true,
@@ -299,19 +353,6 @@ export const createUseDiceItemUseCase = ({
       };
     }
 
-    const reservation = reserveAutoRollSession({
-      userId,
-      itemName: item.name,
-      durationSeconds: item.effect.durationSeconds,
-      intervalSeconds: item.effect.intervalSeconds,
-    });
-    if (!reservation) {
-      return {
-        ok: false,
-        message: "You already have an active auto-roll session.",
-      };
-    }
-
     const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
     if (!consumed.ok) {
       return {
@@ -319,19 +360,26 @@ export const createUseDiceItemUseCase = ({
         message: `You do not have any ${item.name} to use.`,
       };
     }
-    const newlyEarned = awardManualDiceAchievements(
-      progression,
+
+    const reservation = reserveAutoRollSession({
       userId,
-      getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
-    );
-    const achievementText = formatAchievementUnlockText(newlyEarned);
+      itemName: item.name,
+      durationSeconds: item.effect.durationSeconds,
+      intervalSeconds: item.effect.intervalSeconds,
+    });
+    if (!reservation) {
+      inventory.grantInventoryItem({ userId, itemId: item.id, quantity: 1 });
+      return {
+        ok: false,
+        message: "You already have an active auto-roll session.",
+      };
+    }
 
     return {
       ok: true,
       item,
       remainingQuantity: consumed.remainingQuantity,
-      statusMessage: appendAchievementUnlockText(`${item.name} engaged.`, newlyEarned),
-      achievementText: achievementText || undefined,
+      statusMessage: `${item.name} engaged.`,
       autoRollReservation: reservation,
     };
   };
