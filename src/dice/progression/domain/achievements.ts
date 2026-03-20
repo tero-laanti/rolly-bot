@@ -1,10 +1,16 @@
 import { getDiceAchievementsData } from "../../../rolly-data/load";
-import type { DiceAchievementRule } from "../../../rolly-data/types";
+import type {
+  DiceAchievementCategory,
+  DiceAchievementRule,
+} from "../../../rolly-data/types";
 
 type DiceAchievementDefinition = {
   id: DiceAchievementId;
   name: string;
   description: string;
+  category: DiceAchievementCategory;
+  unlockReasonText?: string;
+  rule: DiceAchievementRule;
   evaluate: (context: RollContext) => boolean;
 };
 
@@ -70,6 +76,9 @@ export const diceAchievements: DiceAchievementDefinition[] = getDiceAchievements
     id: achievement.id,
     name: achievement.name,
     description: achievement.description,
+    category: achievement.category,
+    unlockReasonText: achievement.unlockReasonText,
+    rule: achievement.rule,
     evaluate: (context) => evaluateAchievementRule(achievement.rule, context),
   }),
 );
@@ -88,6 +97,10 @@ export const getDiceAchievement = (
   id: DiceAchievementId,
 ): DiceAchievementDefinition | undefined => {
   return diceAchievementById.get(id);
+};
+
+export const isManualDiceAchievement = (id: DiceAchievementId): boolean => {
+  return getDiceAchievement(id)?.rule.type === "manual";
 };
 
 export const getPrestigeAchievementId = (prestige: number): DiceAchievementId | undefined => {

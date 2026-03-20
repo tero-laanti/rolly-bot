@@ -137,5 +137,82 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (user_id, game, bet_tier)
     );
+
+    CREATE TABLE IF NOT EXISTS dice_progression_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      roll_commands_total INTEGER NOT NULL DEFAULT 0,
+      near_levelup_rolls_total INTEGER NOT NULL DEFAULT 0,
+      highest_charge_multiplier INTEGER NOT NULL DEFAULT 1,
+      highest_roll_pass_count INTEGER NOT NULL DEFAULT 1,
+      level_ups_total INTEGER NOT NULL DEFAULT 0,
+      first_ban_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_casino_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      rounds_completed_total INTEGER NOT NULL DEFAULT 0,
+      total_wagered INTEGER NOT NULL DEFAULT 0,
+      highest_payout INTEGER NOT NULL DEFAULT 0,
+      exact_face_wins INTEGER NOT NULL DEFAULT 0,
+      high_low_wins INTEGER NOT NULL DEFAULT 0,
+      push_cashouts INTEGER NOT NULL DEFAULT 0,
+      push_perfect_runs INTEGER NOT NULL DEFAULT 0,
+      blackjack_naturals INTEGER NOT NULL DEFAULT 0,
+      blackjack_pushes INTEGER NOT NULL DEFAULT 0,
+      blackjack_hit_to_21_wins INTEGER NOT NULL DEFAULT 0,
+      poker_straights INTEGER NOT NULL DEFAULT 0,
+      poker_full_houses INTEGER NOT NULL DEFAULT 0,
+      poker_four_of_a_kind INTEGER NOT NULL DEFAULT 0,
+      poker_five_of_a_kind INTEGER NOT NULL DEFAULT 0,
+      played_exact_roll INTEGER NOT NULL DEFAULT 0,
+      played_push_your_luck INTEGER NOT NULL DEFAULT 0,
+      played_blackjack INTEGER NOT NULL DEFAULT 0,
+      played_dice_poker INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_pvp_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      duels_total INTEGER NOT NULL DEFAULT 0,
+      current_win_streak INTEGER NOT NULL DEFAULT 0,
+      highest_win_streak INTEGER NOT NULL DEFAULT 0,
+      highest_tier_win INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_random_event_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      success_count INTEGER NOT NULL DEFAULT 0,
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      multi_user_success_count INTEGER NOT NULL DEFAULT 0,
+      legendary_success_count INTEGER NOT NULL DEFAULT 0,
+      lockout_count INTEGER NOT NULL DEFAULT 0,
+      keep_open_comeback_count INTEGER NOT NULL DEFAULT 0,
+      negative_effect_expires_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_raid_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      joined_count INTEGER NOT NULL DEFAULT 0,
+      hit_count INTEGER NOT NULL DEFAULT 0,
+      eligible_clear_count INTEGER NOT NULL DEFAULT 0,
+      top_damage_clear_count INTEGER NOT NULL DEFAULT 0,
+      lifetime_damage INTEGER NOT NULL DEFAULT 0,
+      highest_cleared_boss_level INTEGER NOT NULL DEFAULT 0,
+      tourist_success_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_item_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      shop_purchase_count INTEGER NOT NULL DEFAULT 0,
+      item_use_count INTEGER NOT NULL DEFAULT 0,
+      used_trigger_random_group_event INTEGER NOT NULL DEFAULT 0,
+      used_auto_roll_item INTEGER NOT NULL DEFAULT 0,
+      used_cleanse_item INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
   `);
 };

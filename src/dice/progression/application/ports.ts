@@ -28,6 +28,23 @@ export type DiceBanUpdate = {
   bannedValue: number;
 };
 
+export type DiceProgressionAchievementStats = {
+  rollCommandsTotal: number;
+  nearLevelupRollsTotal: number;
+  highestChargeMultiplier: number;
+  highestRollPassCount: number;
+  levelUpsTotal: number;
+  firstBanAt: string | null;
+};
+
+export type RecordDiceProgressionAchievementStatsInput = {
+  userId: string;
+  nearLevelupRollCount: number;
+  chargeMultiplier: number;
+  rollPassCount: number;
+  levelUpsGained: number;
+};
+
 export type DiceProgressionRepository = {
   getDiceLevel: (userId: string) => number;
   getDiceLevelForPrestige: (userId: string, prestige: number) => number;
@@ -47,6 +64,11 @@ export type DiceProgressionRepository = {
   getUserDiceAchievements: (userId: string) => DiceAchievementId[];
   awardAchievements: (userId: string, achievementIds: DiceAchievementId[]) => DiceAchievementId[];
   clearUserDiceAchievements: (userId: string) => void;
+  getDiceProgressionAchievementStats: (userId: string) => DiceProgressionAchievementStats;
+  recordDiceProgressionAchievementStats: (
+    input: RecordDiceProgressionAchievementStatsInput,
+  ) => DiceProgressionAchievementStats;
+  markFirstDiceBan: (userId: string) => boolean;
   getLastDiceRollAt: () => number | null;
   setLastDiceRollAt: (nowMs: number) => void;
   purgeExpiredDiceTemporaryEffects: (nowMs?: number) => number;

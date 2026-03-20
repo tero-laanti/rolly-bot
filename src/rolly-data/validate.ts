@@ -1,5 +1,6 @@
 import type {
   DiceAchievementData,
+  DiceAchievementCategory,
   DiceAchievementManualAward,
   DiceCasinoData,
   DiceCasinoPayoutRatio,
@@ -46,6 +47,16 @@ const randomEventOutcomeResolutions = [
   "keep-open-failure",
 ] as const;
 const randomEventRetryPolicies = ["once-per-user", "allow-retry"] as const;
+const achievementCategories = [
+  "progression",
+  "roll",
+  "casino",
+  "pvp",
+  "random-events",
+  "raids",
+  "items",
+  "meta",
+] as const;
 const achievementRuleTypes = [
   "ordered-sequence",
   "contains-all-values",
@@ -87,6 +98,14 @@ const readNonEmptyString = (value: unknown, label: string): string => {
   }
 
   return parsed;
+};
+
+const readOptionalNonEmptyString = (value: unknown, label: string): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return readNonEmptyString(value, label);
 };
 
 const readFiniteNumber = (value: unknown, label: string): number => {
@@ -179,6 +198,15 @@ const readRarityTier = (value: unknown, label: string): RandomEventRarityTier =>
   }
 
   return parsed as RandomEventRarityTier;
+};
+
+const readAchievementCategory = (value: unknown, label: string): DiceAchievementCategory => {
+  const parsed = readNonEmptyString(value, label);
+  if (!achievementCategories.includes(parsed as DiceAchievementCategory)) {
+    throw new Error(`${label} must be one of ${achievementCategories.join(", ")}.`);
+  }
+
+  return parsed as DiceAchievementCategory;
 };
 
 const readRandomEventOutcomeResolution = (
@@ -643,8 +671,13 @@ export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => 
       id: readNonEmptyString(record.id, `achievements[${index}].id`),
       name: readNonEmptyString(record.name, `achievements[${index}].name`),
       description: readNonEmptyString(record.description, `achievements[${index}].description`),
+      category: readAchievementCategory(record.category, `achievements[${index}].category`),
       rule: readAchievementRule(record.rule, `achievements[${index}].rule`),
       manualAward: readManualAward(record.manualAward, `achievements[${index}].manualAward`),
+      unlockReasonText: readOptionalNonEmptyString(
+        record.unlockReasonText,
+        `achievements[${index}].unlockReasonText`,
+      ),
     };
   });
 
