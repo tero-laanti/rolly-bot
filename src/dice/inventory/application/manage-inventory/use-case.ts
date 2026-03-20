@@ -30,7 +30,6 @@ export type DiceInventoryActionOutcome = {
     | {
         reservation: AutoRollSessionReservation;
         itemId: string;
-        achievementText?: string;
       }
     | undefined;
 };
@@ -125,7 +124,6 @@ export const createDiceInventoryUseCase = ({
         autoRollStart: {
           reservation: useResult.autoRollReservation,
           itemId: useResult.item.id,
-          achievementText: useResult.achievementText,
         },
       };
     }

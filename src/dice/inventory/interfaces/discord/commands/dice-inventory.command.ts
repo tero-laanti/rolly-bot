@@ -6,6 +6,7 @@ import {
 } from "../../../../../app/discord/interaction-response";
 import {
   buildAutoRollSessionStartingContent,
+  cancelActiveAutoRollSession,
   releaseAutoRollSessionReservation,
   reserveAutoRollSession,
   startReservedAutoRollSession,
@@ -20,8 +21,12 @@ import { renderDiceInventoryResult } from "../presenters/inventory.presenter";
 
 const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {
   const db = getDatabase();
-  const { inventoryUseCase, refundInventoryItem, triggerRandomGroupEvent } =
-    createSqliteDiceInventoryCommandServices(db);
+  const {
+    finalizeAutoRollItemUse,
+    inventoryUseCase,
+    refundInventoryItem,
+    triggerRandomGroupEvent,
+  } = createSqliteDiceInventoryCommandServices(db);
   const action = parseDiceInventoryAction(interaction.customId);
   if (!action) {
     await applyButtonResult(interaction, {
@@ -39,22 +44,8 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
     triggerRandomGroupEvent,
   });
 
-  if (outcome.autoRollStart) {
-    const content = outcome.autoRollStart.achievementText
-      ? `${buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation)}\n${outcome.autoRollStart.achievementText}`
-      : buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation);
-    await applyButtonResult(interaction, {
-      kind: "update",
-      payload: {
-        content,
-        components: [],
-      },
-    });
-  } else {
-    await applyButtonResult(interaction, renderDiceInventoryResult(outcome.result));
-  }
-
   if (!outcome.autoRollStart) {
+    await applyButtonResult(interaction, renderDiceInventoryResult(outcome.result));
     return;
   }
 
@@ -63,19 +54,56 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
     message: interaction.message,
     userMention: interaction.user.toString(),
   });
-  if (started) {
+  if (!started) {
+    releaseAutoRollSessionReservation(outcome.autoRollStart.reservation);
+    refundInventoryItem({
+      userId: interaction.user.id,
+      itemId: outcome.autoRollStart.itemId,
+      quantity: 1,
+    });
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Clockwork Croupier failed to start. The item was refunded.",
+        ephemeral: true,
+      },
+    });
     return;
   }
 
-  releaseAutoRollSessionReservation(outcome.autoRollStart.reservation);
-  refundInventoryItem({
-    userId: interaction.user.id,
-    itemId: outcome.autoRollStart.itemId,
-    quantity: 1,
-  });
-  await interaction.followUp({
-    content: "Clockwork Croupier failed to start. The item was refunded.",
-    ephemeral: true,
+  let achievementText: string | undefined;
+  try {
+    achievementText = finalizeAutoRollItemUse({
+      userId: interaction.user.id,
+      itemId: outcome.autoRollStart.itemId,
+    }).achievementText;
+  } catch (error) {
+    cancelActiveAutoRollSession(interaction.user.id);
+    refundInventoryItem({
+      userId: interaction.user.id,
+      itemId: outcome.autoRollStart.itemId,
+      quantity: 1,
+    });
+    console.error("Failed to finalize auto-roll session startup:", error);
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Clockwork Croupier failed to start. The item was refunded.",
+        ephemeral: true,
+      },
+    });
+    return;
+  }
+
+  const content = achievementText
+    ? `${buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation)}\n${achievementText}`
+    : buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation);
+  await applyButtonResult(interaction, {
+    kind: "update",
+    payload: {
+      content,
+      components: [],
+    },
   });
 };
 

@@ -6,7 +6,10 @@ import { createSqliteProgressionRepository } from "../../../progression/infrastr
 import { triggerRandomGroupEventNow } from "../../../random-events/infrastructure/admin-controller";
 import { createDiceInventoryUseCase } from "../../application/manage-inventory/use-case";
 import { createDiceShopUseCase } from "../../application/manage-shop/use-case";
-import { createUseDiceItemUseCase } from "../../application/use-item/use-case";
+import {
+  createFinalizeAutoRollItemUseUseCase,
+  createUseDiceItemUseCase,
+} from "../../application/use-item/use-case";
 import { createSqliteInventoryRepository, createDiceShopCatalog } from "./inventory-repository";
 import { createSqliteDiceItemEffectsService } from "./item-effects-service";
 
@@ -39,14 +42,22 @@ export const createSqliteDiceInventoryUseCase = (db: SqliteDatabase) => {
 };
 
 export const createSqliteDiceInventoryCommandServices = (db: SqliteDatabase) => {
+  const unitOfWork = createSqliteUnitOfWork(db);
   const inventory = createSqliteInventoryRepository(db);
+  const progression = createSqliteProgressionRepository(db);
   const useDiceItem = createSqliteUseDiceItemUseCase(db);
+  const finalizeAutoRollItemUse = createFinalizeAutoRollItemUseUseCase({
+    inventory,
+    progression,
+    unitOfWork,
+  });
 
   return {
     inventoryUseCase: createDiceInventoryUseCase({
       inventory,
       useDiceItem,
     }),
+    finalizeAutoRollItemUse,
     refundInventoryItem: (input: { userId: string; itemId: string; quantity?: number }) =>
       inventory.grantInventoryItem(input),
     triggerRandomGroupEvent: triggerRandomGroupEventNow,
