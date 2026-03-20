@@ -79,17 +79,6 @@ const getOrCreateStatsRow = (
   return created;
 };
 
-const mapStats = (row: RandomEventAchievementStatsRow): RandomEventAchievementStats => {
-  return {
-    successCount: row.success_count,
-    failureCount: row.failure_count,
-    multiUserSuccessCount: row.multi_user_success_count,
-    legendarySuccessCount: row.legendary_success_count,
-    lockoutCount: row.lockout_count,
-    keepOpenComebackCount: row.keep_open_comeback_count,
-  };
-};
-
 const getLatestNegativeExpiryIso = (
   _selection: RandomEventScenarioRender,
   attemptResolution: RandomEventAttemptResolution,
@@ -131,7 +120,9 @@ export const recordRandomEventAchievementStats = (
     ? Date.parse(stats.negative_effect_expires_at)
     : Number.NaN;
   const nextNegativeExpiryIso = getLatestNegativeExpiryIso(selection, attemptResolution, nowMs);
-  const nextNegativeExpiryMs = nextNegativeExpiryIso ? Date.parse(nextNegativeExpiryIso) : Number.NaN;
+  const nextNegativeExpiryMs = nextNegativeExpiryIso
+    ? Date.parse(nextNegativeExpiryIso)
+    : Number.NaN;
   const hasNewNegativeEffect = attemptResolution.outcome.effects.some(
     (effect) => effect.type === "temporary-lockout" || effect.type === "temporary-roll-penalty",
   );

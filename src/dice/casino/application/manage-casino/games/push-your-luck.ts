@@ -187,7 +187,11 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, rollResult.payout),
       achievementEvent: { type: "push-perfect-run" },
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(
@@ -222,7 +226,11 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, payout),
       achievementEvent: { type: "push-cashout" },
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(

@@ -174,7 +174,11 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "exact-face-win" } : undefined,
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(
@@ -226,7 +230,11 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "high-low-win" } : undefined,
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(

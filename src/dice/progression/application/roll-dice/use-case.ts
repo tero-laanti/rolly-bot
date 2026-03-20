@@ -318,9 +318,7 @@ export const createRunRollDiceUseCase = ({
   };
 };
 
-const getManualProgressionAchievementIds = (
-  stats: DiceProgressionAchievementStats,
-): string[] => {
+const getManualProgressionAchievementIds = (stats: DiceProgressionAchievementStats): string[] => {
   const achievementIds: string[] = [];
 
   if (stats.rollCommandsTotal >= 1) {

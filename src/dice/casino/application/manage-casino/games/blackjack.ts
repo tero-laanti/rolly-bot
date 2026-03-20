@@ -127,7 +127,11 @@ const startBlackjackRound = ({
           ? { type: "blackjack-push" }
           : undefined,
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(
@@ -206,7 +210,11 @@ const handleBlackjackAction = (
             ? { type: "blackjack-hit-to-21-win" }
             : undefined,
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(
@@ -252,7 +260,11 @@ const handleBlackjackAction = (
       outcome,
       achievementEvent: outcome === "push" ? { type: "blackjack-push" } : undefined,
     });
-    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
+    awardManualDiceAchievements(
+      progression,
+      session.userId,
+      getCasinoAchievementIds(achievementStats),
+    );
 
     return viewMutation(
       normalizeSessionBet(

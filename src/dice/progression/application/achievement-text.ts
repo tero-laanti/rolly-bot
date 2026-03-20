@@ -14,7 +14,9 @@ const formatAchievementUnlockEntry = (achievementId: DiceAchievementId): string 
   return `${achievement.name} (${achievement.unlockReasonText})`;
 };
 
-export const formatAchievementUnlockText = (achievementIds: readonly DiceAchievementId[]): string => {
+export const formatAchievementUnlockText = (
+  achievementIds: readonly DiceAchievementId[],
+): string => {
   if (achievementIds.length < 1) {
     return "";
   }
