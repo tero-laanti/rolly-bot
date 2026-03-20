@@ -97,3 +97,59 @@ test("multi-user window can expire below maxParticipants with the joined users p
   assert.deepEqual(resolvedContext.snapshot.participants, ["111", "222"]);
   assert.equal(manager.getWindow("group-expire"), null);
 });
+
+test("first-click window can reopen from onResolved before the next claim is handled", () => {
+  const resolvedContexts: RandomEventInteractionWindowLifecycleContext[] = [];
+  let nowMs = 10_000;
+  const scheduledCallbackRef: { value: (() => void) | null } = { value: null };
+  let reopenedOnce = false;
+
+  const manager = createRandomEventInteractionWindowManager({
+    timingHooks: {
+      nowMs: () => nowMs,
+      setTimeoutFn: (callback) => {
+        scheduledCallbackRef.value = callback;
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeoutFn: () => {
+        scheduledCallbackRef.value = null;
+      },
+    },
+  });
+
+  const openRetryWindow = () => {
+    manager.openWindow({
+      windowId: "retryable-first-click",
+      durationMs: 60_000,
+      policy: "first-click",
+      callbacks: {
+        onResolved: (context) => {
+          resolvedContexts.push(context);
+          if (context.reason === "claimed" && !reopenedOnce) {
+            reopenedOnce = true;
+            openRetryWindow();
+          }
+        },
+      },
+    });
+  };
+
+  openRetryWindow();
+
+  const firstResult = manager.claim("retryable-first-click", "111");
+  assert.equal(firstResult.status, "accepted");
+  assert.equal(firstResult.becameResolved, true);
+  assert.deepEqual(resolvedContexts[0]?.snapshot.participants, ["111"]);
+
+  const reopenedWindow = manager.getWindow("retryable-first-click");
+  assert.ok(reopenedWindow);
+  assert.equal(reopenedWindow.status, "active");
+  assert.deepEqual(reopenedWindow.participants, []);
+  assert.ok(scheduledCallbackRef.value);
+
+  const secondResult = manager.claim("retryable-first-click", "222");
+  assert.equal(secondResult.status, "accepted");
+  assert.equal(secondResult.becameResolved, true);
+  assert.deepEqual(resolvedContexts[1]?.snapshot.participants, ["222"]);
+  assert.equal(manager.getWindow("retryable-first-click"), null);
+});
