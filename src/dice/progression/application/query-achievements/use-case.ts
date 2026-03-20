@@ -161,8 +161,8 @@ const buildAchievementBrowserPage = (
     visibleAchievements.length > 0
       ? visibleAchievements.map((achievement) =>
           earnedIds.has(achievement.id)
-            ? `[Unlocked] ${achievement.name}`
-            : `[Locked] ${achievement.name}`,
+            ? `[Unlocked] ${achievement.name}${formatAchievementPipRewardLabel(achievement.pipReward)}`
+            : `[Locked] ${achievement.name}${formatAchievementPipRewardLabel(achievement.pipReward)}`,
         )
       : ["No achievements on this page."];
 
@@ -262,4 +262,8 @@ const formatFilterLabel = (filter: DiceAchievementsFilter): string => {
     case "locked":
       return "Locked";
   }
+};
+
+const formatAchievementPipRewardLabel = (pipReward: number): string => {
+  return pipReward > 0 ? ` (+${pipReward} pips)` : "";
 };
