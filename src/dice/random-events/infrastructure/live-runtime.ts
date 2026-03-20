@@ -5,6 +5,7 @@ import { awardManualDiceAchievements } from "../../progression/application/achie
 import { formatAchievementUnlockText } from "../../progression/application/achievement-text";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
+import { createSqlitePvpRepository } from "../../pvp/infrastructure/sqlite/pvp-repository";
 import { getRandomEventAchievementIds } from "../application/achievement-rules";
 import { createRandomEventContentState, getRandomEventRetryPolicy } from "../domain/content";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
@@ -133,6 +134,7 @@ export const createRandomEventsLiveRuntime = ({
   const db = getDatabase();
   const progression = createSqliteProgressionRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
+  const pvp = createSqlitePvpRepository(db);
 
   const windowManager = createRandomEventInteractionWindowManager({
     logger,
@@ -217,6 +219,39 @@ export const createRandomEventsLiveRuntime = ({
     });
   };
 
+  const recordAttemptAchievements = (
+    context: ActiveRandomEventContext | undefined,
+    {
+      userId,
+      attemptResolution,
+      hadKeepOpenFailureBeforeSuccess,
+    }: {
+      userId: string;
+      attemptResolution: RandomEventAttemptResolution;
+      hadKeepOpenFailureBeforeSuccess: boolean;
+    },
+  ): string | null => {
+    if (!context) {
+      return null;
+    }
+
+    const randomEventAchievementResult = recordRandomEventAchievementStats(db, {
+      selection: context.selection,
+      userId,
+      attemptResolution,
+      hadKeepOpenFailureBeforeSuccess,
+      nowMs: Date.now(),
+    });
+    const newlyEarned = awardManualDiceAchievements(
+      progression,
+      userId,
+      getRandomEventAchievementIds(randomEventAchievementResult.stats, {
+        cursedEvening: randomEventAchievementResult.cursedEvening,
+      }),
+    );
+    return formatAchievementUnlockText(newlyEarned) || null;
+  };
+
   const resolveEvent = async ({
     eventId,
     participants,
@@ -241,32 +276,13 @@ export const createRandomEventsLiveRuntime = ({
       state,
       progression,
       hostileEffects,
+      pvp,
       eventId,
       participants,
       challengeProgressByUserId,
       resolutionNotesByUserId,
       attemptResolutionsByUserId,
-      onAttemptResolved: ({ userId, attemptResolution, hadKeepOpenFailureBeforeSuccess }) => {
-        if (!context) {
-          return;
-        }
-
-        const randomEventAchievementResult = recordRandomEventAchievementStats(db, {
-          selection: context.selection,
-          userId,
-          attemptResolution,
-          hadKeepOpenFailureBeforeSuccess,
-          nowMs: Date.now(),
-        });
-        const newlyEarned = awardManualDiceAchievements(
-          progression,
-          userId,
-          getRandomEventAchievementIds(randomEventAchievementResult.stats, {
-            cursedEvening: randomEventAchievementResult.cursedEvening,
-          }),
-        );
-        return formatAchievementUnlockText(newlyEarned) || null;
-      },
+      onAttemptResolved: (input) => recordAttemptAchievements(context, input),
     });
   };
 
@@ -352,6 +368,7 @@ export const createRandomEventsLiveRuntime = ({
     const attemptResolution = resolveRandomEventAttempt({
       progression,
       hostileEffects,
+      pvp,
       selection: context.selection,
       userId,
       challengeProgress,
@@ -359,8 +376,17 @@ export const createRandomEventsLiveRuntime = ({
     });
 
     if (attemptResolution.resolution === "keep-open-failure") {
+      const achievementText = recordAttemptAchievements(context, {
+        userId,
+        attemptResolution,
+        hadKeepOpenFailureBeforeSuccess: false,
+      });
       context.attemptedUserIds.add(userId);
-      context.failedAttemptLines.push(attemptResolution.failedAttemptLine);
+      context.failedAttemptLines.push(
+        achievementText
+          ? `${attemptResolution.failedAttemptLine} ${achievementText}`
+          : attemptResolution.failedAttemptLine,
+      );
       clearSequenceChallengeTimer(context);
       context.sequenceChallenge = null;
 
