@@ -6,6 +6,16 @@ import type {
 
 export type DiceAchievementId = string;
 
+export type DiceAchievementCategory =
+  | "progression"
+  | "roll"
+  | "casino"
+  | "pvp"
+  | "random-events"
+  | "raids"
+  | "items"
+  | "meta";
+
 export type DiceAchievementManualAward = {
   type: "prestige";
   prestige: number;
@@ -62,8 +72,10 @@ export type DiceAchievementData = {
   id: DiceAchievementId;
   name: string;
   description: string;
+  category: DiceAchievementCategory;
   rule: DiceAchievementRule;
   manualAward?: DiceAchievementManualAward;
+  unlockReasonText?: string;
 };
 
 export type DiceBalanceVarietyConfig = {

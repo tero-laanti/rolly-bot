@@ -1,5 +1,4 @@
 import {
-  getDiceAchievement,
   getPrestigeAchievementId,
 } from "../../../progression/domain/achievements";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
@@ -16,6 +15,7 @@ import type {
 } from "../../../../shared-kernel/application/action-view";
 import { chunkActionButtons } from "../../../../shared-kernel/application/action-view";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
+import { formatAchievementUnlockText } from "../achievement-text";
 
 const prestigeButtonsPerRow = 5;
 
@@ -191,9 +191,7 @@ export const createDicePrestigeUseCase = ({
 
     const refreshed = getPrestigeState(progression, action.ownerId);
     const achievementText =
-      newlyEarned.length > 0
-        ? `\nAchievement unlocked: ${newlyEarned.map((id) => getDiceAchievement(id)?.name ?? id).join(", ")}.`
-        : "";
+      newlyEarned.length > 0 ? `\n${formatAchievementUnlockText(newlyEarned)}` : "";
 
     return {
       kind: "update",

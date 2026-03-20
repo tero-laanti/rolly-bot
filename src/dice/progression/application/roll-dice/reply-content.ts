@@ -1,9 +1,7 @@
-import {
-  getDiceAchievement,
-  type DiceAchievementId,
-} from "../../../progression/domain/achievements";
+import { type DiceAchievementId } from "../../../progression/domain/achievements";
 import { discordMessageCharacterLimit } from "../../../../shared/discord";
 import { truncateWithSuffix } from "../../../../shared/text";
+import { formatAchievementUnlockText } from "../achievement-text";
 
 const compactRollSetThreshold = 35;
 const nonBreakingSpace = "\u00A0";
@@ -34,13 +32,7 @@ type BuildDiceRollReplyContentInput = {
 };
 
 export const formatAchievementText = (achievementIds: DiceAchievementId[]): string => {
-  if (achievementIds.length === 0) {
-    return "";
-  }
-
-  const names = achievementIds.map((id) => getDiceAchievement(id)?.name ?? id);
-  const label = names.length === 1 ? "Achievement" : "Achievements";
-  return `${label} unlocked: ${names.join(", ")}.`;
+  return formatAchievementUnlockText(achievementIds);
 };
 
 export const formatRewardText = (totalReward: number, hasLevelUp: boolean): string => {
