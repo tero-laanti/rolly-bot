@@ -1,5 +1,6 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { DiceInventoryRepository, DiceShopCatalog } from "../../application/ports";
+import { isPassivePermanentItem } from "../../domain/passive-items";
 import {
   getDiceShopItem,
   getDiceShopItems,
@@ -107,6 +108,24 @@ const grantInventoryItem = (
     quantity?: number;
   },
 ): number => {
+  const item = getDiceShopItem(itemId);
+  if (item && isPassivePermanentItem(item)) {
+    db.prepare(
+      `
+      INSERT INTO inventory_items (user_id, item_id, quantity, first_acquired_at, updated_at)
+      VALUES (@userId, @itemId, 1, @updatedAt, @updatedAt)
+      ON CONFLICT(user_id, item_id)
+      DO UPDATE SET quantity = 1, updated_at = excluded.updated_at
+    `,
+    ).run({
+      userId,
+      itemId,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return 1;
+  }
+
   return addInventoryItem(db, {
     userId,
     itemId,

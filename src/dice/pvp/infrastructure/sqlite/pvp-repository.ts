@@ -279,7 +279,11 @@ const createDicePvpChallengeIfUsersAvailable = (
   db: SqliteDatabase,
   { nowMs = Date.now(), ...challenge }: DicePvpChallengeCreateIfAvailable,
 ): DicePvpChallengeCreateResult => {
-  const challengerPending = getActivePendingDicePvpChallengeForUser(db, challenge.challengerId, nowMs);
+  const challengerPending = getActivePendingDicePvpChallengeForUser(
+    db,
+    challenge.challengerId,
+    nowMs,
+  );
   if (challengerPending) {
     return {
       created: false as const,
@@ -289,7 +293,11 @@ const createDicePvpChallengeIfUsersAvailable = (
   }
 
   if (challenge.opponentId !== dicePvpOpenOpponentId) {
-    const opponentPending = getActivePendingDicePvpChallengeForUser(db, challenge.opponentId, nowMs);
+    const opponentPending = getActivePendingDicePvpChallengeForUser(
+      db,
+      challenge.opponentId,
+      nowMs,
+    );
     if (opponentPending) {
       return {
         created: false as const,

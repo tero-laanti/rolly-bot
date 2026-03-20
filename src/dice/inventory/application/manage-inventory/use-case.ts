@@ -10,6 +10,7 @@ import {
 } from "../use-item/use-case";
 import type { DiceInventoryEntry } from "../../../inventory/domain/shop";
 import type { AutoRollSessionReservation, DiceInventoryRepository } from "../ports";
+import { getItemOwnershipLabel } from "../../domain/passive-items";
 
 export type DiceInventoryAction =
   | {
@@ -183,7 +184,7 @@ const buildInventoryContent = (
         `**${entry.item.name}**`,
         `Owned: ${entry.quantity}.`,
         entry.item.description,
-        entry.item.consumable ? "Consumable." : "Permanent collectible.",
+        getItemOwnershipLabel(entry.item),
       ].join("\n"),
     ),
   );

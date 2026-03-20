@@ -220,6 +220,19 @@ export type DiceItemEffect =
     }
   | {
       type: "cleanse-all-negative-effects";
+    }
+  | {
+      type: "passive-extra-shield-on-umbrella";
+      extraCharges: number;
+    }
+  | {
+      type: "passive-pvp-loser-lockout-reduction";
+      reductionPercent: number;
+      minimumMinutes: number;
+    }
+  | {
+      type: "passive-cleanse-grants-negative-effect-shield";
+      charges: number;
     };
 
 export type DiceItemData = {

@@ -8,4 +8,3 @@ test("raid pip reward formula stays flat through level 5 and scales from level 6
   assert.equal(getDefaultRaidReward(6).pips, 6);
   assert.equal(getDefaultRaidReward(35).pips, 35);
 });
-

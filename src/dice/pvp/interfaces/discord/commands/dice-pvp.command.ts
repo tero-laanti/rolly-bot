@@ -61,9 +61,7 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   const wager = interaction.options.getInteger("wager") ?? 0;
   await applyChatInputResult(
     interaction,
-    renderDicePvpResult(
-      pvpUseCase.createDicePvpSetupReply(interaction.user.id, opponent, wager),
-    ),
+    renderDicePvpResult(pvpUseCase.createDicePvpSetupReply(interaction.user.id, opponent, wager)),
   );
 };
 

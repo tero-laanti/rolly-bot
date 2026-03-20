@@ -14,20 +14,8 @@
     }
   },
   "bossNames": {
-    "prefixes": [
-      "Example",
-      "Sample",
-      "Placeholder",
-      "Demo",
-      "Training"
-    ],
-    "suffixes": [
-      "Boss",
-      "Guardian",
-      "Construct",
-      "Champion",
-      "Sentinel"
-    ]
+    "prefixes": ["Example", "Sample", "Placeholder", "Demo", "Training"],
+    "suffixes": ["Boss", "Guardian", "Construct", "Champion", "Sentinel"]
   },
   "bossBalance": {
     "expectedRollIntervalSeconds": 10,

@@ -11,6 +11,7 @@ import type { DiceProgressionRepository } from "../../../progression/application
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
 import { appendAchievementUnlockText } from "../../../progression/application/achievement-text";
 import { getDiceItemAchievementIds } from "../achievement-rules";
+import { getItemOwnershipLabel, isPassivePermanentItem } from "../../domain/passive-items";
 
 export type DiceShopAction =
   | {
@@ -88,6 +89,18 @@ export const createDiceShopUseCase = ({
       };
     }
 
+    const ownedQuantity = inventory.getInventoryQuantities(action.ownerId).get(item.id) ?? 0;
+    if (isPassivePermanentItem(item) && ownedQuantity > 0) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: `${item.name} is already owned. Permanent passive upgrades can only be bought once.`,
+          ephemeral: true,
+        },
+      };
+    }
+
     const currentPips = economy.getPips(action.ownerId);
     if (currentPips < item.pricePips) {
       return {
@@ -155,7 +168,7 @@ const buildShopView = (
 ): ActionView<DiceShopAction> => {
   return {
     content: buildShopContent(economy, inventory, shopCatalog, userId, statusLine),
-    components: buildShopComponents(shopCatalog, userId),
+    components: buildShopComponents(shopCatalog, inventory, userId),
   };
 };
 
@@ -196,23 +209,31 @@ const buildItemLines = (item: DiceShopItem, ownedQuantity: number): string[] => 
     `**${item.name}**`,
     `Cost: ${item.pricePips} pips.`,
     `Owned: ${ownedQuantity}.`,
+    getItemOwnershipLabel(item),
     item.description,
   ];
 };
 
 const buildShopComponents = (
   shopCatalog: DiceShopCatalog,
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   userId: string,
 ): ActionView<DiceShopAction>["components"] => {
-  const purchaseButtons = shopCatalog.getDiceShopItems().map((item) => ({
-    action: {
-      type: "buy",
-      ownerId: userId,
-      itemId: item.id,
-    } as const,
-    label: `Buy ${item.name} (${item.pricePips})`,
-    style: "success" as const,
-  }));
+  const inventoryQuantities = inventory.getInventoryQuantities(userId);
+  const purchaseButtons = shopCatalog.getDiceShopItems().map((item) => {
+    const alreadyOwned =
+      isPassivePermanentItem(item) && (inventoryQuantities.get(item.id) ?? 0) > 0;
+    return {
+      action: {
+        type: "buy",
+        ownerId: userId,
+        itemId: item.id,
+      } as const,
+      label: alreadyOwned ? `${item.name} (Owned)` : `Buy ${item.name} (${item.pricePips})`,
+      style: "success" as const,
+      disabled: alreadyOwned,
+    };
+  });
 
   return [
     ...chunkActionButtons(purchaseButtons),
