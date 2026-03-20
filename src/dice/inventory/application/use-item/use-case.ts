@@ -8,6 +8,9 @@ import type {
 } from "../ports";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
+import type { DiceProgressionRepository } from "../../../progression/application/ports";
+import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
+import { getDiceItemAchievementIds } from "../achievement-rules";
 
 export type ReserveAutoRollSession = (input: {
   userId: string;
@@ -34,10 +37,14 @@ export type UseDiceItemResult =
 type UseDiceItemDependencies = {
   inventory: Pick<
     DiceInventoryRepository,
-    "consumeInventoryItem" | "getInventoryQuantity" | "grantInventoryItem"
+    | "consumeInventoryItem"
+    | "getInventoryQuantity"
+    | "grantInventoryItem"
+    | "recordItemUse"
   >;
   itemEffects: DiceItemEffectsService;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "setDicePvpEffects">;
+  progression: Pick<DiceProgressionRepository, "awardAchievements">;
   shopCatalog: Pick<DiceShopCatalog, "getDiceShopItem">;
   unitOfWork: UnitOfWork;
 };
@@ -46,6 +53,7 @@ export const createUseDiceItemUseCase = ({
   inventory,
   itemEffects,
   pvp,
+  progression,
   shopCatalog,
   unitOfWork,
 }: UseDiceItemDependencies) => {
@@ -99,6 +107,11 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           charges: effect.charges,
         });
+        awardManualDiceAchievements(
+          progression,
+          userId,
+          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
+        );
 
         return {
           ok: true as const,
@@ -125,6 +138,11 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           uses: effect.uses,
         });
+        awardManualDiceAchievements(
+          progression,
+          userId,
+          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
+        );
 
         return {
           ok: true as const,
@@ -151,6 +169,11 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           minutes: effect.minutes,
         });
+        awardManualDiceAchievements(
+          progression,
+          userId,
+          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
+        );
 
         return {
           ok: true as const,
@@ -183,6 +206,11 @@ export const createUseDiceItemUseCase = ({
         if (!consumed.ok) {
           throw new Error(`Failed to consume ${item.id} after cleanse.`);
         }
+        awardManualDiceAchievements(
+          progression,
+          userId,
+          getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
+        );
 
         const clearedParts: string[] = [];
         if (clearedTemporaryEffects > 0) {
@@ -230,6 +258,12 @@ export const createUseDiceItemUseCase = ({
         };
       }
 
+      awardManualDiceAchievements(
+        progression,
+        userId,
+        getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
+      );
+
       return {
         ok: true,
         item,
@@ -258,6 +292,11 @@ export const createUseDiceItemUseCase = ({
         message: `You do not have any ${item.name} to use.`,
       };
     }
+    awardManualDiceAchievements(
+      progression,
+      userId,
+      getDiceItemAchievementIds(inventory.recordItemUse({ userId, itemId: item.id })),
+    );
 
     return {
       ok: true,

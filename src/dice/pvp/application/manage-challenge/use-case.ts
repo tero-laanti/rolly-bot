@@ -8,12 +8,14 @@ import { formatDiscordRelativeTime } from "../../../../shared/discord";
 import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
 import {
   getDicePvpDieLabel,
   getDuelPunishmentMs,
   getDuelRewardMs,
   getUnlockedDicePvpTierFromPrestige,
 } from "../../../pvp/domain/game-rules";
+import { getDicePvpAchievementIds } from "../achievement-rules";
 import type { DiceHostileEffectsService } from "../../../progression/application/hostile-effects-service";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import {
@@ -47,13 +49,15 @@ export type DicePvpResult = ActionResult<DicePvpAction>;
 type PublishChallenge = (view: ActionView<DicePvpAction>) => Promise<{ url: string }>;
 
 type ManageChallengeDependencies = {
-  analytics: Pick<DiceAnalyticsRepository, "updateDicePvpStats">;
+  analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics" | "updateDicePvpStats">;
   hostileEffects: Pick<DiceHostileEffectsService, "applyShieldableNegativeLockout">;
-  progression: Pick<DiceProgressionRepository, "getDicePrestige">;
+  progression: Pick<DiceProgressionRepository, "awardAchievements" | "getDicePrestige">;
   pvp: Pick<
     DicePvpRepository,
     | "createDicePvpChallengeIfUsersAvailable"
+    | "recordResolvedDuel"
     | "getActiveDiceLockout"
+    | "getDicePvpAchievementStats"
     | "getDicePvpChallenge"
     | "getDicePvpEffects"
     | "setDicePvpChallengeOpponentFromOpen"
@@ -324,6 +328,32 @@ const handleChallengeAccept = (
     if (challengerRoll === opponentRoll) {
       analytics.updateDicePvpStats({ userId: resolvedChallenge.challengerId, draws: 1 });
       analytics.updateDicePvpStats({ userId: resolvedChallenge.opponentId, draws: 1 });
+      const challengerPvpStats = pvp.recordResolvedDuel({
+        userId: resolvedChallenge.challengerId,
+        duelTier: challenge.duelTier,
+        result: "draw",
+      });
+      const opponentPvpStats = pvp.recordResolvedDuel({
+        userId: resolvedChallenge.opponentId,
+        duelTier: challenge.duelTier,
+        result: "draw",
+      });
+      awardManualDiceAchievements(
+        progression,
+        resolvedChallenge.challengerId,
+        getDicePvpAchievementIds(
+          analytics.getDiceAnalytics(resolvedChallenge.challengerId),
+          challengerPvpStats,
+        ),
+      );
+      awardManualDiceAchievements(
+        progression,
+        resolvedChallenge.opponentId,
+        getDicePvpAchievementIds(
+          analytics.getDiceAnalytics(resolvedChallenge.opponentId),
+          opponentPvpStats,
+        ),
+      );
       return {
         resolved: true as const,
         type: "draw" as const,
@@ -353,6 +383,26 @@ const handleChallengeAccept = (
     });
     analytics.updateDicePvpStats({ userId: winnerId, wins: 1 });
     analytics.updateDicePvpStats({ userId: loserId, losses: 1 });
+    const winnerPvpStats = pvp.recordResolvedDuel({
+      userId: winnerId,
+      duelTier: challenge.duelTier,
+      result: "win",
+    });
+    const loserPvpStats = pvp.recordResolvedDuel({
+      userId: loserId,
+      duelTier: challenge.duelTier,
+      result: "loss",
+    });
+    awardManualDiceAchievements(
+      progression,
+      winnerId,
+      getDicePvpAchievementIds(analytics.getDiceAnalytics(winnerId), winnerPvpStats),
+    );
+    awardManualDiceAchievements(
+      progression,
+      loserId,
+      getDicePvpAchievementIds(analytics.getDiceAnalytics(loserId), loserPvpStats),
+    );
 
     return {
       resolved: true as const,

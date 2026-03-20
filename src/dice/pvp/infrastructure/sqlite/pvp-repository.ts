@@ -28,6 +28,15 @@ type DicePvpChallengeCreateIfAvailable = DicePvpChallengeCreate & {
   nowMs?: number;
 };
 
+type DicePvpAchievementStatsRow = {
+  user_id: string;
+  duels_total: number;
+  current_win_streak: number;
+  highest_win_streak: number;
+  highest_tier_win: number;
+  updated_at: string;
+};
+
 type DicePvpChallengeRow = {
   id: string;
   challenger_id: string;
@@ -300,6 +309,125 @@ const setDicePvpChallengeOpponentFromOpen = (
   return result.changes > 0;
 };
 
+const getAchievementStatsRow = (
+  db: SqliteDatabase,
+  userId: string,
+): DicePvpAchievementStatsRow | undefined => {
+  return db
+    .prepare(
+      `
+      SELECT
+        user_id,
+        duels_total,
+        current_win_streak,
+        highest_win_streak,
+        highest_tier_win,
+        updated_at
+      FROM dice_pvp_achievement_stats
+      WHERE user_id = ?
+    `,
+    )
+    .get(userId) as DicePvpAchievementStatsRow | undefined;
+};
+
+const getOrCreateAchievementStatsRow = (
+  db: SqliteDatabase,
+  userId: string,
+): DicePvpAchievementStatsRow => {
+  const existing = getAchievementStatsRow(db, userId);
+  if (existing) {
+    return existing;
+  }
+
+  const updatedAt = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO dice_pvp_achievement_stats (
+      user_id,
+      duels_total,
+      current_win_streak,
+      highest_win_streak,
+      highest_tier_win,
+      updated_at
+    )
+    VALUES (@userId, 0, 0, 0, 0, @updatedAt)
+    ON CONFLICT(user_id)
+    DO NOTHING
+  `,
+  ).run({
+    userId,
+    updatedAt,
+  });
+
+  const created = getAchievementStatsRow(db, userId);
+  if (!created) {
+    throw new Error(`Failed to initialize PvP achievement stats for user ${userId}`);
+  }
+
+  return created;
+};
+
+const mapAchievementStats = (row: DicePvpAchievementStatsRow) => {
+  return {
+    duelsTotal: row.duels_total,
+    currentWinStreak: row.current_win_streak,
+    highestWinStreak: row.highest_win_streak,
+    highestTierWin: row.highest_tier_win,
+  };
+};
+
+const getDicePvpAchievementStats = (db: SqliteDatabase, userId: string) => {
+  return mapAchievementStats(getOrCreateAchievementStatsRow(db, userId));
+};
+
+const recordResolvedDuel = (
+  db: SqliteDatabase,
+  {
+    userId,
+    duelTier,
+    result,
+  }: {
+    userId: string;
+    duelTier: number;
+    result: "win" | "loss" | "draw";
+  },
+) => {
+  const stats = getOrCreateAchievementStatsRow(db, userId);
+  const nextCurrentWinStreak =
+    result === "win" ? stats.current_win_streak + 1 : 0;
+  const nextHighestWinStreak = Math.max(stats.highest_win_streak, nextCurrentWinStreak);
+  const nextHighestTierWin =
+    result === "win" ? Math.max(stats.highest_tier_win, normalizeDicePvpTier(duelTier)) : stats.highest_tier_win;
+  const updatedAt = new Date().toISOString();
+
+  db.prepare(
+    `
+    UPDATE dice_pvp_achievement_stats
+    SET
+      duels_total = @duelsTotal,
+      current_win_streak = @currentWinStreak,
+      highest_win_streak = @highestWinStreak,
+      highest_tier_win = @highestTierWin,
+      updated_at = @updatedAt
+    WHERE user_id = @userId
+  `,
+  ).run({
+    userId,
+    duelsTotal: stats.duels_total + 1,
+    currentWinStreak: nextCurrentWinStreak,
+    highestWinStreak: nextHighestWinStreak,
+    highestTierWin: nextHighestTierWin,
+    updatedAt,
+  });
+
+  return {
+    duelsTotal: stats.duels_total + 1,
+    currentWinStreak: nextCurrentWinStreak,
+    highestWinStreak: nextHighestWinStreak,
+    highestTierWin: nextHighestTierWin,
+  };
+};
+
 export const createSqlitePvpRepository = (db: SqliteDatabase): DicePvpRepository => {
   return {
     getDicePvpEffects: (userId) => getDicePvpEffects(db, userId),
@@ -313,5 +441,7 @@ export const createSqlitePvpRepository = (db: SqliteDatabase): DicePvpRepository
       setDicePvpChallengeOpponentFromOpen(db, challengeId, opponentId),
     setDicePvpChallengeStatusFromPending: (challengeId, status) =>
       setDicePvpChallengeStatusFromPending(db, challengeId, status),
+    getDicePvpAchievementStats: (userId) => getDicePvpAchievementStats(db, userId),
+    recordResolvedDuel: (update) => recordResolvedDuel(db, update),
   };
 };

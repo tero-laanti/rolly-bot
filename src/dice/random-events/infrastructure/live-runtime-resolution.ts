@@ -242,6 +242,7 @@ export const resolveRandomEvent = async ({
   challengeProgressByUserId,
   resolutionNotesByUserId,
   attemptResolutionsByUserId,
+  onAttemptResolved,
 }: {
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
@@ -258,6 +259,11 @@ export const resolveRandomEvent = async ({
   challengeProgressByUserId?: ReadonlyMap<string, RandomEventRollChallengeProgress>;
   resolutionNotesByUserId?: ReadonlyMap<string, string>;
   attemptResolutionsByUserId?: ReadonlyMap<string, RandomEventAttemptResolution>;
+  onAttemptResolved?: (input: {
+    userId: string;
+    attemptResolution: RandomEventAttemptResolution;
+    hadKeepOpenFailureBeforeSuccess: boolean;
+  }) => void;
 }): Promise<void> => {
   const context = activeEventsById.get(eventId);
   if (!context) {
@@ -323,20 +329,24 @@ export const resolveRandomEvent = async ({
       : null;
 
   const lines = participantsToResolve.map((userId) => {
-    const precomputed = attemptResolutionsByUserId?.get(userId) ?? null;
-    if (precomputed) {
-      return precomputed.finalLine;
-    }
-
-    return resolveRandomEventAttempt({
-      progression,
-      hostileEffects,
-      selection: context.selection,
+    const attemptResolution =
+      attemptResolutionsByUserId?.get(userId) ??
+      resolveRandomEventAttempt({
+        progression,
+        hostileEffects,
+        selection: context.selection,
+        userId,
+        challengeProgress: challengeProgressByUserId?.get(userId) ?? null,
+        resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
+        sharedOutcomeSelection,
+      });
+    onAttemptResolved?.({
       userId,
-      challengeProgress: challengeProgressByUserId?.get(userId) ?? null,
-      resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
-      sharedOutcomeSelection,
-    }).finalLine;
+      attemptResolution,
+      hadKeepOpenFailureBeforeSuccess:
+        attemptResolution.resolution === "resolve-success" && context.failedAttemptLines.length > 0,
+    });
+    return attemptResolution.finalLine;
   });
 
   await context.message.edit({

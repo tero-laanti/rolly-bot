@@ -3,6 +3,7 @@
     "id": "example-ordered-sequence",
     "name": "Example Ordered Sequence",
     "description": "Example achievement: roll 1, 1 in order.",
+    "category": "roll",
     "rule": {
       "type": "ordered-sequence",
       "pattern": [1, 1]
@@ -12,6 +13,7 @@
     "id": "example-pair",
     "name": "Example Pair",
     "description": "Example achievement: roll at least one pair.",
+    "category": "roll",
     "rule": {
       "type": "at-least-of-a-kind",
       "count": 2
@@ -21,6 +23,7 @@
     "id": "example-contains-all-values",
     "name": "Example Contains All Values",
     "description": "Example achievement: roll 1 through 5 in any order.",
+    "category": "roll",
     "rule": {
       "type": "contains-all-values",
       "values": [1, 2, 3, 4, 5]
@@ -30,6 +33,7 @@
     "id": "example-exact-time",
     "name": "Example Exact Time",
     "description": "Example achievement: roll during 13:37 (Helsinki time).",
+    "category": "roll",
     "rule": {
       "type": "exact-time",
       "hour": 13,
@@ -41,12 +45,14 @@
     "id": "example-manual-prestige",
     "name": "Example Manual Prestige",
     "description": "Example achievement: reach Prestige 1 through application logic.",
+    "category": "progression",
     "rule": {
       "type": "manual"
     },
     "manualAward": {
       "type": "prestige",
       "prestige": 1
-    }
+    },
+    "unlockReasonText": "reached Prestige 1"
   }
 ]

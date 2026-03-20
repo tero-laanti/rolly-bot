@@ -1,6 +1,7 @@
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceCasinoAnalyticsRepository, DiceCasinoSessionRepository } from "../ports";
+import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import {
   adjustSessionBet,
   createSessionRecord,
@@ -22,6 +23,7 @@ import { buildCasinoView } from "./view";
 type ManageCasinoDependencies = {
   analytics: DiceCasinoAnalyticsRepository;
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
+  progression: Pick<DiceProgressionRepository, "awardAchievements">;
   sessions: DiceCasinoSessionRepository;
   unitOfWork: UnitOfWork;
 };
@@ -34,6 +36,7 @@ type DiceCasinoReplyPlan = {
 export const createDiceCasinoUseCase = ({
   analytics,
   economy,
+  progression,
   sessions,
   unitOfWork,
 }: ManageCasinoDependencies) => {
@@ -172,7 +175,7 @@ export const createDiceCasinoUseCase = ({
     }
 
     const mutation = unitOfWork.runInTransaction(() =>
-      mutateCasinoSession({ action, analytics, economy, nowMs, sessions }),
+      mutateCasinoSession({ action, analytics, economy, progression, nowMs, sessions }),
     );
 
     if (mutation.kind === "reply") {
@@ -222,12 +225,14 @@ const mutateCasinoSession = ({
   action,
   analytics,
   economy,
+  progression,
   nowMs,
   sessions,
 }: {
   action: DiceCasinoAction;
   analytics: DiceCasinoAnalyticsRepository;
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
+  progression: Pick<DiceProgressionRepository, "awardAchievements">;
   nowMs: number;
   sessions: DiceCasinoSessionRepository;
 }): MutateSessionResult => {
@@ -312,6 +317,7 @@ const mutateCasinoSession = ({
       getDiceCasinoGameModule(nextSession.state.selectedGame).startRound({
         analytics,
         economy,
+        progression,
         session: nextSession,
         pips: nextPips,
       }),
@@ -322,6 +328,7 @@ const mutateCasinoSession = ({
     {
       analytics,
       economy,
+      progression,
       session: nextSession,
       pips: nextPips,
     },

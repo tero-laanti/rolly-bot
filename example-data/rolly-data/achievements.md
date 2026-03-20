@@ -9,6 +9,7 @@ Minimal shape:
   "id": "example-pair",
   "name": "Example Pair",
   "description": "Example achievement: roll at least one pair.",
+  "category": "roll",
   "rule": {
     "type": "at-least-of-a-kind",
     "count": 2
@@ -56,15 +57,23 @@ This accepts any roll containing `1`, `2`, and `3` in any order.
 - `timezone` should be an IANA timezone name such as `Europe/Helsinki`.
 - The runtime checks the time of the roll itself.
 
+Metadata:
+
+- `category` groups the achievement for the in-app browser.
+- Supported categories are `progression`, `roll`, `casino`, `pvp`, `random-events`, `raids`, `items`, and `meta`.
+- `unlockReasonText` is optional. It appears in the immediate unlock message, not in the browser.
+
 Manual prestige awards:
 
 ```json
 {
+  "category": "progression",
   "rule": { "type": "manual" },
   "manualAward": {
     "type": "prestige",
     "prestige": 3
-  }
+  },
+  "unlockReasonText": "reached Prestige 3"
 }
 ```
 

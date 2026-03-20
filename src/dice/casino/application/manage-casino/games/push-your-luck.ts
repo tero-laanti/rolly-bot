@@ -19,6 +19,8 @@ import {
   normalizeSessionBet,
   viewMutation,
 } from "../helpers";
+import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
   DiceCasinoActionRow,
@@ -117,7 +119,7 @@ const startPushYourLuckRound = ({
 };
 
 const handlePushYourLuckAction = (
-  { analytics, economy, pips, session }: DiceCasinoMutationContext,
+  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "push-roll") {
@@ -145,13 +147,19 @@ const handlePushYourLuckAction = (
     }
 
     if (rollResult.kind === "bust") {
-      analytics.recordRoundCompleted({
+      const achievementStats = analytics.recordRoundCompleted({
         userId: session.userId,
         game: "push-your-luck",
         betTier: getDiceCasinoBetTier(round.bet),
+        wagered: round.bet,
         payout: 0,
         outcome: "loss",
       });
+      awardManualDiceAchievements(
+        progression,
+        session.userId,
+        getCasinoAchievementIds(achievementStats),
+      );
 
       return viewMutation(
         normalizeSessionBet(
@@ -170,13 +178,16 @@ const handlePushYourLuckAction = (
     }
 
     const nextPips = economy.applyPipsDelta({ userId: session.userId, amount: rollResult.payout });
-    analytics.recordRoundCompleted({
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "push-your-luck",
       betTier: getDiceCasinoBetTier(round.bet),
+      wagered: round.bet,
       payout: rollResult.payout,
       outcome: getOutcomeFromPayout(round.bet, rollResult.payout),
+      achievementEvent: { type: "push-perfect-run" },
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(
@@ -202,13 +213,16 @@ const handlePushYourLuckAction = (
 
     const payout = getPushYourLuckCashoutPayout(round.bet, round.uniqueValues.length);
     const nextPips = economy.applyPipsDelta({ userId: session.userId, amount: payout });
-    analytics.recordRoundCompleted({
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "push-your-luck",
       betTier: getDiceCasinoBetTier(round.bet),
+      wagered: round.bet,
       payout,
       outcome: getOutcomeFromPayout(round.bet, payout),
+      achievementEvent: { type: "push-cashout" },
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(

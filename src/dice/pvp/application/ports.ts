@@ -23,6 +23,19 @@ export type DicePvpChallengeCreateIfAvailable = DicePvpChallengeCreate & {
   nowMs?: number;
 };
 
+export type DicePvpAchievementStats = {
+  duelsTotal: number;
+  currentWinStreak: number;
+  highestWinStreak: number;
+  highestTierWin: number;
+};
+
+export type DicePvpResolvedDuelUpdate = {
+  userId: string;
+  duelTier: number;
+  result: "win" | "loss" | "draw";
+};
+
 export type DicePvpRepository = {
   getDicePvpEffects: (userId: string) => DicePvpEffects;
   setDicePvpEffects: (update: DicePvpEffectsUpdate) => void;
@@ -37,4 +50,6 @@ export type DicePvpRepository = {
     challengeId: string,
     status: DicePvpChallengeStatus,
   ) => boolean;
+  getDicePvpAchievementStats: (userId: string) => DicePvpAchievementStats;
+  recordResolvedDuel: (update: DicePvpResolvedDuelUpdate) => DicePvpAchievementStats;
 };

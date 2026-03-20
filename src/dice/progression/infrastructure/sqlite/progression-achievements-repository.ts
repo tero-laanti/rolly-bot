@@ -26,6 +26,10 @@ export const createSqliteProgressionAchievementsRepository = (
 
     const newlyEarned: DiceAchievementId[] = [];
     for (const achievementId of achievementIds) {
+      if (!getDiceAchievement(achievementId)) {
+        continue;
+      }
+
       const result = insert.run({ userId, achievementId, earnedAt });
       if (result.changes > 0) {
         newlyEarned.push(achievementId);

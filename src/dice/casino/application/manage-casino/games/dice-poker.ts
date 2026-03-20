@@ -17,6 +17,8 @@ import {
   normalizeSessionBet,
   viewMutation,
 } from "../helpers";
+import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
+import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
   DiceCasinoActionRow,
@@ -131,7 +133,7 @@ const startDicePokerRound = ({
 };
 
 const handleDicePokerAction = (
-  { analytics, economy, pips, session }: DiceCasinoMutationContext,
+  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "poker-toggle-hold") {
@@ -174,13 +176,22 @@ const handleDicePokerAction = (
       });
     }
 
-    analytics.recordRoundCompleted({
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "dice-poker",
       betTier: getDiceCasinoBetTier(round.bet),
+      wagered: round.bet,
       payout: rerollResult.result.payout,
       outcome: getOutcomeFromPayout(round.bet, rerollResult.result.payout),
+      achievementEvent:
+        rerollResult.result.kind === "loss"
+          ? undefined
+          : {
+              type: "poker-hand",
+              handKind: rerollResult.result.kind,
+            },
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(
@@ -206,13 +217,15 @@ const handleDicePokerAction = (
       return invalidCasinoAction();
     }
 
-    analytics.recordRoundCompleted({
+    const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "dice-poker",
       betTier: getDiceCasinoBetTier(round.bet),
+      wagered: round.bet,
       payout: 0,
       outcome: "loss",
     });
+    awardManualDiceAchievements(progression, session.userId, getCasinoAchievementIds(achievementStats));
 
     return viewMutation(
       normalizeSessionBet(
