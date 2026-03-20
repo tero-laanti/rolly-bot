@@ -23,4 +23,5 @@ export type ActiveRandomEventContext = {
   currentPhaseExpiresAtMs: number;
   attemptedUserIds: Set<string>;
   failedAttemptLines: string[];
+  failedAttemptUserIds: Set<string>;
 };

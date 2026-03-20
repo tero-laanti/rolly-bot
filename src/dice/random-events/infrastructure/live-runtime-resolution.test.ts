@@ -12,7 +12,11 @@ import type { RandomEventRollChallengeProgress } from "../domain/roll-challenges
 import type { DiceTemporaryEffect } from "../../progression/domain/temporary-effects";
 import { buildActiveClaimDescription, buildExpiredEventEmbed } from "./live-runtime-presentation";
 import { createRandomEventsState, registerActiveRandomEvent } from "./state-store";
-import { resolveRandomEvent, resolveRandomEventAttempt } from "./live-runtime-resolution";
+import {
+  resolveRandomEvent,
+  resolveRandomEventAttempt,
+  type RandomEventAttemptResolution,
+} from "./live-runtime-resolution";
 
 const createChallengeScenario = (): RandomEventScenario => {
   return {
@@ -492,6 +496,7 @@ const resolveMultiUserScenarioDescription = async (
         currentPhaseExpiresAtMs: Date.now() + 60_000,
         attemptedUserIds: new Set<string>(),
         failedAttemptLines: [],
+        failedAttemptUserIds: new Set<string>(),
       },
     ],
   ]);
@@ -644,6 +649,7 @@ test("threshold multi-user events expire if the required ready count is not met"
         currentPhaseExpiresAtMs: Date.now() + 60_000,
         attemptedUserIds: new Set<string>(),
         failedAttemptLines: [],
+        failedAttemptUserIds: new Set<string>(),
       },
     ],
   ]);
@@ -677,4 +683,122 @@ test("threshold multi-user events expire if the required ready count is not met"
   assert.match(expiredEmbed.description, /Only 2\/3 players were ready before time ran out\./);
   assert.match(expiredEmbed.description, /\*\*Ready players:\*\* <@111>, <@222>/);
   assert.equal(expiredEmbed.footer?.text, "Rare Event • Expired");
+});
+
+test("keep-open comeback progress only counts when the same user failed before succeeding", async () => {
+  const scenario: RandomEventScenario = {
+    id: "keep-open-comeback-attribution",
+    rarity: "rare",
+    title: "Keep-open Comeback Attribution",
+    prompt: "Force the gate open.",
+    claimLabel: "Push",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "gate-opens",
+        resolution: "resolve-success",
+        message: "The gate opens.",
+        effects: [],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const successResolution = (userId: string): RandomEventAttemptResolution => ({
+    userId,
+    outcome: {
+      id: "gate-opens",
+      resolution: "resolve-success",
+      message: "The gate opens.",
+      effects: [],
+    },
+    renderedOutcomeMessage: "The gate opens.",
+    challengeRollSummary: null,
+    effectNotes: [],
+    appliedNegativeEffects: [],
+    hadActiveNegativeEffectBeforeAttempt: false,
+    resolutionNote: null,
+    resolution: "resolve-success",
+    finalLine: `<@${userId}>: Success: The gate opens.`,
+    failedAttemptLine: `<@${userId}> failed: The gate stays shut.`,
+  });
+  const resolveComebackFlag = async ({
+    failedAttemptUserIds,
+    participant,
+    eventId,
+  }: {
+    failedAttemptUserIds: Set<string>;
+    participant: string;
+    eventId: string;
+  }): Promise<boolean | undefined> => {
+    const message = {
+      edit: async () => {},
+    } as unknown as Message;
+    const activeEventsById = new Map([
+      [
+        eventId,
+        {
+          eventId,
+          selection,
+          message,
+          sequenceChallenge: null,
+          currentPhaseExpiresAtMs: Date.now() + 60_000,
+          attemptedUserIds: new Set<string>(),
+          failedAttemptLines: ["<@111> failed: The gate stays shut."],
+          failedAttemptUserIds,
+        },
+      ],
+    ]);
+    const state = createRandomEventsState();
+    registerActiveRandomEvent(state, {
+      id: eventId,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    let recordedFlag: boolean | undefined;
+
+    await resolveRandomEvent({
+      activeEventsById,
+      state,
+      progression: {
+        getDiceSides: () => 6,
+        getDiceBans: () => new Map(),
+        applyDiceTemporaryEffect: () => {
+          throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+        },
+      },
+      hostileEffects: {
+        applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      },
+      eventId,
+      participants: [participant],
+      attemptResolutionsByUserId: new Map([[participant, successResolution(participant)]]),
+      onAttemptResolved: ({ hadKeepOpenFailureBeforeSuccess }) => {
+        recordedFlag = hadKeepOpenFailureBeforeSuccess;
+        return null;
+      },
+    });
+
+    return recordedFlag;
+  };
+
+  assert.equal(
+    await resolveComebackFlag({
+      failedAttemptUserIds: new Set(["111"]),
+      participant: "111",
+      eventId: "event-same-user",
+    }),
+    true,
+  );
+  assert.equal(
+    await resolveComebackFlag({
+      failedAttemptUserIds: new Set(["111"]),
+      participant: "222",
+      eventId: "event-other-user",
+    }),
+    false,
+  );
 });

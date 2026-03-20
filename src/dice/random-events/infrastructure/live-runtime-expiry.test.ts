@@ -42,6 +42,7 @@ const createContext = (): ActiveRandomEventContext => {
     currentPhaseExpiresAtMs: 2_000,
     attemptedUserIds: new Set<string>(),
     failedAttemptLines: [],
+    failedAttemptUserIds: new Set<string>(),
   };
 };
 
