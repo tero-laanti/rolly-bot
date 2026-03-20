@@ -140,7 +140,7 @@ In `pvp.json`, duel timing and base winner/loser effect durations are tuned sepa
 
 In `random-events-balance.json`, global claim-window scaling and variety-selection tuning are configured separately from the event content pack.
 
-In `random-events.v1.json`, each outcome now declares whether it resolves the event as a success, resolves it as a failure, or applies a failure while keeping the event open. First-click events that can reopen after a failed attempt can also declare a retry policy, and multi-user events can optionally declare `requiredReadyCount` with a threshold from `2` to `5` so they resolve immediately once enough players join.
+In `random-events.v1.json`, each outcome now declares whether it resolves the event as a success, resolves it as a failure, or applies a failure while keeping the event open. First-click events that can reopen after a failed attempt can also declare a retry policy, and multi-user events can optionally declare `requiredReadyCount` with a threshold from `2` to `5` so they resolve immediately once enough players join. Text placeholders used in the open prompt are resolved once when the event appears and stay stable through resolution; if an outcome needs its own variable value, use a placeholder key that only appears in the outcome message.
 
 In `raids.json`, raid rewards, boss naming, and boss-balance knobs live separately from core dice progression.
 

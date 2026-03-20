@@ -49,8 +49,9 @@ Text variables:
 
 - Use them in text as `${itemName}`.
 - Scenario-level and outcome-level variables are merged.
-- Outcome-level variables override scenario-level variables with the same key.
-- One value is picked randomly per key when the event is rendered.
+- Keys used in `title`, `prompt`, or `claimLabel` are chosen once when the event opens and stay fixed through resolution.
+- Outcome messages reuse those same values for shared keys so the prompt and resolution stay consistent.
+- If an outcome needs its own variable value, use a key that appears only in the outcome message. Those outcome-only keys still override scenario values.
 
 Outcome weighting:
 
