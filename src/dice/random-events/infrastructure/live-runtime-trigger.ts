@@ -149,6 +149,7 @@ export const triggerRandomEventOpportunity = async ({
     currentPhaseExpiresAtMs: openedWindow.expiresAtMs,
     attemptedUserIds: new Set(),
     failedAttemptLines: [],
+    failedAttemptUserIds: new Set(),
   });
 
   return {

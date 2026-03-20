@@ -382,6 +382,7 @@ export const createRandomEventsLiveRuntime = ({
         hadKeepOpenFailureBeforeSuccess: false,
       });
       context.attemptedUserIds.add(userId);
+      context.failedAttemptUserIds.add(userId);
       context.failedAttemptLines.push(
         achievementText
           ? `${attemptResolution.failedAttemptLine} ${achievementText}`

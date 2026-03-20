@@ -387,7 +387,8 @@ export const resolveRandomEvent = async ({
       userId,
       attemptResolution,
       hadKeepOpenFailureBeforeSuccess:
-        attemptResolution.resolution === "resolve-success" && context.failedAttemptLines.length > 0,
+        attemptResolution.resolution === "resolve-success" &&
+        context.failedAttemptUserIds.has(userId),
     });
     return achievementText
       ? `${attemptResolution.finalLine} ${achievementText}`
