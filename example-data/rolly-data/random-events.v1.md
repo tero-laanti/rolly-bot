@@ -18,7 +18,13 @@ Minimal shape:
       "id": "example-success",
       "resolution": "resolve-success",
       "message": "Example success outcome.",
-      "effects": []
+      "effects": [
+        {
+          "type": "currency",
+          "minAmount": 1,
+          "maxAmount": 3
+        }
+      ]
     }
   ]
 }
@@ -192,6 +198,14 @@ Effect types:
 - `temporary-roll-multiplier`: multiplies future roll value for a number of rolls.
 - `temporary-roll-penalty`: divides future roll value for a number of rolls.
 - `temporary-lockout`: blocks rolling for `durationMinutes`.
+
+Current pip reward bands for successful outcomes:
+
+- `common`: `1-3`
+- `uncommon`: `4-6`
+- `rare`: `7-10`
+- `epic`: `11-20`
+- `legendary`: `25-50`
 
 `stackMode` for multiplier and penalty effects:
 
