@@ -102,18 +102,8 @@ const pickBossName = (random: () => number): string => {
 };
 
 const resolveRaidRewardPips = (bossLevel: number): number => {
-  const rewardTiers = getRaidBalance().reward.pipsByBossLevel;
-  let matchedTier = rewardTiers[0];
-
-  for (const rewardTier of rewardTiers) {
-    if (rewardTier.bossLevelAtLeast > bossLevel) {
-      break;
-    }
-
-    matchedTier = rewardTier;
-  }
-
-  return matchedTier?.pips ?? 0;
+  const { flatPips, flatPipsThroughBossLevel } = getRaidBalance().reward.pipsFormula;
+  return bossLevel <= flatPipsThroughBossLevel ? flatPips : bossLevel;
 };
 
 const resolveRaidRewardRollPassMultiplier = (bossLevel: number): number => {
