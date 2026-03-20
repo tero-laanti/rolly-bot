@@ -338,14 +338,7 @@ const recordDiceCasinoRoundStarted = (
 
 const recordDiceCasinoRoundCompleted = (
   db: SqliteDatabase,
-  {
-    userId,
-    game,
-    betTier,
-    payout,
-    outcome,
-    achievementEvent,
-  }: DiceCasinoAnalyticsCompletion,
+  { userId, game, betTier, payout, outcome, achievementEvent }: DiceCasinoAnalyticsCompletion,
 ): DiceCasinoAchievementStats => {
   const nowIso = new Date().toISOString();
   db.prepare(

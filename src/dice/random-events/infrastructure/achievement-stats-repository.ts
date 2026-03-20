@@ -1,5 +1,8 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import type { RandomEventAttemptResolution } from "./live-runtime-resolution";
+import type {
+  RandomEventAppliedNegativeEffect,
+  RandomEventAttemptResolution,
+} from "./live-runtime-resolution";
 import type { RandomEventScenarioRender } from "../domain/content";
 import type { RandomEventAchievementStats } from "../application/achievement-rules";
 
@@ -80,16 +83,13 @@ const getOrCreateStatsRow = (
 };
 
 const getLatestNegativeExpiryIso = (
-  _selection: RandomEventScenarioRender,
-  attemptResolution: RandomEventAttemptResolution,
-  nowMs: number,
+  appliedNegativeEffects: readonly RandomEventAppliedNegativeEffect[],
 ): string | null => {
-  void _selection;
   let latestExpiryMs = 0;
 
-  for (const effect of attemptResolution.outcome.effects) {
-    if (effect.type === "temporary-lockout") {
-      latestExpiryMs = Math.max(latestExpiryMs, nowMs + effect.durationMinutes * 60_000);
+  for (const effect of appliedNegativeEffects) {
+    if (effect.type === "temporary-lockout" && effect.expiresAtMs !== null) {
+      latestExpiryMs = Math.max(latestExpiryMs, effect.expiresAtMs);
     }
   }
 
@@ -119,17 +119,18 @@ export const recordRandomEventAchievementStats = (
   const currentNegativeExpiryMs = stats.negative_effect_expires_at
     ? Date.parse(stats.negative_effect_expires_at)
     : Number.NaN;
-  const nextNegativeExpiryIso = getLatestNegativeExpiryIso(selection, attemptResolution, nowMs);
+  const nextNegativeExpiryIso = getLatestNegativeExpiryIso(
+    attemptResolution.appliedNegativeEffects,
+  );
   const nextNegativeExpiryMs = nextNegativeExpiryIso
     ? Date.parse(nextNegativeExpiryIso)
     : Number.NaN;
-  const hasNewNegativeEffect = attemptResolution.outcome.effects.some(
-    (effect) => effect.type === "temporary-lockout" || effect.type === "temporary-roll-penalty",
+  const hasAppliedNegativeEffect = attemptResolution.appliedNegativeEffects.length > 0;
+  const appliedLockoutCount = Number(
+    attemptResolution.appliedNegativeEffects.some((effect) => effect.type === "temporary-lockout"),
   );
   const cursedEvening =
-    hasNewNegativeEffect &&
-    Number.isFinite(currentNegativeExpiryMs) &&
-    currentNegativeExpiryMs > nowMs;
+    hasAppliedNegativeEffect && attemptResolution.hadActiveNegativeEffectBeforeAttempt;
   const isSuccess = attemptResolution.resolution === "resolve-success";
   const updatedAt = new Date(nowMs).toISOString();
 
@@ -142,11 +143,7 @@ export const recordRandomEventAchievementStats = (
     legendarySuccessCount:
       stats.legendary_success_count +
       Number(isSuccess && selection.scenario.rarity === "legendary"),
-    lockoutCount:
-      stats.lockout_count +
-      Number(
-        attemptResolution.outcome.effects.some((effect) => effect.type === "temporary-lockout"),
-      ),
+    lockoutCount: stats.lockout_count + appliedLockoutCount,
     keepOpenComebackCount:
       stats.keep_open_comeback_count + Number(isSuccess && hadKeepOpenFailureBeforeSuccess),
     negativeEffectExpiresAt:

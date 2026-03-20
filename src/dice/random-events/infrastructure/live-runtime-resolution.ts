@@ -1,5 +1,6 @@
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import type { DiceHostileEffectsService } from "../../progression/application/hostile-effects-service";
+import type { DicePvpRepository } from "../../pvp/application/ports";
 import {
   hasRandomEventChallengeOutcomeBranching,
   renderRandomEventOutcome,
@@ -18,12 +19,23 @@ import { buildExpiredEventEmbed, buildResolvedEventEmbed } from "./live-runtime-
 import type { ActiveRandomEventContext } from "./live-runtime-types";
 import { resolveActiveRandomEvent, type RandomEventsState } from "./state-store";
 
+export type RandomEventAppliedNegativeEffect =
+  | {
+      type: "temporary-lockout";
+      expiresAtMs: number | null;
+    }
+  | {
+      type: "temporary-roll-penalty";
+    };
+
 export type RandomEventAttemptResolution = {
   userId: string;
   outcome: RandomEventOutcome;
   renderedOutcomeMessage: string;
   challengeRollSummary: string | null;
   effectNotes: string[];
+  appliedNegativeEffects: RandomEventAppliedNegativeEffect[];
+  hadActiveNegativeEffectBeforeAttempt: boolean;
   resolutionNote: string | null;
   resolution: RandomEventOutcomeResolution;
   finalLine: string;
@@ -35,25 +47,34 @@ type SharedRandomEventOutcomeSelection = Pick<
   "selectedOutcome" | "renderedOutcomeMessage"
 >;
 
+type RandomEventResolutionProgression = Pick<
+  DiceProgressionRepository,
+  "getDiceSides" | "getDiceBans" | "applyDiceTemporaryEffect"
+> &
+  Partial<Pick<DiceProgressionRepository, "getActiveDiceTemporaryEffects">>;
+
 const applyOutcomeEffectsToUser = (
   {
     progression,
     hostileEffects,
+    nowMs,
   }: {
-    progression: Pick<
-      DiceProgressionRepository,
-      "getDiceSides" | "getDiceBans" | "applyDiceTemporaryEffect"
-    >;
+    progression: RandomEventResolutionProgression;
     hostileEffects: Pick<
       DiceHostileEffectsService,
       "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
     >;
+    nowMs: number;
   },
   userId: string,
   scenarioId: string,
   outcome: RandomEventOutcome,
-): string[] => {
+): {
+  effectNotes: string[];
+  appliedNegativeEffects: RandomEventAppliedNegativeEffect[];
+} => {
   const effectNotes: string[] = [];
+  const appliedNegativeEffects: RandomEventAppliedNegativeEffect[] = [];
 
   for (const effect of outcome.effects) {
     if (effect.type === "currency") {
@@ -85,6 +106,10 @@ const applyOutcomeEffectsToUser = (
       });
       if (result.blockedByShield) {
         effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
+      } else {
+        appliedNegativeEffects.push({
+          type: "temporary-roll-penalty",
+        });
       }
       continue;
     }
@@ -92,14 +117,22 @@ const applyOutcomeEffectsToUser = (
     const result = hostileEffects.applyShieldableNegativeLockout({
       userId,
       durationMs: minutesToMs(effect.durationMinutes),
-      nowMs: Date.now(),
+      nowMs,
     });
     if (result.blockedByShield) {
       effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
+    } else {
+      appliedNegativeEffects.push({
+        type: "temporary-lockout",
+        expiresAtMs: result.lockoutUntilMs,
+      });
     }
   }
 
-  return effectNotes;
+  return {
+    effectNotes,
+    appliedNegativeEffects,
+  };
 };
 
 const formatChallengeRollSummary = (
@@ -148,20 +181,19 @@ const formatFailedAttemptLine = (resolution: RandomEventAttemptResolution): stri
 export const resolveRandomEventAttempt = ({
   progression,
   hostileEffects,
+  pvp,
   selection,
   userId,
   challengeProgress,
   resolutionNote,
   sharedOutcomeSelection,
 }: {
-  progression: Pick<
-    DiceProgressionRepository,
-    "getDiceSides" | "getDiceBans" | "applyDiceTemporaryEffect"
-  >;
+  progression: RandomEventResolutionProgression;
   hostileEffects: Pick<
     DiceHostileEffectsService,
     "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
   >;
+  pvp?: Pick<DicePvpRepository, "getActiveDiceLockout">;
   selection: RandomEventScenarioRender;
   userId: string;
   challengeProgress?: RandomEventRollChallengeProgress | null;
@@ -202,8 +234,17 @@ export const resolveRandomEventAttempt = ({
         renderedOutcomeMessage: resolvedOutcome.renderedOutcomeMessage,
       };
     })();
-  const effectNotes = applyOutcomeEffectsToUser(
-    { progression, hostileEffects },
+  const nowMs = Date.now();
+  const hadActiveNegativeEffectBeforeAttempt =
+    progression
+      .getActiveDiceTemporaryEffects?.({
+        userId,
+        nowMs,
+      })
+      ?.some((effect) => effect.kind === "negative") === true ||
+    (pvp?.getActiveDiceLockout(userId, nowMs) ?? null) !== null;
+  const { effectNotes, appliedNegativeEffects } = applyOutcomeEffectsToUser(
+    { progression, hostileEffects, nowMs },
     userId,
     scenario.id,
     renderedOutcome.selectedOutcome,
@@ -217,6 +258,8 @@ export const resolveRandomEventAttempt = ({
       renderedOutcome.selectedOutcome.resolution !== "keep-open-failure",
     ),
     effectNotes,
+    appliedNegativeEffects,
+    hadActiveNegativeEffectBeforeAttempt,
     resolutionNote: resolutionNote ?? null,
     resolution: renderedOutcome.selectedOutcome.resolution,
     finalLine: "",
@@ -237,6 +280,7 @@ export const resolveRandomEvent = async ({
   state,
   progression,
   hostileEffects,
+  pvp,
   eventId,
   participants,
   challengeProgressByUserId,
@@ -246,14 +290,12 @@ export const resolveRandomEvent = async ({
 }: {
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
-  progression: Pick<
-    DiceProgressionRepository,
-    "getDiceSides" | "getDiceBans" | "applyDiceTemporaryEffect"
-  >;
+  progression: RandomEventResolutionProgression;
   hostileEffects: Pick<
     DiceHostileEffectsService,
     "applyShieldableNegativeLockout" | "applyShieldableNegativeRollPenalty"
   >;
+  pvp?: Pick<DicePvpRepository, "getActiveDiceLockout">;
   eventId: string;
   participants: string[];
   challengeProgressByUserId?: ReadonlyMap<string, RandomEventRollChallengeProgress>;
@@ -334,6 +376,7 @@ export const resolveRandomEvent = async ({
       resolveRandomEventAttempt({
         progression,
         hostileEffects,
+        pvp,
         selection: context.selection,
         userId,
         challengeProgress: challengeProgressByUserId?.get(userId) ?? null,

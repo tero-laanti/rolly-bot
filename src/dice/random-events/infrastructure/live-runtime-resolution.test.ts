@@ -167,6 +167,116 @@ test("keep-open attempt resolution logs a neutral failed-attempt history line", 
   assert.doesNotMatch(attempt.failedAttemptLine, /still open/);
 });
 
+test("shield-blocked negative outcomes report no applied negative effects", () => {
+  const scenario: RandomEventScenario = {
+    id: "blocked-negative-test",
+    rarity: "common",
+    title: "Blocked Negative Test",
+    prompt: "A storm rolls in.",
+    claimLabel: "Stand firm",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "lockout",
+        resolution: "resolve-failure",
+        message: "The storm should curse you.",
+        effects: [
+          {
+            type: "temporary-lockout",
+            durationMinutes: 10,
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario);
+
+  const attempt = resolveRandomEventAttempt({
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({ blockedByShield: true, lockoutUntilMs: null }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+    },
+    selection,
+    userId: "123",
+  });
+
+  assert.deepEqual(attempt.appliedNegativeEffects, []);
+  assert.equal(attempt.hadActiveNegativeEffectBeforeAttempt, false);
+  assert.deepEqual(attempt.effectNotes, ["Bad Luck Umbrella blocked a negative event effect."]);
+});
+
+test("attempt resolution detects an already-active negative effect before applying a new curse", () => {
+  const scenario: RandomEventScenario = {
+    id: "overlap-negative-test",
+    rarity: "common",
+    title: "Overlap Negative Test",
+    prompt: "A shadow circles overhead.",
+    claimLabel: "Look up",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "penalty",
+        resolution: "resolve-failure",
+        message: "The shadow drains your luck.",
+        effects: [
+          {
+            type: "temporary-roll-penalty",
+            divisor: 2,
+            rolls: 1,
+            stackMode: "replace",
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario);
+
+  const attempt = resolveRandomEventAttempt({
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [
+        {
+          id: "effect-1",
+          userId: "123",
+          effectCode: "roll-pass-divisor",
+          kind: "negative",
+          source: "test",
+          magnitude: 2,
+          remainingRolls: 1,
+          expiresAt: null,
+          consumeOnCommand: "dice",
+          stackGroup: "roll-pass-divisor",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        } satisfies DiceTemporaryEffect,
+      ],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+    },
+    selection,
+    userId: "123",
+  });
+
+  assert.equal(attempt.hadActiveNegativeEffectBeforeAttempt, true);
+  assert.deepEqual(attempt.appliedNegativeEffects, [{ type: "temporary-roll-penalty" }]);
+});
+
 test("outcome text variables override scenario text variables for the same key", () => {
   const scenario: RandomEventScenario = {
     id: "override-test",
