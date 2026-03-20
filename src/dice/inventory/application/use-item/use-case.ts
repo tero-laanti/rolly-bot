@@ -15,6 +15,7 @@ import {
   appendAchievementUnlockText,
   formatAchievementUnlockText,
 } from "../../../progression/application/achievement-text";
+import { getBadLuckUmbrellaCharges, getCleanseSaltShieldCharges } from "../../domain/passive-items";
 
 export type ReserveAutoRollSession = (input: {
   userId: string;
@@ -42,7 +43,11 @@ export type UseDiceItemResult =
 type UseDiceItemDependencies = {
   inventory: Pick<
     DiceInventoryRepository,
-    "consumeInventoryItem" | "getInventoryQuantity" | "grantInventoryItem" | "recordItemUse"
+    | "consumeInventoryItem"
+    | "getInventoryQuantities"
+    | "getInventoryQuantity"
+    | "grantInventoryItem"
+    | "recordItemUse"
   >;
   itemEffects: DiceItemEffectsService;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "setDicePvpEffects">;
@@ -149,6 +154,8 @@ export const createUseDiceItemUseCase = ({
 
     if (item.effect.type === "negative-effect-shield") {
       const effect = item.effect;
+      const ownedQuantities = inventory.getInventoryQuantities(userId);
+      const grantedCharges = getBadLuckUmbrellaCharges(effect.charges, ownedQuantities);
       return unitOfWork.runInTransaction(() => {
         const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
         if (!consumed.ok) {
@@ -161,7 +168,7 @@ export const createUseDiceItemUseCase = ({
         itemEffects.grantNegativeEffectShield({
           userId,
           source: `item:${item.id}`,
-          charges: effect.charges,
+          charges: grantedCharges,
         });
         const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
           inventory,
@@ -175,7 +182,9 @@ export const createUseDiceItemUseCase = ({
           item,
           remainingQuantity: consumed.remainingQuantity,
           statusMessage: appendAchievementUnlockText(
-            `${item.name} opened. The next negative effect will be blocked.`,
+            grantedCharges > effect.charges
+              ? `${item.name} opened. The next ${grantedCharges} negative effects will be blocked.`
+              : `${item.name} opened. The next negative effect will be blocked.`,
             newlyEarned,
           ),
           achievementText: achievementText || undefined,
@@ -256,6 +265,8 @@ export const createUseDiceItemUseCase = ({
     }
 
     if (item.effect.type === "cleanse-all-negative-effects") {
+      const ownedQuantities = inventory.getInventoryQuantities(userId);
+      const bonusShieldCharges = getCleanseSaltShieldCharges(ownedQuantities);
       return unitOfWork.runInTransaction(() => {
         const clearedTemporaryEffects = itemEffects.clearAllNegativeTemporaryEffects(userId);
         const hadActiveLockout = pvp.getActiveDiceLockout(userId) !== null;
@@ -276,6 +287,13 @@ export const createUseDiceItemUseCase = ({
         const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
         if (!consumed.ok) {
           throw new Error(`Failed to consume ${item.id} after cleanse.`);
+        }
+        if (bonusShieldCharges > 0) {
+          itemEffects.grantNegativeEffectShield({
+            userId,
+            source: `item:${item.id}:passive-clean-room-kit`,
+            charges: bonusShieldCharges,
+          });
         }
         const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
           inventory,
@@ -299,7 +317,14 @@ export const createUseDiceItemUseCase = ({
           item,
           remainingQuantity: consumed.remainingQuantity,
           statusMessage: appendAchievementUnlockText(
-            `${item.name} removed ${clearedParts.join(" and ")}.`,
+            [
+              `${item.name} removed ${clearedParts.join(" and ")}.`,
+              bonusShieldCharges > 0
+                ? `Clean Room Kit also granted ${bonusShieldCharges} Bad Luck Umbrella charge${bonusShieldCharges === 1 ? "" : "s"}.`
+                : "",
+            ]
+              .filter((part) => part.length > 0)
+              .join(" "),
             newlyEarned,
           ),
           achievementText: achievementText || undefined,
@@ -353,34 +378,41 @@ export const createUseDiceItemUseCase = ({
       };
     }
 
-    const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
-    if (!consumed.ok) {
-      return {
-        ok: false,
-        message: `You do not have any ${item.name} to use.`,
-      };
-    }
+    if (item.effect.type === "auto-roll-session") {
+      const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
+      if (!consumed.ok) {
+        return {
+          ok: false,
+          message: `You do not have any ${item.name} to use.`,
+        };
+      }
 
-    const reservation = reserveAutoRollSession({
-      userId,
-      itemName: item.name,
-      durationSeconds: item.effect.durationSeconds,
-      intervalSeconds: item.effect.intervalSeconds,
-    });
-    if (!reservation) {
-      inventory.grantInventoryItem({ userId, itemId: item.id, quantity: 1 });
+      const reservation = reserveAutoRollSession({
+        userId,
+        itemName: item.name,
+        durationSeconds: item.effect.durationSeconds,
+        intervalSeconds: item.effect.intervalSeconds,
+      });
+      if (!reservation) {
+        inventory.grantInventoryItem({ userId, itemId: item.id, quantity: 1 });
+        return {
+          ok: false,
+          message: "You already have an active auto-roll session.",
+        };
+      }
+
       return {
-        ok: false,
-        message: "You already have an active auto-roll session.",
+        ok: true,
+        item,
+        remainingQuantity: consumed.remainingQuantity,
+        statusMessage: `${item.name} engaged.`,
+        autoRollReservation: reservation,
       };
     }
 
     return {
-      ok: true,
-      item,
-      remainingQuantity: consumed.remainingQuantity,
-      statusMessage: `${item.name} engaged.`,
-      autoRollReservation: reservation,
+      ok: false,
+      message: `${item.name} cannot be consumed.`,
     };
   };
 };

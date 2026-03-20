@@ -2,6 +2,7 @@ import type { SqliteDatabase } from "../../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteAnalyticsRepository } from "../../../analytics/infrastructure/sqlite/analytics-repository";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
+import { createSqliteInventoryRepository } from "../../../inventory/infrastructure/sqlite/inventory-repository";
 import { createSqliteProgressionRepository } from "../../../progression/infrastructure/sqlite/progression-repository";
 import { createDicePvpUseCase } from "../../application/manage-challenge/use-case";
 import { createSqliteDiceHostileEffectsService } from "../../../progression/infrastructure/sqlite/hostile-effects-service";
@@ -11,6 +12,7 @@ export const createSqliteDicePvpUseCase = (db: SqliteDatabase) => {
   const unitOfWork = createSqliteUnitOfWork(db);
   const analytics = createSqliteAnalyticsRepository(db);
   const economy = createSqliteEconomyRepository(db);
+  const inventory = createSqliteInventoryRepository(db);
   const progression = createSqliteProgressionRepository(db);
   const pvp = createSqlitePvpRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
@@ -19,6 +21,7 @@ export const createSqliteDicePvpUseCase = (db: SqliteDatabase) => {
     analytics,
     economy,
     hostileEffects,
+    inventory,
     progression,
     pvp,
     unitOfWork,
