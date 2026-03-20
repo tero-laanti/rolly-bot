@@ -14,6 +14,11 @@
         "message": "Example success outcome: you find a useful item and get a small roll buff.",
         "effects": [
           {
+            "type": "currency",
+            "minAmount": 1,
+            "maxAmount": 3
+          },
+          {
             "type": "temporary-roll-multiplier",
             "multiplier": 2,
             "rolls": 2,
@@ -30,7 +35,10 @@
       }
     ],
     "activityTemplates": {
-      "accepted": ["<@{userId}> checks the example crate.", "<@{userId}> opens the example event."],
+      "accepted": [
+        "<@{userId}> checks the example crate.",
+        "<@{userId}> opens the example event."
+      ],
       "alreadyReady": [
         "<@{userId}> is already checking the example crate.",
         "<@{userId}> is already in this example event."
@@ -53,14 +61,18 @@
         {
           "id": "step-one",
           "label": "Step 1: roll 5+ on your die",
-          "source": { "type": "player-die" },
+          "source": {
+            "type": "player-die"
+          },
           "target": 5,
           "comparator": "gte"
         },
         {
           "id": "step-two",
           "label": "Step 2: roll 3+ on your die",
-          "source": { "type": "player-die" },
+          "source": {
+            "type": "player-die"
+          },
           "target": 3,
           "comparator": "gte"
         }
@@ -68,8 +80,12 @@
       "failOnFirstMiss": true
     },
     "challengeOutcomeIds": {
-      "success": ["example-challenge-success"],
-      "failure": ["example-keep-open-failure"]
+      "success": [
+        "example-challenge-success"
+      ],
+      "failure": [
+        "example-keep-open-failure"
+      ]
     },
     "outcomes": [
       {
@@ -77,6 +93,11 @@
         "resolution": "resolve-success",
         "message": "Example success outcome: you clear the challenge and get a stronger buff.",
         "effects": [
+          {
+            "type": "currency",
+            "minAmount": 7,
+            "maxAmount": 10
+          },
           {
             "type": "temporary-roll-multiplier",
             "multiplier": 4,
@@ -125,6 +146,11 @@
         "resolution": "resolve-success",
         "message": "The vault opens the moment the third hand lands on it, and everyone inside catches a strong roll buff.",
         "effects": [
+          {
+            "type": "currency",
+            "minAmount": 11,
+            "maxAmount": 20
+          },
           {
             "type": "temporary-roll-multiplier",
             "multiplier": 5,

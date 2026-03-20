@@ -1,27 +1,9 @@
 {
   "reward": {
-    "pipsByBossLevel": [
-      {
-        "bossLevelAtLeast": 1,
-        "pips": 4
-      },
-      {
-        "bossLevelAtLeast": 5,
-        "pips": 6
-      },
-      {
-        "bossLevelAtLeast": 10,
-        "pips": 8
-      },
-      {
-        "bossLevelAtLeast": 20,
-        "pips": 12
-      },
-      {
-        "bossLevelAtLeast": 35,
-        "pips": 16
-      }
-    ],
+    "pipsFormula": {
+      "flatPips": 5,
+      "flatPipsThroughBossLevel": 5
+    },
     "rollPassBuff": {
       "multiplierPerBossLevel": 1,
       "minimumMultiplier": 2,
@@ -32,8 +14,20 @@
     }
   },
   "bossNames": {
-    "prefixes": ["Example", "Sample", "Placeholder", "Demo", "Training"],
-    "suffixes": ["Boss", "Guardian", "Construct", "Champion", "Sentinel"]
+    "prefixes": [
+      "Example",
+      "Sample",
+      "Placeholder",
+      "Demo",
+      "Training"
+    ],
+    "suffixes": [
+      "Boss",
+      "Guardian",
+      "Construct",
+      "Champion",
+      "Sentinel"
+    ]
   },
   "bossBalance": {
     "expectedRollIntervalSeconds": 10,

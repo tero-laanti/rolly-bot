@@ -5,13 +5,10 @@ This file controls raid rewards, boss naming, and raid boss-balance tuning.
 ```json
 {
   "reward": {
-    "pipsByBossLevel": [
-      { "bossLevelAtLeast": 1, "pips": 4 },
-      { "bossLevelAtLeast": 5, "pips": 6 },
-      { "bossLevelAtLeast": 10, "pips": 8 },
-      { "bossLevelAtLeast": 20, "pips": 12 },
-      { "bossLevelAtLeast": 35, "pips": 16 }
-    ],
+    "pipsFormula": {
+      "flatPips": 5,
+      "flatPipsThroughBossLevel": 5
+    },
     "rollPassBuff": {
       "multiplierPerBossLevel": 1,
       "minimumMultiplier": 2,
@@ -41,8 +38,8 @@ This file controls raid rewards, boss naming, and raid boss-balance tuning.
 }
 ```
 
-- `reward.pipsByBossLevel` is an ascending floor table. Each raider who landed at least one hit gets the full matching pip payout on a successful clear.
-- `reward.pipsByBossLevel[0].bossLevelAtLeast` must start at `1`.
+- `reward.pipsFormula.flatPips` is the clear payout for boss levels up to and including `reward.pipsFormula.flatPipsThroughBossLevel`.
+- Boss levels above `reward.pipsFormula.flatPipsThroughBossLevel` pay pips equal to the boss level itself.
 - `reward.rollPassBuff.multiplierPerBossLevel` scales the normal `/dice` roll-pass buff from boss level before clamping.
 - `reward.rollPassBuff.minimumMultiplier` and `reward.rollPassBuff.maximumMultiplier` clamp that buff magnitude.
 - `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
