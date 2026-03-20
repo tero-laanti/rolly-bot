@@ -161,7 +161,7 @@ const buildAchievementBrowserPage = (
     visibleAchievements.length > 0
       ? visibleAchievements.map((achievement) =>
           earnedIds.has(achievement.id)
-            ? `[Unlocked] ${achievement.name}: ${achievement.description}`
+            ? `[Unlocked] ${achievement.name}`
             : `[Locked] ${achievement.name}`,
         )
       : ["No achievements on this page."];
