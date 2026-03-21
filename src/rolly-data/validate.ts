@@ -695,6 +695,14 @@ const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
   throw new Error(`${label}.type is invalid.`);
 };
 
+const isPassiveDiceItemEffect = (effect: DiceItemEffect): boolean => {
+  return (
+    effect.type === "passive-extra-shield-on-umbrella" ||
+    effect.type === "passive-pvp-loser-lockout-reduction" ||
+    effect.type === "passive-cleanse-grants-negative-effect-shield"
+  );
+};
+
 export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => {
   if (!Array.isArray(value)) {
     throw new Error("Achievements data must be an array.");
@@ -1211,6 +1219,10 @@ export const parseDiceItems = (value: unknown): DiceItemData[] => {
       if (item.effect.durationSeconds < item.effect.intervalSeconds) {
         throw new Error(`Auto-roll item ${item.id} must have durationSeconds >= intervalSeconds.`);
       }
+    }
+
+    if (item.consumable && isPassiveDiceItemEffect(item.effect)) {
+      throw new Error(`Passive item ${item.id} must set consumable to false.`);
     }
 
     ids.add(item.id);
