@@ -45,6 +45,7 @@ export type DicePvpRepository = {
   createDicePvpChallengeIfUsersAvailable: (
     challenge: DicePvpChallengeCreateIfAvailable,
   ) => DicePvpChallengeCreateResult;
+  expireExpiredPendingDicePvpChallenges: (nowMs?: number) => DicePvpChallenge[];
   expireExpiredPendingDicePvpChallengesForUser: (
     userId: string,
     nowMs?: number,

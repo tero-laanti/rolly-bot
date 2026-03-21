@@ -30,6 +30,10 @@ import {
   type DicePvpChallengeCreateResult,
 } from "../../../pvp/domain/pvp";
 import type { DicePvpRepository } from "../ports";
+import {
+  expireExpiredPendingChallengesForUsers,
+  refundChallengeChallenger,
+} from "../challenge-expiration";
 import { applyPvpLoserLockoutReduction } from "../../../inventory/domain/passive-items";
 
 export type DicePvpAction =
@@ -1051,44 +1055,6 @@ const cancelledByTierUpdate = (challenge: DicePvpChallenge): DicePvpResult => {
       .join("\n"),
     true,
   );
-};
-
-const expireExpiredPendingChallengesForUsers = ({
-  economy,
-  pvp,
-  userIds,
-  nowMs,
-}: {
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta">;
-  pvp: Pick<DicePvpRepository, "expireExpiredPendingDicePvpChallengesForUser">;
-  userIds: string[];
-  nowMs: number;
-}): void => {
-  const expiredChallenges = new Map<string, DicePvpChallenge>();
-
-  for (const userId of new Set(userIds)) {
-    for (const challenge of pvp.expireExpiredPendingDicePvpChallengesForUser(userId, nowMs)) {
-      expiredChallenges.set(challenge.id, challenge);
-    }
-  }
-
-  for (const challenge of expiredChallenges.values()) {
-    refundChallengeChallenger(economy, challenge);
-  }
-};
-
-const refundChallengeChallenger = (
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta">,
-  challenge: DicePvpChallenge,
-): void => {
-  if (challenge.wagerPips < 1) {
-    return;
-  }
-
-  economy.applyPipsDelta({
-    userId: challenge.challengerId,
-    amount: challenge.wagerPips,
-  });
 };
 
 const cancelPendingChallenge = ({
