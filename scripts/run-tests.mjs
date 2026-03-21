@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(scriptDir, "..");
 const distRoot = join(projectRoot, "dist");
+const exampleRollyDataRoot = join(projectRoot, "example-data", "rolly-data");
 
 const collectCompiledTestFiles = (directory) => {
   const entries = readdirSync(directory, { withFileTypes: true });
@@ -40,6 +41,10 @@ if (testFiles.length < 1) {
 }
 
 const result = spawnSync(process.execPath, ["--test", ...testFiles], {
+  env: {
+    ...process.env,
+    ROLLY_DATA_DIR: exampleRollyDataRoot,
+  },
   stdio: "inherit",
 });
 
