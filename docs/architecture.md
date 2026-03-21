@@ -6,6 +6,53 @@ Read [README.md](../README.md) first for the product overview and [development.m
 
 Rolly is a Discord-first modular monolith. Discord interactions enter through the shared app runtime, get routed to context-owned command adapters, and then flow into context application use cases and domain rules. Concrete adapters handle SQLite, Discord I/O, schedulers, and process execution. Gameplay content is loaded from `rolly-data`, which lets balance and authored content evolve without changing the bot runtime every time.
 
+## Visual Map
+
+The diagrams below are intentionally structural, not exhaustive. They show the stable paths and boundaries that matter when navigating or extending the codebase.
+
+### System overview
+
+```mermaid
+flowchart TD
+    Discord["Discord interactions"] --> App["src/app/discord<br/>runtime + routing"]
+    App --> Registry["explicit command registry"]
+    Registry --> Interfaces["context interfaces/discord"]
+    Interfaces --> Application["context application<br/>use cases + ports"]
+    Application --> Domain["context domain<br/>rules + value types"]
+    Application --> Infra["context infrastructure<br/>SQLite / schedulers / process adapters"]
+    Infra --> Shared["src/shared<br/>env + db + cross-cutting utilities"]
+    Application --> Kernel["src/shared-kernel<br/>stable shared primitives"]
+    App --> Kernel
+    Application --> RollyData["src/rolly-data<br/>validated gameplay content"]
+    RollyData --> Examples["example-data/rolly-data<br/>public contract examples"]
+```
+
+### Typical interaction flow
+
+```mermaid
+sequenceDiagram
+    participant U as Discord user
+    participant D as Discord API
+    participant A as src/app/discord runtime
+    participant C as context interfaces/discord
+    participant UC as application use case
+    participant R as infrastructure adapter
+    participant DB as SQLite / external runtime
+
+    U->>D: Slash command or button click
+    D->>A: Interaction payload
+    A->>C: Route via explicit registry
+    C->>UC: Parse input and invoke use case
+    UC->>R: Call repository / runtime port
+    R->>DB: Read or mutate state
+    DB-->>R: Result
+    R-->>UC: Port response
+    UC-->>C: View model / action result
+    C-->>A: Discord response shape
+    A-->>D: Render reply / update
+    D-->>U: Visible message or component update
+```
+
 ## Codemap
 
 ### Boot and composition
@@ -30,6 +77,18 @@ Rolly is a Discord-first modular monolith. Discord interactions enter through th
   `interfaces/discord/` for slash commands, button ids, and presenters.
 - `random-events` and `raids` are intentionally different. Their [src/dice/random-events/infrastructure/](../src/dice/random-events/infrastructure/) and [src/dice/raids/infrastructure/](../src/dice/raids/infrastructure/) folders own live runtimes, schedulers, admin control, and Discord orchestration. Their `interfaces/discord/` folders stay narrow and mostly handle button ids, prompts, and interaction helpers.
 - Search for `DiceEconomyRepository` or other context `ports.ts` symbols when you need the application-facing repository contracts.
+
+#### Context shape
+
+```mermaid
+flowchart LR
+    X["interfaces/discord/"] --> A["application/"]
+    A --> D["domain/"]
+    A --> I["infrastructure/"]
+    I -. "runtime orchestration<br/>(raids / random-events only)" .-> X
+```
+
+Runtime orchestration includes the scheduler, live runtime, admin control, and Discord orchestration that `random-events` and `raids` keep in `infrastructure/`.
 
 ### Shared systems
 
