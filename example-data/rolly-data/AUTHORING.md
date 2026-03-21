@@ -1,6 +1,6 @@
 # Rolly Data Authoring Guide
 
-This directory explains the current `rolly-data` contract without changing the runtime format.
+This directory explains the `rolly-data` JSON contract used by the bot.
 All data files are plain JSON.
 
 Use the file-specific guides when authoring or reviewing private `rolly-data`:
