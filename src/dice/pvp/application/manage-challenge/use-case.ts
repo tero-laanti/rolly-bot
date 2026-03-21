@@ -31,6 +31,7 @@ import {
 } from "../../../pvp/domain/pvp";
 import type { DicePvpRepository } from "../ports";
 import {
+  cancelLockedPendingChallengesForUsers,
   expireExpiredPendingChallengesForUsers,
   refundChallengeChallenger,
 } from "../challenge-expiration";
@@ -65,6 +66,7 @@ type ManageChallengeDependencies = {
   progression: Pick<DiceProgressionRepository, "awardAchievements" | "getDicePrestige">;
   pvp: Pick<
     DicePvpRepository,
+    | "cancelLockedPendingDicePvpChallengesForUser"
     | "createDicePvpChallengeIfUsersAvailable"
     | "expireExpiredPendingDicePvpChallengesForUser"
     | "recordResolvedDuel"
@@ -98,6 +100,12 @@ export const createDicePvpUseCase = ({
   ): DicePvpResult => {
     unitOfWork.runInTransaction(() => {
       expireExpiredPendingChallengesForUsers({
+        economy,
+        pvp,
+        userIds: [challengerId],
+        nowMs,
+      });
+      cancelLockedPendingChallengesForUsers({
         economy,
         pvp,
         userIds: [challengerId],
@@ -245,6 +253,13 @@ const handleTierPick = async (
 
   const createResult = unitOfWork.runInTransaction(() => {
     expireExpiredPendingChallengesForUsers({
+      economy,
+      pvp,
+      userIds:
+        opponentId === dicePvpOpenOpponentId ? [action.ownerId] : [action.ownerId, opponentId],
+      nowMs,
+    });
+    cancelLockedPendingChallengesForUsers({
       economy,
       pvp,
       userIds:
