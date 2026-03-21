@@ -13,11 +13,11 @@ import {
 } from "../../../progression/domain/achievements-store";
 import {
   getBaseRollPassCount,
+  getFirstDailyRollPipReward,
   getDiceLevelUpReward,
   getDiceMaxRollPassCount,
   getDicePrestigeBaseLevel,
   getDoubleBuffRollPassCount,
-  getFirstDailyRollPipReward,
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
 import { rollDieWithBans } from "../../../progression/domain/bans";
@@ -67,6 +67,7 @@ type RunRollDiceUseCaseInput = {
   userId: string;
   userMention: string;
   raidThreadId?: string | null;
+  source?: "manual" | "auto";
   nowMs?: number;
 };
 
@@ -113,8 +114,10 @@ export const createRunRollDiceUseCase = ({
     userId,
     userMention,
     raidThreadId = null,
+    source = "manual",
     nowMs = Date.now(),
   }: RunRollDiceUseCaseInput): DiceRollResult => {
+    const firstDailyRollPipReward = getFirstDailyRollPipReward();
     const lockoutUntil = pvp.getActiveDiceLockout(userId, nowMs);
     if (lockoutUntil) {
       const content = `${userMention}, you can play again ${formatDiscordRelativeTime(lockoutUntil)}.`;
@@ -209,12 +212,18 @@ export const createRunRollDiceUseCase = ({
       const fameReward = newlyEarned.length + levelIncrease * getDiceLevelUpReward();
       const fameAfter =
         fameReward > 0 ? economy.applyFameDelta({ userId, amount: fameReward }) : fameBefore;
-      const firstDailyRollPipReward = getFirstDailyRollPipReward();
-      const dailyPipGrant = economy.grantDailyPipsIfEligible({
-        userId,
-        amount: firstDailyRollPipReward,
-        nowMs,
-      });
+      const dailyPipGrant =
+        source === "manual" && firstDailyRollPipReward > 0
+          ? economy.grantDailyPipsIfEligible({
+              userId,
+              amount: firstDailyRollPipReward,
+              nowMs,
+            })
+          : {
+              awarded: false,
+              pips: 0,
+              lastDailyPipRewardAt: null,
+            };
       const dailyPipReward = dailyPipGrant.awarded ? firstDailyRollPipReward : 0;
       const pipReward = achievementPipReward + dailyPipReward;
 
