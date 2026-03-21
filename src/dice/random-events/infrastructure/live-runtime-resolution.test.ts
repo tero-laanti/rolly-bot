@@ -626,6 +626,97 @@ test("multi-user events without challenge branching reuse one rendered outcome f
   assert.ok(sharedOutcomeMatch);
 });
 
+test("multi-user events reuse one currency amount for all participants in a shared outcome", async () => {
+  const scenario: RandomEventScenario = {
+    id: "shared-group-currency",
+    rarity: "uncommon",
+    title: "Shared Group Currency",
+    prompt: "Everyone crowds around the same chest.",
+    claimLabel: "Open chest",
+    claimPolicy: "multi-user",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "shared-payout",
+        resolution: "resolve-success",
+        message: "The chest clicks open.",
+        effects: [
+          {
+            type: "currency",
+            minAmount: 2,
+            maxAmount: 4,
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const message = {
+    edit: async () => {},
+  } as unknown as Message;
+  const activeEventsById = new Map([
+    [
+      "event-shared-currency",
+      {
+        eventId: "event-shared-currency",
+        selection,
+        message,
+        sequenceChallenge: null,
+        currentPhaseExpiresAtMs: Date.now() + 60_000,
+        attemptedUserIds: new Set<string>(),
+        failedAttemptLines: [],
+        failedAttemptUserIds: new Set<string>(),
+      },
+    ],
+  ]);
+  const state = createRandomEventsState();
+  registerActiveRandomEvent(state, {
+    id: "event-shared-currency",
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  const awarded: number[] = [];
+
+  const originalRandom = Math.random;
+  Math.random = (() => {
+    const values = [0, 0, 0.999];
+    let index = 0;
+    return () => values[index++] ?? 0.999;
+  })();
+
+  try {
+    await resolveRandomEvent({
+      activeEventsById,
+      state,
+      economy: {
+        applyPipsDelta: ({ amount }) => {
+          awarded.push(amount);
+          return amount;
+        },
+      },
+      progression: {
+        getDiceSides: () => 6,
+        getDiceBans: () => new Map(),
+        applyDiceTemporaryEffect: () => {
+          throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+        },
+      },
+      hostileEffects: {
+        applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      },
+      eventId: "event-shared-currency",
+      participants: ["111", "222"],
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.deepEqual(awarded, [2, 2]);
+});
+
 test("multi-user events ignore stray challengeOutcomeIds when there is no roll challenge", async () => {
   const scenario: RandomEventScenario = {
     id: "shared-outcome-stray-branching",

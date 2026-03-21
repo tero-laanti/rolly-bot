@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseRandomEventScenarios } from "./validate";
+import { parseDiceBalance, parseRandomEventScenarios } from "./validate";
 
 type RandomEventScenarioInput = {
   id: string;
@@ -43,6 +43,32 @@ const createRandomEventScenarioInput = (): RandomEventScenarioInput => {
     ],
   };
 };
+
+const createDiceBalanceInput = () => ({
+  prestigeSides: [6, 8, 12, 20],
+  lowerPrestigeBaseLevel: 5,
+  banStep: 4,
+  levelUpReward: 1,
+  firstDailyRollPipReward: 5,
+  maxRollPassCount: 500,
+  charge: {
+    startAfterMinutes: 10,
+    maxMultiplier: 100,
+  },
+});
+
+test("parseDiceBalance requires firstDailyRollPipReward", () => {
+  const input = createDiceBalanceInput();
+  const parsed = parseDiceBalance(input);
+
+  assert.equal(parsed.firstDailyRollPipReward, 5);
+
+  delete (input as Partial<typeof input>).firstDailyRollPipReward;
+  assert.throws(
+    () => parseDiceBalance(input),
+    /diceBalance\.firstDailyRollPipReward must be a finite number/i,
+  );
+});
 
 test("parseRandomEventScenarios rejects invalid requiredReadyCount at load time", () => {
   const scenario = createRandomEventScenarioInput();

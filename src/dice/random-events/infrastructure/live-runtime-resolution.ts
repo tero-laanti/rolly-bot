@@ -47,7 +47,9 @@ export type RandomEventAttemptResolution = {
 type SharedRandomEventOutcomeSelection = Pick<
   RandomEventRenderedOutcome,
   "selectedOutcome" | "renderedOutcomeMessage"
->;
+> & {
+  resolvedCurrencyAmounts: number[];
+};
 
 type RandomEventResolutionProgression = Pick<
   DiceProgressionRepository,
@@ -61,6 +63,19 @@ const getRandomIntInclusive = (min: number, max: number, random: () => number): 
   return Math.floor(random() * (upper - lower + 1)) + lower;
 };
 
+const resolveCurrencyEffectAmounts = (
+  outcome: RandomEventOutcome,
+  random: () => number,
+): number[] => {
+  return outcome.effects.flatMap((effect) => {
+    if (effect.type !== "currency") {
+      return [];
+    }
+
+    return [getRandomIntInclusive(effect.minAmount, effect.maxAmount, random)];
+  });
+};
+
 const applyOutcomeEffectsToUser = (
   {
     economy,
@@ -68,6 +83,7 @@ const applyOutcomeEffectsToUser = (
     hostileEffects,
     nowMs,
     random,
+    resolvedCurrencyAmounts,
   }: {
     economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
     progression: RandomEventResolutionProgression;
@@ -77,6 +93,7 @@ const applyOutcomeEffectsToUser = (
     >;
     nowMs: number;
     random: () => number;
+    resolvedCurrencyAmounts?: number[];
   },
   userId: string,
   scenarioId: string,
@@ -88,11 +105,15 @@ const applyOutcomeEffectsToUser = (
 } => {
   const effectNotes: string[] = [];
   let pipReward = 0;
+  let currencyEffectIndex = 0;
   const appliedNegativeEffects: RandomEventAppliedNegativeEffect[] = [];
 
   for (const effect of outcome.effects) {
     if (effect.type === "currency") {
-      const amount = getRandomIntInclusive(effect.minAmount, effect.maxAmount, random);
+      const amount =
+        resolvedCurrencyAmounts?.[currencyEffectIndex] ??
+        getRandomIntInclusive(effect.minAmount, effect.maxAmount, random);
+      currencyEffectIndex += 1;
       if (amount > 0) {
         economy?.applyPipsDelta({ userId, amount });
         pipReward += amount;
@@ -269,7 +290,14 @@ export const resolveRandomEventAttempt = ({
       ?.some((effect) => effect.kind === "negative") === true ||
     (pvp?.getActiveDiceLockout(userId, nowMs) ?? null) !== null;
   const { effectNotes, pipReward, appliedNegativeEffects } = applyOutcomeEffectsToUser(
-    { economy, progression, hostileEffects, nowMs, random },
+    {
+      economy,
+      progression,
+      hostileEffects,
+      nowMs,
+      random,
+      resolvedCurrencyAmounts: sharedOutcomeSelection?.resolvedCurrencyAmounts,
+    },
     userId,
     scenario.id,
     renderedOutcome.selectedOutcome,
@@ -394,6 +422,10 @@ export const resolveRandomEvent = async ({
           return {
             selectedOutcome: renderedOutcome.selectedOutcome,
             renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
+            resolvedCurrencyAmounts: resolveCurrencyEffectAmounts(
+              renderedOutcome.selectedOutcome,
+              Math.random,
+            ),
           };
         })()
       : null;

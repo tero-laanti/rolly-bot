@@ -30,11 +30,13 @@ Fame and bans:
 Level-up and roll-pass tuning:
 
 - `levelUpReward`: Fame granted on level-up.
+- `firstDailyRollPipReward`: Pips granted on the first successful `/dice` roll of each UTC day.
 - `maxRollPassCount`: hard cap for total roll passes after charge or other roll-pass modifiers are applied.
 
 ```json
 {
   "levelUpReward": 1,
+  "firstDailyRollPipReward": 5,
   "maxRollPassCount": 500
 }
 ```

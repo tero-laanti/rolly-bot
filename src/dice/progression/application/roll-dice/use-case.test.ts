@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getFirstDailyRollPipReward } from "../../domain/game-rules";
 import { createRunRollDiceUseCase } from "./use-case";
 
-test("roll dice unlocks Peak Goblin when roll pass count reaches 2", () => {
+const firstDailyRollPipReward = getFirstDailyRollPipReward();
+
+test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
   const originalRandom = Math.random;
   Math.random = () => 0;
 
@@ -65,7 +68,7 @@ test("roll dice unlocks Peak Goblin when roll pass count reaches 2", () => {
       nowMs: 1_710_000_000_000,
     });
 
-    assert.match(result.content, /Peak Goblin/);
+    assert.match(result.content, /peak-goblin/);
   } finally {
     Math.random = originalRandom;
   }
@@ -82,7 +85,7 @@ test("first roll of the UTC day awards daily pips", () => {
       getFame: () => 0,
       grantDailyPipsIfEligible: () => ({
         awarded: true,
-        pips: 5,
+        pips: firstDailyRollPipReward,
         lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
       }),
     },
@@ -130,7 +133,7 @@ test("first roll of the UTC day awards daily pips", () => {
     nowMs: 1_710_000_000_000,
   });
 
-  assert.match(result.content, /5 Pips/);
+  assert.match(result.content, new RegExp(`${firstDailyRollPipReward} Pips`));
 });
 
 test("blocked rolls do not consume or grant the daily pip reward", () => {
@@ -147,7 +150,7 @@ test("blocked rolls do not consume or grant the daily pip reward", () => {
         dailyGrantCalled = true;
         return {
           awarded: true,
-          pips: 5,
+          pips: firstDailyRollPipReward,
           lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
         };
       },
@@ -215,7 +218,7 @@ test("reward text includes both fame and pip rewards when both are earned", () =
         getFame: () => 0,
         grantDailyPipsIfEligible: () => ({
           awarded: true,
-          pips: 5,
+          pips: firstDailyRollPipReward,
           lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
         }),
       },
@@ -263,7 +266,10 @@ test("reward text includes both fame and pip rewards when both are earned", () =
       nowMs: 1_710_000_000_000,
     });
 
-    assert.match(result.content, /You receive 3 Fame and 11 Pips and a new die\./);
+    assert.match(
+      result.content,
+      new RegExp(`You receive 3 Fame and ${firstDailyRollPipReward} Pips and a new die\\.`),
+    );
   } finally {
     Math.random = originalRandom;
   }

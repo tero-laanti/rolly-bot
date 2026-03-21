@@ -139,6 +139,7 @@ This README only covers how gameplay data is discovered and used at runtime. For
 - [example-data/rolly-data/README.md](example-data/rolly-data/README.md) for the high-level layout
 - [example-data/rolly-data/AUTHORING.md](example-data/rolly-data/AUTHORING.md) for the authoring guide
 - [example-data/rolly-data/achievements.md](example-data/rolly-data/achievements.md) for achievement fields such as optional one-time `pipReward`
+- [example-data/rolly-data/dice-balance.md](example-data/rolly-data/dice-balance.md) for `/dice` economy tuning such as the first-daily-roll pip faucet
 - `example-data/rolly-data/*.md` for per-file docs
 
 If the app falls back to `example-data`, it starts normally and prints a warning so you can tell you are not using private gameplay data.
@@ -149,7 +150,7 @@ If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` w
 
 ## Commands
 
-- `/dice` rolls your current dice set, handles level-ups, rewards, charge rolls, temporary effects, and achievements. If you use it inside an active raid thread after joining the raid, the same roll also deals raid damage equal to the total pips rolled.
+- `/dice` rolls your current dice set, handles level-ups, rewards, the first-daily-roll pip faucet, charge rolls, temporary effects, and achievements. If you use it inside an active raid thread after joining the raid, the same roll also deals raid damage equal to the total pips rolled.
 - `/dice-prestige` manages prestige progression and active prestige selection.
 - `/dice-casino` opens the casino panel for Exact Roll, Push Your Luck, Blackjack, and Dice Poker.
 - `/dice-shop` lets players spend Pips on shop items and build an inventory.

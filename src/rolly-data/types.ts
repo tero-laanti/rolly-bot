@@ -139,6 +139,7 @@ export type DiceBalanceData = {
   lowerPrestigeBaseLevel: number;
   banStep: number;
   levelUpReward: number;
+  firstDailyRollPipReward: number;
   maxRollPassCount: number;
   charge: {
     startAfterMinutes: number;

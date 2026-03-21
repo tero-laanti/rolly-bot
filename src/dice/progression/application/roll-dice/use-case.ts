@@ -17,6 +17,7 @@ import {
   getDiceMaxRollPassCount,
   getDicePrestigeBaseLevel,
   getDoubleBuffRollPassCount,
+  getFirstDailyRollPipReward,
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
 import { rollDieWithBans } from "../../../progression/domain/bans";
@@ -97,7 +98,6 @@ type RunRollDiceDependencies = {
 };
 
 const spamWindowMs = 2_000;
-const firstDailyRollPipReward = 5;
 const diceSpamTracker = new Map<string, number>();
 
 export const createRunRollDiceUseCase = ({
@@ -209,6 +209,7 @@ export const createRunRollDiceUseCase = ({
       const fameReward = newlyEarned.length + levelIncrease * getDiceLevelUpReward();
       const fameAfter =
         fameReward > 0 ? economy.applyFameDelta({ userId, amount: fameReward }) : fameBefore;
+      const firstDailyRollPipReward = getFirstDailyRollPipReward();
       const dailyPipGrant = economy.grantDailyPipsIfEligible({
         userId,
         amount: firstDailyRollPipReward,
