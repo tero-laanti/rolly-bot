@@ -3,6 +3,7 @@
   "lowerPrestigeBaseLevel": 5,
   "banStep": 4,
   "levelUpReward": 1,
+  "firstDailyRollPipReward": 5,
   "maxRollPassCount": 500,
   "charge": {
     "startAfterMinutes": 10,

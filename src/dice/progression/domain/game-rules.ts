@@ -37,6 +37,10 @@ export const getDiceLevelUpReward = (): number => {
   return getDiceBalanceData().levelUpReward;
 };
 
+export const getFirstDailyRollPipReward = (): number => {
+  return getDiceBalanceData().firstDailyRollPipReward;
+};
+
 export const getDiceMaxRollPassCount = (): number => {
   return getDiceBalanceData().maxRollPassCount;
 };
