@@ -35,7 +35,15 @@ Exact Roll:
 {
   "exactRoll": {
     "dieSides": 6,
-    "highLowLowMaxFace": 3
+    "highLowLowMaxFace": 3,
+    "facePayout": {
+      "numerator": 59,
+      "denominator": 10
+    },
+    "highLowPayout": {
+      "numerator": 197,
+      "denominator": 100
+    }
   }
 }
 ```
@@ -43,6 +51,9 @@ Exact Roll:
 - `highLowLowMaxFace` is the inclusive top end of the `low` bucket.
 - Values above that boundary count as `high`.
 - It must be between `1` and `dieSides - 1`.
+- `facePayout` is the total payout ratio for betting an exact face.
+- `highLowPayout` is the total payout ratio for betting `high` or `low`.
+- `dieSides` must currently be `<= 8` so the face buttons fit within Discord component row limits.
 
 Push Your Luck:
 
@@ -52,7 +63,13 @@ Push Your Luck:
     "dieSides": 6,
     "cashoutStartsAtUniqueFaces": 2,
     "autoCashoutAtUniqueFaces": 6,
-    "payouts": [{ "uniqueFaces": 2, "numerator": 59, "denominator": 50 }]
+    "payouts": [
+      { "uniqueFaces": 2, "numerator": 59, "denominator": 50 },
+      { "uniqueFaces": 3, "numerator": 177, "denominator": 100 },
+      { "uniqueFaces": 4, "numerator": 177, "denominator": 50 },
+      { "uniqueFaces": 5, "numerator": 531, "denominator": 50 },
+      { "uniqueFaces": 6, "numerator": 1593, "denominator": 25 }
+    ]
   }
 }
 ```
