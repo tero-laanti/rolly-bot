@@ -41,6 +41,30 @@ export const expireExpiredPendingChallengesForUsers = ({
   }
 };
 
+export const cancelLockedPendingChallengesForUsers = ({
+  economy,
+  pvp,
+  userIds,
+  nowMs,
+}: {
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  pvp: Pick<DicePvpRepository, "cancelLockedPendingDicePvpChallengesForUser">;
+  userIds: string[];
+  nowMs: number;
+}): void => {
+  const cancelledChallenges = new Map<string, DicePvpChallenge>();
+
+  for (const userId of new Set(userIds)) {
+    for (const challenge of pvp.cancelLockedPendingDicePvpChallengesForUser(userId, nowMs)) {
+      cancelledChallenges.set(challenge.id, challenge);
+    }
+  }
+
+  for (const challenge of cancelledChallenges.values()) {
+    refundChallengeChallenger(economy, challenge);
+  }
+};
+
 export const expireExpiredPendingChallenges = ({
   economy,
   pvp,

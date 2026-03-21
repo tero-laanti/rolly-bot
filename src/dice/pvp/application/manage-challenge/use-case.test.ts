@@ -42,6 +42,15 @@ const createHarness = ({
   };
   const getEffects = (userId: string): DicePvpEffects =>
     effects.get(userId) ?? { lockoutUntil: null, doubleRollUntil: null };
+  const getActiveLockout = (userId: string, nowMs: number = Date.now()) => {
+    const lockoutUntil = getEffects(userId).lockoutUntil;
+    if (!lockoutUntil) {
+      return null;
+    }
+
+    const parsed = Date.parse(lockoutUntil);
+    return Number.isNaN(parsed) || parsed <= nowMs ? null : parsed;
+  };
   const getAnalytics = (userId: string): DiceAnalytics =>
     analytics.get(userId) ?? {
       levelStartedAt: new Date(0).toISOString(),
@@ -137,6 +146,31 @@ const createHarness = ({
 
         return expiredChallenges;
       },
+      cancelLockedPendingDicePvpChallengesForUser: (userId, nowMs = Date.now()) => {
+        const cancelledChallenges: DicePvpChallenge[] = [];
+
+        for (const challenge of challenges.values()) {
+          if (
+            challenge.status !== "pending" ||
+            (challenge.challengerId !== userId && challenge.opponentId !== userId) ||
+            isDicePvpChallengeExpired(challenge, nowMs) ||
+            (getActiveLockout(challenge.challengerId, nowMs) === null &&
+              getActiveLockout(challenge.opponentId, nowMs) === null)
+          ) {
+            continue;
+          }
+
+          const cancelledChallenge = {
+            ...challenge,
+            status: "cancelled" as const,
+            updatedAt: new Date().toISOString(),
+          };
+          challenges.set(challenge.id, cancelledChallenge);
+          cancelledChallenges.push(cancelledChallenge);
+        }
+
+        return cancelledChallenges;
+      },
       recordResolvedDuel: ({ userId, duelTier, result }) => {
         const current = getStats(userId);
         const nextCurrentWinStreak = result === "win" ? current.currentWinStreak + 1 : 0;
@@ -151,13 +185,7 @@ const createHarness = ({
         return next;
       },
       getActiveDiceLockout: (userId, nowMs = Date.now()) => {
-        const lockoutUntil = getEffects(userId).lockoutUntil;
-        if (!lockoutUntil) {
-          return null;
-        }
-
-        const parsed = Date.parse(lockoutUntil);
-        return Number.isNaN(parsed) || parsed <= nowMs ? null : parsed;
+        return getActiveLockout(userId, nowMs);
       },
       getDicePvpAchievementStats: (userId) => getStats(userId),
       getDicePvpChallenge: (challengeId) => challenges.get(challengeId),
@@ -366,6 +394,47 @@ test("creating a new wagered challenge auto-expires stale pending escrow", async
   assert.equal(challenges.length, 2);
   assert.equal(latestChallenge?.status, "pending");
   assert.notEqual(latestChallenge?.id, firstChallenge.id);
+});
+
+test("creating a new wagered challenge cancels lockout-blocked pending escrow first", async () => {
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const harness = createHarness({
+    pips: { challenger: 20, opponent: 20, third: 20 },
+  });
+
+  const firstChallenge = await createChallenge({
+    harness,
+    wagerPips: 6,
+    nowMs,
+  });
+
+  harness.effects.set("challenger", {
+    lockoutUntil: new Date(nowMs + 5 * 60 * 1000).toISOString(),
+    doubleRollUntil: null,
+  });
+
+  const result = await harness.useCase.handleDicePvpAction(
+    "opponent",
+    {
+      type: "pick",
+      ownerId: "opponent",
+      opponentId: "third",
+      duelTier: 1,
+      wagerPips: 4,
+    },
+    async () => ({ url: "https://example.test/challenge-2" }),
+    nowMs,
+  );
+
+  assert.equal(result.payload.type, "message");
+  assert.match(result.payload.content, /Challenge created:/);
+  assert.equal(harness.challenges.get(firstChallenge.id)?.status, "cancelled");
+  assert.equal(harness.balances.get("challenger"), 20);
+
+  const challenges = Array.from(harness.challenges.values());
+  assert.equal(challenges.length, 2);
+  assert.equal(challenges.at(-1)?.status, "pending");
+  assert.equal(challenges.at(-1)?.challengerId, "opponent");
 });
 
 test("accept rejects players who cannot cover the wager and keeps the challenge pending", async () => {
