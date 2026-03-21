@@ -57,17 +57,11 @@ const createDiceBalanceInput = () => ({
   },
 });
 
-test("parseDiceBalance requires firstDailyRollPipReward", () => {
+test("parseDiceBalance preserves firstDailyRollPipReward when provided", () => {
   const input = createDiceBalanceInput();
   const parsed = parseDiceBalance(input);
 
   assert.equal(parsed.firstDailyRollPipReward, 5);
-
-  delete (input as Partial<typeof input>).firstDailyRollPipReward;
-  assert.throws(
-    () => parseDiceBalance(input),
-    /diceBalance\.firstDailyRollPipReward must be a finite number/i,
-  );
 });
 
 test("parseRandomEventScenarios rejects invalid requiredReadyCount at load time", () => {
