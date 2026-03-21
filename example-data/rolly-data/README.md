@@ -17,6 +17,6 @@ This directory contains safe example data for the public `rolly-bot` repository.
   - `random-events-balance.json`
   - `random-events.v1.json`
 
-These example values are safe to expose and do not need to match production.
+These example values are safe to expose and do not need to match the private game data used outside this public repo.
 
 For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

@@ -27,7 +27,7 @@ This file controls global claim-window scaling and variety-selection tuning for 
 ```
 
 - `claimWindowDurationMultiplier` multiplies each scenario's `claimWindowSeconds` from `random-events.v1.json`.
-- `variety` currently requires all three keys: `antiRepeatCooldownTriggers`, `rarityChances`, and `pity`.
+- `variety` requires all three keys: `antiRepeatCooldownTriggers`, `rarityChances`, and `pity`.
 - `antiRepeatCooldownTriggers` makes a just-used scenario temporarily ineligible when alternatives exist.
 - `rarityChances` sets base rarity-bucket weights for `common`, `uncommon`, `rare`, `epic`, and `legendary`.
 

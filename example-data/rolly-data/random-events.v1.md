@@ -199,7 +199,7 @@ Effect types:
 - `temporary-roll-penalty`: divides future roll value for a number of rolls.
 - `temporary-lockout`: blocks rolling for `durationMinutes`.
 
-Current pip reward bands for successful outcomes:
+Recommended pip reward bands for successful outcomes:
 
 - `common`: `1-3`
 - `uncommon`: `4-6`

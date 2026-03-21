@@ -53,7 +53,7 @@ Exact Roll:
 - It must be between `1` and `dieSides - 1`.
 - `facePayout` is the total payout ratio for betting an exact face.
 - `highLowPayout` is the total payout ratio for betting `high` or `low`.
-- `dieSides` must currently be `<= 8` so the face buttons fit within Discord component row limits.
+- `dieSides` must be `<= 8` so the face buttons fit within Discord component row limits.
 
 Push Your Luck:
 
@@ -116,6 +116,6 @@ Dice Poker:
 }
 ```
 
-- Dice Poker always uses a five-die `d8` hand in the current implementation.
+- Dice Poker uses a fixed five-die `d8` hand.
 - Payout multipliers are total payout multipliers applied to the bet.
-- Only the listed hand kinds are paid in the current implementation.
+- Only the listed hand kinds are paid.

@@ -13,7 +13,7 @@ Prestige progression:
 
 - `prestigeSides[0]` is prestige `0`, `prestigeSides[1]` is prestige `1`, and so on.
 - Max prestige is `prestigeSides.length - 1`.
-- `lowerPrestigeBaseLevel` is used when a player switches down to a previously unlocked lower prestige. Those older prestiges start at this base level instead of level `1`.
+- `lowerPrestigeBaseLevel` is used when a player switches down to a previously unlocked lower prestige. Those lower prestiges start at this base level instead of level `1`.
 
 Fame and bans:
 
@@ -23,9 +23,9 @@ Fame and bans:
 }
 ```
 
-- Current runtime behavior is `floor(fame / banStep)`.
+- Ban slots are calculated as `floor(fame / banStep)`.
 - Higher fame unlocks more ban slots.
-- Level and die size are not currently part of the unlock formula.
+- Level and die size are not part of the unlock formula.
 
 Level-up and roll-pass tuning:
 
