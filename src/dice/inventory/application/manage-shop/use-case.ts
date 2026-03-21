@@ -26,6 +26,26 @@ export type DiceShopAction =
 
 export type DiceShopResult = ActionResult<DiceShopAction>;
 
+type ShopPurchaseAttempt =
+  | {
+      ok: false;
+      reason: "already-owned";
+      item: DiceShopItem;
+    }
+  | {
+      ok: false;
+      reason: "insufficient-pips";
+      item: DiceShopItem;
+      currentPips: number;
+    }
+  | {
+      ok: true;
+      item: DiceShopItem;
+      quantity: number;
+      remainingPips: number;
+      newlyEarned: ReturnType<DiceProgressionRepository["awardAchievements"]>;
+    };
+
 type ManageShopDependencies = {
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getEconomySnapshot" | "getPips">;
   inventory: Pick<
@@ -89,31 +109,26 @@ export const createDiceShopUseCase = ({
       };
     }
 
-    const ownedQuantity = inventory.getInventoryQuantities(action.ownerId).get(item.id) ?? 0;
-    if (isPassivePermanentItem(item) && ownedQuantity > 0) {
-      return {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: `${item.name} is already owned. Permanent passive upgrades can only be bought once.`,
-          ephemeral: true,
-        },
-      };
-    }
+    const purchase = unitOfWork.runInTransaction<ShopPurchaseAttempt>(() => {
+      const ownedQuantity = inventory.getInventoryQuantities(action.ownerId).get(item.id) ?? 0;
+      if (isPassivePermanentItem(item) && ownedQuantity > 0) {
+        return {
+          ok: false,
+          reason: "already-owned",
+          item,
+        };
+      }
 
-    const currentPips = economy.getPips(action.ownerId);
-    if (currentPips < item.pricePips) {
-      return {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: `You need ${item.pricePips} pips to buy ${item.name}. Current balance: ${currentPips} pips.`,
-          ephemeral: true,
-        },
-      };
-    }
+      const currentPips = economy.getPips(action.ownerId);
+      if (currentPips < item.pricePips) {
+        return {
+          ok: false,
+          reason: "insufficient-pips",
+          item,
+          currentPips,
+        };
+      }
 
-    const purchase = unitOfWork.runInTransaction(() => {
       economy.applyPipsDelta({ userId: action.ownerId, amount: -item.pricePips });
       const quantity = inventory.grantInventoryItem({
         userId: action.ownerId,
@@ -128,12 +143,35 @@ export const createDiceShopUseCase = ({
       );
 
       return {
+        ok: true,
         item,
         quantity,
         remainingPips: economy.getPips(action.ownerId),
         newlyEarned,
       };
     });
+
+    if (!purchase.ok) {
+      if (purchase.reason === "already-owned") {
+        return {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: `${purchase.item.name} is already owned. Permanent passive upgrades can only be bought once.`,
+            ephemeral: true,
+          },
+        };
+      }
+
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: `You need ${purchase.item.pricePips} pips to buy ${purchase.item.name}. Current balance: ${purchase.currentPips} pips.`,
+          ephemeral: true,
+        },
+      };
+    }
 
     return {
       kind: "update",
