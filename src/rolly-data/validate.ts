@@ -19,7 +19,6 @@ import type {
   DiceRaidPipRewardTierData,
   DiceRaidRewardData,
 } from "./types";
-import { defaultFirstDailyRollPipReward } from "./defaults";
 import {
   validateRandomEventScenarios,
   type RandomEventClaimActivityTemplates,
@@ -958,7 +957,7 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
         record.firstDailyRollPipReward,
         "diceBalance.firstDailyRollPipReward",
         0,
-      ) ?? defaultFirstDailyRollPipReward,
+      ) ?? 0,
     maxRollPassCount: readInteger(record.maxRollPassCount, "diceBalance.maxRollPassCount", 1),
     charge: {
       startAfterMinutes: readInteger(

@@ -134,8 +134,6 @@ A valid data directory is expected to contain these files:
 
 The committed files under [example-data/rolly-data/](example-data/rolly-data/) are safe public examples only. They keep the repo understandable, document the current data shape, and let the bot run locally when you intentionally use example data, but they are not meant to mirror production values.
 
-For `dice-balance.json`, newer tuning keys can be added compatibly. For example, `firstDailyRollPipReward` defaults to `0` when older data files omit it.
-
 This README only covers how gameplay data is discovered and used at runtime. For the file-by-file data contract and authoring details, start here instead:
 
 - [example-data/rolly-data/README.md](example-data/rolly-data/README.md) for the high-level layout

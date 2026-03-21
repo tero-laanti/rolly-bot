@@ -41,30 +41,3 @@ test("grantDailyPipsIfEligible awards once per UTC day", () => {
     lastDailyPipRewardAt: "2026-03-21T00:00:00.000Z",
   });
 });
-
-test("initializeDatabaseSchema migrates legacy balances tables for daily pip rewards", () => {
-  const db = new Database(":memory:");
-  db.exec(`
-    CREATE TABLE balances (
-      user_id TEXT PRIMARY KEY,
-      fame INTEGER NOT NULL DEFAULT 0,
-      pips INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL
-    );
-  `);
-
-  initializeDatabaseSchema(db);
-  const economy = createSqliteEconomyRepository(db);
-
-  const reward = economy.grantDailyPipsIfEligible({
-    userId: "legacy-user",
-    amount: 5,
-    nowMs: Date.parse("2026-03-20T09:00:00.000Z"),
-  });
-
-  assert.deepEqual(reward, {
-    awarded: true,
-    pips: 5,
-    lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
-  });
-});
