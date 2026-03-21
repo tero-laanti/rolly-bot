@@ -96,6 +96,11 @@ export type DiceRandomEventBalanceData = {
   variety: DiceBalanceVarietyConfig;
 };
 
+export type DiceRaidPipRewardTierData = {
+  bossLevelAtLeast: number;
+  pips: number;
+};
+
 export type DiceRaidPipRewardFormulaData = {
   flatPips: number;
   flatPipsThroughBossLevel: number;
@@ -110,10 +115,15 @@ export type DiceRaidRollPassRewardData = {
   maximumRolls: number;
 };
 
-export type DiceRaidRewardData = {
-  pipsFormula: DiceRaidPipRewardFormulaData;
-  rollPassBuff: DiceRaidRollPassRewardData;
-};
+export type DiceRaidRewardData =
+  | {
+      pipsFormula: DiceRaidPipRewardFormulaData;
+      rollPassBuff: DiceRaidRollPassRewardData;
+    }
+  | {
+      pipsByBossLevel: DiceRaidPipRewardTierData[];
+      rollPassBuff: DiceRaidRollPassRewardData;
+    };
 
 export type DiceRaidBossNamesData = {
   prefixes: string[];

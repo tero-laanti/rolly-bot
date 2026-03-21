@@ -3,7 +3,7 @@ import type { ButtonInteraction } from "discord.js";
 import { discordButtonHandlers, discordCommands } from "./command-registry";
 import { dispatchButtonInteraction, registerButtonHandler } from "./button-router";
 import { randomEventsFoundationConfig, raidsConfig } from "../../shared/config";
-import { initDatabase } from "../../shared/db";
+import { getDatabase, initDatabase } from "../../shared/db";
 import { requireEnv } from "../../shared/env";
 import { getRollyDataSourceDescription, primeRollyData } from "../../rolly-data/load";
 import type { Command } from "../../types/command";
@@ -23,6 +23,7 @@ import {
 } from "../../dice/raids/infrastructure/admin-controller";
 import { raidJoinButtonPrefix } from "../../dice/raids/interfaces/discord/button-ids";
 import { createRaidsState } from "../../dice/raids/infrastructure/state-store";
+import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastructure/challenge-expiration-runtime";
 
 const token = requireEnv("DISCORD_TOKEN");
 
@@ -46,6 +47,7 @@ let randomEventsLiveRuntime: ReturnType<typeof createRandomEventsLiveRuntime> | 
 let stopRandomEventsScheduler: (() => void) | null = null;
 let raidsLiveRuntime: ReturnType<typeof createRaidsLiveRuntime> | null = null;
 let stopRaidsScheduler: (() => void) | null = null;
+let stopDicePvpChallengeExpirationRuntime: (() => void) | null = null;
 
 const handleRandomEventButton = async (interaction: ButtonInteraction): Promise<void> => {
   if (!randomEventsLiveRuntime) {
@@ -166,6 +168,20 @@ const startRaidsFoundation = (): void => {
   );
 };
 
+const startDicePvpChallengeExpiration = (): void => {
+  if (stopDicePvpChallengeExpirationRuntime) {
+    return;
+  }
+
+  const runtime = startDicePvpChallengeExpirationRuntime({
+    db: getDatabase(),
+    logger: console,
+  });
+  stopDicePvpChallengeExpirationRuntime = runtime.stop;
+
+  console.log("[pvp] Challenge expiration runtime started.");
+};
+
 const stopBackgroundSchedulers = async (): Promise<void> => {
   clearRandomEventsAdminController();
   clearRaidsAdminController();
@@ -178,6 +194,11 @@ const stopBackgroundSchedulers = async (): Promise<void> => {
   if (randomEventsLiveRuntime) {
     randomEventsLiveRuntime.stop();
     randomEventsLiveRuntime = null;
+  }
+
+  if (stopDicePvpChallengeExpirationRuntime) {
+    stopDicePvpChallengeExpirationRuntime();
+    stopDicePvpChallengeExpirationRuntime = null;
   }
 
   if (stopRaidsScheduler) {
@@ -219,6 +240,7 @@ client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
   startRandomEventsFoundation();
   startRaidsFoundation();
+  startDicePvpChallengeExpiration();
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

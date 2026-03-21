@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiceAnalytics } from "../../../analytics/domain/analytics";
 import {
+  getDuelPunishmentMs,
   isDicePvpChallengeExpired,
   type DicePvpChallenge,
   type DicePvpEffects,
 } from "../../domain/pvp";
+import { applyPvpLoserLockoutReduction } from "../../../inventory/domain/passive-items";
 import { createDicePvpUseCase } from "./use-case";
 
 type Harness = ReturnType<typeof createHarness>;
@@ -506,5 +508,11 @@ test("padded bracers reduce PvP loser lockout duration", async () => {
   assert.equal(harness.challenges.get(challenge.id)?.status, "resolved");
   const loserEffectsLockout = harness.effects.get("opponent")?.lockoutUntil;
   assert.ok(loserEffectsLockout);
-  assert.equal(Date.parse(loserEffectsLockout) - nowMs, 51 * 60 * 1000);
+  assert.equal(
+    Date.parse(loserEffectsLockout) - nowMs,
+    applyPvpLoserLockoutReduction(
+      getDuelPunishmentMs(challenge.duelTier),
+      new Map([["padded-bracers", 1]]),
+    ),
+  );
 });

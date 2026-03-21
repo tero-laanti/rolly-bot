@@ -202,6 +202,30 @@ const getDicePvpChallenge = (
   return row ? mapDicePvpChallengeRow(row) : undefined;
 };
 
+const getPendingDicePvpChallenges = (db: SqliteDatabase): DicePvpChallenge[] => {
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        id,
+        challenger_id,
+        opponent_id,
+        duel_tier,
+        wager_pips,
+        status,
+        created_at,
+        expires_at,
+        updated_at
+      FROM dice_pvp_challenges
+      WHERE status = 'pending'
+      ORDER BY created_at DESC
+    `,
+    )
+    .all() as DicePvpChallengeRow[];
+
+  return rows.map(mapDicePvpChallengeRow);
+};
+
 const getPendingDicePvpChallengesByUser = (
   db: SqliteDatabase,
   userId: string,
@@ -253,6 +277,30 @@ const hasLockedParticipant = (
     getActiveDiceLockout(db, challenge.challengerId, nowMs) !== null ||
     getActiveDiceLockout(db, challenge.opponentId, nowMs) !== null
   );
+};
+
+const expireExpiredPendingDicePvpChallenges = (
+  db: SqliteDatabase,
+  nowMs: number = Date.now(),
+): DicePvpChallenge[] => {
+  const expiredChallenges: DicePvpChallenge[] = [];
+
+  for (const pending of getPendingDicePvpChallenges(db)) {
+    if (!isDicePvpChallengeExpired(pending, nowMs)) {
+      continue;
+    }
+
+    if (!setDicePvpChallengeStatusFromPending(db, pending.id, "expired")) {
+      continue;
+    }
+
+    expiredChallenges.push({
+      ...pending,
+      status: "expired",
+    });
+  }
+
+  return expiredChallenges;
 };
 
 const expireExpiredPendingDicePvpChallengesForUser = (
@@ -483,6 +531,8 @@ export const createSqlitePvpRepository = (db: SqliteDatabase): DicePvpRepository
     getActiveDoubleRoll: (userId, nowMs) => getActiveDoubleRoll(db, userId, nowMs),
     createDicePvpChallengeIfUsersAvailable: (challenge) =>
       createDicePvpChallengeIfUsersAvailable(db, challenge),
+    expireExpiredPendingDicePvpChallenges: (nowMs) =>
+      expireExpiredPendingDicePvpChallenges(db, nowMs),
     expireExpiredPendingDicePvpChallengesForUser: (userId, nowMs) =>
       expireExpiredPendingDicePvpChallengesForUser(db, userId, nowMs),
     getDicePvpChallenge: (challengeId) => getDicePvpChallenge(db, challengeId),

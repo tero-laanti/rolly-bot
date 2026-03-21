@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseDiceBalance, parseRandomEventScenarios } from "./validate";
+import { parseDiceBalance, parseDiceRaidsData, parseRandomEventScenarios } from "./validate";
 
 type RandomEventScenarioInput = {
   id: string;
@@ -112,4 +112,46 @@ test("parseDiceBalance defaults firstDailyRollPipReward to zero when omitted", (
   });
 
   assert.equal(parsed.firstDailyRollPipReward, 0);
+});
+
+test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
+  const raids = parseDiceRaidsData({
+    reward: {
+      pipsByBossLevel: [
+        { bossLevelAtLeast: 1, pips: 4 },
+        { bossLevelAtLeast: 5, pips: 6 },
+      ],
+      rollPassBuff: {
+        multiplierPerBossLevel: 1,
+        minimumMultiplier: 2,
+        maximumMultiplier: 10,
+        rollsPerBossLevelDivisor: 5,
+        minimumRolls: 1,
+        maximumRolls: 3,
+      },
+    },
+    bossNames: {
+      prefixes: ["Example"],
+      suffixes: ["Boss"],
+    },
+    bossBalance: {
+      expectedRollIntervalSeconds: 10,
+      minimumHitsPerParticipant: 12,
+      minimumBossHp: 120,
+      damageBudgetRatio: 0.7,
+      baseHp: 80,
+      hpPerBossLevel: 28,
+      timeBudgetFlatHpPerMinute: 6,
+      participantPrestigeWeight: 2,
+      participantExtraSidesDivisor: 2,
+      baselineDieSides: 6,
+      maxBossLevel: 999,
+    },
+  });
+
+  assert.ok("pipsByBossLevel" in raids.reward);
+  assert.deepEqual(raids.reward.pipsByBossLevel, [
+    { bossLevelAtLeast: 1, pips: 4 },
+    { bossLevelAtLeast: 5, pips: 6 },
+  ]);
 });
