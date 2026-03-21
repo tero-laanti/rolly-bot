@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseDiceBalance, parseDiceRaidsData, parseRandomEventScenarios } from "./validate";
+import {
+  parseDiceBalance,
+  parseDiceItems,
+  parseDiceRaidsData,
+  parseRandomEventScenarios,
+} from "./validate";
 
 type RandomEventScenarioInput = {
   id: string;
@@ -54,6 +59,19 @@ const createDiceBalanceInput = () => ({
   charge: {
     startAfterMinutes: 10,
     maxMultiplier: 100,
+  },
+});
+
+const createDiceItemInput = () => ({
+  id: "padded-bracers",
+  name: "Padded Bracers",
+  description: "Reduce PvP loser lockout duration.",
+  pricePips: 25,
+  consumable: false,
+  effect: {
+    type: "passive-pvp-loser-lockout-reduction",
+    reductionPercent: 0.25,
+    minimumMinutes: 5,
   },
 });
 
@@ -154,4 +172,14 @@ test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
     { bossLevelAtLeast: 1, pips: 4 },
     { bossLevelAtLeast: 5, pips: 6 },
   ]);
+});
+
+test("parseDiceItems rejects passive effects on consumable items", () => {
+  const item = createDiceItemInput();
+  item.consumable = true;
+
+  assert.throws(
+    () => parseDiceItems([item]),
+    /Passive item padded-bracers must set consumable to false/i,
+  );
 });
