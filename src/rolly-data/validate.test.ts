@@ -103,3 +103,19 @@ test("parseRandomEventScenarios rejects stray challengeOutcomeIds without a roll
     /challengeOutcomeIds require an explicit rollChallenge/i,
   );
 });
+
+test("parseDiceBalance defaults firstDailyRollPipReward to zero when omitted", () => {
+  const parsed = parseDiceBalance({
+    prestigeSides: [6, 8, 12, 20],
+    lowerPrestigeBaseLevel: 5,
+    banStep: 4,
+    levelUpReward: 1,
+    maxRollPassCount: 500,
+    charge: {
+      startAfterMinutes: 10,
+      maxMultiplier: 100,
+    },
+  });
+
+  assert.equal(parsed.firstDailyRollPipReward, 0);
+});

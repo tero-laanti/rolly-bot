@@ -142,6 +142,7 @@ const runAutoRollTick = async (session: AutoRollSession): Promise<void> => {
   const result = runRollDiceUseCase({
     userId: session.reservation.userId,
     userMention: session.userMention,
+    source: "auto",
   });
   const classification = result.autoRollClassification;
 
