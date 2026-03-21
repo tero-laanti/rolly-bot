@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getAchievementPipRewardTotal } from "../../domain/achievements-store";
 import { getFirstDailyRollPipReward } from "../../domain/game-rules";
 import { createRunRollDiceUseCase } from "./use-case";
 
@@ -68,7 +69,7 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
       nowMs: 1_710_000_000_000,
     });
 
-    assert.match(result.content, /peak-goblin/);
+    assert.equal(result.content.includes("peak-goblin"), true);
   } finally {
     Math.random = originalRandom;
   }
@@ -274,6 +275,8 @@ test("auto rolls do not grant the daily pip reward", () => {
 test("reward text includes both fame and pip rewards when both are earned", () => {
   const originalRandom = Math.random;
   Math.random = () => 0;
+  const achievementPipReward =
+    getAchievementPipRewardTotal(["first-roll", "first-level-up"]) + firstDailyRollPipReward;
 
   try {
     const useCase = createRunRollDiceUseCase({
@@ -336,7 +339,7 @@ test("reward text includes both fame and pip rewards when both are earned", () =
 
     assert.match(
       result.content,
-      new RegExp(`You receive 3 Fame and ${firstDailyRollPipReward} Pips and a new die\\.`),
+      new RegExp(`You receive 3 Fame and ${achievementPipReward} Pips and a new die\\.`),
     );
   } finally {
     Math.random = originalRandom;

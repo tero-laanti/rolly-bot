@@ -167,7 +167,7 @@ test("finalizing auto-roll item use records item-use progress inside a transacti
     itemId: autoRollItem.id,
   });
 
-  assert.deepEqual(calls, ["transaction", `record:user-1:${autoRollItem.id}`, "award"]);
+  assert.deepEqual(calls, ["transaction", `record:user-1:${autoRollItem.id}`]);
   assert.equal(result.achievementText, undefined);
 });
 

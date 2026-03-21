@@ -11,10 +11,11 @@ test("achievement pip rewards are granted only on first unlock", () => {
   const progression = createSqliteProgressionAchievementsRepository(db);
   const economy = createSqliteEconomyRepository(db);
 
-  const first = progression.awardAchievements("user-1", ["first-roll", "first-level-up"]);
-  const second = progression.awardAchievements("user-1", ["first-roll", "first-level-up"]);
+  const achievementIds = ["example-pair", "example-manual-prestige"];
+  const first = progression.awardAchievements("user-1", achievementIds);
+  const second = progression.awardAchievements("user-1", achievementIds);
 
-  assert.deepEqual(first, ["first-roll", "first-level-up"]);
+  assert.deepEqual(first, achievementIds);
   assert.deepEqual(second, []);
-  assert.equal(economy.getPips("user-1"), 6);
+  assert.equal(economy.getPips("user-1"), 23);
 });
