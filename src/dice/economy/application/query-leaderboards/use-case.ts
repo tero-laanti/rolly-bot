@@ -1,4 +1,4 @@
-import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import type { ActionButtonRowSpec } from "../../../../shared-kernel/application/action-view";
 import type {
   DiceEconomyRepository,
   EconomyLeaderboardEntry,
@@ -16,7 +16,35 @@ export type DiceLeaderboardsAction = {
   metric: EconomyLeaderboardMetric;
 };
 
-export type DiceLeaderboardsResult = ActionResult<DiceLeaderboardsAction>;
+export type DiceLeaderboardRow = {
+  rank: number;
+  userId: string;
+  summary: string;
+};
+
+export type DiceLeaderboardsView = {
+  title: string;
+  rows: DiceLeaderboardRow[];
+  emptyMessage: string;
+  components: ActionButtonRowSpec<DiceLeaderboardsAction>[];
+};
+
+export type DiceLeaderboardsResult =
+  | {
+      kind: "reply";
+      payload: {
+        type: "view";
+        view: DiceLeaderboardsView;
+        ephemeral: boolean;
+      };
+    }
+  | {
+      kind: "update";
+      payload: {
+        type: "view";
+        view: DiceLeaderboardsView;
+      };
+    };
 
 type QueryDiceLeaderboardsDependencies = {
   economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
@@ -60,9 +88,11 @@ const buildLeaderboardsView = (
     progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
   },
   metric: EconomyLeaderboardMetric,
-): ActionView<DiceLeaderboardsAction> => {
+): DiceLeaderboardsView => {
   return {
-    content: buildLeaderboardsContent(dependencies, metric),
+    title: `**Rolly Leaderboards: Top ${leaderboardSize} ${formatMetricLabel(metric)}**`,
+    rows: buildLeaderboardRows(dependencies, metric),
+    emptyMessage: "No players are on the leaderboard yet.",
     components: [
       [
         {
@@ -88,47 +118,31 @@ const buildLeaderboardsView = (
   };
 };
 
-const buildLeaderboardsContent = (
+const buildLeaderboardRows = (
   dependencies: {
     economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
     progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
   },
   metric: EconomyLeaderboardMetric,
-): string => {
-  const lines = buildLeaderboardLines(dependencies, metric);
-
-  return [
-    `**Rolly Leaderboards: Top ${leaderboardSize} ${formatMetricLabel(metric)}**`,
-    "",
-    ...lines,
-  ].join("\n");
-};
-
-const buildLeaderboardLines = (
-  dependencies: {
-    economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
-    progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
-  },
-  metric: EconomyLeaderboardMetric,
-): string[] => {
+): DiceLeaderboardRow[] => {
   if (metric === "prestige") {
     const entries = dependencies.progression.getTopPrestigeEntries(leaderboardSize);
-    return entries.length > 0
-      ? entries.map(
-          (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatPrestigeEntry(entry)}`,
-        )
-      : ["No players are on the leaderboard yet."];
+    return entries.map((entry, index) => ({
+      rank: index + 1,
+      userId: entry.userId,
+      summary: formatPrestigeEntry(entry),
+    }));
   }
 
   const entries = dependencies.economy.getTopBalanceEntries({
     metric,
     limit: leaderboardSize,
   });
-  return entries.length > 0
-    ? entries.map(
-        (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatEntry(metric, entry)}`,
-      )
-    : ["No players are on the leaderboard yet."];
+  return entries.map((entry, index) => ({
+    rank: index + 1,
+    userId: entry.userId,
+    summary: formatEntry(metric, entry),
+  }));
 };
 
 const formatEntry = (metric: "fame" | "pips", entry: EconomyLeaderboardEntry): string => {

@@ -4,6 +4,7 @@ import {
   applyButtonResult,
   applyChatInputResult,
 } from "../../../../../app/discord/interaction-response";
+import { createUserDisplayNameResolver } from "../../../../../app/discord/resolve-user-display-name";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteQueryDiceLeaderboardsUseCase } from "../../../infrastructure/sqlite/services";
 import {
@@ -28,7 +29,13 @@ const handleDiceLeaderboardsButton = async (interaction: ButtonInteraction): Pro
   const queryDiceLeaderboards = createSqliteQueryDiceLeaderboardsUseCase(getDatabase());
   await applyButtonResult(
     interaction,
-    renderDiceLeaderboardsResult(queryDiceLeaderboards.handleDiceLeaderboardsAction(action)),
+    await renderDiceLeaderboardsResult(
+      queryDiceLeaderboards.handleDiceLeaderboardsAction(action),
+      createUserDisplayNameResolver({
+        client: interaction.client,
+        guild: interaction.guild,
+      }),
+    ),
   );
 };
 
@@ -40,7 +47,13 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   const queryDiceLeaderboards = createSqliteQueryDiceLeaderboardsUseCase(getDatabase());
   await applyChatInputResult(
     interaction,
-    renderDiceLeaderboardsResult(queryDiceLeaderboards.createDiceLeaderboardsReply()),
+    await renderDiceLeaderboardsResult(
+      queryDiceLeaderboards.createDiceLeaderboardsReply(),
+      createUserDisplayNameResolver({
+        client: interaction.client,
+        guild: interaction.guild,
+      }),
+    ),
   );
 };
 
