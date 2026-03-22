@@ -8,7 +8,7 @@ export type EconomySnapshot = {
   pips: number;
 };
 
-export type EconomyLeaderboardMetric = "fame" | "pips";
+export type EconomyLeaderboardMetric = "fame" | "pips" | "prestige";
 
 export type EconomyLeaderboardEntry = EconomySnapshot & {
   userId: string;

@@ -4,7 +4,6 @@ import type {
   DailyPipGrantResult,
   EconomyChange,
   EconomyLeaderboardEntry,
-  EconomyLeaderboardMetric,
   EconomySnapshot,
 } from "../../domain/balance";
 
@@ -31,12 +30,12 @@ const getLastDailyPipRewardAt = (db: SqliteDatabase, userId: string): string | n
   return row?.last_daily_pip_reward_at ?? null;
 };
 
-const leaderboardQueries: Record<EconomyLeaderboardMetric, string> = {
+const leaderboardQueries: Record<"fame" | "pips", string> = {
   fame: `
     SELECT user_id AS userId, fame, pips
     FROM balances
     WHERE fame > 0 OR pips > 0
-    ORDER BY fame DESC, pips DESC, user_id ASC
+    ORDER BY fame DESC, COALESCE(fame_updated_at, updated_at) ASC, user_id ASC
     LIMIT ?
   `,
   pips: `
@@ -51,7 +50,7 @@ const leaderboardQueries: Record<EconomyLeaderboardMetric, string> = {
 const getTopBalanceEntries = (
   db: SqliteDatabase,
   input: {
-    metric: EconomyLeaderboardMetric;
+    metric: "fame" | "pips";
     limit: number;
   },
 ): EconomyLeaderboardEntry[] => {
@@ -71,10 +70,13 @@ const applyFameDelta = (db: SqliteDatabase, { userId, amount }: EconomyChange): 
   const updatedAt = new Date().toISOString();
   const upsert = db.prepare(
     `
-    INSERT INTO balances (user_id, fame, updated_at)
-    VALUES (@userId, @amount, @updatedAt)
+    INSERT INTO balances (user_id, fame, fame_updated_at, updated_at)
+    VALUES (@userId, @amount, @updatedAt, @updatedAt)
     ON CONFLICT(user_id)
-    DO UPDATE SET fame = fame + excluded.fame, updated_at = excluded.updated_at
+    DO UPDATE SET
+      fame = fame + excluded.fame,
+      fame_updated_at = excluded.fame_updated_at,
+      updated_at = excluded.updated_at
   `,
   );
   const select = db.prepare("SELECT fame FROM balances WHERE user_id = ?");

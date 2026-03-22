@@ -22,6 +22,12 @@ export type DicePrestigeUpdate = {
   prestige: number;
 };
 
+export type DicePrestigeLeaderboardEntry = {
+  userId: string;
+  prestige: number;
+  level: number;
+};
+
 export type DiceBanUpdate = {
   userId: string;
   dieIndex: number;
@@ -51,6 +57,7 @@ export type DiceProgressionRepository = {
   setDiceLevel: (update: DiceLevelUpdate) => void;
   setDiceLevelForPrestige: (update: DiceLevelByPrestigeUpdate) => void;
   getDicePrestige: (userId: string) => number;
+  getTopPrestigeEntries: (limit: number) => DicePrestigeLeaderboardEntry[];
   setDicePrestige: (update: DicePrestigeUpdate) => void;
   getActiveDicePrestige: (userId: string) => number;
   setActiveDicePrestige: (update: DicePrestigeUpdate) => void;

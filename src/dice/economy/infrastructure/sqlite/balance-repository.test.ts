@@ -47,13 +47,30 @@ test("getTopBalanceEntries sorts by the requested metric and excludes empty rows
   initializeDatabaseSchema(db);
   const economy = createSqliteEconomyRepository(db);
 
-  economy.applyFameDelta({ userId: "user-1", amount: 40 });
-  economy.applyPipsDelta({ userId: "user-1", amount: 15 });
-  economy.applyFameDelta({ userId: "user-2", amount: 40 });
-  economy.applyPipsDelta({ userId: "user-2", amount: 18 });
-  economy.applyFameDelta({ userId: "user-3", amount: 12 });
-  economy.applyPipsDelta({ userId: "user-3", amount: 25 });
-  economy.applyFameDelta({ userId: "user-4", amount: 0 });
+  db.prepare(
+    `
+    INSERT INTO balances (user_id, fame, pips, fame_updated_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  ).run("user-1", 40, 15, "2026-03-20T12:00:00.000Z", "2026-03-22T12:00:00.000Z");
+  db.prepare(
+    `
+    INSERT INTO balances (user_id, fame, pips, fame_updated_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  ).run("user-2", 40, 18, "2026-03-19T12:00:00.000Z", "2026-03-21T12:00:00.000Z");
+  db.prepare(
+    `
+    INSERT INTO balances (user_id, fame, pips, fame_updated_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  ).run("user-3", 12, 25, "2026-03-18T12:00:00.000Z", "2026-03-22T15:00:00.000Z");
+  db.prepare(
+    `
+    INSERT INTO balances (user_id, fame, pips, fame_updated_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  ).run("user-4", 0, 0, "2026-03-18T12:00:00.000Z", "2026-03-18T12:00:00.000Z");
 
   assert.deepEqual(
     economy.getTopBalanceEntries({
