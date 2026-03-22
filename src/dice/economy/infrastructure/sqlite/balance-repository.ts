@@ -1,6 +1,12 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { DiceEconomyRepository } from "../../application/ports";
-import type { DailyPipGrantResult, EconomyChange, EconomySnapshot } from "../../domain/balance";
+import type {
+  DailyPipGrantResult,
+  EconomyChange,
+  EconomyLeaderboardEntry,
+  EconomyLeaderboardMetric,
+  EconomySnapshot,
+} from "../../domain/balance";
 
 const getEconomySnapshot = (db: SqliteDatabase, userId: string): EconomySnapshot => {
   const row = db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get(userId) as
@@ -23,6 +29,34 @@ const getLastDailyPipRewardAt = (db: SqliteDatabase, userId: string): string | n
     | undefined;
 
   return row?.last_daily_pip_reward_at ?? null;
+};
+
+const leaderboardQueries: Record<EconomyLeaderboardMetric, string> = {
+  fame: `
+    SELECT user_id AS userId, fame, pips
+    FROM balances
+    WHERE fame > 0 OR pips > 0
+    ORDER BY fame DESC, pips DESC, user_id ASC
+    LIMIT ?
+  `,
+  pips: `
+    SELECT user_id AS userId, fame, pips
+    FROM balances
+    WHERE fame > 0 OR pips > 0
+    ORDER BY pips DESC, fame DESC, user_id ASC
+    LIMIT ?
+  `,
+};
+
+const getTopBalanceEntries = (
+  db: SqliteDatabase,
+  input: {
+    metric: EconomyLeaderboardMetric;
+    limit: number;
+  },
+): EconomyLeaderboardEntry[] => {
+  const safeLimit = Math.max(1, Math.floor(input.limit));
+  return db.prepare(leaderboardQueries[input.metric]).all(safeLimit) as EconomyLeaderboardEntry[];
 };
 
 const getFame = (db: SqliteDatabase, userId: string): number => {
@@ -144,6 +178,7 @@ const grantDailyPipsIfEligible = (
 export const createSqliteEconomyRepository = (db: SqliteDatabase): DiceEconomyRepository => {
   return {
     getEconomySnapshot: (userId) => getEconomySnapshot(db, userId),
+    getTopBalanceEntries: (input) => getTopBalanceEntries(db, input),
     getFame: (userId) => getFame(db, userId),
     getPips: (userId) => getPips(db, userId),
     getLastDailyPipRewardAt: (userId) => getLastDailyPipRewardAt(db, userId),

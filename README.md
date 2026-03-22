@@ -23,7 +23,7 @@ Random events arrive as live interaction prompts inside the server:
 
 ## Command Surface
 
-- Player commands: `/dice`, `/dice-prestige`, `/dice-bans`, `/dice-casino`, `/dice-shop`, `/dice-inventory`, `/dice-pvp`, `/dice-achievements`, and `/dice-analytics`
+- Player commands: `/dice`, `/dice-balance`, `/dice-leaderboards`, `/dice-prestige`, `/dice-bans`, `/dice-casino`, `/dice-shop`, `/dice-inventory`, `/dice-pvp`, `/dice-achievements`, and `/dice-analytics`
 - Owner/admin commands: `/dice-admin` and `/self-update`
 
 ## Quick Start

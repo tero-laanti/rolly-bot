@@ -41,3 +41,40 @@ test("grantDailyPipsIfEligible awards once per UTC day", () => {
     lastDailyPipRewardAt: "2026-03-21T00:00:00.000Z",
   });
 });
+
+test("getTopBalanceEntries sorts by the requested metric and excludes empty rows", () => {
+  const db = new Database(":memory:");
+  initializeDatabaseSchema(db);
+  const economy = createSqliteEconomyRepository(db);
+
+  economy.applyFameDelta({ userId: "user-1", amount: 40 });
+  economy.applyPipsDelta({ userId: "user-1", amount: 15 });
+  economy.applyFameDelta({ userId: "user-2", amount: 40 });
+  economy.applyPipsDelta({ userId: "user-2", amount: 18 });
+  economy.applyFameDelta({ userId: "user-3", amount: 12 });
+  economy.applyPipsDelta({ userId: "user-3", amount: 25 });
+  economy.applyFameDelta({ userId: "user-4", amount: 0 });
+
+  assert.deepEqual(
+    economy.getTopBalanceEntries({
+      metric: "fame",
+      limit: 3,
+    }),
+    [
+      { userId: "user-2", fame: 40, pips: 18 },
+      { userId: "user-1", fame: 40, pips: 15 },
+      { userId: "user-3", fame: 12, pips: 25 },
+    ],
+  );
+
+  assert.deepEqual(
+    economy.getTopBalanceEntries({
+      metric: "pips",
+      limit: 2,
+    }),
+    [
+      { userId: "user-3", fame: 12, pips: 25 },
+      { userId: "user-2", fame: 40, pips: 18 },
+    ],
+  );
+});
