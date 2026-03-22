@@ -1,23 +1,33 @@
-export type EconomySnapshot = {
-  fame: number;
-  pips: number;
-};
+import type {
+  DailyPipGrantResult,
+  EconomyChange,
+  EconomyLeaderboardEntry,
+  EconomyLeaderboardMetric,
+  EconomySnapshot,
+} from "../domain/balance";
 
-export type EconomyChange = {
-  userId: string;
-  amount: number;
-};
+export type {
+  DailyPipGrantResult,
+  EconomyChange,
+  EconomyLeaderboardEntry,
+  EconomyLeaderboardMetric,
+  EconomySnapshot,
+} from "../domain/balance";
 
 export type DiceEconomyRepository = {
   getEconomySnapshot: (userId: string) => EconomySnapshot;
+  getTopBalanceEntries: (input: {
+    metric: EconomyLeaderboardMetric;
+    limit: number;
+  }) => EconomyLeaderboardEntry[];
   getFame: (userId: string) => number;
   getPips: (userId: string) => number;
   getLastDailyPipRewardAt: (userId: string) => string | null;
   applyFameDelta: (change: EconomyChange) => number;
   applyPipsDelta: (change: EconomyChange) => number;
-  grantDailyPipsIfEligible: (input: { userId: string; amount: number; nowMs?: number }) => {
-    awarded: boolean;
-    pips: number;
-    lastDailyPipRewardAt: string | null;
-  };
+  grantDailyPipsIfEligible: (input: {
+    userId: string;
+    amount: number;
+    nowMs?: number;
+  }) => DailyPipGrantResult;
 };

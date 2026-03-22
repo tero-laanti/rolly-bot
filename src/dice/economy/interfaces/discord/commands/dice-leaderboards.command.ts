@@ -1,0 +1,52 @@
+import { SlashCommandBuilder } from "discord.js";
+import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
+import {
+  applyButtonResult,
+  applyChatInputResult,
+} from "../../../../../app/discord/interaction-response";
+import { getDatabase } from "../../../../../shared/db";
+import { createSqliteQueryDiceLeaderboardsUseCase } from "../../../infrastructure/sqlite/services";
+import {
+  diceLeaderboardsButtonPrefix,
+  parseDiceLeaderboardsAction,
+} from "../buttons/leaderboards-buttons";
+import { renderDiceLeaderboardsResult } from "../presenters/leaderboards.presenter";
+
+const handleDiceLeaderboardsButton = async (interaction: ButtonInteraction): Promise<void> => {
+  const action = parseDiceLeaderboardsAction(interaction.customId);
+  if (!action) {
+    await applyButtonResult(interaction, {
+      kind: "reply",
+      payload: {
+        content: "Unknown leaderboard action.",
+        ephemeral: true,
+      },
+    });
+    return;
+  }
+
+  const queryDiceLeaderboards = createSqliteQueryDiceLeaderboardsUseCase(getDatabase());
+  await applyButtonResult(
+    interaction,
+    renderDiceLeaderboardsResult(queryDiceLeaderboards.handleDiceLeaderboardsAction(action)),
+  );
+};
+
+export const data = new SlashCommandBuilder()
+  .setName("dice-leaderboards")
+  .setDescription("Show the top Fame and Pips rankings.");
+
+export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
+  const queryDiceLeaderboards = createSqliteQueryDiceLeaderboardsUseCase(getDatabase());
+  await applyChatInputResult(
+    interaction,
+    renderDiceLeaderboardsResult(queryDiceLeaderboards.createDiceLeaderboardsReply()),
+  );
+};
+
+export const buttonHandlers = [
+  {
+    prefix: diceLeaderboardsButtonPrefix,
+    handle: handleDiceLeaderboardsButton,
+  },
+];

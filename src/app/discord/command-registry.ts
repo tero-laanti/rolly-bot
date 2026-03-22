@@ -6,6 +6,8 @@ import * as dicePrestigeCommand from "../../dice/progression/interfaces/discord/
 import * as diceAdminCommand from "../../dice/admin/interfaces/discord/commands/dice-admin.command";
 import * as diceAnalyticsCommand from "../../dice/analytics/interfaces/discord/commands/dice-analytics.command";
 import * as diceCasinoCommand from "../../dice/casino/interfaces/discord/commands/dice-casino.command";
+import * as diceBalanceCommand from "../../dice/economy/interfaces/discord/commands/dice-balance.command";
+import * as diceLeaderboardsCommand from "../../dice/economy/interfaces/discord/commands/dice-leaderboards.command";
 import * as diceInventoryCommand from "../../dice/inventory/interfaces/discord/commands/dice-inventory.command";
 import * as diceShopCommand from "../../dice/inventory/interfaces/discord/commands/dice-shop.command";
 import * as dicePvpCommand from "../../dice/pvp/interfaces/discord/commands/dice-pvp.command";
@@ -27,6 +29,8 @@ const discordCommandModules: DiscordCommandModule[] = [
   diceBansCommand,
   diceAchievementsCommand,
   diceCasinoCommand,
+  diceBalanceCommand,
+  diceLeaderboardsCommand,
   diceShopCommand,
   diceInventoryCommand,
   dicePvpCommand,
