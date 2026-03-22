@@ -15,7 +15,6 @@ export const buildCasinoView = (
     `Pips: ${pips}.`,
     `Bet: ${session.bet}.`,
     `Selected game: ${getDiceCasinoGameLabel(session.state.selectedGame)}.`,
-    "All payouts are integer total returns including stake. Fractional theoretical payouts are rounded down in the house's favor.",
   ];
 
   if (session.state.lastOutcome) {

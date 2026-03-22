@@ -389,7 +389,7 @@ export const createRandomEventsLiveRuntime = ({
       context.failedAttemptUserIds.add(userId);
       context.failedAttemptLines.push(
         achievementText
-          ? `${attemptResolution.failedAttemptLine} ${achievementText}`
+          ? `${attemptResolution.failedAttemptLine}\n${achievementText}`
           : attemptResolution.failedAttemptLine,
       );
       clearSequenceChallengeTimer(context);

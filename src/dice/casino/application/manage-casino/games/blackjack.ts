@@ -6,7 +6,6 @@ import {
   getBlackjackHandTotals,
   getBlackjackDieSides,
   getBlackjackNaturalPayout,
-  getBlackjackNaturalPayoutRatio,
   getBlackjackWinPayoutMultiplier,
   getDiceCasinoBetTier,
   hitBlackjackRound,
@@ -44,7 +43,7 @@ const buildBlackjackDescriptionLines = (
     `d${getBlackjackDieSides()} draws. A 1 is Ace (1 or 11). Dealer stands on soft ${getBlackjackDealerStandOnTotal()}.`,
     `Normal win: ${session.bet * getBlackjackWinPayoutMultiplier()} total.`,
     `Push: ${session.bet} total.`,
-    `Natural: floor(${getBlackjackNaturalPayoutRatio().numerator} * bet / ${getBlackjackNaturalPayoutRatio().denominator}) = ${getBlackjackNaturalPayout(session.bet)}.`,
+    `Natural 21: ${getBlackjackNaturalPayout(session.bet)}.`,
     "Dealer natural is checked immediately after the opening deal.",
   ];
 

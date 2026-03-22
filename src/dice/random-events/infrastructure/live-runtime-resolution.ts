@@ -452,7 +452,7 @@ export const resolveRandomEvent = async ({
         context.failedAttemptUserIds.has(userId),
     });
     return achievementText
-      ? `${attemptResolution.finalLine} ${achievementText}`
+      ? `${attemptResolution.finalLine}\n${achievementText}`
       : attemptResolution.finalLine;
   });
 

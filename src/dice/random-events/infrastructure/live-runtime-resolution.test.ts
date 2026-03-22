@@ -832,6 +832,82 @@ test("threshold multi-user events expire if the required ready count is not met"
   assert.equal(expiredEmbed.footer?.text, "Rare Event • Expired");
 });
 
+test("resolved event lines place unlocked achievements on a new line", async () => {
+  const scenario: RandomEventScenario = {
+    id: "resolved-achievement-newline",
+    rarity: "rare",
+    title: "Resolved Achievement Newline",
+    prompt: "Open the old gate.",
+    claimLabel: "Open",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "gate-opens",
+        resolution: "resolve-success",
+        message: "The gate opens.",
+        effects: [],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario, {
+    random: () => 0,
+  });
+  const editedPayloads: Array<{ embeds?: Array<{ description?: string }> }> = [];
+  const message = {
+    edit: async (payload: { embeds?: Array<{ description?: string }> }) => {
+      editedPayloads.push(payload);
+    },
+  } as unknown as Message;
+  const activeEventsById = new Map([
+    [
+      "event-achievement-newline",
+      {
+        eventId: "event-achievement-newline",
+        selection,
+        message,
+        sequenceChallenge: null,
+        currentPhaseExpiresAtMs: Date.now() + 60_000,
+        attemptedUserIds: new Set<string>(),
+        failedAttemptLines: [],
+        failedAttemptUserIds: new Set<string>(),
+      },
+    ],
+  ]);
+  const state = createRandomEventsState();
+  registerActiveRandomEvent(state, {
+    id: "event-achievement-newline",
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  await resolveRandomEvent({
+    activeEventsById,
+    state,
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+    },
+    eventId: "event-achievement-newline",
+    participants: ["111"],
+    onAttemptResolved: () => "Achievement unlocked: Bitten Once (first random-event failure).",
+  });
+
+  const resolvedEmbedDescription = editedPayloads[0]?.embeds?.[0]?.description;
+  assert.ok(resolvedEmbedDescription);
+  assert.match(
+    resolvedEmbedDescription,
+    /<@111>: Success: The gate opens\.\nAchievement unlocked: Bitten Once \(first random-event failure\)\./,
+  );
+});
+
 test("keep-open comeback progress only counts when the same user failed before succeeding", async () => {
   const scenario: RandomEventScenario = {
     id: "keep-open-comeback-attribution",
