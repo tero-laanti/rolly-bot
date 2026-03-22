@@ -115,7 +115,7 @@ const buildLeaderboardLines = (
     const entries = dependencies.progression.getTopPrestigeEntries(leaderboardSize);
     return entries.length > 0
       ? entries.map(
-          (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatPrestigeEntry(entry)}`,
+          (entry, index) => `${index + 1}. ${entry.userId} - ${formatPrestigeEntry(entry)}`,
         )
       : ["No players are on the leaderboard yet."];
   }
@@ -125,9 +125,7 @@ const buildLeaderboardLines = (
     limit: leaderboardSize,
   });
   return entries.length > 0
-    ? entries.map(
-        (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatEntry(metric, entry)}`,
-      )
+    ? entries.map((entry, index) => `${index + 1}. ${entry.userId} - ${formatEntry(metric, entry)}`)
     : ["No players are on the leaderboard yet."];
 };
 

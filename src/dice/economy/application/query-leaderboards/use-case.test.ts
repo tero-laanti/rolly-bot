@@ -23,7 +23,7 @@ test("leaderboards default to top pips and disable the active toggle", () => {
   assert.equal(result.kind, "reply");
   assert.equal(result.payload.type, "view");
   assert.equal(result.payload.view.content.includes("Top 10 Pips"), true);
-  assert.equal(result.payload.view.content.includes("1. <@user-2> - 15 Pips | 40 Fame"), true);
+  assert.equal(result.payload.view.content.includes("1. user-2 - 15 Pips | 40 Fame"), true);
   assert.equal(result.payload.view.components[0]?.[0]?.disabled, true);
   assert.equal(result.payload.view.components[0]?.[1]?.disabled, false);
   assert.equal(result.payload.view.components[0]?.[2]?.disabled, false);
@@ -53,7 +53,7 @@ test("leaderboards switch to fame ordering when the fame toggle is pressed", () 
   assert.equal(result.kind, "update");
   assert.equal(result.payload.type, "view");
   assert.equal(result.payload.view.content.includes("Top 10 Fame"), true);
-  assert.equal(result.payload.view.content.includes("1. <@user-3> - 50 Fame | 4 Pips"), true);
+  assert.equal(result.payload.view.content.includes("1. user-3 - 50 Fame | 4 Pips"), true);
   assert.equal(result.payload.view.components[0]?.[0]?.disabled, false);
   assert.equal(result.payload.view.components[0]?.[1]?.disabled, true);
   assert.equal(result.payload.view.components[0]?.[2]?.disabled, false);
@@ -80,7 +80,7 @@ test("leaderboards switch to prestige ordering when the prestige toggle is press
   assert.equal(result.kind, "update");
   assert.equal(result.payload.type, "view");
   assert.equal(result.payload.view.content.includes("Top 10 Prestige"), true);
-  assert.equal(result.payload.view.content.includes("1. <@user-9> - Prestige 4 | Level 2"), true);
+  assert.equal(result.payload.view.content.includes("1. user-9 - Prestige 4 | Level 2"), true);
   assert.equal(result.payload.view.components[0]?.[0]?.disabled, false);
   assert.equal(result.payload.view.components[0]?.[1]?.disabled, false);
   assert.equal(result.payload.view.components[0]?.[2]?.disabled, true);
