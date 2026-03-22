@@ -4,6 +4,10 @@ import type {
   EconomyLeaderboardEntry,
   EconomyLeaderboardMetric,
 } from "../ports";
+import type {
+  DicePrestigeLeaderboardEntry,
+  DiceProgressionRepository,
+} from "../../../progression/application/ports";
 
 const leaderboardSize = 10;
 
@@ -16,17 +20,19 @@ export type DiceLeaderboardsResult = ActionResult<DiceLeaderboardsAction>;
 
 type QueryDiceLeaderboardsDependencies = {
   economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
+  progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
 };
 
 export const createQueryDiceLeaderboardsUseCase = ({
   economy,
+  progression,
 }: QueryDiceLeaderboardsDependencies) => {
   const createDiceLeaderboardsReply = (): DiceLeaderboardsResult => {
     return {
       kind: "reply",
       payload: {
         type: "view",
-        view: buildLeaderboardsView(economy, "pips"),
+        view: buildLeaderboardsView({ economy, progression }, "pips"),
         ephemeral: false,
       },
     };
@@ -37,7 +43,7 @@ export const createQueryDiceLeaderboardsUseCase = ({
       kind: "update",
       payload: {
         type: "view",
-        view: buildLeaderboardsView(economy, action.metric),
+        view: buildLeaderboardsView({ economy, progression }, action.metric),
       },
     };
   };
@@ -49,16 +55,14 @@ export const createQueryDiceLeaderboardsUseCase = ({
 };
 
 const buildLeaderboardsView = (
-  economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">,
+  dependencies: {
+    economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
+    progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
+  },
   metric: EconomyLeaderboardMetric,
 ): ActionView<DiceLeaderboardsAction> => {
-  const entries = economy.getTopBalanceEntries({
-    metric,
-    limit: leaderboardSize,
-  });
-
   return {
-    content: buildLeaderboardsContent(metric, entries),
+    content: buildLeaderboardsContent(dependencies, metric),
     components: [
       [
         {
@@ -73,21 +77,25 @@ const buildLeaderboardsView = (
           style: metric === "fame" ? "primary" : "secondary",
           disabled: metric === "fame",
         },
+        {
+          action: { type: "metric", metric: "prestige" },
+          label: "Top Prestige",
+          style: metric === "prestige" ? "primary" : "secondary",
+          disabled: metric === "prestige",
+        },
       ],
     ],
   };
 };
 
 const buildLeaderboardsContent = (
+  dependencies: {
+    economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
+    progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
+  },
   metric: EconomyLeaderboardMetric,
-  entries: EconomyLeaderboardEntry[],
 ): string => {
-  const lines =
-    entries.length > 0
-      ? entries.map(
-          (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatEntry(metric, entry)}`,
-        )
-      : ["No players are on the leaderboard yet."];
+  const lines = buildLeaderboardLines(dependencies, metric);
 
   return [
     `**Rolly Leaderboards: Top ${leaderboardSize} ${formatMetricLabel(metric)}**`,
@@ -96,7 +104,34 @@ const buildLeaderboardsContent = (
   ].join("\n");
 };
 
-const formatEntry = (metric: EconomyLeaderboardMetric, entry: EconomyLeaderboardEntry): string => {
+const buildLeaderboardLines = (
+  dependencies: {
+    economy: Pick<DiceEconomyRepository, "getTopBalanceEntries">;
+    progression: Pick<DiceProgressionRepository, "getTopPrestigeEntries">;
+  },
+  metric: EconomyLeaderboardMetric,
+): string[] => {
+  if (metric === "prestige") {
+    const entries = dependencies.progression.getTopPrestigeEntries(leaderboardSize);
+    return entries.length > 0
+      ? entries.map(
+          (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatPrestigeEntry(entry)}`,
+        )
+      : ["No players are on the leaderboard yet."];
+  }
+
+  const entries = dependencies.economy.getTopBalanceEntries({
+    metric,
+    limit: leaderboardSize,
+  });
+  return entries.length > 0
+    ? entries.map(
+        (entry, index) => `${index + 1}. <@${entry.userId}> - ${formatEntry(metric, entry)}`,
+      )
+    : ["No players are on the leaderboard yet."];
+};
+
+const formatEntry = (metric: "fame" | "pips", entry: EconomyLeaderboardEntry): string => {
   if (metric === "fame") {
     return `${entry.fame} Fame | ${entry.pips} Pips`;
   }
@@ -104,6 +139,18 @@ const formatEntry = (metric: EconomyLeaderboardMetric, entry: EconomyLeaderboard
   return `${entry.pips} Pips | ${entry.fame} Fame`;
 };
 
+const formatPrestigeEntry = (entry: DicePrestigeLeaderboardEntry): string => {
+  return `Prestige ${entry.prestige} | Level ${entry.level}`;
+};
+
 const formatMetricLabel = (metric: EconomyLeaderboardMetric): string => {
-  return metric === "fame" ? "Fame" : "Pips";
+  if (metric === "fame") {
+    return "Fame";
+  }
+
+  if (metric === "prestige") {
+    return "Prestige";
+  }
+
+  return "Pips";
 };

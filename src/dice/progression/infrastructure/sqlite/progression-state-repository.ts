@@ -1,6 +1,7 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type {
   DiceLevelByPrestigeUpdate,
+  DicePrestigeLeaderboardEntry,
   DiceLevelUpdate,
   DicePrestigeUpdate,
   DiceProgressionRepository,
@@ -28,6 +29,7 @@ export const createSqliteProgressionStateRepository = (
   | "setDiceLevel"
   | "setDiceLevelForPrestige"
   | "getDicePrestige"
+  | "getTopPrestigeEntries"
   | "setDicePrestige"
   | "getActiveDicePrestige"
   | "setActiveDicePrestige"
@@ -61,6 +63,37 @@ export const createSqliteProgressionStateRepository = (
       prestige: normalizePrestige(prestige),
       updatedAt,
     });
+  };
+
+  const getTopPrestigeEntries = (limit: number): DicePrestigeLeaderboardEntry[] => {
+    const safeLimit = Math.max(1, Math.floor(limit));
+    return db
+      .prepare(
+        `
+        WITH tracked_users AS (
+          SELECT user_id FROM dice_prestige
+          UNION
+          SELECT user_id FROM dice_levels_by_prestige
+        )
+        SELECT
+          tracked_users.user_id AS userId,
+          COALESCE(dice_prestige.prestige, 0) AS prestige,
+          COALESCE(highest_level.level, 1) AS level
+        FROM tracked_users
+        LEFT JOIN dice_prestige
+          ON dice_prestige.user_id = tracked_users.user_id
+        LEFT JOIN dice_levels_by_prestige AS highest_level
+          ON highest_level.user_id = tracked_users.user_id
+         AND highest_level.prestige = COALESCE(dice_prestige.prestige, 0)
+        ORDER BY
+          COALESCE(dice_prestige.prestige, 0) DESC,
+          COALESCE(highest_level.level, 1) DESC,
+          COALESCE(highest_level.updated_at, dice_prestige.updated_at) ASC,
+          tracked_users.user_id ASC
+        LIMIT ?
+      `,
+      )
+      .all(safeLimit) as DicePrestigeLeaderboardEntry[];
   };
 
   const setActiveDicePrestige = ({ userId, prestige }: DicePrestigeUpdate): void => {
@@ -177,6 +210,7 @@ export const createSqliteProgressionStateRepository = (
     setDiceLevel,
     setDiceLevelForPrestige,
     getDicePrestige,
+    getTopPrestigeEntries,
     setDicePrestige,
     getActiveDicePrestige,
     setActiveDicePrestige,

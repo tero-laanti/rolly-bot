@@ -9,7 +9,7 @@ export const encodeDiceLeaderboardsAction = (action: DiceLeaderboardsAction): st
 };
 
 const isLeaderboardMetric = (value: string): value is EconomyLeaderboardMetric => {
-  return value === "fame" || value === "pips";
+  return value === "fame" || value === "pips" || value === "prestige";
 };
 
 export const parseDiceLeaderboardsAction = (customId: string): DiceLeaderboardsAction | null => {

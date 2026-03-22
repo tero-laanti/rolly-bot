@@ -17,7 +17,7 @@ export type {
 export type DiceEconomyRepository = {
   getEconomySnapshot: (userId: string) => EconomySnapshot;
   getTopBalanceEntries: (input: {
-    metric: EconomyLeaderboardMetric;
+    metric: Exclude<EconomyLeaderboardMetric, "prestige">;
     limit: number;
   }) => EconomyLeaderboardEntry[];
   getFame: (userId: string) => number;
