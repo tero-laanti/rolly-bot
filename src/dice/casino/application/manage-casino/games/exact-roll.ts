@@ -137,6 +137,7 @@ const handleExactRollAction = (
         ...session,
         state: {
           ...session.state,
+          currentScreen: "setup",
           exactRollMode: action.mode,
         },
       },
@@ -187,12 +188,13 @@ const handleExactRollAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             exactRollFace: action.face,
             exactRollMode: "exact-face",
             lastOutcome: appendAchievementUnlockText(
               resolution.won
-                ? `Exact Face hit. You picked ${action.face} and rolled ${rolledFace}. Paid ${resolution.payout} pips total.`
-                : `Exact Face missed. You picked ${action.face} and rolled ${rolledFace}.`,
+                ? `Hit. Picked ${action.face}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
+                : `Missed. Picked ${action.face}, rolled ${rolledFace}.`,
               newlyEarned,
             ),
           },
@@ -246,12 +248,13 @@ const handleExactRollAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             exactRollHighLowChoice: action.choice,
             exactRollMode: "high-low",
             lastOutcome: appendAchievementUnlockText(
               resolution.won
-                ? `High / Low hit. You picked ${capitalize(action.choice)} and rolled ${rolledFace}. Paid ${resolution.payout} pips total.`
-                : `High / Low missed. You picked ${capitalize(action.choice)} and rolled ${rolledFace}.`,
+                ? `Hit. Picked ${capitalize(action.choice)}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
+                : `Missed. Picked ${capitalize(action.choice)}, rolled ${rolledFace}.`,
               newlyEarned,
             ),
           },

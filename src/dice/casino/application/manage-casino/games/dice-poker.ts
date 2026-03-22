@@ -30,17 +30,6 @@ import type {
   MutateSessionResult,
 } from "../types";
 
-const buildStraightExamples = (): string => {
-  const maxStart = dicePokerDieSides - dicePokerDiceCount + 1;
-  const ranges: string[] = [];
-
-  for (let start = 1; start <= maxStart; start += 1) {
-    ranges.push(`${start}-${start + dicePokerDiceCount - 1}`);
-  }
-
-  return ranges.join(", ");
-};
-
 const buildDicePokerDescriptionLines = (
   session: DiceCasinoMutationContext["session"],
 ): string[] => {
@@ -51,7 +40,6 @@ const buildDicePokerDescriptionLines = (
     `Four of a Kind: ${session.bet * getDicePokerPayoutMultiplier("four-of-a-kind")} total.`,
     `Full House: ${session.bet * getDicePokerPayoutMultiplier("full-house")} total.`,
     `Straight: ${session.bet * getDicePokerPayoutMultiplier("straight")} total.`,
-    `Straight means ${buildStraightExamples()}.`,
   ];
 
   const round = getExpectedRound(session.state.activeRound, "dice-poker");
@@ -81,8 +69,8 @@ const buildDicePokerComponentRows = ({
   } as const;
   const holdRow: DiceCasinoActionRow = round.initialRoll.map((_, index) => ({
     action: { type: "poker-toggle-hold", ...actionTarget, index } as const,
-    label: round.heldIndices.includes(index) ? `Release ${index + 1}` : `Hold ${index + 1}`,
-    style: round.heldIndices.includes(index) ? "danger" : "secondary",
+    label: round.heldIndices.includes(index) ? `Held ${index + 1}` : `Hold ${index + 1}`,
+    style: round.heldIndices.includes(index) ? "primary" : "secondary",
   }));
   const actionRow: DiceCasinoActionRow = [
     {
@@ -125,6 +113,7 @@ const startDicePokerRound = ({
       ...session,
       state: {
         ...session.state,
+        currentScreen: "setup",
         activeRound: pokerRound,
         lastOutcome: `Dice Poker hand started. Hold any dice, including all ${dicePokerDiceCount}, then reroll once.`,
       },
@@ -152,6 +141,7 @@ const handleDicePokerAction = (
         ...session,
         state: {
           ...session.state,
+          currentScreen: "setup",
           activeRound: {
             ...round,
             heldIndices,
@@ -204,9 +194,10 @@ const handleDicePokerAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
             lastOutcome: appendAchievementUnlockText(
-              `Final hand ${formatDice(rerollResult.finalRoll)}. ${describePokerResult(
+              `Final hand: ${formatDice(rerollResult.finalRoll)}.\n${describePokerResult(
                 rerollResult.result,
               )}`,
               newlyEarned,
@@ -245,11 +236,9 @@ const handleDicePokerAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              "Dice Poker hand cancelled. Bet forfeited.",
-              newlyEarned,
-            ),
+            lastOutcome: appendAchievementUnlockText("Cancelled. Bet forfeited.", newlyEarned),
           },
         },
         pips,

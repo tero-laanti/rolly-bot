@@ -21,6 +21,21 @@ export type DiceCasinoAction =
       type: "refresh";
     } & DiceCasinoActionTarget)
   | ({
+      type: "go-lobby";
+    } & DiceCasinoActionTarget)
+  | ({
+      type: "show-rules";
+    } & DiceCasinoActionTarget)
+  | ({
+      type: "back";
+    } & DiceCasinoActionTarget)
+  | ({
+      type: "resume-round";
+    } & DiceCasinoActionTarget)
+  | ({
+      type: "play-again";
+    } & DiceCasinoActionTarget)
+  | ({
       type: "select-game";
       game: DiceCasinoGame;
     } & DiceCasinoActionTarget)

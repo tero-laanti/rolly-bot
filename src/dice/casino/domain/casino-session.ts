@@ -6,6 +6,8 @@ export type ExactRollMode = "exact-face" | "high-low";
 
 export type ExactRollHighLowChoice = "low" | "high";
 
+export type DiceCasinoScreen = "lobby" | "setup" | "rules" | "result";
+
 export type PushYourLuckRoundState = {
   type: "push-your-luck";
   bet: number;
@@ -37,6 +39,7 @@ export type DiceCasinoActiveRound =
 export type DiceCasinoSessionState = {
   sessionToken: string;
   allowLegacyActions: boolean;
+  currentScreen: DiceCasinoScreen;
   selectedGame: DiceCasinoGame;
   exactRollMode: ExactRollMode;
   exactRollFace: number;
@@ -61,6 +64,7 @@ export const createDefaultDiceCasinoSessionState = (
   return {
     sessionToken,
     allowLegacyActions: false,
+    currentScreen: "lobby",
     selectedGame: "exact-roll",
     exactRollMode: "exact-face",
     exactRollFace: 1,

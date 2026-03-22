@@ -139,9 +139,10 @@ const startBlackjackRound = ({
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
             lastOutcome: appendAchievementUnlockText(
-              `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
+              `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
                 resolution.playerHand,
               )}.`,
               newlyEarned,
@@ -159,6 +160,7 @@ const startBlackjackRound = ({
       ...session,
       state: {
         ...session.state,
+        currentScreen: "setup",
         activeRound: resolution.round,
         lastOutcome: "Blackjack hand started.",
       },
@@ -184,6 +186,7 @@ const handleBlackjackAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "setup",
             activeRound: resolution.round,
             lastOutcome: `You drew ${resolution.round.playerHand.at(-1) ?? resolution.round.playerHand[0]}.`,
           },
@@ -225,9 +228,10 @@ const handleBlackjackAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
             lastOutcome: appendAchievementUnlockText(
-              `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
+              `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
                 resolution.playerHand,
               )}.`,
               newlyEarned,
@@ -278,9 +282,10 @@ const handleBlackjackAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
             lastOutcome: appendAchievementUnlockText(
-              `${resolution.summary} Dealer: ${formatDice(resolution.dealerHand)}. You: ${formatDice(
+              `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
                 resolution.playerHand,
               )}.`,
               newlyEarned,

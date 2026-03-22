@@ -266,6 +266,78 @@ const mutateCasinoSession = ({
     );
   }
 
+  if (action.type === "go-lobby") {
+    return persistMutationResult(
+      sessions,
+      viewMutation(
+        {
+          ...nextSession,
+          state: {
+            ...nextSession.state,
+            currentScreen: "lobby",
+          },
+        },
+        nextPips,
+      ),
+    );
+  }
+
+  if (action.type === "show-rules") {
+    if (nextSession.state.activeRound) {
+      return replyMutation("Resume or finish the current round before opening rules.", true);
+    }
+
+    return persistMutationResult(
+      sessions,
+      viewMutation(
+        {
+          ...nextSession,
+          state: {
+            ...nextSession.state,
+            currentScreen: "rules",
+          },
+        },
+        nextPips,
+      ),
+    );
+  }
+
+  if (action.type === "back") {
+    return persistMutationResult(
+      sessions,
+      viewMutation(
+        {
+          ...nextSession,
+          state: {
+            ...nextSession.state,
+            currentScreen: "setup",
+          },
+        },
+        nextPips,
+      ),
+    );
+  }
+
+  if (action.type === "resume-round") {
+    if (!nextSession.state.activeRound) {
+      return replyMutation("There is no active round to resume.", true);
+    }
+
+    return persistMutationResult(
+      sessions,
+      viewMutation(
+        {
+          ...nextSession,
+          state: {
+            ...nextSession.state,
+            currentScreen: "setup",
+          },
+        },
+        nextPips,
+      ),
+    );
+  }
+
   if (action.type === "select-game") {
     if (nextSession.state.activeRound) {
       return replyMutation("Finish the current round before switching games.", true);
@@ -279,6 +351,7 @@ const mutateCasinoSession = ({
             ...nextSession,
             state: {
               ...nextSession.state,
+              currentScreen: "setup",
               selectedGame: action.game,
               lastOutcome: null,
             },
@@ -301,9 +374,52 @@ const mutateCasinoSession = ({
         {
           ...nextSession,
           bet: adjustSessionBet(nextSession.bet, action.adjustment, nextPips),
+          state: {
+            ...nextSession.state,
+            currentScreen: "setup",
+          },
         },
         nextPips,
       ),
+    );
+  }
+
+  if (action.type === "play-again") {
+    if (nextSession.state.activeRound) {
+      return replyMutation("Finish the current round before starting another one.", true);
+    }
+
+    if (nextSession.state.selectedGame === "exact-roll") {
+      return persistMutationResult(
+        sessions,
+        viewMutation(
+          {
+            ...nextSession,
+            state: {
+              ...nextSession.state,
+              currentScreen: "setup",
+            },
+          },
+          nextPips,
+        ),
+      );
+    }
+
+    return persistMutationResult(
+      sessions,
+      getDiceCasinoGameModule(nextSession.state.selectedGame).startRound({
+        analytics,
+        economy,
+        progression,
+        session: {
+          ...nextSession,
+          state: {
+            ...nextSession.state,
+            currentScreen: "setup",
+          },
+        },
+        pips: nextPips,
+      }),
     );
   }
 
@@ -318,7 +434,13 @@ const mutateCasinoSession = ({
         analytics,
         economy,
         progression,
-        session: nextSession,
+        session: {
+          ...nextSession,
+          state: {
+            ...nextSession.state,
+            currentScreen: "setup",
+          },
+        },
         pips: nextPips,
       }),
     );

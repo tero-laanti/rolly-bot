@@ -21,6 +21,11 @@ const encodeDiceCasinoTarget = (action: DiceCasinoAction, arg?: string | number)
 export const encodeDiceCasinoAction = (action: DiceCasinoAction): string => {
   switch (action.type) {
     case "refresh":
+    case "go-lobby":
+    case "show-rules":
+    case "back":
+    case "resume-round":
+    case "play-again":
     case "play":
     case "push-roll":
     case "push-cashout":
@@ -80,6 +85,11 @@ export const parseDiceCasinoAction = (customId: string): DiceCasinoAction | null
 
   if (
     action === "refresh" ||
+    action === "go-lobby" ||
+    action === "show-rules" ||
+    action === "back" ||
+    action === "resume-round" ||
+    action === "play-again" ||
     action === "play" ||
     action === "push-roll" ||
     action === "push-cashout" ||

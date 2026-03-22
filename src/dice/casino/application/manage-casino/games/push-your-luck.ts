@@ -111,6 +111,7 @@ const startPushYourLuckRound = ({
       ...session,
       state: {
         ...session.state,
+        currentScreen: "setup",
         activeRound: pushRound,
         lastOutcome: `Push Your Luck started. First roll: ${pushRound.rolls[0]}.`,
       },
@@ -137,6 +138,7 @@ const handlePushYourLuckAction = (
             ...session,
             state: {
               ...session.state,
+              currentScreen: "setup",
               activeRound: rollResult.round,
               lastOutcome: `Rolled ${rollResult.round.rolls.at(-1) ?? rollResult.round.rolls[0]}. ${rollResult.round.uniqueValues.length} unique faces so far.`,
             },
@@ -168,9 +170,10 @@ const handlePushYourLuckAction = (
             ...session,
             state: {
               ...session.state,
+              currentScreen: "result",
               activeRound: null,
               lastOutcome: appendAchievementUnlockText(
-                `Bust. You repeated ${rollResult.rolledValue} and lost the round.`,
+                `Bust. Repeated ${rollResult.rolledValue}.`,
                 newlyEarned,
               ),
             },
@@ -203,9 +206,10 @@ const handlePushYourLuckAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
             lastOutcome: appendAchievementUnlockText(
-              `Perfect run. Rolled ${rollResult.rolledValue} for ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips total.`,
+              `Perfect run. Reached ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips.`,
               newlyEarned,
             ),
           },
@@ -245,9 +249,10 @@ const handlePushYourLuckAction = (
           ...session,
           state: {
             ...session.state,
+            currentScreen: "result",
             activeRound: null,
             lastOutcome: appendAchievementUnlockText(
-              `Cashed out after ${round.uniqueValues.length} uniques for ${payout} pips total.`,
+              `Cashed out at ${round.uniqueValues.length} uniques for ${payout} pips.`,
               newlyEarned,
             ),
           },
