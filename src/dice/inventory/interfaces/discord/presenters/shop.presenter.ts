@@ -96,7 +96,10 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
               ? view.categoryItems
                   .map(
                     (item) =>
-                      `**${item.name}** • ${item.pricePips} pips • Owned ${item.ownedQuantity}`,
+                      `**${item.name}** • ${item.pricePips} pips • ${formatOwnedSummary(
+                        view.categoryId,
+                        item.ownedQuantity,
+                      )}`,
                   )
                   .join("\n")
               : "No items available in this category.",
@@ -122,7 +125,7 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
         },
         {
           name: "Owned",
-          value: `${view.selectedItem.ownedQuantity}`,
+          value: formatOwnedValue(view.categoryId, view.selectedItem.ownedQuantity),
           inline: true,
         },
         {
@@ -207,7 +210,7 @@ const buildDiceShopComponents = (
   if (view.screen === "landing") {
     return [
       new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-        ...view.categorySummaries.map((summary, index) =>
+        ...view.categorySummaries.map((summary) =>
           new ButtonBuilder()
             .setCustomId(
               encodeDiceShopButtonAction({
@@ -217,7 +220,7 @@ const buildDiceShopComponents = (
               }),
             )
             .setLabel(summary.label)
-            .setStyle(index === 0 ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            .setStyle(ButtonStyle.Primary),
         ),
         new ButtonBuilder()
           .setCustomId(encodeDiceShopButtonAction({ type: "close", ownerId: view.ownerId }))
@@ -229,6 +232,7 @@ const buildDiceShopComponents = (
 
   if (view.screen === "category") {
     const rows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [];
+    const alternateCategory = getAlternateCategorySummary(view);
 
     if (view.categoryItems.length > 0) {
       rows.push(
@@ -248,7 +252,10 @@ const buildDiceShopComponents = (
               view.categoryItems.map((item) => ({
                 label: item.name,
                 value: item.id,
-                description: `${item.pricePips} pips • Owned ${item.ownedQuantity}`,
+                description: `${item.pricePips} pips • ${formatOwnedSummary(
+                  view.categoryId,
+                  item.ownedQuantity,
+                )}`,
               })),
             ),
         ),
@@ -257,6 +264,16 @@ const buildDiceShopComponents = (
 
     rows.push(
       new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            encodeDiceShopButtonAction({
+              type: "open-category",
+              ownerId: view.ownerId,
+              categoryId: alternateCategory.id,
+            }),
+          )
+          .setLabel(`View ${alternateCategory.label}`)
+          .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId(encodeDiceShopButtonAction({ type: "view-home", ownerId: view.ownerId }))
           .setLabel("Shop Home")
@@ -316,4 +333,31 @@ const buildDiceShopComponents = (
         .setStyle(ButtonStyle.Danger),
     ),
   ];
+};
+
+const formatOwnedSummary = (categoryId: string, ownedQuantity: number): string => {
+  if (categoryId === "permanent-upgrades") {
+    return `Owned: ${ownedQuantity > 0 ? "✅" : "❌"}`;
+  }
+
+  return `Owned ${ownedQuantity}`;
+};
+
+const formatOwnedValue = (categoryId: string, ownedQuantity: number): string => {
+  if (categoryId === "permanent-upgrades") {
+    return ownedQuantity > 0 ? "✅" : "❌";
+  }
+
+  return `${ownedQuantity}`;
+};
+
+const getAlternateCategorySummary = (view: Extract<DiceShopViewModel, { screen: "category" }>) => {
+  const alternateCategory = view.categorySummaries.find(
+    (summary) => summary.id !== view.categoryId,
+  );
+  if (!alternateCategory) {
+    throw new Error(`Missing alternate shop category for ${view.categoryId}.`);
+  }
+
+  return alternateCategory;
 };

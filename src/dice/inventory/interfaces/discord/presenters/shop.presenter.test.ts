@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ComponentType } from "discord.js";
+import { ButtonStyle, ComponentType } from "discord.js";
 import { renderDiceShopResult } from "./shop.presenter";
 
 const categorySummaries = [
@@ -46,6 +46,10 @@ test("landing renders only top-level navigation buttons", () => {
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
     ["Consumables", "Permanent Upgrades", "Close"],
+  );
+  assert.deepEqual(
+    rows[0]?.components.map((component) => ("style" in component ? component.style : undefined)),
+    [ButtonStyle.Primary, ButtonStyle.Primary, ButtonStyle.Danger],
   );
 });
 
@@ -93,8 +97,12 @@ test("category renders one select menu with only that category's items", () => {
     ["dice-revolver", "cleanse-salt"],
   );
   assert.deepEqual(
+    rows[0].components[0].options.map((option) => option.description),
+    ["6 pips • Owned 0", "15 pips • Owned 2"],
+  );
+  assert.deepEqual(
     rows[1]?.components.map((component) => ("label" in component ? component.label : undefined)),
-    ["Shop Home", "Close"],
+    ["View Permanent Upgrades", "Shop Home", "Close"],
   );
 });
 
@@ -203,6 +211,75 @@ test("empty category omits the select menu and keeps navigation buttons", () => 
   assert.equal(rows.length, 1);
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
-    ["Shop Home", "Close"],
+    ["View Permanent Upgrades", "Shop Home", "Close"],
   );
+});
+
+test("permanent upgrades render owned state as emoji instead of a count", () => {
+  const rendered = renderDiceShopResult({
+    kind: "update",
+    payload: {
+      type: "view",
+      view: {
+        screen: "category",
+        ownerId: "user-1",
+        balancePips: 40,
+        categorySummaries,
+        categoryId: "permanent-upgrades",
+        categoryLabel: "Permanent Upgrades",
+        categorySummary: "One-time passive upgrades that stay active once owned.",
+        categoryItems: [
+          {
+            id: "umbrella-harness",
+            name: "Umbrella Harness",
+            pricePips: 25,
+            ownedQuantity: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  const itemsField = embed?.fields?.find((field) => field.name === "Items");
+  assert.match(itemsField?.value ?? "", /Owned: ❌/);
+
+  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  assert.equal(rows[0]?.components[0]?.type, ComponentType.StringSelect);
+  if (rows[0]?.components[0]?.type !== ComponentType.StringSelect) {
+    return;
+  }
+
+  assert.equal(rows[0].components[0].options[0]?.description, "25 pips • Owned: ❌");
+});
+
+test("permanent upgrade item detail renders emoji owned state", () => {
+  const rendered = renderDiceShopResult({
+    kind: "update",
+    payload: {
+      type: "view",
+      view: {
+        screen: "item-detail",
+        ownerId: "user-1",
+        balancePips: 15,
+        categorySummaries,
+        categoryId: "permanent-upgrades",
+        categoryLabel: "Permanent Upgrades",
+        selectedItem: {
+          id: "umbrella-harness",
+          name: "Umbrella Harness",
+          description: "Adds one extra Bad Luck Umbrella charge.",
+          pricePips: 25,
+          ownedQuantity: 0,
+          typeLabel: "Permanent Upgrade",
+          buyable: false,
+          buyDisabledReason: "You need 25 pips. Current balance: 15 pips.",
+        },
+      },
+    },
+  });
+
+  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  const ownedField = embed?.fields?.find((field) => field.name === "Owned");
+  assert.equal(ownedField?.value, "❌");
 });
