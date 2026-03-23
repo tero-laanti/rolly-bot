@@ -3,11 +3,17 @@ import type {
   ButtonBuilder,
   ButtonInteraction,
   ChatInputCommandInteraction,
+  EmbedBuilder,
+  MessageActionRowComponentBuilder,
+  StringSelectMenuInteraction,
 } from "discord.js";
 
 type InteractionMessagePayload = {
-  content: string;
-  components?: ActionRowBuilder<ButtonBuilder>[];
+  content?: string;
+  embeds?: EmbedBuilder[];
+  components?:
+    | ActionRowBuilder<MessageActionRowComponentBuilder>[]
+    | ActionRowBuilder<ButtonBuilder>[];
 };
 
 export type InteractionResult =
@@ -37,6 +43,20 @@ export const applyChatInputResult = async (
 
 export const applyButtonResult = async (
   interaction: ButtonInteraction,
+  result: InteractionResult,
+): Promise<void> => {
+  await applyMessageComponentResult(interaction, result);
+};
+
+export const applyStringSelectMenuResult = async (
+  interaction: StringSelectMenuInteraction,
+  result: InteractionResult,
+): Promise<void> => {
+  await applyMessageComponentResult(interaction, result);
+};
+
+const applyMessageComponentResult = async (
+  interaction: ButtonInteraction | StringSelectMenuInteraction,
   result: InteractionResult,
 ): Promise<void> => {
   if (result.kind === "reply") {

@@ -1,30 +1,154 @@
-import {
-  chunkActionButtons,
-  type ActionResult,
-  type ActionView,
-} from "../../../../shared-kernel/application/action-view";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
 import type { DiceShopItem } from "../../../inventory/domain/shop";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
-import { appendAchievementUnlockText } from "../../../progression/application/achievement-text";
+import { formatAchievementUnlockText } from "../../../progression/application/achievement-text";
 import { getDiceItemAchievementIds } from "../achievement-rules";
-import { getItemOwnershipLabel, isPassivePermanentItem } from "../../domain/passive-items";
+import { isPassivePermanentItem } from "../../domain/passive-items";
+
+export type DiceShopCategoryId = "consumables" | "permanent-upgrades";
+
+type DiceShopCategoryDefinition = {
+  id: DiceShopCategoryId;
+  label: string;
+  singularLabel: string;
+  summary: string;
+};
+
+const diceShopCategories: DiceShopCategoryDefinition[] = [
+  {
+    id: "consumables",
+    label: "Consumables",
+    singularLabel: "Consumable",
+    summary: "Single-use items and timed boosts for your next moves.",
+  },
+  {
+    id: "permanent-upgrades",
+    label: "Permanent Upgrades",
+    singularLabel: "Permanent Upgrade",
+    summary: "One-time passive upgrades that stay active once owned.",
+  },
+];
 
 export type DiceShopAction =
   | {
-      type: "buy";
+      type: "view-home";
       ownerId: string;
+    }
+  | {
+      type: "open-category";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+    }
+  | {
+      type: "select-item";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
       itemId: string;
     }
   | {
-      type: "refresh";
+      type: "buy-selected-item";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+      itemId: string;
+    }
+  | {
+      type: "close";
       ownerId: string;
     };
 
-export type DiceShopResult = ActionResult<DiceShopAction>;
+export type DiceShopCategorySummary = {
+  id: DiceShopCategoryId;
+  label: string;
+  summary: string;
+  itemCount: number;
+};
+
+export type DiceShopCategoryItemSummary = {
+  id: string;
+  name: string;
+  pricePips: number;
+  ownedQuantity: number;
+};
+
+export type DiceShopItemDetail = {
+  id: string;
+  name: string;
+  description: string;
+  pricePips: number;
+  ownedQuantity: number;
+  typeLabel: string;
+  buyable: boolean;
+  buyDisabledReason?: string;
+};
+
+export type DiceShopPurchaseReceipt = {
+  itemName: string;
+  ownedQuantity: number;
+  remainingPips: number;
+  changeSummary: string;
+  statusText?: string;
+};
+
+type DiceShopViewBase = {
+  ownerId: string;
+  balancePips: number;
+  categorySummaries: DiceShopCategorySummary[];
+  statusMessage?: string;
+};
+
+export type DiceShopViewModel =
+  | (DiceShopViewBase & {
+      screen: "landing";
+    })
+  | (DiceShopViewBase & {
+      screen: "category";
+      categoryId: DiceShopCategoryId;
+      categoryLabel: string;
+      categorySummary: string;
+      categoryItems: DiceShopCategoryItemSummary[];
+    })
+  | (DiceShopViewBase & {
+      screen: "item-detail";
+      categoryId: DiceShopCategoryId;
+      categoryLabel: string;
+      selectedItem: DiceShopItemDetail;
+    })
+  | (DiceShopViewBase & {
+      screen: "purchase-receipt";
+      receipt: DiceShopPurchaseReceipt;
+    });
+
+export type DiceShopResult =
+  | {
+      kind: "reply";
+      payload:
+        | {
+            type: "view";
+            view: DiceShopViewModel;
+            ephemeral?: boolean;
+          }
+        | {
+            type: "message";
+            content: string;
+            ephemeral: boolean;
+          };
+    }
+  | {
+      kind: "update" | "edit";
+      payload:
+        | {
+            type: "view";
+            view: DiceShopViewModel;
+          }
+        | {
+            type: "message";
+            content: string;
+            clearComponents?: boolean;
+          };
+    };
 
 type ShopPurchaseAttempt =
   | {
@@ -69,7 +193,7 @@ export const createDiceShopUseCase = ({
       kind: "reply",
       payload: {
         type: "view",
-        view: buildShopView(economy, inventory, shopCatalog, userId),
+        view: buildLandingViewModel(economy, shopCatalog, userId),
         ephemeral: false,
       },
     };
@@ -87,24 +211,74 @@ export const createDiceShopUseCase = ({
       };
     }
 
-    if (action.type === "refresh") {
+    if (action.type === "close") {
+      return {
+        kind: "update",
+        payload: {
+          type: "message",
+          content: "Shop closed.",
+          clearComponents: true,
+        },
+      };
+    }
+
+    if (action.type === "view-home") {
       return {
         kind: "update",
         payload: {
           type: "view",
-          view: buildShopView(economy, inventory, shopCatalog, action.ownerId),
+          view: buildLandingViewModel(economy, shopCatalog, action.ownerId),
+        },
+      };
+    }
+
+    const category = getDiceShopCategoryDefinition(action.categoryId);
+    if (!category) {
+      return {
+        kind: "reply",
+        payload: {
+          type: "message",
+          content: "That shop category does not exist.",
+          ephemeral: true,
+        },
+      };
+    }
+
+    if (action.type === "open-category") {
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildCategoryViewModel(economy, inventory, shopCatalog, action.ownerId, category),
         },
       };
     }
 
     const item = shopCatalog.getDiceShopItem(action.itemId);
-    if (!item) {
+    if (!item || getDiceShopCategoryId(item) !== category.id) {
       return {
         kind: "reply",
         payload: {
           type: "message",
           content: "That shop item does not exist.",
           ephemeral: true,
+        },
+      };
+    }
+
+    if (action.type === "select-item") {
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildItemDetailViewModel(
+            economy,
+            inventory,
+            shopCatalog,
+            action.ownerId,
+            category,
+            item.id,
+          ),
         },
       };
     }
@@ -152,23 +326,21 @@ export const createDiceShopUseCase = ({
     });
 
     if (!purchase.ok) {
-      if (purchase.reason === "already-owned") {
-        return {
-          kind: "reply",
-          payload: {
-            type: "message",
-            content: `${purchase.item.name} is already owned. Permanent passive upgrades can only be bought once.`,
-            ephemeral: true,
-          },
-        };
-      }
-
       return {
-        kind: "reply",
+        kind: "update",
         payload: {
-          type: "message",
-          content: `You need ${purchase.item.pricePips} pips to buy ${purchase.item.name}. Current balance: ${purchase.currentPips} pips.`,
-          ephemeral: true,
+          type: "view",
+          view: buildItemDetailViewModel(
+            economy,
+            inventory,
+            shopCatalog,
+            action.ownerId,
+            category,
+            item.id,
+            purchase.reason === "already-owned"
+              ? buildAlreadyOwnedMessage(purchase.item)
+              : buildInsufficientPipsMessage(purchase.item, purchase.currentPips),
+          ),
         },
       };
     }
@@ -177,16 +349,7 @@ export const createDiceShopUseCase = ({
       kind: "update",
       payload: {
         type: "view",
-        view: buildShopView(
-          economy,
-          inventory,
-          shopCatalog,
-          action.ownerId,
-          appendAchievementUnlockText(
-            `Purchased ${purchase.item.name}. Remaining pips: ${purchase.remainingPips}. Owned: ${purchase.quantity}.`,
-            purchase.newlyEarned,
-          ),
-        ),
+        view: buildPurchaseReceiptViewModel(shopCatalog, action.ownerId, purchase),
       },
     };
   };
@@ -197,90 +360,153 @@ export const createDiceShopUseCase = ({
   };
 };
 
-const buildShopView = (
+const buildLandingViewModel = (
   economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
-  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   shopCatalog: DiceShopCatalog,
   userId: string,
-  statusLine?: string,
-): ActionView<DiceShopAction> => {
+  statusMessage?: string,
+): DiceShopViewModel => {
   return {
-    content: buildShopContent(economy, inventory, shopCatalog, userId, statusLine),
-    components: buildShopComponents(shopCatalog, inventory, userId),
+    screen: "landing",
+    ownerId: userId,
+    balancePips: economy.getEconomySnapshot(userId).pips,
+    categorySummaries: buildCategorySummaries(shopCatalog),
+    statusMessage,
   };
 };
 
-const buildShopContent = (
+const buildCategoryViewModel = (
   economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
   inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   shopCatalog: DiceShopCatalog,
   userId: string,
-  statusLine?: string,
-): string => {
-  const economySnapshot = economy.getEconomySnapshot(userId);
+  category: DiceShopCategoryDefinition,
+  statusMessage?: string,
+): DiceShopViewModel => {
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
-  const sections: string[] = [];
 
-  if (statusLine) {
-    sections.push(statusLine);
+  return {
+    screen: "category",
+    ownerId: userId,
+    balancePips: economy.getEconomySnapshot(userId).pips,
+    categorySummaries: buildCategorySummaries(shopCatalog),
+    categoryId: category.id,
+    categoryLabel: category.label,
+    categorySummary: category.summary,
+    categoryItems: getCategoryItems(shopCatalog, category.id).map((item) => ({
+      id: item.id,
+      name: item.name,
+      pricePips: item.pricePips,
+      ownedQuantity: inventoryQuantities.get(item.id) ?? 0,
+    })),
+    statusMessage,
+  };
+};
+
+const buildItemDetailViewModel = (
+  economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
+  shopCatalog: DiceShopCatalog,
+  userId: string,
+  category: DiceShopCategoryDefinition,
+  itemId: string,
+  statusMessage?: string,
+): DiceShopViewModel => {
+  const item = shopCatalog.getDiceShopItem(itemId);
+  if (!item || getDiceShopCategoryId(item) !== category.id) {
+    throw new Error(`Missing shop item detail for ${itemId} in category ${category.id}.`);
   }
 
-  sections.push(
-    [
-      `Dice shop for <@${userId}>:`,
-      `Pips: ${economySnapshot.pips}.`,
-      "Spend pips on inventory items.",
-    ].join("\n"),
-  );
+  const balancePips = economy.getEconomySnapshot(userId).pips;
+  const ownedQuantity = inventory.getInventoryQuantities(userId).get(item.id) ?? 0;
+  const alreadyOwned = isPassivePermanentItem(item) && ownedQuantity > 0;
+  const hasEnoughPips = balancePips >= item.pricePips;
+  const buyable = !alreadyOwned && hasEnoughPips;
 
-  sections.push(
-    ...shopCatalog
-      .getDiceShopItems()
-      .map((item) => buildItemLines(item, inventoryQuantities.get(item.id) ?? 0).join("\n")),
-  );
-
-  return sections.join("\n\n");
+  return {
+    screen: "item-detail",
+    ownerId: userId,
+    balancePips,
+    categorySummaries: buildCategorySummaries(shopCatalog),
+    categoryId: category.id,
+    categoryLabel: category.label,
+    selectedItem: {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      pricePips: item.pricePips,
+      ownedQuantity,
+      typeLabel: category.singularLabel,
+      buyable,
+      buyDisabledReason: alreadyOwned
+        ? "Already owned. Permanent upgrades can only be bought once."
+        : hasEnoughPips
+          ? undefined
+          : `You need ${item.pricePips} pips. Current balance: ${balancePips} pips.`,
+    },
+    statusMessage,
+  };
 };
 
-const buildItemLines = (item: DiceShopItem, ownedQuantity: number): string[] => {
-  return [
-    `**${item.name}**`,
-    `Cost: ${item.pricePips} pips.`,
-    `Owned: ${ownedQuantity}.`,
-    getItemOwnershipLabel(item),
-    item.description,
-  ];
-};
-
-const buildShopComponents = (
+const buildPurchaseReceiptViewModel = (
   shopCatalog: DiceShopCatalog,
-  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   userId: string,
-): ActionView<DiceShopAction>["components"] => {
-  const inventoryQuantities = inventory.getInventoryQuantities(userId);
-  const purchaseButtons = shopCatalog.getDiceShopItems().map((item) => {
-    const alreadyOwned =
-      isPassivePermanentItem(item) && (inventoryQuantities.get(item.id) ?? 0) > 0;
-    return {
-      action: {
-        type: "buy",
-        ownerId: userId,
-        itemId: item.id,
-      } as const,
-      label: alreadyOwned ? `${item.name} (Owned)` : `Buy ${item.name} (${item.pricePips})`,
-      style: "success" as const,
-      disabled: alreadyOwned,
-    };
-  });
+  purchase: Extract<ShopPurchaseAttempt, { ok: true }>,
+): DiceShopViewModel => {
+  const achievementText = formatAchievementUnlockText(purchase.newlyEarned);
 
-  return [
-    ...chunkActionButtons(purchaseButtons),
-    [
-      {
-        action: { type: "refresh", ownerId: userId },
-        label: "Refresh",
-        style: "secondary",
-      },
-    ],
-  ];
+  return {
+    screen: "purchase-receipt",
+    ownerId: userId,
+    balancePips: purchase.remainingPips,
+    categorySummaries: buildCategorySummaries(shopCatalog),
+    receipt: {
+      itemName: purchase.item.name,
+      ownedQuantity: purchase.quantity,
+      remainingPips: purchase.remainingPips,
+      changeSummary: buildPurchaseChangeSummary(purchase.item),
+      statusText: achievementText || undefined,
+    },
+  };
+};
+
+const buildCategorySummaries = (shopCatalog: DiceShopCatalog): DiceShopCategorySummary[] => {
+  return diceShopCategories.map((category) => ({
+    id: category.id,
+    label: category.label,
+    summary: category.summary,
+    itemCount: getCategoryItems(shopCatalog, category.id).length,
+  }));
+};
+
+const getCategoryItems = (shopCatalog: DiceShopCatalog, categoryId: DiceShopCategoryId) => {
+  return shopCatalog
+    .getDiceShopItems()
+    .filter((item) => getDiceShopCategoryId(item) === categoryId);
+};
+
+const getDiceShopCategoryDefinition = (
+  categoryId: DiceShopCategoryId,
+): DiceShopCategoryDefinition | null => {
+  return diceShopCategories.find((category) => category.id === categoryId) ?? null;
+};
+
+const getDiceShopCategoryId = (item: DiceShopItem): DiceShopCategoryId => {
+  return isPassivePermanentItem(item) ? "permanent-upgrades" : "consumables";
+};
+
+const buildAlreadyOwnedMessage = (item: DiceShopItem): string => {
+  return `${item.name} is already owned. Permanent upgrades can only be bought once.`;
+};
+
+const buildInsufficientPipsMessage = (item: DiceShopItem, currentPips: number): string => {
+  return `You need ${item.pricePips} pips to buy ${item.name}. Current balance: ${currentPips} pips.`;
+};
+
+const buildPurchaseChangeSummary = (item: DiceShopItem): string => {
+  if (isPassivePermanentItem(item)) {
+    return "This permanent upgrade is now active.";
+  }
+
+  return "The item was added to your inventory. Use /inventory when you want to activate it.";
 };

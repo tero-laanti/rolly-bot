@@ -1,7 +1,15 @@
 import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import type { ButtonInteraction } from "discord.js";
-import { discordButtonHandlers, discordCommands } from "./command-registry";
+import {
+  discordButtonHandlers,
+  discordCommands,
+  discordStringSelectMenuHandlers,
+} from "./command-registry";
 import { dispatchButtonInteraction, registerButtonHandler } from "./button-router";
+import {
+  dispatchStringSelectMenuInteraction,
+  registerStringSelectMenuHandler,
+} from "./string-select-menu-router";
 import { introPostsConfig, randomEventsFoundationConfig, raidsConfig } from "../../shared/config";
 import { getDatabase, initDatabase } from "../../shared/db";
 import { requireEnv } from "../../shared/env";
@@ -81,6 +89,12 @@ const registerDiscordButtonHandlers = (): void => {
 
   registerButtonHandler(randomEventButtonPrefix, handleRandomEventButton);
   registerButtonHandler(raidJoinButtonPrefix, handleRaidJoinButton);
+};
+
+const registerDiscordStringSelectMenuHandlers = (): void => {
+  for (const handler of discordStringSelectMenuHandlers) {
+    registerStringSelectMenuHandler(handler.prefix, handler.handle);
+  }
 };
 
 const startRandomEventsFoundation = (): void => {
@@ -304,6 +318,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ephemeral: true,
       });
     }
+
+    return;
+  }
+
+  if (interaction.isStringSelectMenu()) {
+    try {
+      const handled = await dispatchStringSelectMenuInteraction(interaction);
+      if (!handled) {
+        return;
+      }
+    } catch (error) {
+      console.error("Error handling string select interaction:", error);
+
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "There was an error while handling this selection!",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.reply({
+        content: "There was an error while handling this selection!",
+        ephemeral: true,
+      });
+    }
   }
 });
 
@@ -325,6 +365,7 @@ export const startDiscordBot = async (): Promise<void> => {
     initDatabase();
     registerDiscordCommands();
     registerDiscordButtonHandlers();
+    registerDiscordStringSelectMenuHandlers();
     await client.login(token);
   } catch (error) {
     console.error("Failed to start bot:", error);

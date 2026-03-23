@@ -1,4 +1,4 @@
-import type { ButtonInteraction } from "discord.js";
+import type { ButtonInteraction, StringSelectMenuInteraction } from "discord.js";
 import * as achievementsCommand from "../../dice/progression/interfaces/discord/commands/achievements.command";
 import * as bansCommand from "../../dice/progression/interfaces/discord/commands/bans.command";
 import * as rCommand from "../../dice/progression/interfaces/discord/commands/r.command";
@@ -20,8 +20,14 @@ export type DiscordButtonHandlerRegistration = {
   handle: (interaction: ButtonInteraction) => Promise<void>;
 };
 
+export type DiscordStringSelectMenuHandlerRegistration = {
+  prefix: string;
+  handle: (interaction: StringSelectMenuInteraction) => Promise<void>;
+};
+
 type DiscordCommandModule = Command & {
   buttonHandlers?: DiscordButtonHandlerRegistration[];
+  stringSelectMenuHandlers?: DiscordStringSelectMenuHandlerRegistration[];
 };
 
 const discordCommandModules: DiscordCommandModule[] = [
@@ -62,3 +68,6 @@ export const discordCommandPayloads = discordCommands.map((command) => command.d
 
 export const discordButtonHandlers: DiscordButtonHandlerRegistration[] =
   discordCommandModules.flatMap((module) => module.buttonHandlers ?? []);
+
+export const discordStringSelectMenuHandlers: DiscordStringSelectMenuHandlerRegistration[] =
+  discordCommandModules.flatMap((module) => module.stringSelectMenuHandlers ?? []);
