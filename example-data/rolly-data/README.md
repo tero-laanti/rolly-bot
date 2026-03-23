@@ -11,6 +11,7 @@ This directory contains safe example data for the public `rolly-bot` repository.
   - `achievements.json`
   - `casino.v1.json`
   - `dice-balance.json`
+  - `intro-posts.v1.json`
   - `items.v1.json`
   - `pvp.json`
   - `raids.json`

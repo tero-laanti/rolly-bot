@@ -2,7 +2,7 @@ import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import type { ButtonInteraction } from "discord.js";
 import { discordButtonHandlers, discordCommands } from "./command-registry";
 import { dispatchButtonInteraction, registerButtonHandler } from "./button-router";
-import { randomEventsFoundationConfig, raidsConfig } from "../../shared/config";
+import { introPostsConfig, randomEventsFoundationConfig, raidsConfig } from "../../shared/config";
 import { getDatabase, initDatabase } from "../../shared/db";
 import { requireEnv } from "../../shared/env";
 import { getRollyDataSourceDescription, primeRollyData } from "../../rolly-data/load";
@@ -24,6 +24,7 @@ import {
 import { raidJoinButtonPrefix } from "../../dice/raids/interfaces/discord/button-ids";
 import { createRaidsState } from "../../dice/raids/infrastructure/state-store";
 import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastructure/challenge-expiration-runtime";
+import { syncIntroPostsOnStartup } from "../../system/intro-posts/infrastructure/startup-sync";
 
 const token = requireEnv("DISCORD_TOKEN");
 
@@ -238,6 +239,14 @@ process.once("SIGTERM", () => {
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
+  void syncIntroPostsOnStartup({
+    client,
+    config: introPostsConfig,
+    db: getDatabase(),
+    logger: console,
+  }).catch((error) => {
+    console.error("[intro-posts] Startup sync failed:", error);
+  });
   startRandomEventsFoundation();
   startRaidsFoundation();
   startDicePvpChallengeExpiration();

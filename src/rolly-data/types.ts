@@ -255,6 +255,14 @@ export type DiceItemData = {
   effect: DiceItemEffect;
 };
 
+export type IntroPostMessageData = {
+  content: string;
+};
+
+export type IntroPostsV1Data = {
+  messages: IntroPostMessageData[];
+};
+
 export type RollyDataSourceKind = "env" | "local" | "example";
 
 export type RollyDataSource = {
@@ -267,6 +275,7 @@ export type LoadedRollyData = {
   achievements: DiceAchievementData[];
   casinoV1: DiceCasinoData;
   diceBalance: DiceBalanceData;
+  introPostsV1: IntroPostsV1Data;
   pvp: DicePvpData;
   randomEventBalance: DiceRandomEventBalanceData;
   raids: DiceRaidData;

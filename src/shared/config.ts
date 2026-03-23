@@ -2,6 +2,12 @@ import { minutesToMs, secondsToMs } from "./time";
 
 export const databasePath = "data/rolly-bot.sqlite";
 
+export type IntroPostsConfig = {
+  enabled: boolean;
+  inactiveReason: string | null;
+  channelId: string | null;
+};
+
 type QuietHoursConfig = {
   start: string;
   end: string;
@@ -131,6 +137,18 @@ const defaultRaidsConfig = {
     end: "08:00",
     timezone: "Europe/Helsinki",
   },
+};
+
+const introPostsChannelId = parseOptionalString(process.env.INTRO_POST_CHANNEL_ID);
+const introPostsActivation = resolveFeatureActivation({
+  channelId: introPostsChannelId,
+  channelEnvName: "INTRO_POST_CHANNEL_ID",
+});
+
+export const introPostsConfig: IntroPostsConfig = {
+  enabled: introPostsActivation.enabled,
+  inactiveReason: introPostsActivation.inactiveReason,
+  channelId: introPostsChannelId,
 };
 
 const randomEventsChannelId = parseOptionalString(process.env.RANDOM_EVENTS_CHANNEL_ID);

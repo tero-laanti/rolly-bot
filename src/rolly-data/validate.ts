@@ -10,6 +10,7 @@ import type {
   DicePvpData,
   DiceItemData,
   DiceItemEffect,
+  IntroPostsV1Data,
   DiceBalanceVarietyConfig,
   DiceRandomEventBalanceData,
   DiceRaidBossBalanceData,
@@ -1189,6 +1190,27 @@ export const parseRandomEventScenarios = (value: unknown): RandomEventScenario[]
   );
   validateRandomEventScenarios(parsed);
   return parsed;
+};
+
+export const parseIntroPostsV1Data = (value: unknown): IntroPostsV1Data => {
+  const record = assertRecord(value, "introPostsV1");
+
+  if (!Array.isArray(record.messages)) {
+    throw new Error("introPostsV1.messages must be an array.");
+  }
+
+  const messages = record.messages.map((entry, index) => {
+    const message = assertRecord(entry, `introPostsV1.messages[${index}]`);
+    return {
+      content: readNonEmptyString(message.content, `introPostsV1.messages[${index}].content`),
+    };
+  });
+
+  if (messages.length < 1) {
+    throw new Error("introPostsV1.messages must include at least one entry.");
+  }
+
+  return { messages };
 };
 
 export const parseDiceItems = (value: unknown): DiceItemData[] => {
