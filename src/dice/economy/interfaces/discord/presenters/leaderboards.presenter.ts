@@ -1,18 +1,14 @@
-import { escapeMarkdown } from "discord.js";
+import { userMention } from "discord.js";
 import type { InteractionResult } from "../../../../../app/discord/interaction-response";
 import { renderActionButtonRows } from "../../../../../app/discord/render-action-button-rows";
-import type { UserDisplayNameResolver } from "../../../../../app/discord/resolve-user-display-name";
 import type {
   DiceLeaderboardsResult,
   DiceLeaderboardsView,
 } from "../../../application/query-leaderboards/use-case";
 import { encodeDiceLeaderboardsAction } from "../buttons/leaderboards-buttons";
 
-export const renderDiceLeaderboardsResult = async (
-  result: DiceLeaderboardsResult,
-  resolveDisplayName: UserDisplayNameResolver,
-): Promise<InteractionResult> => {
-  const payload = await renderDiceLeaderboardsView(result.payload.view, resolveDisplayName);
+export const renderDiceLeaderboardsResult = (result: DiceLeaderboardsResult): InteractionResult => {
+  const payload = renderDiceLeaderboardsView(result.payload.view);
 
   if (result.kind === "reply") {
     return {
@@ -30,26 +26,17 @@ export const renderDiceLeaderboardsResult = async (
   };
 };
 
-const renderDiceLeaderboardsView = async (
-  view: DiceLeaderboardsView,
-  resolveDisplayName: UserDisplayNameResolver,
-): Promise<InteractionResult["payload"]> => {
+const renderDiceLeaderboardsView = (view: DiceLeaderboardsView): InteractionResult["payload"] => {
   const lines =
     view.rows.length > 0
-      ? await Promise.all(
-          view.rows.map(async (row) => {
-            const displayName = formatDisplayName(await resolveDisplayName(row.userId));
-            return `${row.rank}. ${displayName} - ${row.summary}`;
-          }),
-        )
+      ? view.rows.map((row) => `${row.rank}. ${userMention(row.userId)} - ${row.summary}`)
       : [view.emptyMessage];
 
   return {
     content: [view.title, "", ...lines].join("\n"),
+    allowedMentions: {
+      users: [],
+    },
     components: renderActionButtonRows(view.components, encodeDiceLeaderboardsAction),
   };
-};
-
-const formatDisplayName = (displayName: string): string => {
-  return escapeMarkdown(displayName).replace(/@/g, "@\u200b");
 };

@@ -4,6 +4,7 @@ import type {
   ButtonInteraction,
   ChatInputCommandInteraction,
   EmbedBuilder,
+  MessageMentionOptions,
   MessageActionRowComponentBuilder,
   StringSelectMenuInteraction,
 } from "discord.js";
@@ -11,6 +12,7 @@ import type {
 type InteractionMessagePayload = {
   content?: string;
   embeds?: EmbedBuilder[];
+  allowedMentions?: MessageMentionOptions;
   components?:
     | ActionRowBuilder<MessageActionRowComponentBuilder>[]
     | ActionRowBuilder<ButtonBuilder>[];
