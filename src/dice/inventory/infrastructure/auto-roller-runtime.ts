@@ -248,7 +248,7 @@ const buildAutoRollContent = ({
   }
 
   if (isFinished) {
-    lines.push("", "Use /dice-inventory to start another item.");
+    lines.push("", "Use /inventory to start another item.");
   }
 
   return lines.join("\n");

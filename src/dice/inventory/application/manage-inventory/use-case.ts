@@ -171,9 +171,7 @@ const buildInventoryContent = (
   }
 
   if (entries.length === 0) {
-    sections.push(
-      `Dice inventory for <@${userId}>:\nInventory is empty.\nBuy items with /dice-shop.`,
-    );
+    sections.push(`Dice inventory for <@${userId}>:\nInventory is empty.\nBuy items with /shop.`);
     return sections.join("\n\n");
   }
 

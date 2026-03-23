@@ -108,7 +108,7 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-inventory")
+  .setName("inventory")
   .setDescription("View and use your inventory items.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

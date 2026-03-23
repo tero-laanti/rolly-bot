@@ -1,6 +1,6 @@
 # `dice-balance.json`
 
-This file controls core dice progression, bans, charge behavior, and the global `/dice` roll-pass cap.
+This file controls core dice progression, bans, charge behavior, and the global `/roll` roll-pass cap.
 
 Prestige progression:
 
@@ -30,7 +30,7 @@ Fame and bans:
 Level-up and roll-pass tuning:
 
 - `levelUpReward`: Fame granted on level-up.
-- `firstDailyRollPipReward`: Pips granted by the first manual `/dice` roll of the UTC day.
+- `firstDailyRollPipReward`: Pips granted by the first manual `/roll` of the UTC day.
 - `maxRollPassCount`: hard cap for total roll passes after charge or other roll-pass modifiers are applied.
 
 ```json
@@ -55,4 +55,4 @@ Charge:
 - Charge only starts after this many idle minutes.
 - Once active, the multiplier grows with elapsed charged minutes.
 - The runtime clamps the final value to `maxMultiplier`.
-- When charge is active, `/dice` uses the charge roll instead of other roll-pass modifiers.
+- When charge is active, `/roll` uses the charge roll instead of other roll-pass modifiers.

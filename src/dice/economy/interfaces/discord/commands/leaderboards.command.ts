@@ -40,7 +40,7 @@ const handleDiceLeaderboardsButton = async (interaction: ButtonInteraction): Pro
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-leaderboards")
+  .setName("leaderboards")
   .setDescription("Show the top Fame, Pips, and Prestige rankings.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

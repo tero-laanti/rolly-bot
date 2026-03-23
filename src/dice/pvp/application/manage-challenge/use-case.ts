@@ -841,7 +841,7 @@ const buildChallengeContent = (
       : `<@${opponentId}> can accept if they have ${duelDieLabel} unlocked.`,
     `Challenge expires ${formatDiscordRelativeTime(expiresAtMs)}.`,
     `Loser lockout: ${formatMinutesOrHours(getDuelPunishmentMs(duelTier))}.`,
-    `Winner buff: ${formatMinutesOrHours(getDuelRewardMs(duelTier))} of double buff on /dice.`,
+    `Winner buff: ${formatMinutesOrHours(getDuelRewardMs(duelTier))} of double buff on /roll.`,
   ].join("\n");
 };
 
@@ -902,7 +902,7 @@ const buildWinResultContent = (
     loserBlockedByShield
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
       : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
-    `<@${winnerId}> has double buff on /dice. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
+    `<@${winnerId}> has double buff on /roll. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
     formatUserAchievementUnlockLine(winnerId, winnerNewlyEarned),
     formatUserAchievementUnlockLine(loserId, loserNewlyEarned),
   ]

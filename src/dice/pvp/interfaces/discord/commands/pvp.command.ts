@@ -41,7 +41,7 @@ const handleDicePvpButton = async (interaction: ButtonInteraction): Promise<void
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-pvp")
+  .setName("pvp")
   .setDescription("Challenge another user to a dice duel.")
   .addUserOption((option) =>
     option.setName("opponent").setDescription("The user you want to challenge.").setRequired(false),

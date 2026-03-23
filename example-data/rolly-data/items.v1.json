@@ -13,7 +13,7 @@
   {
     "id": "dice-revolver",
     "name": "Dice Revolver",
-    "description": "Your next 6 /dice uses roll twice.",
+    "description": "Your next 6 /roll uses roll twice.",
     "pricePips": 6,
     "consumable": true,
     "effect": {
@@ -24,7 +24,7 @@
   {
     "id": "longburn-spring",
     "name": "Longburn Spring",
-    "description": "Your /dice uses roll twice for 5 minutes.",
+    "description": "Your /roll uses roll twice for 5 minutes.",
     "pricePips": 12,
     "consumable": true,
     "effect": {

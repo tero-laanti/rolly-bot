@@ -220,7 +220,7 @@ export const createUseDiceItemUseCase = ({
           item,
           remainingQuantity: consumed.remainingQuantity,
           statusMessage: appendAchievementUnlockText(
-            `${item.name} loaded. Your next ${effect.uses} /dice uses roll twice.`,
+            `${item.name} loaded. Your next ${effect.uses} /roll uses roll twice.`,
             newlyEarned,
           ),
           achievementText: achievementText || undefined,
@@ -256,7 +256,7 @@ export const createUseDiceItemUseCase = ({
           item,
           remainingQuantity: consumed.remainingQuantity,
           statusMessage: appendAchievementUnlockText(
-            `${item.name} activated. Your /dice uses roll twice for ${effect.minutes} minutes.`,
+            `${item.name} activated. Your /roll uses roll twice for ${effect.minutes} minutes.`,
             newlyEarned,
           ),
           achievementText: achievementText || undefined,

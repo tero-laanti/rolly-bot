@@ -6,7 +6,7 @@ Read [README.md](../README.md) for the product overview and [architecture.md](ar
 
 - Node.js `24.14.0` from [.nvmrc](../.nvmrc)
 - A Discord application with a bot token and application ID
-- An owner Discord user ID for `/dice-admin` and `/self-update`
+- An owner Discord user ID for `/admin` and `/self-update`
 - Optional: a private `rolly-data` checkout for real gameplay content
 
 ## Local Setup
@@ -33,7 +33,7 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 ### Core Discord configuration
 
 - `DISCORD_TOKEN`: Required. Bot token from the Discord Developer Portal.
-- `DISCORD_OWNER_ID`: Required. Discord user ID allowed to run owner-only commands such as `/self-update` and `/dice-admin`.
+- `DISCORD_OWNER_ID`: Required. Discord user ID allowed to run owner-only commands such as `/self-update` and `/admin`.
 - `DISCORD_CLIENT_ID`: Required for `npm run deploy:commands`. Discord application ID used when registering slash commands.
 - `DISCORD_GUILD_ID`: Optional. Development guild/server ID for fast command deployment. If omitted, commands are deployed globally.
 

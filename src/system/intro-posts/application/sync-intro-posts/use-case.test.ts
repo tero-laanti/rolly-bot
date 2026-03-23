@@ -103,7 +103,7 @@ test("syncManagedIntroPosts creates all messages on first sync", async () => {
   const sync = createSyncManagedIntroPostsUseCase({
     config: activeConfig,
     contentSource: {
-      getMessages: () => [{ content: "Welcome" }, { content: "Use /dice" }],
+      getMessages: () => [{ content: "Welcome" }, { content: "Use /roll" }],
     },
     publisher,
     repository,
@@ -122,7 +122,7 @@ test("syncManagedIntroPosts creates all messages on first sync", async () => {
   assert.equal(repository.listManagedIntroPosts().length, 2);
   assert.deepEqual(
     publisher.created.map(({ content }) => content),
-    ["Welcome", "Use /dice"],
+    ["Welcome", "Use /roll"],
   );
 });
 

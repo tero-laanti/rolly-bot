@@ -8,7 +8,7 @@ Minimal shape:
 {
   "messages": [
     {
-      "content": "# Welcome to Rolly\nUse `/dice` to get started."
+      "content": "# Welcome to Rolly\nUse `/roll` to get started."
     }
   ]
 }

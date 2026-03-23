@@ -187,7 +187,7 @@ export const createDiceCasinoUseCase = ({
         kind: "edit",
         payload: {
           type: "message",
-          content: "This casino session has expired. Start `/dice-casino` again.",
+          content: "This casino session has expired. Start `/casino` again.",
           clearComponents: true,
         },
       };
@@ -199,7 +199,7 @@ export const createDiceCasinoUseCase = ({
         payload: {
           type: "message",
           content:
-            "This casino session is no longer current. Start or rerun `/dice-casino` to continue.",
+            "This casino session is no longer current. Start or rerun `/casino` to continue.",
           clearComponents: true,
         },
       };

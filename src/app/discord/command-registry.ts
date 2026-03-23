@@ -1,16 +1,17 @@
 import type { ButtonInteraction } from "discord.js";
-import * as diceAchievementsCommand from "../../dice/progression/interfaces/discord/commands/dice-achievements.command";
-import * as diceBansCommand from "../../dice/progression/interfaces/discord/commands/dice-bans.command";
-import * as diceCommand from "../../dice/progression/interfaces/discord/commands/dice.command";
-import * as dicePrestigeCommand from "../../dice/progression/interfaces/discord/commands/dice-prestige.command";
-import * as diceAdminCommand from "../../dice/admin/interfaces/discord/commands/dice-admin.command";
-import * as diceAnalyticsCommand from "../../dice/analytics/interfaces/discord/commands/dice-analytics.command";
-import * as diceCasinoCommand from "../../dice/casino/interfaces/discord/commands/dice-casino.command";
-import * as diceBalanceCommand from "../../dice/economy/interfaces/discord/commands/dice-balance.command";
-import * as diceLeaderboardsCommand from "../../dice/economy/interfaces/discord/commands/dice-leaderboards.command";
-import * as diceInventoryCommand from "../../dice/inventory/interfaces/discord/commands/dice-inventory.command";
-import * as diceShopCommand from "../../dice/inventory/interfaces/discord/commands/dice-shop.command";
-import * as dicePvpCommand from "../../dice/pvp/interfaces/discord/commands/dice-pvp.command";
+import * as achievementsCommand from "../../dice/progression/interfaces/discord/commands/achievements.command";
+import * as bansCommand from "../../dice/progression/interfaces/discord/commands/bans.command";
+import * as rCommand from "../../dice/progression/interfaces/discord/commands/r.command";
+import * as rollCommand from "../../dice/progression/interfaces/discord/commands/roll.command";
+import * as prestigeCommand from "../../dice/progression/interfaces/discord/commands/prestige.command";
+import * as adminCommand from "../../dice/admin/interfaces/discord/commands/admin.command";
+import * as analyticsCommand from "../../dice/analytics/interfaces/discord/commands/analytics.command";
+import * as casinoCommand from "../../dice/casino/interfaces/discord/commands/casino.command";
+import * as balanceCommand from "../../dice/economy/interfaces/discord/commands/balance.command";
+import * as leaderboardsCommand from "../../dice/economy/interfaces/discord/commands/leaderboards.command";
+import * as inventoryCommand from "../../dice/inventory/interfaces/discord/commands/inventory.command";
+import * as shopCommand from "../../dice/inventory/interfaces/discord/commands/shop.command";
+import * as pvpCommand from "../../dice/pvp/interfaces/discord/commands/pvp.command";
 import * as selfUpdateCommand from "../../system/self-update/interfaces/discord/commands/self-update.command";
 import type { Command } from "../../types/command";
 
@@ -24,18 +25,19 @@ type DiscordCommandModule = Command & {
 };
 
 const discordCommandModules: DiscordCommandModule[] = [
-  diceCommand,
-  dicePrestigeCommand,
-  diceBansCommand,
-  diceAchievementsCommand,
-  diceCasinoCommand,
-  diceBalanceCommand,
-  diceLeaderboardsCommand,
-  diceShopCommand,
-  diceInventoryCommand,
-  dicePvpCommand,
-  diceAnalyticsCommand,
-  diceAdminCommand,
+  rollCommand,
+  rCommand,
+  prestigeCommand,
+  bansCommand,
+  achievementsCommand,
+  casinoCommand,
+  balanceCommand,
+  leaderboardsCommand,
+  shopCommand,
+  inventoryCommand,
+  pvpCommand,
+  analyticsCommand,
+  adminCommand,
   selfUpdateCommand,
 ];
 

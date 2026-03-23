@@ -4,7 +4,7 @@ import { getDatabase } from "../../../../../shared/db";
 import { createSqliteQueryDiceAnalyticsUseCase } from "../../../infrastructure/sqlite/services";
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-analytics")
+  .setName("analytics")
   .setDescription("Show your dice progression analytics.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

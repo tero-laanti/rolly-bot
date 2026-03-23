@@ -21,7 +21,7 @@ const handleDiceAdminButton = async (interaction: ButtonInteraction): Promise<vo
     await applyButtonResult(interaction, {
       kind: "reply",
       payload: {
-        content: "Unknown dice-admin action.",
+        content: "Unknown admin action.",
         ephemeral: true,
       },
     });
@@ -43,7 +43,7 @@ const handleDiceAdminButton = async (interaction: ButtonInteraction): Promise<vo
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-admin")
+  .setName("admin")
   .setDescription("Owner-only dice administration tools.")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .setContexts(InteractionContextType.Guild)

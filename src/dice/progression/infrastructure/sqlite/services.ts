@@ -8,7 +8,7 @@ import { createSqliteDiceItemEffectsService } from "../../../inventory/infrastru
 import { createDiceBansUseCase } from "../../application/manage-bans/use-case";
 import { createDicePrestigeUseCase } from "../../application/manage-prestige/use-case";
 import { createQueryDiceAchievementsUseCase } from "../../application/query-achievements/use-case";
-import { createRunRollDiceUseCase } from "../../application/roll-dice/use-case";
+import { createRunRollDiceUseCase } from "../../application/roll/use-case";
 import { createSqliteProgressionRepository } from "./progression-repository";
 
 export const createSqliteDicePrestigeUseCase = (db: SqliteDatabase) => {

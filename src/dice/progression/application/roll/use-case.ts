@@ -291,7 +291,7 @@ export const createRunRollDiceUseCase = ({
     const doubleRollFooter = doubleRollFooterParts.join(" ");
     const prestigeFooter =
       result.levelAfter >= getDicePrestigeBaseLevel() && level < getDicePrestigeBaseLevel()
-        ? "Prestige is now available. Use /dice-prestige to advance."
+        ? "Prestige is now available. Use /prestige to advance."
         : "";
 
     const baseContent = buildDiceRollReplyContent({

@@ -5,7 +5,7 @@ Repo-specific guidance for working on Rolly.
 ## Product Scope
 
 - Rolly is a Discord dice game with progression, random events, casino games, raids, and owner-only admin/update tools.
-- User-facing commands are `/dice`, `/dice-prestige`, `/dice-bans`, `/dice-casino`, `/dice-shop`, `/dice-inventory`, `/dice-pvp`, `/dice-achievements`, `/dice-analytics`, `/dice-admin`, and `/self-update`.
+- User-facing commands are `/roll`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, `/analytics`, `/admin`, and `/self-update`.
 - Random events are part of the core product, not side infrastructure.
 - Fame and pips are part of the live game model. They are stored in the `balances` table and are used by gameplay systems.
 - Use `Rolly` for human-facing product copy and `rolly-bot` for package, repo, and filesystem identifiers when appropriate.
@@ -58,7 +58,7 @@ Repo-specific guidance for working on Rolly.
 - `src/rolly-data/` loads and validates gameplay data.
 - `src/system/self-update/` follows the same application/infrastructure split, with its owner-only Discord command under `interfaces/discord/`.
 - `src/types/` contains shared types and module augmentation.
-- `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/progression/application/roll-dice/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, `src/dice/inventory/application/manage-inventory/use-case.ts`, `src/dice/inventory/application/use-item/use-case.ts`, `src/dice/pvp/application/manage-challenge/use-case.ts`, and `src/dice/admin/application/manage-admin/use-case.ts` are the reference examples for the context-first use-case patterns.
+- `src/dice/progression/application/manage-prestige/use-case.ts`, `src/dice/progression/application/manage-bans/use-case.ts`, `src/dice/progression/application/roll/use-case.ts`, `src/dice/inventory/application/manage-shop/use-case.ts`, `src/dice/inventory/application/manage-inventory/use-case.ts`, `src/dice/inventory/application/use-item/use-case.ts`, `src/dice/pvp/application/manage-challenge/use-case.ts`, and `src/dice/admin/application/manage-admin/use-case.ts` are the reference examples for the context-first use-case patterns.
 - `eslint.config.js` contains architecture guardrails for the covered context-first modules. When you add new files under context `application/` or `domain/`, keep them free of Discord runtime imports, and keep new `application/` code free of direct `shared/db` imports.
 
 ## Feature Workflow

@@ -4,7 +4,7 @@ import { getDatabase } from "../../../../../shared/db";
 import { createSqliteQueryDiceBalanceUseCase } from "../../../infrastructure/sqlite/services";
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-balance")
+  .setName("balance")
   .setDescription("Show your Fame and Pips.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

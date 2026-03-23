@@ -30,7 +30,7 @@ const handleDiceBansButton = async (interaction: ButtonInteraction): Promise<voi
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-bans")
+  .setName("bans")
   .setDescription("Configure your dice bans.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

@@ -30,7 +30,7 @@ const handleDiceShopButton = async (interaction: ButtonInteraction): Promise<voi
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-shop")
+  .setName("shop")
   .setDescription("Spend your pips on shop items.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

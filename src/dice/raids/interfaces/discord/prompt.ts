@@ -172,7 +172,7 @@ export const buildRaidActivePrompt = ({
       [
         `Fight in <#${threadId}>.`,
         `Raid opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
-        "Only joined raiders using /dice in this thread deal damage.",
+        "Only joined raiders using /roll in this thread deal damage.",
         "Land at least one hit in this thread to qualify for the clear reward.",
         "",
         `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
@@ -187,7 +187,7 @@ export const buildRaidActivePrompt = ({
         buildContributionBlock(contributionLines),
       ].join("\n"),
     )
-    .setFooter({ text: "Use /dice inside the raid thread to attack." });
+    .setFooter({ text: "Use /roll inside the raid thread to attack." });
 
   return {
     embeds: [embed],

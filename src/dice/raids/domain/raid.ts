@@ -147,7 +147,7 @@ export const getDefaultRaidReward = (bossLevel: number): RaidRewardDefinition =>
 
 export const describeRaidReward = (reward: RaidRewardDefinition): string => {
   const pipText = `${reward.pips} pip${reward.pips === 1 ? "" : "s"}`;
-  const rollBuffText = `x${reward.rollPassMultiplier} roll buff for the next ${reward.rollPassRolls} /dice roll${reward.rollPassRolls === 1 ? "" : "s"}`;
+  const rollBuffText = `x${reward.rollPassMultiplier} roll buff for the next ${reward.rollPassRolls} /roll${reward.rollPassRolls === 1 ? "" : "s"}`;
   return `${pipText} and ${rollBuffText} per eligible raider`;
 };
 

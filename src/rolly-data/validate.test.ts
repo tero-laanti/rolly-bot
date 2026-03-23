@@ -187,11 +187,11 @@ test("parseDiceItems rejects passive effects on consumable items", () => {
 
 test("parseIntroPostsV1Data accepts valid intro posts", () => {
   const parsed = parseIntroPostsV1Data({
-    messages: [{ content: "# Welcome to Rolly" }, { content: "Use /dice to get started." }],
+    messages: [{ content: "# Welcome to Rolly" }, { content: "Use /roll to get started." }],
   });
 
   assert.deepEqual(parsed, {
-    messages: [{ content: "# Welcome to Rolly" }, { content: "Use /dice to get started." }],
+    messages: [{ content: "# Welcome to Rolly" }, { content: "Use /roll to get started." }],
   });
 });
 

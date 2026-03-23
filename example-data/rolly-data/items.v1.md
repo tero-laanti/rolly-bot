@@ -8,7 +8,7 @@ Minimal shape:
 {
   "id": "dice-revolver",
   "name": "Dice Revolver",
-  "description": "Your next 6 /dice uses roll twice.",
+  "description": "Your next 6 /roll uses roll twice.",
   "pricePips": 6,
   "consumable": true,
   "effect": {
@@ -29,8 +29,8 @@ Shared notes:
 Effect types:
 
 - `negative-effect-shield`: grants charges that block the next matching hostile effect. Current item behavior covers PvP and random events that consume the same shield effect.
-- `double-roll-uses`: the next `uses` `/dice` actions roll twice.
-- `double-roll-duration`: `/dice` rolls twice for the next `minutes`.
+- `double-roll-uses`: the next `uses` `/roll` actions roll twice.
+- `double-roll-duration`: `/roll` rolls twice for the next `minutes`.
 - `trigger-random-group-event`: tries to spawn a random event immediately. If the runtime is disabled, unavailable, or already busy, the item is refunded.
 - `auto-roll-session`: reserves an automated rolling session. Only one active auto-roll session per user is allowed.
 - `cleanse-all-negative-effects`: clears negative temporary effects and any active PvP lockout. If nothing negative is active, use fails and the item is not consumed.

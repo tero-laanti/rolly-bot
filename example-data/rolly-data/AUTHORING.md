@@ -6,7 +6,7 @@ All data files are plain JSON.
 Use the file-specific guides when authoring or reviewing private `rolly-data`:
 
 - [achievements.md](achievements.md): achievement rules, ordered vs unordered matching, manual prestige awards.
-- [dice-balance.md](dice-balance.md): prestige, bans, charge, and core `/dice` progression tuning.
+- [dice-balance.md](dice-balance.md): prestige, bans, charge, and core `/roll` progression tuning.
 - [casino.v1.md](casino.v1.md): payout math, bet settings, and game-specific tuning rules.
 - [intro-posts.v1.md](intro-posts.v1.md): startup-synced channel intro messages managed by the bot.
 - [items.v1.md](items.v1.md): item effect behavior and time-based units.

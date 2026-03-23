@@ -4,16 +4,16 @@ Rolly is a Discord dice game bot built around a persistent loop: roll, grow your
 
 ## Why Rolly
 
-- `/dice` is the core loop: matching rolls drive progression, achievements, Fame, Pips, bans, and temporary effects.
+- `/roll` is the core loop: matching rolls drive progression, achievements, Fame, Pips, bans, and temporary effects.
 - The surrounding systems keep the server busy: PvP, casino games, raids, random events, inventory, and analytics all feed back into the next roll.
 
 ## In Action
 
-PvP duels can grant temporary roll buffs that feed back into the main `/dice` loop:
+PvP duels can grant temporary roll buffs that feed back into the main `/roll` loop:
 
 <img src="docs/images/pvp.png" alt="PvP duel and follow-up dice roll" width="480" />
 
-Players can inspect long-term progression with `/dice-analytics`:
+Players can inspect long-term progression with `/analytics`:
 
 <img src="docs/images/analytics.png" alt="Dice analytics command output" width="360" />
 
@@ -23,8 +23,8 @@ Random events arrive as live interaction prompts inside the server:
 
 ## Command Surface
 
-- Player commands: `/dice`, `/dice-balance`, `/dice-leaderboards`, `/dice-prestige`, `/dice-bans`, `/dice-casino`, `/dice-shop`, `/dice-inventory`, `/dice-pvp`, `/dice-achievements`, and `/dice-analytics`
-- Owner/admin commands: `/dice-admin` and `/self-update`
+- Player commands: `/roll`, `/balance`, `/leaderboards`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, and `/analytics`
+- Owner/admin commands: `/admin` and `/self-update`
 
 ## Quick Start
 

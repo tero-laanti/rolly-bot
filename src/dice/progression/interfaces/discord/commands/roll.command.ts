@@ -3,9 +3,9 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { applyChatInputResult } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteRollDiceUseCase } from "../../../infrastructure/sqlite/services";
-import { renderDiceRollResult } from "../presenters/dice.presenter";
+import { renderDiceRollResult } from "../presenters/roll.presenter";
 
-export const data = new SlashCommandBuilder().setName("dice").setDescription("Roll your dice.");
+export const data = new SlashCommandBuilder().setName("roll").setDescription("Roll your dice.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const runRollDiceUseCase = createSqliteRollDiceUseCase(getDatabase());

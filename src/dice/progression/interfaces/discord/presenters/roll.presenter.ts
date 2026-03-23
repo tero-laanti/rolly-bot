@@ -1,5 +1,5 @@
 import type { InteractionResult } from "../../../../../app/discord/interaction-response";
-import type { DiceRollResult } from "../../../application/roll-dice/use-case";
+import type { DiceRollResult } from "../../../application/roll/use-case";
 
 export const renderDiceRollResult = (result: DiceRollResult): InteractionResult => {
   return {

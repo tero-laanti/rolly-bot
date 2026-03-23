@@ -30,7 +30,7 @@ const handleDicePrestigeButton = async (interaction: ButtonInteraction): Promise
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-prestige")
+  .setName("prestige")
   .setDescription("Manage your prestige progression and active prestige level.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

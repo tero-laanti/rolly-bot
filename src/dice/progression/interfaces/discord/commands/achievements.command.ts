@@ -35,7 +35,7 @@ const handleDiceAchievementsButton = async (interaction: ButtonInteraction): Pro
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-achievements")
+  .setName("achievements")
   .setDescription("Browse your dice achievements.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {

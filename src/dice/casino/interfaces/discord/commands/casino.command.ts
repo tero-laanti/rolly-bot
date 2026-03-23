@@ -31,7 +31,7 @@ const handleDiceCasinoButton = async (interaction: ButtonInteraction): Promise<v
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dice-casino")
+  .setName("casino")
   .setDescription("Play dice-based casino games with your pips.")
   .addIntegerOption((option) =>
     option

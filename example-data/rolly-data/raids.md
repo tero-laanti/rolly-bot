@@ -71,12 +71,12 @@ Tiered reward alternative:
 - `reward.pipsByBossLevel` must contain at least one row.
 - The first row must start at `bossLevelAtLeast = 1`.
 - Rows must be sorted by ascending `bossLevelAtLeast` with no duplicates.
-- `reward.rollPassBuff.multiplierPerBossLevel` scales the normal `/dice` roll-pass buff from boss level before clamping.
+- `reward.rollPassBuff.multiplierPerBossLevel` scales the normal `/roll` roll-pass buff from boss level before clamping.
 - `reward.rollPassBuff.minimumMultiplier` and `reward.rollPassBuff.maximumMultiplier` clamp that buff magnitude.
 - `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
 - `reward.rollPassBuff.minimumRolls` and `reward.rollPassBuff.maximumRolls` clamp the rewarded roll count.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
-- `expectedRollIntervalSeconds` is the raid HP model's expected per-player `/dice` cadence.
+- `expectedRollIntervalSeconds` is the raid HP model's expected per-player `/roll` cadence.
 - `minimumHitsPerParticipant` keeps raids from collapsing to trivially low HP in short windows.
 - `minimumBossHp` is a flat floor for the final generated HP pool.
 - `damageBudgetRatio` controls how much of the estimated total player damage budget becomes boss HP.
