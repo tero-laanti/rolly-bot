@@ -482,23 +482,21 @@ test("draws refund both wager stakes in full", async () => {
   assert.match(result.payload.content, /Draw refund: both players get 10 pips back/);
 });
 
-test("decisive wager payouts apply the minimum and maximum burn caps", async () => {
+test("decisive wager payouts credit the full pot to the winner", async () => {
   for (const scenario of [
     {
       wagerPips: 1,
       startingPips: 10,
-      expectedWinnerPips: 10,
+      expectedWinnerPips: 11,
       expectedLoserPips: 9,
-      burnText: /1 pip burned/,
-      payoutText: /receives 1 pip/,
+      payoutText: /receives 2 pips/,
     },
     {
       wagerPips: 100,
       startingPips: 200,
-      expectedWinnerPips: 295,
+      expectedWinnerPips: 300,
       expectedLoserPips: 100,
-      burnText: /5 pips burned/,
-      payoutText: /receives 195 pips/,
+      payoutText: /receives 200 pips/,
     },
   ]) {
     const harness = createHarness({
@@ -520,7 +518,7 @@ test("decisive wager payouts apply the minimum and maximum burn caps", async () 
     assert.equal(harness.balances.get("opponent"), scenario.expectedLoserPips);
     assert.equal(result.payload.type, "message");
     assert.match(result.payload.content, scenario.payoutText);
-    assert.match(result.payload.content, scenario.burnText);
+    assert.doesNotMatch(result.payload.content, /burned/);
   }
 });
 

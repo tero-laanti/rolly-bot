@@ -561,7 +561,6 @@ const handleChallengeAccept = (
       winnerId === resolvedChallenge.challengerId
         ? resolvedChallenge.opponentId
         : resolvedChallenge.challengerId;
-    const burnPips = getWagerBurnPips(challenge.wagerPips);
     const payoutPips = getWagerWinnerPayoutPips(challenge.wagerPips);
 
     if (payoutPips > 0) {
@@ -617,7 +616,6 @@ const handleChallengeAccept = (
       type: "win" as const,
       winnerId,
       loserId,
-      burnPips,
       payoutPips,
       winnerDoubleRollUntilMs,
       loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
@@ -660,7 +658,6 @@ const handleChallengeAccept = (
       opponentRoll,
       duelDieSides,
       challenge.wagerPips,
-      outcome.burnPips,
       outcome.payoutPips,
       outcome.winnerId,
       outcome.loserId,
@@ -834,7 +831,7 @@ const buildChallengeContent = (
     title,
     `Duel die: ${duelDieLabel}.`,
     buildChallengeStakeLine(wagerPips),
-    buildChallengeBurnLine(wagerPips),
+    buildChallengePayoutLine(wagerPips),
     "",
     openChallenge
       ? `Anyone can accept if they have ${duelDieLabel} unlocked.`
@@ -876,7 +873,6 @@ const buildWinResultContent = (
   opponentRoll: number,
   duelDieSides: number,
   wagerPips: number,
-  burnPips: number,
   payoutPips: number,
   winnerId: string,
   loserId: string,
@@ -894,10 +890,7 @@ const buildWinResultContent = (
     `<@${challenge.opponentId}> rolled ${opponentRoll}.`,
     `<@${winnerId}> is the winner.`,
     ...(wagerPips > 0
-      ? [
-          `<@${winnerId}> receives ${payoutPips} pip${payoutPips === 1 ? "" : "s"}.`,
-          `${burnPips} pip${burnPips === 1 ? "" : "s"} burned from the pot.`,
-        ]
+      ? [`<@${winnerId}> receives ${payoutPips} pip${payoutPips === 1 ? "" : "s"}.`]
       : []),
     loserBlockedByShield
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
@@ -999,14 +992,13 @@ const buildChallengeStakeLine = (wagerPips: number): string => {
   return `Stake: ${formatChallengeWagerText(wagerPips)}.`;
 };
 
-const buildChallengeBurnLine = (wagerPips: number): string => {
+const buildChallengePayoutLine = (wagerPips: number): string => {
   if (wagerPips < 1) {
-    return "Burn on decisive result: none.";
+    return "Decisive payout: none.";
   }
 
-  const burnPips = getWagerBurnPips(wagerPips);
   const payoutPips = getWagerWinnerPayoutPips(wagerPips);
-  return `Decisive payout: ${payoutPips} pips to the winner, ${burnPips} pip${burnPips === 1 ? "" : "s"} burned.`;
+  return `Decisive payout: ${payoutPips} pip${payoutPips === 1 ? "" : "s"} to the winner.`;
 };
 
 const formatChallengeRefundLine = (challenge: DicePvpChallenge): string => {
@@ -1145,20 +1137,12 @@ const cancelChallengeForLockout = (
   );
 };
 
-const getWagerBurnPips = (wagerPips: number): number => {
-  if (wagerPips < 1) {
-    return 0;
-  }
-
-  return Math.max(1, Math.min(5, Math.floor(wagerPips * 0.1)));
-};
-
 const getWagerWinnerPayoutPips = (wagerPips: number): number => {
   if (wagerPips < 1) {
     return 0;
   }
 
-  return wagerPips * 2 - getWagerBurnPips(wagerPips);
+  return wagerPips * 2;
 };
 
 const extendEffect = (currentUntil: string | null, durationMs: number, nowMs: number): number => {
