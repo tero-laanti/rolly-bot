@@ -9,11 +9,16 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const queryDiceAnalytics = createSqliteQueryDiceAnalyticsUseCase(getDatabase());
-  await interaction.reply(
-    queryDiceAnalytics({
-      userId: interaction.user.id,
-      userMention: interaction.user.toString(),
-      nowMs: Date.now(),
-    }),
-  );
+  const result = queryDiceAnalytics({
+    userId: interaction.user.id,
+    userMention: interaction.user.toString(),
+    nowMs: Date.now(),
+  });
+
+  await interaction.reply({
+    ...result,
+    allowedMentions: {
+      users: [],
+    },
+  });
 };
