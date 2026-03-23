@@ -9,6 +9,7 @@ import { getDiceItemAchievementIds } from "../achievement-rules";
 import { isPassivePermanentItem } from "../../domain/passive-items";
 
 export type DiceShopCategoryId = "consumables" | "permanent-upgrades";
+export type DiceShopItemNavigationDirection = "previous" | "next";
 
 type DiceShopCategoryDefinition = {
   id: DiceShopCategoryId;
@@ -55,6 +56,13 @@ export type DiceShopAction =
       itemId: string;
     }
   | {
+      type: "view-adjacent-item";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+      itemId: string;
+      direction: DiceShopItemNavigationDirection;
+    }
+  | {
       type: "close";
       ownerId: string;
     };
@@ -82,6 +90,11 @@ export type DiceShopItemDetail = {
   typeLabel: string;
   buyable: boolean;
   buyDisabledReason?: string;
+};
+
+export type DiceShopItemNavigation = {
+  previousItemId: string | null;
+  nextItemId: string | null;
 };
 
 export type DiceShopPurchaseReceipt = {
@@ -115,6 +128,7 @@ export type DiceShopViewModel =
       categoryId: DiceShopCategoryId;
       categoryLabel: string;
       selectedItem: DiceShopItemDetail;
+      itemNavigation: DiceShopItemNavigation;
     })
   | (DiceShopViewBase & {
       screen: "purchase-receipt";
@@ -283,6 +297,40 @@ export const createDiceShopUseCase = ({
       };
     }
 
+    if (action.type === "view-adjacent-item") {
+      const adjacentItem = getAdjacentCategoryItem(
+        shopCatalog,
+        category.id,
+        action.itemId,
+        action.direction,
+      );
+      if (!adjacentItem) {
+        return {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "That shop item does not exist.",
+            ephemeral: true,
+          },
+        };
+      }
+
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildItemDetailViewModel(
+            economy,
+            inventory,
+            shopCatalog,
+            action.ownerId,
+            category,
+            adjacentItem.id,
+          ),
+        },
+      };
+    }
+
     const purchase = unitOfWork.runInTransaction<ShopPurchaseAttempt>(() => {
       const ownedQuantity = inventory.getInventoryQuantities(action.ownerId).get(item.id) ?? 0;
       if (isPassivePermanentItem(item) && ownedQuantity > 0) {
@@ -422,6 +470,7 @@ const buildItemDetailViewModel = (
   const alreadyOwned = isPassivePermanentItem(item) && ownedQuantity > 0;
   const hasEnoughPips = balancePips >= item.pricePips;
   const buyable = !alreadyOwned && hasEnoughPips;
+  const itemNavigation = buildItemNavigation(shopCatalog, category.id, item.id);
 
   return {
     screen: "item-detail",
@@ -430,6 +479,7 @@ const buildItemDetailViewModel = (
     categorySummaries: buildCategorySummaries(shopCatalog),
     categoryId: category.id,
     categoryLabel: category.label,
+    itemNavigation,
     selectedItem: {
       id: item.id,
       name: item.name,
@@ -483,6 +533,39 @@ const getCategoryItems = (shopCatalog: DiceShopCatalog, categoryId: DiceShopCate
   return shopCatalog
     .getDiceShopItems()
     .filter((item) => getDiceShopCategoryId(item) === categoryId);
+};
+
+const getAdjacentCategoryItem = (
+  shopCatalog: DiceShopCatalog,
+  categoryId: DiceShopCategoryId,
+  itemId: string,
+  direction: DiceShopItemNavigationDirection,
+) => {
+  const items = getCategoryItems(shopCatalog, categoryId);
+  const currentIndex = items.findIndex((item) => item.id === itemId);
+  if (currentIndex < 0) {
+    return null;
+  }
+
+  const adjacentIndex = direction === "previous" ? currentIndex - 1 : currentIndex + 1;
+  return items[adjacentIndex] ?? items[currentIndex] ?? null;
+};
+
+const buildItemNavigation = (
+  shopCatalog: DiceShopCatalog,
+  categoryId: DiceShopCategoryId,
+  itemId: string,
+): DiceShopItemNavigation => {
+  const items = getCategoryItems(shopCatalog, categoryId);
+  const currentIndex = items.findIndex((item) => item.id === itemId);
+  if (currentIndex < 0) {
+    throw new Error(`Missing shop item navigation for ${itemId} in category ${categoryId}.`);
+  }
+
+  return {
+    previousItemId: currentIndex > 0 ? (items[currentIndex - 1]?.id ?? null) : null,
+    nextItemId: currentIndex < items.length - 1 ? (items[currentIndex + 1]?.id ?? null) : null,
+  };
 };
 
 const getDiceShopCategoryDefinition = (

@@ -211,6 +211,10 @@ test("selecting an item returns the expected item-detail state", () => {
     return;
   }
 
+  assert.deepEqual(result.payload.view.itemNavigation, {
+    previousItemId: null,
+    nextItemId: cleanseSalt.id,
+  });
   assert.deepEqual(result.payload.view.selectedItem, {
     id: diceRevolver.id,
     name: "Dice Revolver",
@@ -220,6 +224,35 @@ test("selecting an item returns the expected item-detail state", () => {
     typeLabel: "Consumable",
     buyable: true,
     buyDisabledReason: undefined,
+  });
+});
+
+test("adjacent item navigation moves within the selected category order", () => {
+  const { useCase } = createTestShopUseCase();
+
+  const result = useCase.handleDiceShopAction("user-1", {
+    type: "view-adjacent-item",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    itemId: diceRevolver.id,
+    direction: "next",
+  });
+
+  assert.equal(result.kind, "update");
+  assert.equal(result.payload.type, "view");
+  if (result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(result.payload.view.screen, "item-detail");
+  if (result.payload.view.screen !== "item-detail") {
+    return;
+  }
+
+  assert.equal(result.payload.view.selectedItem.id, cleanseSalt.id);
+  assert.deepEqual(result.payload.view.itemNavigation, {
+    previousItemId: diceRevolver.id,
+    nextItemId: null,
   });
 });
 

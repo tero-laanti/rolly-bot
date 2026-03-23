@@ -118,6 +118,10 @@ test("item-detail renders one buy button plus navigation controls", () => {
         categorySummaries,
         categoryId: "consumables",
         categoryLabel: "Consumables",
+        itemNavigation: {
+          previousItemId: null,
+          nextItemId: "cleanse-salt",
+        },
         selectedItem: {
           id: "dice-revolver",
           name: "Dice Revolver",
@@ -135,9 +139,19 @@ test("item-detail renders one buy button plus navigation controls", () => {
   assert.equal(embed?.title, "Dice Revolver");
 
   const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
+    ["Previous", "Next"],
+  );
+  assert.deepEqual(
+    rows[0]?.components.map((component) =>
+      "disabled" in component ? component.disabled : undefined,
+    ),
+    [true, false],
+  );
+  assert.deepEqual(
+    rows[1]?.components.map((component) => ("label" in component ? component.label : undefined)),
     ["Buy", "Back to Categories", "Close"],
   );
 });
@@ -265,6 +279,10 @@ test("permanent upgrade item detail renders emoji owned state", () => {
         categorySummaries,
         categoryId: "permanent-upgrades",
         categoryLabel: "Permanent Upgrades",
+        itemNavigation: {
+          previousItemId: null,
+          nextItemId: null,
+        },
         selectedItem: {
           id: "umbrella-harness",
           name: "Umbrella Harness",

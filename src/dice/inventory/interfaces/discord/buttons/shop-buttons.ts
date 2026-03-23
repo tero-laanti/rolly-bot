@@ -1,4 +1,8 @@
-import type { DiceShopAction, DiceShopCategoryId } from "../../../application/manage-shop/use-case";
+import type {
+  DiceShopAction,
+  DiceShopCategoryId,
+  DiceShopItemNavigationDirection,
+} from "../../../application/manage-shop/use-case";
 import { encodeActionId, parseActionId } from "../../../../../shared-kernel/application/action-id";
 
 export const diceShopButtonPrefix = "dice-shop:";
@@ -24,6 +28,15 @@ export const encodeDiceShopButtonAction = (
         action.categoryId,
         action.itemId,
       );
+    case "view-adjacent-item":
+      return encodeActionId(
+        diceShopButtonPrefix,
+        "view-adjacent-item",
+        action.ownerId,
+        action.categoryId,
+        action.itemId,
+        action.direction,
+      );
     case "close":
       return encodeActionId(diceShopButtonPrefix, "close", action.ownerId);
     case "select-item":
@@ -43,7 +56,7 @@ export const parseDiceShopButtonAction = (
     return null;
   }
 
-  const [action, ownerId, categoryId, itemId] = parsed;
+  const [action, ownerId, categoryId, itemId, direction] = parsed;
   if (!ownerId) {
     return null;
   }
@@ -64,9 +77,24 @@ export const parseDiceShopButtonAction = (
     return { type: "buy-selected-item", ownerId, categoryId, itemId };
   }
 
+  if (
+    action === "view-adjacent-item" &&
+    isDiceShopCategoryId(categoryId) &&
+    itemId &&
+    isDiceShopItemNavigationDirection(direction)
+  ) {
+    return { type: "view-adjacent-item", ownerId, categoryId, itemId, direction };
+  }
+
   return null;
 };
 
 const isDiceShopCategoryId = (value: string | undefined): value is DiceShopCategoryId => {
   return value === "consumables" || value === "permanent-upgrades";
+};
+
+const isDiceShopItemNavigationDirection = (
+  value: string | undefined,
+): value is DiceShopItemNavigationDirection => {
+  return value === "previous" || value === "next";
 };

@@ -294,6 +294,34 @@ const buildDiceShopComponents = (
         new ButtonBuilder()
           .setCustomId(
             encodeDiceShopButtonAction({
+              type: "view-adjacent-item",
+              ownerId: view.ownerId,
+              categoryId: view.categoryId,
+              itemId: view.selectedItem.id,
+              direction: "previous",
+            }),
+          )
+          .setLabel("Previous")
+          .setStyle(ButtonStyle.Primary)
+          .setDisabled(!view.itemNavigation.previousItemId),
+        new ButtonBuilder()
+          .setCustomId(
+            encodeDiceShopButtonAction({
+              type: "view-adjacent-item",
+              ownerId: view.ownerId,
+              categoryId: view.categoryId,
+              itemId: view.selectedItem.id,
+              direction: "next",
+            }),
+          )
+          .setLabel("Next")
+          .setStyle(ButtonStyle.Primary)
+          .setDisabled(!view.itemNavigation.nextItemId),
+      ),
+      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            encodeDiceShopButtonAction({
               type: "buy-selected-item",
               ownerId: view.ownerId,
               categoryId: view.categoryId,
