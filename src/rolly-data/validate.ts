@@ -73,6 +73,7 @@ const achievementRuleTypes = [
   "all-of",
   "manual",
 ] as const;
+const introPostContentMaxLength = 2_000;
 
 const isRecord = (value: unknown): value is UnknownRecord => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1201,8 +1202,15 @@ export const parseIntroPostsV1Data = (value: unknown): IntroPostsV1Data => {
 
   const messages = record.messages.map((entry, index) => {
     const message = assertRecord(entry, `introPostsV1.messages[${index}]`);
+    const content = readNonEmptyString(message.content, `introPostsV1.messages[${index}].content`);
+    if (content.length > introPostContentMaxLength) {
+      throw new Error(
+        `introPostsV1.messages[${index}].content must be <= ${introPostContentMaxLength} characters.`,
+      );
+    }
+
     return {
-      content: readNonEmptyString(message.content, `introPostsV1.messages[${index}].content`),
+      content,
     };
   });
 

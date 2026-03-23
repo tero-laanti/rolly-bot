@@ -195,6 +195,18 @@ test("parseIntroPostsV1Data accepts valid intro posts", () => {
   });
 });
 
+test("parseIntroPostsV1Data accepts content at Discord's 2000-character limit", () => {
+  const content = "a".repeat(2_000);
+
+  const parsed = parseIntroPostsV1Data({
+    messages: [{ content }],
+  });
+
+  assert.deepEqual(parsed, {
+    messages: [{ content }],
+  });
+});
+
 test("parseIntroPostsV1Data rejects missing messages", () => {
   assert.throws(() => parseIntroPostsV1Data({}), /introPostsV1\.messages must be an array/i);
 });
@@ -210,5 +222,12 @@ test("parseIntroPostsV1Data rejects empty content", () => {
   assert.throws(
     () => parseIntroPostsV1Data({ messages: [{ content: "   " }] }),
     /introPostsV1\.messages\[0\]\.content must not be empty/i,
+  );
+});
+
+test("parseIntroPostsV1Data rejects content above Discord's 2000-character limit", () => {
+  assert.throws(
+    () => parseIntroPostsV1Data({ messages: [{ content: "a".repeat(2_001) }] }),
+    /introPostsV1\.messages\[0\]\.content must be <= 2000 characters/i,
   );
 });
