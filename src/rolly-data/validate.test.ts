@@ -4,6 +4,7 @@ import {
   parseDiceBalance,
   parseDiceItems,
   parseDiceRaidsData,
+  parseIntroPostsV1Data,
   parseRandomEventScenarios,
 } from "./validate";
 
@@ -181,5 +182,33 @@ test("parseDiceItems rejects passive effects on consumable items", () => {
   assert.throws(
     () => parseDiceItems([item]),
     /Passive item padded-bracers must set consumable to false/i,
+  );
+});
+
+test("parseIntroPostsV1Data accepts valid intro posts", () => {
+  const parsed = parseIntroPostsV1Data({
+    messages: [{ content: "# Welcome to Rolly" }, { content: "Use /dice to get started." }],
+  });
+
+  assert.deepEqual(parsed, {
+    messages: [{ content: "# Welcome to Rolly" }, { content: "Use /dice to get started." }],
+  });
+});
+
+test("parseIntroPostsV1Data rejects missing messages", () => {
+  assert.throws(() => parseIntroPostsV1Data({}), /introPostsV1\.messages must be an array/i);
+});
+
+test("parseIntroPostsV1Data rejects empty messages arrays", () => {
+  assert.throws(
+    () => parseIntroPostsV1Data({ messages: [] }),
+    /introPostsV1\.messages must include at least one entry/i,
+  );
+});
+
+test("parseIntroPostsV1Data rejects empty content", () => {
+  assert.throws(
+    () => parseIntroPostsV1Data({ messages: [{ content: "   " }] }),
+    /introPostsV1\.messages\[0\]\.content must not be empty/i,
   );
 });

@@ -1,0 +1,10 @@
+{
+  "messages": [
+    {
+      "content": "# Welcome to Rolly\nUse `/dice` to roll, level up, and grow your dice."
+    },
+    {
+      "content": "Check `/dice-shop`, `/dice-inventory`, `/dice-pvp`, and `/dice-casino` for the side systems that feed back into the main loop."
+    }
+  ]
+}

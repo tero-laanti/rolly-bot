@@ -217,5 +217,13 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       used_cleanse_item INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS managed_intro_posts (
+      slot_index INTEGER PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 };
