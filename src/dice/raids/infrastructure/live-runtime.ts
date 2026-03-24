@@ -646,6 +646,11 @@ export const createRaidsLiveRuntime = ({
         allowedStatuses: ["cleanup-needed"],
         logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
       });
+      await publishAchievementAnnouncements({
+        client,
+        announcements: context.raid.achievementAnnouncements,
+        logger,
+      });
       finalizeRaid(context);
       return;
     }
