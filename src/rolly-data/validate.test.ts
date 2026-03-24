@@ -154,17 +154,10 @@ test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
       suffixes: ["Boss"],
     },
     bossBalance: {
-      expectedRollIntervalSeconds: 10,
-      minimumHitsPerParticipant: 12,
-      minimumBossHp: 120,
-      damageBudgetRatio: 0.7,
-      baseHp: 80,
-      hpPerBossLevel: 28,
-      timeBudgetFlatHpPerMinute: 6,
-      participantPrestigeWeight: 2,
-      participantExtraSidesDivisor: 2,
-      baselineDieSides: 6,
-      maxBossLevel: 999,
+      baseHp: 120,
+      hpIncreasePerBossLevelPercent: 3,
+      levelHalfLifeLevels: 10,
+      maxBossLevel: 50,
     },
   });
 

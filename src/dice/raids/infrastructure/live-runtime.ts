@@ -41,6 +41,7 @@ import {
   recordRaidJoin,
   recordRaidSuccessResolution,
 } from "./achievement-stats-repository";
+import { buildRaidHitSummary } from "./raid-hit-summary";
 
 type CreateRaidsLiveRuntimeInput = {
   client: Client;
@@ -525,15 +526,6 @@ export const createRaidsLiveRuntime = ({
     });
   };
 
-  const buildParticipantProfiles = (participantIds: readonly string[]) => {
-    return participantIds.map((participantId) => ({
-      userId: participantId,
-      level: progression.getDiceLevel(participantId),
-      prestige: progression.getActiveDicePrestige(participantId),
-      dieSides: progression.getDiceSides(participantId),
-    }));
-  };
-
   const applyRaidRewards = (context: ActiveRaidContext): void => {
     const boss = context.raid.boss;
     if (!boss) {
@@ -736,10 +728,7 @@ export const createRaidsLiveRuntime = ({
     }
 
     const participantIds = participantIdsFromContext(context);
-    const bossDefinition = createRaidBoss({
-      participantProfiles: buildParticipantProfiles(participantIds),
-      activeDurationMs: config.activeDurationMs,
-    });
+    const bossDefinition = createRaidBoss();
 
     const activeMessage = await activeChannel
       .send({
@@ -1047,6 +1036,7 @@ export const createRaidsLiveRuntime = ({
     userId,
     userMention,
     damage,
+    bestRollSet = null,
     nowMs = Date.now(),
   }: ApplyRaidDiceRollInput): ApplyRaidDiceRollResult => {
     if (!channelId || damage <= 0) {
@@ -1115,7 +1105,14 @@ export const createRaidsLiveRuntime = ({
         defeated: true,
         summary: appendAchievementUnlockText(
           appendAchievementUnlockText(
-            `Raid damage: ${damage} to ${boss.name}. Boss defeated. ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"} earned ${rewardSummary}.`,
+            buildRaidHitSummary({
+              damage,
+              bossName: boss.name,
+              bestRollSet,
+              defeated: true,
+              rewardSummary,
+              eligibleParticipantCount,
+            }),
             hitAchievements,
           ),
           killShotAchievements,
@@ -1128,7 +1125,14 @@ export const createRaidsLiveRuntime = ({
       kind: "applied",
       defeated: false,
       summary: appendAchievementUnlockText(
-        `Raid damage: ${damage} to ${boss.name}. ${boss.currentHp}/${boss.maxHp} HP remaining.`,
+        buildRaidHitSummary({
+          damage,
+          bossName: boss.name,
+          bestRollSet,
+          defeated: false,
+          currentHp: boss.currentHp,
+          maxHp: boss.maxHp,
+        }),
         hitAchievements,
       ),
     };

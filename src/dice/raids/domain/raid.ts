@@ -1,13 +1,4 @@
 import { getDiceRaidData } from "../../../rolly-data/load";
-import { getBaseRollPassCount } from "../../progression/domain/game-rules";
-import { minuteMs } from "../../../shared/time";
-
-export type RaidParticipantProfile = {
-  userId: string;
-  level: number;
-  prestige: number;
-  dieSides: number;
-};
 
 export type RaidRewardDefinition = {
   pips: number;
@@ -26,72 +17,43 @@ const getRaidBalance = () => {
   return getDiceRaidData();
 };
 
-const getExpectedDamagePerRoll = (participant: RaidParticipantProfile): number => {
-  const normalizedLevel = Math.max(1, Math.floor(participant.level));
-  const normalizedSides = Math.max(2, Math.floor(participant.dieSides));
-  const normalizedPrestige = Math.max(0, Math.floor(participant.prestige));
-  const passCount = getBaseRollPassCount(normalizedPrestige);
-  return normalizedLevel * ((normalizedSides + 1) / 2) * passCount;
-};
-
 const clampBossLevel = (value: number): number => {
   const { maxBossLevel } = getRaidBalance().bossBalance;
   return Math.max(1, Math.min(maxBossLevel, Math.round(value)));
 };
 
-const calculateBossLevel = (participantProfiles: readonly RaidParticipantProfile[]): number => {
-  if (participantProfiles.length < 1) {
+const getBossLevelWeightRatio = (): number => {
+  const { levelHalfLifeLevels } = getRaidBalance().bossBalance;
+  return Math.pow(0.5, 1 / levelHalfLifeLevels);
+};
+
+export const rollRaidBossLevel = (random: () => number = Math.random): number => {
+  const { maxBossLevel } = getRaidBalance().bossBalance;
+  if (maxBossLevel <= 1) {
     return 1;
   }
 
-  const { participantPrestigeWeight, participantExtraSidesDivisor, baselineDieSides } =
-    getRaidBalance().bossBalance;
-  const weightedLevelSum = participantProfiles.reduce((total, participant) => {
-    const sideBonus = Math.max(
-      0,
-      (participant.dieSides - baselineDieSides) / participantExtraSidesDivisor,
-    );
-    return total + participant.level + participant.prestige * participantPrestigeWeight + sideBonus;
-  }, 0);
+  const weightRatio = getBossLevelWeightRatio();
+  const totalWeight =
+    weightRatio === 1 ? maxBossLevel : (1 - weightRatio ** maxBossLevel) / (1 - weightRatio);
+  const target = Math.min(Math.max(0, random()), 0.999999999999) * totalWeight;
+  let cumulativeWeight = 0;
 
-  return clampBossLevel(weightedLevelSum / participantProfiles.length);
+  for (let level = 1; level <= maxBossLevel; level += 1) {
+    cumulativeWeight += weightRatio ** (level - 1);
+    if (target < cumulativeWeight) {
+      return level;
+    }
+  }
+
+  return maxBossLevel;
 };
 
-const calculateBossMaxHp = ({
-  participantProfiles,
-  bossLevel,
-  activeDurationMs,
-}: {
-  participantProfiles: readonly RaidParticipantProfile[];
-  bossLevel: number;
-  activeDurationMs: number;
-}): number => {
-  const {
-    expectedRollIntervalSeconds,
-    minimumHitsPerParticipant,
-    minimumBossHp,
-    damageBudgetRatio,
-    baseHp,
-    hpPerBossLevel,
-    timeBudgetFlatHpPerMinute,
-  } = getRaidBalance().bossBalance;
-  const expectedHitsPerParticipant = Math.max(
-    minimumHitsPerParticipant,
-    Math.round(activeDurationMs / (expectedRollIntervalSeconds * 1_000)),
-  );
-  const levelScaledBaseHp = baseHp + bossLevel * hpPerBossLevel;
-  const perParticipantScaling = participantProfiles.reduce((total, participant) => {
-    return (
-      total +
-      Math.round(
-        getExpectedDamagePerRoll(participant) * expectedHitsPerParticipant * damageBudgetRatio,
-      )
-    );
-  }, 0);
-  const timeBudgetMinutes = Math.max(1, Math.round(activeDurationMs / minuteMs));
-  const timeBudgetAdjustment = timeBudgetMinutes * (timeBudgetFlatHpPerMinute + bossLevel);
-
-  return Math.max(minimumBossHp, levelScaledBaseHp + perParticipantScaling + timeBudgetAdjustment);
+export const calculateRaidBossMaxHp = (bossLevel: number): number => {
+  const normalizedBossLevel = clampBossLevel(bossLevel);
+  const { baseHp, hpIncreasePerBossLevelPercent } = getRaidBalance().bossBalance;
+  const hpMultiplier = (1 + hpIncreasePerBossLevelPercent / 100) ** (normalizedBossLevel - 1);
+  return Math.max(1, Math.round(baseHp * hpMultiplier));
 };
 
 const pickBossName = (random: () => number): string => {
@@ -152,25 +114,17 @@ export const describeRaidReward = (reward: RaidRewardDefinition): string => {
 };
 
 export const createRaidBoss = ({
-  participantProfiles,
-  activeDurationMs,
   random = Math.random,
 }: {
-  participantProfiles: readonly RaidParticipantProfile[];
-  activeDurationMs: number;
   random?: () => number;
-}): RaidBossDefinition => {
-  const level = calculateBossLevel(participantProfiles);
+} = {}): RaidBossDefinition => {
+  const level = rollRaidBossLevel(random);
   const reward = getDefaultRaidReward(level);
 
   return {
     name: pickBossName(random),
     level,
-    maxHp: calculateBossMaxHp({
-      participantProfiles,
-      bossLevel: level,
-      activeDurationMs,
-    }),
+    maxHp: calculateRaidBossMaxHp(level),
     reward,
   };
 };

@@ -308,10 +308,8 @@ export const createRunRollDiceUseCase = ({
       matchCount: allSameCount,
       rewardText,
     });
-    const raidDamage = rollPasses.reduce(
-      (total, rolls) => total + rolls.reduce((rollTotal, roll) => rollTotal + roll, 0),
-      0,
-    );
+    const bestRaidRollSet = getHighestRollSet(rollPasses);
+    const raidDamage = getRollSetTotal(bestRaidRollSet);
     const raidResult =
       raidDamage > 0
         ? (raids?.applyDiceRoll({
@@ -319,6 +317,7 @@ export const createRunRollDiceUseCase = ({
             userId,
             userMention,
             damage: raidDamage,
+            bestRollSet: rollPasses.length > 1 ? bestRaidRollSet : null,
             nowMs,
           }) ?? null)
         : null;
@@ -577,6 +576,16 @@ const buildAutoRollClassification = ({
 const summarizeAutoRollText = (content: string): string => {
   const singleLine = content.replace(/\s+/g, " ").trim();
   return truncateWithSuffix(singleLine, 220, "...");
+};
+
+const getHighestRollSet = (rollPasses: number[][]): number[] => {
+  return rollPasses.reduce((bestRollSet, rolls) => {
+    return getRollSetTotal(rolls) > getRollSetTotal(bestRollSet) ? rolls : bestRollSet;
+  }, rollPasses[0] ?? []);
+};
+
+const getRollSetTotal = (rolls: readonly number[]): number => {
+  return rolls.reduce((rollTotal, roll) => rollTotal + roll, 0);
 };
 
 const appendRaidSummaryWithinLimit = (baseContent: string, raidSummary: string): string => {

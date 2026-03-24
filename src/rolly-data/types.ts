@@ -131,16 +131,9 @@ export type DiceRaidBossNamesData = {
 };
 
 export type DiceRaidBossBalanceData = {
-  expectedRollIntervalSeconds: number;
-  minimumHitsPerParticipant: number;
-  minimumBossHp: number;
-  damageBudgetRatio: number;
   baseHp: number;
-  hpPerBossLevel: number;
-  timeBudgetFlatHpPerMinute: number;
-  participantPrestigeWeight: number;
-  participantExtraSidesDivisor: number;
-  baselineDieSides: number;
+  hpIncreasePerBossLevelPercent: number;
+  levelHalfLifeLevels: number;
   maxBossLevel: number;
 };
 

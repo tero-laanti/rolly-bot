@@ -28,17 +28,10 @@ This file controls raid rewards, boss naming, and raid boss-balance tuning.
     "suffixes": ["Boss"]
   },
   "bossBalance": {
-    "expectedRollIntervalSeconds": 10,
-    "minimumHitsPerParticipant": 12,
-    "minimumBossHp": 120,
-    "damageBudgetRatio": 0.7,
-    "baseHp": 80,
-    "hpPerBossLevel": 28,
-    "timeBudgetFlatHpPerMinute": 6,
-    "participantPrestigeWeight": 2,
-    "participantExtraSidesDivisor": 2,
-    "baselineDieSides": 6,
-    "maxBossLevel": 999
+    "baseHp": 120,
+    "hpIncreasePerBossLevelPercent": 3,
+    "levelHalfLifeLevels": 10,
+    "maxBossLevel": 50
   }
 }
 ```
@@ -76,10 +69,8 @@ Tiered reward alternative:
 - `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
 - `reward.rollPassBuff.minimumRolls` and `reward.rollPassBuff.maximumRolls` clamp the rewarded roll count.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
-- `expectedRollIntervalSeconds` is the raid HP model's expected per-player `/roll` cadence.
-- `minimumHitsPerParticipant` keeps raids from collapsing to trivially low HP in short windows.
-- `minimumBossHp` is a flat floor for the final generated HP pool.
-- `damageBudgetRatio` controls how much of the estimated total player damage budget becomes boss HP.
-- `baseHp`, `hpPerBossLevel`, and `timeBudgetFlatHpPerMinute` shape the readable HP formula.
-- `participantPrestigeWeight`, `participantExtraSidesDivisor`, and `baselineDieSides` control how player stats influence generated boss level.
-- `maxBossLevel` is a guardrail clamp, not a progression system by itself.
+- `baseHp` is the level 1 boss HP before level scaling.
+- `hpIncreasePerBossLevelPercent` is the compound HP increase applied for each boss level above 1.
+- With the default values, level 50 lands at roughly `4.26x` the HP of level 1.
+- `levelHalfLifeLevels` controls the low-heavy level roll. With the default `10`, a level 50 boss is half as likely as a level 40 boss, which is half as likely as a level 30 boss.
+- `maxBossLevel` caps the random boss level roll. With the default `50`, bosses roll from level 1 through level 50.
