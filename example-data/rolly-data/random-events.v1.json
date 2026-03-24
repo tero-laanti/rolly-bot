@@ -19,6 +19,11 @@
             "maxAmount": 3
           },
           {
+            "type": "consumable-item",
+            "itemId": "dice-revolver",
+            "quantity": 1
+          },
+          {
             "type": "temporary-roll-multiplier",
             "multiplier": 2,
             "rolls": 2,

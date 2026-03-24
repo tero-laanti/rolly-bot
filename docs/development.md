@@ -40,6 +40,7 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 ### Gameplay data
 
 - `ROLLY_DATA_DIR`: Optional. Absolute or repo-relative path to a private `rolly-data` checkout. If omitted, Rolly tries `./rolly-data` and then [example-data/rolly-data/](../example-data/rolly-data/). The data directory is expected to include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
+- `random-events.v1.json` can reference consumable rewards from `items.v1.json`; startup validation rejects missing or non-consumable item ids.
 
 ### Intro posts
 

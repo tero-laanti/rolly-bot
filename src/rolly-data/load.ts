@@ -22,6 +22,7 @@ import {
   parseIntroPostsV1Data,
   parseRandomEventBalance,
   parseRandomEventScenarios,
+  validateRandomEventConsumableRewards,
 } from "./validate";
 import type { RandomEventScenario } from "../dice/random-events/domain/content";
 
@@ -59,17 +60,21 @@ const readJsonFile = (source: RollyDataSource, fileName: string): unknown => {
 
 const loadRollyData = (): LoadedRollyData => {
   const source = resolveRollyDataSource();
+  const itemsV1 = parseDiceItems(readJsonFile(source, itemsV1FileName));
+  const randomEventsV1 = parseRandomEventScenarios(readJsonFile(source, randomEventsV1FileName));
+  validateRandomEventConsumableRewards(randomEventsV1, itemsV1);
+
   return {
     source,
     achievements: parseDiceAchievements(readJsonFile(source, achievementsFileName)),
     casinoV1: parseDiceCasinoData(readJsonFile(source, casinoV1FileName)),
     diceBalance: parseDiceBalance(readJsonFile(source, diceBalanceFileName)),
     introPostsV1: parseIntroPostsV1Data(readJsonFile(source, introPostsV1FileName)),
-    itemsV1: parseDiceItems(readJsonFile(source, itemsV1FileName)),
+    itemsV1,
     pvp: parseDicePvpData(readJsonFile(source, pvpFileName)),
     randomEventBalance: parseRandomEventBalance(readJsonFile(source, randomEventBalanceFileName)),
     raids: parseDiceRaidsData(readJsonFile(source, raidsFileName)),
-    randomEventsV1: parseRandomEventScenarios(readJsonFile(source, randomEventsV1FileName)),
+    randomEventsV1,
   };
 };
 
