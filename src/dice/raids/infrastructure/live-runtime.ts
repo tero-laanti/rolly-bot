@@ -22,7 +22,11 @@ import type {
   TriggerRaidNowOutcome,
 } from "../application/ports";
 import { getDiceRaidAchievementIds } from "../application/achievement-rules";
-import { createRaidBoss, describeRaidReward } from "../domain/raid";
+import {
+  calculateRaidParticipantStrength,
+  createRaidBoss,
+  describeRaidReward,
+} from "../domain/raid";
 import { parseRaidJoinButtonId } from "../interfaces/discord/button-ids";
 import {
   buildRaidActivePrompt,
@@ -739,7 +743,15 @@ export const createRaidsLiveRuntime = ({
     }
 
     const participantIds = participantIdsFromContext(context);
-    const bossDefinition = createRaidBoss();
+    const totalRaiderStrength = participantIds.reduce((strengthTotal, participantId) => {
+      return (
+        strengthTotal +
+        calculateRaidParticipantStrength(progression.getActiveDicePrestige(participantId))
+      );
+    }, 0);
+    const bossDefinition = createRaidBoss({
+      raiderStrength: totalRaiderStrength,
+    });
 
     const activeMessage = await activeChannel
       .send({

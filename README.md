@@ -69,7 +69,7 @@ Use [`.env.example`](.env.example) for the exact variable list and [docs/develop
 - Runtime state is stored in `./data/rolly-bot.sqlite`.
 - Gameplay data is loaded from `ROLLY_DATA_DIR`, then `./rolly-data`, then [example-data/rolly-data/](example-data/rolly-data/).
 - The public files under [example-data/rolly-data/](example-data/rolly-data/) are safe examples only. They document the contract and let the bot boot locally, but they are not intended to mirror private balance or spoiler-heavy content.
-- Raid boss balance in `raids.json` uses a weighted random boss level roll and per-level HP scaling; see [example-data/rolly-data/raids.md](example-data/rolly-data/raids.md) for the current contract.
+- Raid boss balance in `raids.json` uses a weighted random boss level roll, per-level HP scaling, and joined-raider strength scaling locked at raid start; see [example-data/rolly-data/raids.md](example-data/rolly-data/raids.md) for the current contract.
 - Managed intro posts stay inactive until `INTRO_POST_CHANNEL_ID` is set.
 - Achievement posts stay inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.
 - Random events and raids are both inactive until their channel IDs are configured.

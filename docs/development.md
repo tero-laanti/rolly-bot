@@ -94,7 +94,7 @@ When command names, descriptions, or options change, run `npm run deploy:command
 - Runtime state is stored in `./data/rolly-bot.sqlite`.
 - Gameplay data loads in this order: `ROLLY_DATA_DIR`, `./rolly-data`, then [example-data/rolly-data/](../example-data/rolly-data/).
 - The expected data files are `achievements.json`, `casino.v1.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
-- Raid boss balance is defined in `raids.json` using a weighted random boss-level roll and per-level HP scaling. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
+- Raid boss balance is defined in `raids.json` using a weighted random boss-level roll, per-level HP scaling, and joined-raider strength scaling locked at raid start. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
 - Public contract docs live in [example-data/rolly-data/README.md](../example-data/rolly-data/README.md) and [example-data/rolly-data/AUTHORING.md](../example-data/rolly-data/AUTHORING.md).
 - Managed intro posts are inactive until `INTRO_POST_CHANNEL_ID` is set.
 - Achievement posts are inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.

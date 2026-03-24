@@ -17,6 +17,28 @@ const getRaidBalance = () => {
   return getDiceRaidData();
 };
 
+export const calculateRaidParticipantStrength = (prestige: number): number => {
+  const normalizedPrestige = Math.max(0, Math.floor(prestige));
+
+  if (normalizedPrestige <= 0) {
+    return 1;
+  }
+  if (normalizedPrestige === 1) {
+    return 1.5;
+  }
+  if (normalizedPrestige === 2) {
+    return 2;
+  }
+  if (normalizedPrestige === 3) {
+    return 2.5;
+  }
+  if (normalizedPrestige === 4) {
+    return 4;
+  }
+
+  return 20;
+};
+
 const clampBossLevel = (value: number): number => {
   const { maxBossLevel } = getRaidBalance().bossBalance;
   return Math.max(1, Math.min(maxBossLevel, Math.round(value)));
@@ -50,10 +72,19 @@ export const rollRaidBossLevel = (random: () => number = Math.random): number =>
 };
 
 export const calculateRaidBossMaxHp = (bossLevel: number): number => {
+  return calculateRaidBossMaxHpForStrength(bossLevel, 1);
+};
+
+export const calculateRaidBossMaxHpForStrength = (
+  bossLevel: number,
+  raiderStrength: number,
+): number => {
   const normalizedBossLevel = clampBossLevel(bossLevel);
   const { baseHp, hpIncreasePerBossLevelPercent } = getRaidBalance().bossBalance;
   const hpMultiplier = (1 + hpIncreasePerBossLevelPercent / 100) ** (normalizedBossLevel - 1);
-  return Math.max(1, Math.round(baseHp * hpMultiplier));
+  const baseLevelHp = Math.max(1, Math.round(baseHp * hpMultiplier));
+  const normalizedRaiderStrength = Math.max(1, raiderStrength);
+  return Math.max(1, Math.round(baseLevelHp * normalizedRaiderStrength));
 };
 
 const pickBossName = (random: () => number): string => {
@@ -115,8 +146,10 @@ export const describeRaidReward = (reward: RaidRewardDefinition): string => {
 
 export const createRaidBoss = ({
   random = Math.random,
+  raiderStrength = 1,
 }: {
   random?: () => number;
+  raiderStrength?: number;
 } = {}): RaidBossDefinition => {
   const level = rollRaidBossLevel(random);
   const reward = getDefaultRaidReward(level);
@@ -124,7 +157,7 @@ export const createRaidBoss = ({
   return {
     name: pickBossName(random),
     level,
-    maxHp: calculateRaidBossMaxHp(level),
+    maxHp: calculateRaidBossMaxHpForStrength(level, raiderStrength),
     reward,
   };
 };

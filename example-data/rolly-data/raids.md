@@ -71,6 +71,8 @@ Tiered reward alternative:
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
 - `baseHp` is the level 1 boss HP before level scaling.
 - `hpIncreasePerBossLevelPercent` is the compound HP increase applied for each boss level above 1.
+- Boss HP is calculated from boss level first, then multiplied by the joined-raider strength total when the raid starts.
+- Raider strength is estimated from each joined player's active prestige, so stronger prestiges add more HP than weaker ones.
 - With the default values, level 50 lands at roughly `4.26x` the HP of level 1.
 - `levelHalfLifeLevels` controls the low-heavy level roll. With the default `10`, a level 50 boss is half as likely as a level 40 boss, which is half as likely as a level 30 boss.
 - `maxBossLevel` caps the random boss level roll. With the default `50`, bosses roll from level 1 through level 50.
