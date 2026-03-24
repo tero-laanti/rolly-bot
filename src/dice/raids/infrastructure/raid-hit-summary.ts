@@ -16,11 +16,13 @@ type BuildRaidHitSummaryInput =
       eligibleParticipantCount: number;
     };
 
+const maxBestRollPreviewDice = 12;
+
 export const buildRaidHitSummary = (input: BuildRaidHitSummaryInput): string => {
   const lines: string[] = [];
 
   if (input.bestRollSet && input.bestRollSet.length > 0) {
-    lines.push(`Best Roll: **${input.bestRollSet.join(" • ")}**`);
+    lines.push(`Best Roll: **${formatBestRollPreview(input.bestRollSet)}**`);
   }
 
   lines.push(`You dealt **${input.damage} raid damage.**`);
@@ -31,4 +33,15 @@ export const buildRaidHitSummary = (input: BuildRaidHitSummaryInput): string => 
 
   lines.push(resolutionLine);
   return lines.join("\n");
+};
+
+const formatBestRollPreview = (bestRollSet: readonly number[]): string => {
+  const preview = bestRollSet.slice(0, maxBestRollPreviewDice).join(" • ");
+  const omittedDiceCount = bestRollSet.length - maxBestRollPreviewDice;
+
+  if (omittedDiceCount <= 0) {
+    return preview;
+  }
+
+  return `${preview} • ... (+${omittedDiceCount} more)`;
 };

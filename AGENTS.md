@@ -18,6 +18,7 @@ Repo-specific guidance for working on Rolly.
 - Prefer plain functions and objects over classes.
 - Use composition and modules over inheritance-heavy designs.
 - Keep Discord command files focused on Discord interaction flow; move reusable game logic into context `application/`, `domain/`, and `infrastructure/` modules.
+- Discord message content must stay within the 2,000-character limit. When composing replies or summaries from variable-length gameplay data, budget for the full message and cap or compact unbounded sections before appending them.
 
 ## Project Structure
 
