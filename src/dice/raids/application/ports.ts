@@ -89,6 +89,7 @@ export type ApplyRaidDiceRollInput = {
   userId: string;
   userMention: string;
   damage: number;
+  bestRollSet?: readonly number[] | null;
   nowMs?: number;
 };
 

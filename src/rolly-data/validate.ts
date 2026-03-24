@@ -903,40 +903,17 @@ const readRaidBossNamesConfig = (value: unknown, label: string): DiceRaidBossNam
 const readRaidBossBalanceConfig = (value: unknown, label: string): DiceRaidBossBalanceData => {
   const record = assertRecord(value, label);
   return {
-    expectedRollIntervalSeconds: readFiniteNumberAtLeast(
-      record.expectedRollIntervalSeconds,
-      `${label}.expectedRollIntervalSeconds`,
-      1,
-    ),
-    minimumHitsPerParticipant: readInteger(
-      record.minimumHitsPerParticipant,
-      `${label}.minimumHitsPerParticipant`,
-      1,
-    ),
-    minimumBossHp: readInteger(record.minimumBossHp, `${label}.minimumBossHp`, 1),
-    damageBudgetRatio: readFiniteNumberAtLeast(
-      record.damageBudgetRatio,
-      `${label}.damageBudgetRatio`,
-      0,
-    ),
     baseHp: readInteger(record.baseHp, `${label}.baseHp`, 1),
-    hpPerBossLevel: readInteger(record.hpPerBossLevel, `${label}.hpPerBossLevel`, 0),
-    timeBudgetFlatHpPerMinute: readInteger(
-      record.timeBudgetFlatHpPerMinute,
-      `${label}.timeBudgetFlatHpPerMinute`,
+    hpIncreasePerBossLevelPercent: readFiniteNumberAtLeast(
+      record.hpIncreasePerBossLevelPercent,
+      `${label}.hpIncreasePerBossLevelPercent`,
       0,
     ),
-    participantPrestigeWeight: readFiniteNumberAtLeast(
-      record.participantPrestigeWeight,
-      `${label}.participantPrestigeWeight`,
-      0,
-    ),
-    participantExtraSidesDivisor: readFiniteNumberAtLeast(
-      record.participantExtraSidesDivisor,
-      `${label}.participantExtraSidesDivisor`,
+    levelHalfLifeLevels: readFiniteNumberAtLeast(
+      record.levelHalfLifeLevels,
+      `${label}.levelHalfLifeLevels`,
       1,
     ),
-    baselineDieSides: readInteger(record.baselineDieSides, `${label}.baselineDieSides`, 2),
     maxBossLevel: readInteger(record.maxBossLevel, `${label}.maxBossLevel`, 1),
   };
 };

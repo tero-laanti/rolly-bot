@@ -345,3 +345,94 @@ test("reward text includes both fame and pip rewards when both are earned", () =
     Math.random = originalRandom;
   }
 });
+
+test("raid damage uses the highest roll set total instead of summing all roll sets", () => {
+  const originalRandom = Math.random;
+  const randomValues = [0, 0.8, 0.5, 0.5];
+  let randomIndex = 0;
+  let appliedRaidDamage = 0;
+  let appliedBestRollSet: readonly number[] | null | undefined;
+  Math.random = () => {
+    const value = randomValues[randomIndex] ?? 0;
+    randomIndex += 1;
+    return value;
+  };
+
+  try {
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: () => {},
+        resetDiceLevelAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      progression: {
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearLevelupRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 2,
+          levelUpsTotal: 0,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceLevel: () => 2,
+        getDicePrestige: () => 1,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceLevel: () => {},
+        setLastDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      raids: {
+        applyDiceRoll: ({ damage, bestRollSet }) => {
+          appliedRaidDamage = damage;
+          appliedBestRollSet = bestRollSet;
+          return {
+            kind: "applied",
+            summary: `Raid damage: ${damage}`,
+            defeated: false,
+          };
+        },
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = useCase({
+      userId: "user-6",
+      userMention: "<@user-6>",
+      raidThreadId: "raid-thread-1",
+      nowMs: 1_710_000_000_000,
+    });
+
+    assert.equal(appliedRaidDamage, 8);
+    assert.deepEqual(appliedBestRollSet, [4, 4]);
+    assert.match(result.content, /Raid damage: 8/);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
