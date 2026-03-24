@@ -6,6 +6,7 @@ import {
   parseDiceRaidsData,
   parseIntroPostsV1Data,
   parseRandomEventScenarios,
+  validateRandomEventConsumableRewards,
 } from "./validate";
 
 type RandomEventScenarioInput = {
@@ -26,7 +27,7 @@ type RandomEventScenarioInput = {
     id: string;
     resolution: string;
     message: string;
-    effects: [];
+    effects: unknown[];
   }>;
 };
 
@@ -175,6 +176,70 @@ test("parseDiceItems rejects passive effects on consumable items", () => {
   assert.throws(
     () => parseDiceItems([item]),
     /Passive item padded-bracers must set consumable to false/i,
+  );
+});
+
+test("validateRandomEventConsumableRewards rejects unknown item ids", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.outcomes = [
+    {
+      id: "success",
+      resolution: "resolve-success",
+      message: "You find something useful.",
+      effects: [
+        {
+          type: "consumable-item",
+          itemId: "missing-item",
+          quantity: 1,
+        },
+      ],
+    },
+  ];
+
+  const parsedScenarios = parseRandomEventScenarios([scenario]);
+  const parsedItems = parseDiceItems([
+    {
+      id: "dice-revolver",
+      name: "Dice Revolver",
+      description: "Your next few /roll uses roll twice.",
+      pricePips: 6,
+      consumable: true,
+      effect: {
+        type: "double-roll-uses",
+        uses: 6,
+      },
+    },
+  ]);
+
+  assert.throws(
+    () => validateRandomEventConsumableRewards(parsedScenarios, parsedItems),
+    /references unknown consumable item 'missing-item'/i,
+  );
+});
+
+test("validateRandomEventConsumableRewards rejects passive item rewards", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.outcomes = [
+    {
+      id: "success",
+      resolution: "resolve-success",
+      message: "You find something useful.",
+      effects: [
+        {
+          type: "consumable-item",
+          itemId: "padded-bracers",
+          quantity: 1,
+        },
+      ],
+    },
+  ];
+
+  const parsedScenarios = parseRandomEventScenarios([scenario]);
+  const parsedItems = parseDiceItems([createDiceItemInput()]);
+
+  assert.throws(
+    () => validateRandomEventConsumableRewards(parsedScenarios, parsedItems),
+    /must reference a consumable item/i,
   );
 });
 

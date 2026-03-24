@@ -195,6 +195,10 @@ Activity templates:
 Effect types:
 
 - `currency`: grants a random amount between `minAmount` and `maxAmount`.
+- `consumable-item`: grants `quantity` of a consumable item from `items.v1.json`.
+  - `itemId` must exist in `items.v1.json`.
+  - The referenced item must set `consumable` to `true`.
+  - Omit `quantity` to grant `1`.
 - `temporary-roll-multiplier`: multiplies future roll value for a number of rolls.
 - `temporary-roll-penalty`: divides future roll value for a number of rolls.
 - `temporary-lockout`: blocks rolling for `durationMinutes`.

@@ -379,6 +379,14 @@ const readRandomEventEffect = (value: unknown, label: string): RandomEventEffect
     };
   }
 
+  if (type === "consumable-item") {
+    return {
+      type,
+      itemId: readNonEmptyString(record.itemId, `${label}.itemId`),
+      quantity: readOptionalInteger(record.quantity, `${label}.quantity`, 1) ?? 1,
+    };
+  }
+
   if (type === "temporary-roll-multiplier") {
     const stackMode = readNonEmptyString(record.stackMode, `${label}.stackMode`);
     if (
@@ -1168,6 +1176,36 @@ export const parseRandomEventScenarios = (value: unknown): RandomEventScenario[]
   );
   validateRandomEventScenarios(parsed);
   return parsed;
+};
+
+export const validateRandomEventConsumableRewards = (
+  scenarios: RandomEventScenario[],
+  items: DiceItemData[],
+): void => {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+
+  for (const scenario of scenarios) {
+    for (const outcome of scenario.outcomes) {
+      for (const effect of outcome.effects) {
+        if (effect.type !== "consumable-item") {
+          continue;
+        }
+
+        const item = itemsById.get(effect.itemId);
+        if (!item) {
+          throw new Error(
+            `Scenario ${scenario.id} outcome ${outcome.id} references unknown consumable item '${effect.itemId}'.`,
+          );
+        }
+
+        if (!item.consumable) {
+          throw new Error(
+            `Scenario ${scenario.id} outcome ${outcome.id} must reference a consumable item, but '${effect.itemId}' is passive.`,
+          );
+        }
+      }
+    }
+  }
 };
 
 export const parseIntroPostsV1Data = (value: unknown): IntroPostsV1Data => {
