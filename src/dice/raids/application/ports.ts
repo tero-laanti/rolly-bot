@@ -1,3 +1,5 @@
+import type { AchievementAnnouncement } from "../../progression/application/achievement-announcements";
+
 export type RaidStatus =
   | "joining"
   | "starting"
@@ -106,6 +108,7 @@ export type ApplyRaidDiceRollResult =
       kind: "applied";
       summary: string;
       defeated: boolean;
+      achievementAnnouncements?: AchievementAnnouncement[];
     };
 
 export type RaidDiceRollPort = {

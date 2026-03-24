@@ -2,7 +2,8 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedButtonResult,
+  applyRenderedChatInputResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteDicePvpUseCase } from "../../../infrastructure/sqlite/services";
@@ -32,7 +33,7 @@ const handleDicePvpButton = async (interaction: ButtonInteraction): Promise<void
         }
       : null;
 
-  await applyButtonResult(
+  await applyRenderedButtonResult(
     interaction,
     renderDicePvpResult(
       await pvpUseCase.handleDicePvpAction(interaction.user.id, action, publishChallenge),
@@ -59,7 +60,7 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   const pvpUseCase = createSqliteDicePvpUseCase(getDatabase());
   const opponent = interaction.options.getUser("opponent");
   const wager = interaction.options.getInteger("wager") ?? 0;
-  await applyChatInputResult(
+  await applyRenderedChatInputResult(
     interaction,
     renderDicePvpResult(pvpUseCase.createDicePvpSetupReply(interaction.user.id, opponent, wager)),
   );

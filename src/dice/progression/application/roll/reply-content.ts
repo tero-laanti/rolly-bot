@@ -1,7 +1,6 @@
 import { type DiceAchievementId } from "../../../progression/domain/achievements";
 import { discordMessageCharacterLimit } from "../../../../shared/discord";
 import { truncateWithSuffix } from "../../../../shared/text";
-import { formatAchievementUnlockText } from "../achievement-text";
 
 const compactRollSetThreshold = 35;
 const nonBreakingSpace = "\u00A0";
@@ -12,12 +11,11 @@ type RollSetOutputMode = "detailed" | "compact";
 type HighlightedRollSet = {
   setIndex: number;
   formattedRolls: string;
-  unlockedAchievementIds: DiceAchievementId[];
+  unlockedAchievementCount: number;
   hasMatchingDice: boolean;
 };
 
 type BuildDiceRollReplyContentInput = {
-  achievementText: string;
   multiplierFooter: string;
   unlockedFooter: string;
   doubleRollFooter: string;
@@ -29,10 +27,6 @@ type BuildDiceRollReplyContentInput = {
   previouslyEarnedAchievementIds: Set<DiceAchievementId>;
   matchCount: number;
   rewardText: string;
-};
-
-export const formatAchievementText = (achievementIds: DiceAchievementId[]): string => {
-  return formatAchievementUnlockText(achievementIds);
 };
 
 export const formatRewardText = ({
@@ -59,7 +53,6 @@ export const formatRewardText = ({
 };
 
 export const buildDiceRollReplyContent = ({
-  achievementText,
   multiplierFooter,
   unlockedFooter,
   doubleRollFooter,
@@ -87,13 +80,7 @@ export const buildDiceRollReplyContent = ({
     newlyUnlockedAchievementIdsByRollSet,
   });
 
-  const fixedContentParts = [
-    achievementText,
-    multiplierFooter,
-    unlockedFooter,
-    doubleRollFooter,
-    prestigeFooter,
-  ];
+  const fixedContentParts = [multiplierFooter, unlockedFooter, doubleRollFooter, prestigeFooter];
   const initialRollSetOutputMode: RollSetOutputMode =
     rollPassCount > compactRollSetThreshold ? "compact" : "detailed";
 
@@ -110,7 +97,6 @@ export const buildDiceRollReplyContent = ({
   });
 
   let content = buildDiceReplyContent({
-    achievementText,
     resultLines,
     multiplierFooter,
     unlockedFooter,
@@ -131,7 +117,6 @@ export const buildDiceRollReplyContent = ({
       rollSetOutputMode: "compact",
     });
     content = buildDiceReplyContent({
-      achievementText,
       resultLines,
       multiplierFooter,
       unlockedFooter,
@@ -142,8 +127,7 @@ export const buildDiceRollReplyContent = ({
 
   if (content.length > discordMessageCharacterLimit) {
     const maxResultLength = getMaxResultLengthForReply({
-      achievementText,
-      trailingParts: fixedContentParts.slice(1),
+      trailingParts: fixedContentParts,
       messageLimit: discordMessageCharacterLimit,
     });
     resultLines = buildResultLines({
@@ -159,7 +143,6 @@ export const buildDiceRollReplyContent = ({
       maxResultLength,
     });
     content = buildDiceReplyContent({
-      achievementText,
       resultLines,
       multiplierFooter,
       unlockedFooter,
@@ -314,13 +297,9 @@ const formatCompactRollSetLines = ({
 const formatHighlightedRollSetLine = ({
   setIndex,
   formattedRolls,
-  unlockedAchievementIds,
   hasMatchingDice,
 }: HighlightedRollSet): string => {
   const tags: string[] = [];
-  if (unlockedAchievementIds.length > 0) {
-    tags.push("new achievement");
-  }
   if (hasMatchingDice) {
     tags.push("all dice matched");
   }
@@ -525,7 +504,6 @@ const appendSuffixWithinLimit = (
 };
 
 type BuildReplyContentInput = {
-  achievementText: string;
   resultLines: string[];
   multiplierFooter: string;
   unlockedFooter: string;
@@ -534,7 +512,6 @@ type BuildReplyContentInput = {
 };
 
 const buildDiceReplyContent = ({
-  achievementText,
   resultLines,
   multiplierFooter,
   unlockedFooter,
@@ -542,7 +519,6 @@ const buildDiceReplyContent = ({
   prestigeFooter,
 }: BuildReplyContentInput): string => {
   return [
-    achievementText,
     resultLines.join("\n"),
     multiplierFooter,
     unlockedFooter,
@@ -554,17 +530,15 @@ const buildDiceReplyContent = ({
 };
 
 type GetMaxResultLengthForReplyInput = {
-  achievementText: string;
   trailingParts: string[];
   messageLimit: number;
 };
 
 const getMaxResultLengthForReply = ({
-  achievementText,
   trailingParts,
   messageLimit,
 }: GetMaxResultLengthForReplyInput): number => {
-  const otherParts = [achievementText, ...trailingParts].filter((part) => part.length > 0);
+  const otherParts = trailingParts.filter((part) => part.length > 0);
   const separatorsLength = otherParts.length * 2;
   const otherPartsLength = otherParts.reduce((total, part) => total + part.length, 0);
   return Math.max(0, messageLimit - separatorsLength - otherPartsLength);
@@ -616,13 +590,13 @@ const getHighlightedRollSets = ({
   newlyUnlockedAchievementIdsByRollSet,
 }: GetHighlightedRollSetsInput): HighlightedRollSet[] => {
   return formattedRollPasses.flatMap((formattedRolls, setIndex) => {
-    const unlockedAchievementIds = newlyUnlockedAchievementIdsByRollSet[setIndex] ?? [];
+    const unlockedAchievementCount = (newlyUnlockedAchievementIdsByRollSet[setIndex] ?? []).length;
     const hasMatchingDice = allSameByRollSet[setIndex] ?? false;
-    if (unlockedAchievementIds.length < 1 && !hasMatchingDice) {
+    if (unlockedAchievementCount < 1 && !hasMatchingDice) {
       return [];
     }
 
-    return [{ setIndex, formattedRolls, unlockedAchievementIds, hasMatchingDice }];
+    return [{ setIndex, formattedRolls, unlockedAchievementCount, hasMatchingDice }];
   });
 };
 

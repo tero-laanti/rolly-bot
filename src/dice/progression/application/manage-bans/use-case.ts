@@ -3,6 +3,10 @@ import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "../../../progress
 import type { DiceProgressionRepository } from "../ports";
 import { awardManualDiceAchievements } from "../achievement-awards";
 import {
+  createAchievementAnnouncement,
+  type AchievementAnnouncement,
+} from "../achievement-announcements";
+import {
   chunkActionButtons,
   type ActionResult,
   type ActionView,
@@ -44,7 +48,9 @@ export type DiceBansAction =
       page: number;
     };
 
-export type DiceBansResult = ActionResult<DiceBansAction>;
+export type DiceBansResult = ActionResult<DiceBansAction> & {
+  achievementAnnouncements?: AchievementAnnouncement[];
+};
 
 type ManageBansDependencies = {
   economy: Pick<DiceEconomyRepository, "getFame">;
@@ -253,6 +259,8 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
     const isUnban = bannedValuesBefore.has(action.value);
     const usedCount = countUsedBans(bansBefore);
 
+    let achievementAnnouncements: ReturnType<typeof createAchievementAnnouncement>[] = [];
+
     if (isUnban) {
       progression.clearSingleDiceBan(action.ownerId, action.dieIndex, action.value);
     } else if (usedCount >= unlockedSlots) {
@@ -280,7 +288,12 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
         bannedValue: action.value,
       });
       if (progression.markFirstDiceBan(action.ownerId)) {
-        awardManualDiceAchievements(progression, action.ownerId, ["first-ban"]);
+        achievementAnnouncements = [
+          createAchievementAnnouncement(
+            action.ownerId,
+            awardManualDiceAchievements(progression, action.ownerId, ["first-ban"]),
+          ),
+        ];
       }
     }
 
@@ -291,6 +304,9 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
 
     return {
       kind: "update",
+      achievementAnnouncements: achievementAnnouncements.flatMap((announcement) =>
+        announcement ? [announcement] : [],
+      ),
       payload: {
         type: "view",
         view: buildNumberSelectionView({

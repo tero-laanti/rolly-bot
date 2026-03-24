@@ -6,48 +6,56 @@ import {
   StringSelectMenuBuilder,
 } from "discord.js";
 import type { MessageActionRowComponentBuilder } from "discord.js";
-import type { InteractionResult } from "../../../../../app/discord/interaction-response";
+import {
+  createRenderedInteractionResult,
+  type InteractionResult,
+  type RenderedInteractionResult,
+} from "../../../../../app/discord/interaction-response";
 import type { DiceShopResult, DiceShopViewModel } from "../../../application/manage-shop/use-case";
 import { encodeDiceShopButtonAction } from "../buttons/shop-buttons";
 import { encodeDiceShopSelectMenuId } from "../select-menus/shop-select-menus";
 
-export const renderDiceShopResult = (result: DiceShopResult): InteractionResult => {
+export const renderDiceShopResult = (result: DiceShopResult): RenderedInteractionResult => {
+  let interactionResult: InteractionResult;
+
   if (result.payload.type === "message") {
     if (result.kind === "reply") {
-      return {
+      interactionResult = {
         kind: "reply",
         payload: {
           content: result.payload.content,
           ephemeral: result.payload.ephemeral,
         },
       };
+    } else {
+      interactionResult = {
+        kind: result.kind,
+        payload: {
+          content: result.payload.content,
+          embeds: result.payload.clearComponents ? [] : undefined,
+          components: result.payload.clearComponents ? [] : undefined,
+        },
+      };
     }
-
-    return {
-      kind: result.kind,
-      payload: {
-        content: result.payload.content,
-        embeds: result.payload.clearComponents ? [] : undefined,
-        components: result.payload.clearComponents ? [] : undefined,
-      },
-    };
+  } else {
+    const payload = renderDiceShopView(result.payload.view);
+    if (result.kind === "reply") {
+      interactionResult = {
+        kind: "reply",
+        payload: {
+          ...payload,
+          ephemeral: result.payload.ephemeral,
+        },
+      };
+    } else {
+      interactionResult = {
+        kind: result.kind,
+        payload,
+      };
+    }
   }
 
-  const payload = renderDiceShopView(result.payload.view);
-  if (result.kind === "reply") {
-    return {
-      kind: "reply",
-      payload: {
-        ...payload,
-        ephemeral: result.payload.ephemeral,
-      },
-    };
-  }
-
-  return {
-    kind: result.kind,
-    payload,
-  };
+  return createRenderedInteractionResult(interactionResult, result.achievementAnnouncements ?? []);
 };
 
 const renderDiceShopView = (view: DiceShopViewModel): InteractionResult["payload"] => {
@@ -172,14 +180,6 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
         inline: false,
       },
     );
-
-  if (view.receipt.statusText) {
-    embed.addFields({
-      name: "Status",
-      value: view.receipt.statusText,
-      inline: false,
-    });
-  }
 
   return embed;
 };

@@ -46,6 +46,10 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 
 - `INTRO_POST_CHANNEL_ID`: Optional. Channel ID where the bot manages startup-synced intro posts from `intro-posts.v1.json`. The feature stays inactive until this is set.
 
+### Achievement posts
+
+- `ACHIEVEMENTS_CHANNEL_ID`: Optional. Channel ID where the bot posts batched achievement unlock announcements. Achievements are still awarded when this is unset; only the announcement posts are skipped.
+
 ### Random events
 
 - `RANDOM_EVENTS_CHANNEL_ID`: Optional. Channel ID where random events are posted. Random events stay inactive until this is set.
@@ -93,6 +97,7 @@ When command names, descriptions, or options change, run `npm run deploy:command
 - Raid boss balance is defined in `raids.json` using a weighted random boss-level roll and per-level HP scaling. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
 - Public contract docs live in [example-data/rolly-data/README.md](../example-data/rolly-data/README.md) and [example-data/rolly-data/AUTHORING.md](../example-data/rolly-data/AUTHORING.md).
 - Managed intro posts are inactive until `INTRO_POST_CHANNEL_ID` is set.
+- Achievement posts are inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.
 - Random events are inactive until `RANDOM_EVENTS_CHANNEL_ID` is set.
 - Raids are inactive until `RAIDS_CHANNEL_ID` is set.
 - `dist/` is generated output. Do not edit it directly.

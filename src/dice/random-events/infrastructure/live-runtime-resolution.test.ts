@@ -886,7 +886,7 @@ test("threshold multi-user events expire if the required ready count is not met"
     expiresAt: new Date(Date.now() + 60_000),
   });
 
-  await resolveRandomEvent({
+  const announcements = await resolveRandomEvent({
     activeEventsById,
     state,
     progression: {
@@ -905,6 +905,7 @@ test("threshold multi-user events expire if the required ready count is not met"
   });
 
   const expiredEmbed = editedPayloads[0]?.embeds?.[0];
+  assert.deepEqual(announcements, []);
   assert.ok(expiredEmbed?.description);
   assert.match(expiredEmbed.description, /Only 2\/3 players were ready before time ran out\./);
   assert.match(expiredEmbed.description, /\*\*Ready players:\*\* <@111>, <@222>/);
@@ -960,7 +961,7 @@ test("resolved event lines place unlocked achievements on a new line", async () 
     expiresAt: new Date(Date.now() + 60_000),
   });
 
-  await resolveRandomEvent({
+  const announcements = await resolveRandomEvent({
     activeEventsById,
     state,
     progression: {
@@ -976,15 +977,24 @@ test("resolved event lines place unlocked achievements on a new line", async () 
     },
     eventId: "event-achievement-newline",
     participants: ["111"],
-    onAttemptResolved: () => "Achievement unlocked: Bitten Once (first random-event failure).",
+    onAttemptResolved: ({ userId }) => [
+      {
+        userId,
+        achievementIds: ["random-event-first-success"],
+      },
+    ],
   });
 
+  assert.deepEqual(announcements, [
+    {
+      userId: "111",
+      achievementIds: ["random-event-first-success"],
+    },
+  ]);
   const resolvedEmbedDescription = editedPayloads[0]?.embeds?.[0]?.description;
   assert.ok(resolvedEmbedDescription);
-  assert.match(
-    resolvedEmbedDescription,
-    /<@111>: Success: The gate opens\.\nAchievement unlocked: Bitten Once \(first random-event failure\)\./,
-  );
+  assert.match(resolvedEmbedDescription, /<@111>: Success: The gate opens\./);
+  assert.doesNotMatch(resolvedEmbedDescription, /Achievement unlocked/i);
 });
 
 test("keep-open comeback progress only counts when the same user failed before succeeding", async () => {

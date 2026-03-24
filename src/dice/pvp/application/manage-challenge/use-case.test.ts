@@ -16,10 +16,12 @@ const createHarness = ({
   inventoryQuantities = {},
   pips = {},
   randomValues = [0],
+  awardedAchievements = {},
 }: {
   inventoryQuantities?: Record<string, Record<string, number>>;
   pips?: Record<string, number>;
   randomValues?: number[];
+  awardedAchievements?: Record<string, string[]>;
 } = {}) => {
   const balances = new Map<string, number>(Object.entries(pips));
   const challenges = new Map<string, DicePvpChallenge>();
@@ -111,7 +113,7 @@ const createHarness = ({
     },
     progression: {
       getDicePrestige: () => 0,
-      awardAchievements: () => [],
+      awardAchievements: (userId) => awardedAchievements[userId] ?? [],
     },
     pvp: {
       createDicePvpChallengeIfUsersAvailable: (challenge) => {

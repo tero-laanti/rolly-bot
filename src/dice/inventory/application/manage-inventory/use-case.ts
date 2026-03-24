@@ -3,6 +3,7 @@ import {
   type ActionResult,
   type ActionView,
 } from "../../../../shared-kernel/application/action-view";
+import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import {
   type UseDiceItemResult,
   type ReserveAutoRollSession,
@@ -27,6 +28,7 @@ export type DiceInventoryResult = ActionResult<DiceInventoryAction>;
 
 export type DiceInventoryActionOutcome = {
   result: DiceInventoryResult;
+  achievementAnnouncements?: AchievementAnnouncement[];
   autoRollStart?:
     | {
         reservation: AutoRollSessionReservation;
@@ -122,6 +124,7 @@ export const createDiceInventoryUseCase = ({
             clearComponents: true,
           },
         },
+        achievementAnnouncements: useResult.achievementAnnouncements,
         autoRollStart: {
           reservation: useResult.autoRollReservation,
           itemId: useResult.item.id,
@@ -137,6 +140,7 @@ export const createDiceInventoryUseCase = ({
           view: buildInventoryView(inventory, action.ownerId, useResult.statusMessage),
         },
       },
+      achievementAnnouncements: useResult.achievementAnnouncements,
     };
   };
 

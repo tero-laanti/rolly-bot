@@ -61,8 +61,9 @@ Metadata:
 
 - `category` groups the achievement for the in-app browser.
 - Supported categories are `progression`, `roll`, `casino`, `pvp`, `random-events`, `raids`, `items`, and `meta`.
+- `hidden` is optional and defaults to `false`. Hidden achievements still exist in the browser, but achievements-channel posts only show the title instead of the unlock-reason and pip detail.
 - `pipReward` is optional. When present, the user earns that many pips the first time the achievement unlocks.
-- `unlockReasonText` is optional. It appears in the immediate unlock message, not in the browser.
+- `unlockReasonText` is optional. It appears in achievements-channel posts for non-hidden achievements, not in the browser.
 
 Manual prestige awards:
 

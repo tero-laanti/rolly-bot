@@ -46,6 +46,7 @@
     "id": "example-manual-prestige",
     "name": "Example Manual Prestige",
     "description": "Example achievement: reach Prestige 1 through application logic.",
+    "hidden": true,
     "category": "progression",
     "pipReward": 20,
     "rule": {

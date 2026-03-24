@@ -283,7 +283,6 @@ test("successful purchase returns a purchase receipt with the updated balance an
     remainingPips: 34,
     changeSummary:
       "The item was added to your inventory. Use /inventory when you want to activate it.",
-    statusText: undefined,
   });
   assert.equal(inventoryQuantities.get(diceRevolver.id), 1);
   assert.equal(getPips(), 34);

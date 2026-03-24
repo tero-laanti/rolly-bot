@@ -2,8 +2,10 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedChatInputResult,
+  createRenderedInteractionResult,
 } from "../../../../../app/discord/interaction-response";
+import { publishAchievementAnnouncements } from "../../../../../app/discord/achievement-announcements";
 import {
   buildAutoRollSessionStartingContent,
   cancelActiveAutoRollSession,
@@ -45,7 +47,12 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
   });
 
   if (!outcome.autoRollStart) {
-    await applyButtonResult(interaction, renderDiceInventoryResult(outcome.result));
+    const rendered = renderDiceInventoryResult(outcome.result);
+    await applyButtonResult(interaction, rendered.interactionResult);
+    await publishAchievementAnnouncements({
+      client: interaction.client,
+      announcements: outcome.achievementAnnouncements ?? rendered.achievementAnnouncements ?? [],
+    });
     return;
   }
 
@@ -71,12 +78,15 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
     return;
   }
 
-  let achievementText: string | undefined;
+  let achievementAnnouncements = outcome.achievementAnnouncements ?? [];
   try {
-    achievementText = finalizeAutoRollItemUse({
-      userId: interaction.user.id,
-      itemId: outcome.autoRollStart.itemId,
-    }).achievementText;
+    achievementAnnouncements = [
+      ...achievementAnnouncements,
+      ...(finalizeAutoRollItemUse({
+        userId: interaction.user.id,
+        itemId: outcome.autoRollStart.itemId,
+      }).achievementAnnouncements ?? []),
+    ];
   } catch (error) {
     cancelActiveAutoRollSession(interaction.user.id);
     refundInventoryItem({
@@ -95,15 +105,22 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
     return;
   }
 
-  const content = achievementText
-    ? `${buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation)}\n${achievementText}`
-    : buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation);
-  await applyButtonResult(interaction, {
-    kind: "update",
-    payload: {
-      content,
-      components: [],
-    },
+  await applyButtonResult(
+    interaction,
+    createRenderedInteractionResult(
+      {
+        kind: "update",
+        payload: {
+          content: buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation),
+          components: [],
+        },
+      },
+      achievementAnnouncements,
+    ).interactionResult,
+  );
+  await publishAchievementAnnouncements({
+    client: interaction.client,
+    announcements: achievementAnnouncements,
   });
 };
 
@@ -113,7 +130,7 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const inventoryUseCase = createSqliteDiceInventoryUseCase(getDatabase());
-  await applyChatInputResult(
+  await applyRenderedChatInputResult(
     interaction,
     renderDiceInventoryResult(inventoryUseCase.createDiceInventoryReply(interaction.user.id)),
   );

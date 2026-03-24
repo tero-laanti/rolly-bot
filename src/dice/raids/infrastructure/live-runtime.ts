@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "discord.js";
+import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
 import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import {
-  appendAchievementUnlockText,
-  formatAchievementUnlockText,
-} from "../../progression/application/achievement-text";
+  createAchievementAnnouncement,
+  mergeAchievementAnnouncements,
+  type AchievementAnnouncement,
+} from "../../progression/application/achievement-announcements";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type {
   ApplyRaidDiceRollInput,
@@ -105,11 +107,6 @@ const buildContributionLines = (context: ActiveRaidContext): string[] => {
     .sort((left, right) => right[1] - left[1])
     .slice(0, maxContributionLines)
     .map(([userId, damage]) => `<@${userId}> - ${damage} dmg`);
-};
-
-const formatRaidAchievementLine = (userId: string, achievementIds: readonly string[]): string => {
-  const achievementText = formatAchievementUnlockText(achievementIds);
-  return achievementText ? `<@${userId}>: ${achievementText}` : "";
 };
 
 export const createRaidsLiveRuntime = ({
@@ -225,7 +222,6 @@ export const createRaidsLiveRuntime = ({
             bossLevel: boss.level,
             maxHp: boss.maxHp,
             rewardSummary: describeRaidReward(boss.reward),
-            achievementLines: context.raid.achievementLines,
             contributionLines: buildContributionLines(context),
           });
         }
@@ -282,7 +278,6 @@ export const createRaidsLiveRuntime = ({
             bossLevel: boss.level,
             maxHp: boss.maxHp,
             rewardSummary: describeRaidReward(boss.reward),
-            achievementLines: context.raid.achievementLines,
             contributionLines: buildContributionLines(context),
           });
         }
@@ -546,7 +541,7 @@ export const createRaidsLiveRuntime = ({
     );
 
     unitOfWork.runInTransaction(() => {
-      const achievementLines: string[] = [];
+      const achievementAnnouncements: AchievementAnnouncement[] = [];
 
       for (const participantId of rewardEligibleUserIds) {
         economy.applyPipsDelta({
@@ -577,9 +572,9 @@ export const createRaidsLiveRuntime = ({
             }),
           ),
         );
-        const achievementLine = formatRaidAchievementLine(participantId, newlyEarned);
-        if (achievementLine) {
-          achievementLines.push(achievementLine);
+        const achievementAnnouncement = createAchievementAnnouncement(participantId, newlyEarned);
+        if (achievementAnnouncement) {
+          achievementAnnouncements.push(achievementAnnouncement);
         }
       }
 
@@ -601,13 +596,14 @@ export const createRaidsLiveRuntime = ({
             }),
           ),
         );
-        const achievementLine = formatRaidAchievementLine(participantId, newlyEarned);
-        if (achievementLine) {
-          achievementLines.push(achievementLine);
+        const achievementAnnouncement = createAchievementAnnouncement(participantId, newlyEarned);
+        if (achievementAnnouncement) {
+          achievementAnnouncements.push(achievementAnnouncement);
         }
       }
 
-      context.raid.achievementLines = achievementLines;
+      context.raid.achievementAnnouncements =
+        mergeAchievementAnnouncements(achievementAnnouncements);
     });
   };
 
@@ -625,6 +621,11 @@ export const createRaidsLiveRuntime = ({
         context,
         allowedStatuses: ["cleanup-needed"],
         logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
+      });
+      await publishAchievementAnnouncements({
+        client,
+        announcements: context.raid.achievementAnnouncements,
+        logger,
       });
       finalizeRaid(context);
       return;
@@ -653,6 +654,11 @@ export const createRaidsLiveRuntime = ({
       context,
       allowedStatuses: ["resolved"],
       logFailureMessage: "[raids] Failed to update resolved raid announcement.",
+    });
+    await publishAchievementAnnouncements({
+      client,
+      announcements: context.raid.achievementAnnouncements,
+      logger,
     });
     finalizeRaid(context);
   };
@@ -941,7 +947,7 @@ export const createRaidsLiveRuntime = ({
         closedAtMs: null,
         participantIds: new Set<string>(),
         rewardEligibleUserIds: new Set<string>(),
-        achievementLines: [],
+        achievementAnnouncements: [],
         activeThreadId: null,
         boss: null,
       },
@@ -1016,18 +1022,19 @@ export const createRaidsLiveRuntime = ({
       interaction.user.id,
       getDiceRaidAchievementIds(recordRaidJoin(db, interaction.user.id)),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(interaction.user.id, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
     await interaction.deferUpdate();
-    const achievementText = formatAchievementUnlockText(newlyEarned);
-    if (achievementText) {
-      await interaction.followUp({
-        content: achievementText,
-        ephemeral: true,
-      });
-    }
     await queueAnnouncementRender({
       context,
       allowedStatuses: ["joining"],
       logFailureMessage: "[raids] Failed to refresh raid announcement prompt.",
+    });
+    await publishAchievementAnnouncements({
+      client,
+      announcements: achievementAnnouncements,
+      logger,
     });
   };
 
@@ -1091,32 +1098,35 @@ export const createRaidsLiveRuntime = ({
       userId,
       getDiceRaidAchievementIds(recordRaidHit(db, { userId, damage })),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(userId, hitAchievements),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     const boss = context.raid.boss;
     if (boss.currentHp <= 0) {
       const killShotAchievements = awardManualDiceAchievements(progression, userId, [
         "raid-kill-shot",
       ]);
+      achievementAnnouncements.push(
+        ...[createAchievementAnnouncement(userId, killShotAchievements)].flatMap((announcement) =>
+          announcement ? [announcement] : [],
+        ),
+      );
       const rewardSummary = describeRaidReward(boss.reward);
       const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
       resolveRaid(context, "success", nowMs);
       return {
         kind: "applied",
         defeated: true,
-        summary: appendAchievementUnlockText(
-          appendAchievementUnlockText(
-            buildRaidHitSummary({
-              damage,
-              bossName: boss.name,
-              bestRollSet,
-              defeated: true,
-              rewardSummary,
-              eligibleParticipantCount,
-            }),
-            hitAchievements,
-          ),
-          killShotAchievements,
-        ),
+        summary: buildRaidHitSummary({
+          damage,
+          bossName: boss.name,
+          bestRollSet,
+          defeated: true,
+          rewardSummary,
+          eligibleParticipantCount,
+        }),
+        achievementAnnouncements,
       };
     }
 
@@ -1124,17 +1134,15 @@ export const createRaidsLiveRuntime = ({
     return {
       kind: "applied",
       defeated: false,
-      summary: appendAchievementUnlockText(
-        buildRaidHitSummary({
-          damage,
-          bossName: boss.name,
-          bestRollSet,
-          defeated: false,
-          currentHp: boss.currentHp,
-          maxHp: boss.maxHp,
-        }),
-        hitAchievements,
-      ),
+      summary: buildRaidHitSummary({
+        damage,
+        bossName: boss.name,
+        bestRollSet,
+        defeated: false,
+        currentHp: boss.currentHp,
+        maxHp: boss.maxHp,
+      }),
+      achievementAnnouncements,
     };
   };
 

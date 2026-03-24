@@ -20,7 +20,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
-import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
+import { createAchievementAnnouncement } from "../../../../progression/application/achievement-announcements";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -163,6 +163,9 @@ const handlePushYourLuckAction = (
         session.userId,
         getCasinoAchievementIds(achievementStats),
       );
+      const achievementAnnouncements = [
+        createAchievementAnnouncement(session.userId, newlyEarned),
+      ].flatMap((announcement) => (announcement ? [announcement] : []));
 
       return viewMutation(
         normalizeSessionBet(
@@ -172,15 +175,13 @@ const handlePushYourLuckAction = (
               ...session.state,
               currentScreen: "result",
               activeRound: null,
-              lastOutcome: appendAchievementUnlockText(
-                `Bust. Repeated ${rollResult.rolledValue}.`,
-                newlyEarned,
-              ),
+              lastOutcome: `Bust. Repeated ${rollResult.rolledValue}.`,
             },
           },
           pips,
         ),
         pips,
+        achievementAnnouncements,
       );
     }
 
@@ -199,6 +200,9 @@ const handlePushYourLuckAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -208,15 +212,13 @@ const handlePushYourLuckAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              `Perfect run. Reached ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips.`,
-              newlyEarned,
-            ),
+            lastOutcome: `Perfect run. Reached ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 
@@ -242,6 +244,9 @@ const handlePushYourLuckAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -251,15 +256,13 @@ const handlePushYourLuckAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              `Cashed out at ${round.uniqueValues.length} uniques for ${payout} pips.`,
-              newlyEarned,
-            ),
+            lastOutcome: `Cashed out at ${round.uniqueValues.length} uniques for ${payout} pips.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 

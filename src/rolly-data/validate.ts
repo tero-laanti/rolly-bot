@@ -723,6 +723,10 @@ export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => 
       id: readNonEmptyString(record.id, `achievements[${index}].id`),
       name: readNonEmptyString(record.name, `achievements[${index}].name`),
       description: readNonEmptyString(record.description, `achievements[${index}].description`),
+      hidden:
+        record.hidden === undefined
+          ? false
+          : readBoolean(record.hidden, `achievements[${index}].hidden`),
       category: readAchievementCategory(record.category, `achievements[${index}].category`),
       rule: readAchievementRule(record.rule, `achievements[${index}].rule`),
       pipReward:

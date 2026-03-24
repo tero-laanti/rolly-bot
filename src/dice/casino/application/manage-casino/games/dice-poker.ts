@@ -18,7 +18,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
-import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
+import { createAchievementAnnouncement } from "../../../../progression/application/achievement-announcements";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -187,6 +187,9 @@ const handleDicePokerAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -196,17 +199,15 @@ const handleDicePokerAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              `Final hand: ${formatDice(rerollResult.finalRoll)}.\n${describePokerResult(
-                rerollResult.result,
-              )}`,
-              newlyEarned,
-            ),
+            lastOutcome: `Final hand: ${formatDice(rerollResult.finalRoll)}.\n${describePokerResult(
+              rerollResult.result,
+            )}`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 
@@ -229,6 +230,9 @@ const handleDicePokerAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -238,12 +242,13 @@ const handleDicePokerAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText("Cancelled. Bet forfeited.", newlyEarned),
+            lastOutcome: "Cancelled. Bet forfeited.",
           },
         },
         pips,
       ),
       pips,
+      achievementAnnouncements,
     );
   }
 

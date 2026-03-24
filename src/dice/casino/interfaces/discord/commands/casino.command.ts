@@ -2,7 +2,8 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedButtonResult,
+  applyRenderedChatInputResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { getDiceCasinoMaxBet, getDiceCasinoMinBet } from "../../../domain/game-rules";
@@ -24,7 +25,7 @@ const handleDiceCasinoButton = async (interaction: ButtonInteraction): Promise<v
   }
 
   const casinoUseCase = createSqliteDiceCasinoUseCase(getDatabase());
-  await applyButtonResult(
+  await applyRenderedButtonResult(
     interaction,
     renderDiceCasinoResult(casinoUseCase.handleDiceCasinoAction(interaction.user.id, action)),
   );
@@ -47,7 +48,7 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
   const requestedBet = interaction.options.getInteger("bet");
   const replyPlan = casinoUseCase.createDiceCasinoReply(interaction.user.id, requestedBet);
 
-  await applyChatInputResult(interaction, renderDiceCasinoResult(replyPlan.result));
+  await applyRenderedChatInputResult(interaction, renderDiceCasinoResult(replyPlan.result));
 
   if (!replyPlan.finalizeSessionToken) {
     return;
@@ -75,13 +76,13 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
     throw error;
   }
 
-  if (finalizedReply.kind !== "edit") {
+  if (finalizedReply.interactionResult.kind !== "edit") {
     throw new Error(
-      `Casino reply finalization must edit the initial reply, got ${finalizedReply.kind}.`,
+      `Casino reply finalization must edit the initial reply, got ${finalizedReply.interactionResult.kind}.`,
     );
   }
 
-  await interaction.editReply(finalizedReply.payload);
+  await interaction.editReply(finalizedReply.interactionResult.payload);
 };
 
 export const buttonHandlers = [

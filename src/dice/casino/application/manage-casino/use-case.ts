@@ -179,7 +179,11 @@ export const createDiceCasinoUseCase = ({
     );
 
     if (mutation.kind === "reply") {
-      return replyMessage(mutation.content, mutation.ephemeral);
+      return replyMessage(
+        mutation.content,
+        mutation.ephemeral,
+        mutation.achievementAnnouncements ?? [],
+      );
     }
 
     if (mutation.kind === "expired") {
@@ -207,6 +211,7 @@ export const createDiceCasinoUseCase = ({
 
     return {
       kind: "update",
+      achievementAnnouncements: mutation.achievementAnnouncements ?? [],
       payload: {
         type: "view",
         view: buildCasinoView(mutation.session, mutation.pips),

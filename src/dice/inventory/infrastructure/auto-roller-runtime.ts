@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "discord.js";
+import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
 import type { SqliteDatabase } from "../../../shared/db";
 import { formatClockDuration } from "../../../shared/text";
 import { secondsToMs } from "../../../shared/time";
@@ -143,6 +144,10 @@ const runAutoRollTick = async (session: AutoRollSession): Promise<void> => {
     userId: session.reservation.userId,
     userMention: session.userMention,
     source: "auto",
+  });
+  await publishAchievementAnnouncements({
+    client: session.message.client,
+    announcements: result.achievementAnnouncements ?? [],
   });
   const classification = result.autoRollClassification;
 

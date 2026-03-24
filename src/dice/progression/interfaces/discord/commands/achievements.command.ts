@@ -2,7 +2,8 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedButtonResult,
+  applyRenderedChatInputResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteQueryDiceAchievementsUseCase } from "../../../infrastructure/sqlite/services";
@@ -26,7 +27,7 @@ const handleDiceAchievementsButton = async (interaction: ButtonInteraction): Pro
     return;
   }
 
-  await applyButtonResult(
+  await applyRenderedButtonResult(
     interaction,
     renderDiceAchievementsResult(
       achievementsUseCase.handleDiceAchievementsAction(interaction.user.id, action),
@@ -40,7 +41,7 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const achievementsUseCase = createSqliteQueryDiceAchievementsUseCase(getDatabase());
-  await applyChatInputResult(
+  await applyRenderedChatInputResult(
     interaction,
     renderDiceAchievementsResult(
       achievementsUseCase.createDiceAchievementsReply(interaction.user.id),

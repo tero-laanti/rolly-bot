@@ -19,7 +19,7 @@ const categorySummaries = [
 ];
 
 test("landing renders only top-level navigation buttons", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "reply",
     payload: {
       type: "view",
@@ -31,13 +31,13 @@ test("landing renders only top-level navigation buttons", () => {
         categorySummaries,
       },
     },
-  });
+  }).interactionResult;
 
-  assert.equal(rendered.kind, "reply");
-  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  assert.equal(interaction.kind, "reply");
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
   assert.equal(embed?.title, "Rolly Shop");
 
-  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows.length, 1);
   assert.deepEqual(
     rows[0]?.components.map((component) => component.type),
@@ -54,7 +54,7 @@ test("landing renders only top-level navigation buttons", () => {
 });
 
 test("category renders one select menu with only that category's items", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "view",
@@ -82,10 +82,10 @@ test("category renders one select menu with only that category's items", () => {
         ],
       },
     },
-  });
+  }).interactionResult;
 
-  assert.equal(rendered.kind, "update");
-  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  assert.equal(interaction.kind, "update");
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows.length, 2);
   assert.equal(rows[0]?.components[0]?.type, ComponentType.StringSelect);
   if (rows[0]?.components[0]?.type !== ComponentType.StringSelect) {
@@ -107,7 +107,7 @@ test("category renders one select menu with only that category's items", () => {
 });
 
 test("item-detail renders one buy button plus navigation controls", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "view",
@@ -133,12 +133,12 @@ test("item-detail renders one buy button plus navigation controls", () => {
         },
       },
     },
-  });
+  }).interactionResult;
 
-  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
   assert.equal(embed?.title, "Dice Revolver");
 
-  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows.length, 2);
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
@@ -157,7 +157,7 @@ test("item-detail renders one buy button plus navigation controls", () => {
 });
 
 test("receipt renders success embed plus only Shop Home and Close", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "view",
@@ -175,12 +175,12 @@ test("receipt renders success embed plus only Shop Home and Close", () => {
         },
       },
     },
-  });
+  }).interactionResult;
 
-  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
   assert.equal(embed?.title, "Purchase Complete");
 
-  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows.length, 1);
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
@@ -189,22 +189,22 @@ test("receipt renders success embed plus only Shop Home and Close", () => {
 });
 
 test("close message clears both embeds and components", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "message",
       content: "Shop closed.",
       clearComponents: true,
     },
-  });
+  }).interactionResult;
 
-  assert.equal(rendered.kind, "update");
-  assert.deepEqual(rendered.payload.embeds, []);
-  assert.deepEqual(rendered.payload.components, []);
+  assert.equal(interaction.kind, "update");
+  assert.deepEqual(interaction.payload.embeds, []);
+  assert.deepEqual(interaction.payload.components, []);
 });
 
 test("empty category omits the select menu and keeps navigation buttons", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "view",
@@ -219,9 +219,9 @@ test("empty category omits the select menu and keeps navigation buttons", () => 
         categoryItems: [],
       },
     },
-  });
+  }).interactionResult;
 
-  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows.length, 1);
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
@@ -230,7 +230,7 @@ test("empty category omits the select menu and keeps navigation buttons", () => 
 });
 
 test("permanent upgrades render owned state as emoji instead of a count", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "view",
@@ -252,13 +252,13 @@ test("permanent upgrades render owned state as emoji instead of a count", () => 
         ],
       },
     },
-  });
+  }).interactionResult;
 
-  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
   const itemsField = embed?.fields?.find((field) => field.name === "Items");
   assert.match(itemsField?.value ?? "", /Owned: ❌/);
 
-  const rows = rendered.payload.components?.map((row) => row.toJSON()) ?? [];
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows[0]?.components[0]?.type, ComponentType.StringSelect);
   if (rows[0]?.components[0]?.type !== ComponentType.StringSelect) {
     return;
@@ -268,7 +268,7 @@ test("permanent upgrades render owned state as emoji instead of a count", () => 
 });
 
 test("permanent upgrade item detail renders emoji owned state", () => {
-  const rendered = renderDiceShopResult({
+  const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
       type: "view",
@@ -295,9 +295,9 @@ test("permanent upgrade item detail renders emoji owned state", () => {
         },
       },
     },
-  });
+  }).interactionResult;
 
-  const embed = rendered.payload.embeds?.[0]?.toJSON();
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
   const ownedField = embed?.fields?.find((field) => field.name === "Owned");
   assert.equal(ownedField?.value, "❌");
 });

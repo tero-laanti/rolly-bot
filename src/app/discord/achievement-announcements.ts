@@ -1,0 +1,106 @@
+import type { Client, Message, MessageMentionOptions } from "discord.js";
+import type { AchievementsChannelConfig } from "../../shared/config";
+import { achievementsChannelConfig } from "../../shared/config";
+import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
+import { mergeAchievementAnnouncements } from "../../dice/progression/application/achievement-announcements";
+import { getDiceAchievement } from "../../dice/progression/domain/achievements";
+
+type SendableMessageChannel = {
+  send: (options: { content: string; allowedMentions: MessageMentionOptions }) => Promise<Message>;
+};
+
+type AchievementAnnouncementsLogger = {
+  warn: (...args: unknown[]) => void;
+};
+
+const formatAchievementAnnouncementEntry = (achievementId: string): string => {
+  const achievement = getDiceAchievement(achievementId);
+  if (!achievement) {
+    return achievementId;
+  }
+
+  if (achievement.hidden) {
+    return achievement.name;
+  }
+
+  const rewardText =
+    achievement.pipReward > 0
+      ? `, +${achievement.pipReward} pip${achievement.pipReward === 1 ? "" : "s"}`
+      : "";
+  if (!achievement.unlockReasonText) {
+    return `${achievement.name}${rewardText}`;
+  }
+
+  return `${achievement.name} (${achievement.unlockReasonText}${rewardText})`;
+};
+
+const isSendableMessageChannel = (value: unknown): value is SendableMessageChannel => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const channel = value as {
+    send?: unknown;
+  };
+  return typeof channel.send === "function";
+};
+
+const resolveAchievementsChannel = async (
+  client: Client,
+  channelId: string,
+): Promise<SendableMessageChannel> => {
+  const channel = await client.channels.fetch(channelId);
+  if (!channel || !channel.isTextBased() || !isSendableMessageChannel(channel)) {
+    throw new Error(
+      `ACHIEVEMENTS_CHANNEL_ID must reference a sendable text channel. Received ${channelId}.`,
+    );
+  }
+
+  return channel;
+};
+
+export const formatAchievementAnnouncementContent = (
+  announcement: AchievementAnnouncement,
+): string => {
+  const entries = announcement.achievementIds.map(formatAchievementAnnouncementEntry);
+  const label = entries.length === 1 ? "Achievement" : "Achievements";
+  return `<@${announcement.userId}> ${label} unlocked: ${entries.join(", ")}.`;
+};
+
+export const publishAchievementAnnouncements = async ({
+  client,
+  announcements,
+  config = achievementsChannelConfig,
+  logger = console,
+}: {
+  client: Client;
+  announcements: readonly AchievementAnnouncement[];
+  config?: AchievementsChannelConfig;
+  logger?: AchievementAnnouncementsLogger;
+}): Promise<void> => {
+  if (!config.enabled || !config.channelId || announcements.length < 1) {
+    return;
+  }
+
+  let channel: SendableMessageChannel;
+  try {
+    channel = await resolveAchievementsChannel(client, config.channelId);
+  } catch (error) {
+    logger.warn("[achievements] Failed to resolve achievements channel.", error);
+    return;
+  }
+
+  for (const announcement of mergeAchievementAnnouncements(announcements)) {
+    try {
+      await channel.send({
+        content: formatAchievementAnnouncementContent(announcement),
+        allowedMentions: {
+          parse: [],
+          users: [announcement.userId],
+        },
+      });
+    } catch (error) {
+      logger.warn("[achievements] Failed to publish achievement announcement.", error);
+    }
+  }
+};

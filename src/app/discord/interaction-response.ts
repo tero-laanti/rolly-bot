@@ -8,6 +8,8 @@ import type {
   MessageActionRowComponentBuilder,
   StringSelectMenuInteraction,
 } from "discord.js";
+import { publishAchievementAnnouncements } from "./achievement-announcements";
+import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
 
 type InteractionMessagePayload = {
   content?: string;
@@ -32,6 +34,21 @@ export type InteractionResult =
       payload: InteractionMessagePayload;
     };
 
+export type RenderedInteractionResult = {
+  interactionResult: InteractionResult;
+  achievementAnnouncements?: AchievementAnnouncement[];
+};
+
+export const createRenderedInteractionResult = (
+  interactionResult: InteractionResult,
+  achievementAnnouncements: readonly AchievementAnnouncement[] = [],
+): RenderedInteractionResult => {
+  return {
+    interactionResult,
+    achievementAnnouncements: [...achievementAnnouncements],
+  };
+};
+
 export const applyChatInputResult = async (
   interaction: ChatInputCommandInteraction,
   result: InteractionResult,
@@ -43,6 +60,17 @@ export const applyChatInputResult = async (
   await interaction.reply(result.payload);
 };
 
+export const applyRenderedChatInputResult = async (
+  interaction: ChatInputCommandInteraction,
+  result: RenderedInteractionResult,
+): Promise<void> => {
+  await applyChatInputResult(interaction, result.interactionResult);
+  await publishAchievementAnnouncements({
+    client: interaction.client,
+    announcements: result.achievementAnnouncements ?? [],
+  });
+};
+
 export const applyButtonResult = async (
   interaction: ButtonInteraction,
   result: InteractionResult,
@@ -50,11 +78,33 @@ export const applyButtonResult = async (
   await applyMessageComponentResult(interaction, result);
 };
 
+export const applyRenderedButtonResult = async (
+  interaction: ButtonInteraction,
+  result: RenderedInteractionResult,
+): Promise<void> => {
+  await applyButtonResult(interaction, result.interactionResult);
+  await publishAchievementAnnouncements({
+    client: interaction.client,
+    announcements: result.achievementAnnouncements ?? [],
+  });
+};
+
 export const applyStringSelectMenuResult = async (
   interaction: StringSelectMenuInteraction,
   result: InteractionResult,
 ): Promise<void> => {
   await applyMessageComponentResult(interaction, result);
+};
+
+export const applyRenderedStringSelectMenuResult = async (
+  interaction: StringSelectMenuInteraction,
+  result: RenderedInteractionResult,
+): Promise<void> => {
+  await applyStringSelectMenuResult(interaction, result.interactionResult);
+  await publishAchievementAnnouncements({
+    client: interaction.client,
+    announcements: result.achievementAnnouncements ?? [],
+  });
 };
 
 const applyMessageComponentResult = async (

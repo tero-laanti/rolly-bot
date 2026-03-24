@@ -1,4 +1,5 @@
 import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
+import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import {
   createDefaultDiceCasinoSessionState,
   createDiceCasinoSessionToken,
@@ -208,19 +209,29 @@ export const getOutcomeFromPayout = (bet: number, payout: number): "win" | "loss
   return "win";
 };
 
-export const viewMutation = (session: DiceCasinoSession, pips: number): MutateSessionResult => {
+export const viewMutation = (
+  session: DiceCasinoSession,
+  pips: number,
+  achievementAnnouncements: AchievementAnnouncement[] = [],
+): MutateSessionResult => {
   return {
     kind: "view",
     session,
     pips,
+    achievementAnnouncements,
   };
 };
 
-export const replyMutation = (content: string, ephemeral: boolean): MutateSessionResult => {
+export const replyMutation = (
+  content: string,
+  ephemeral: boolean,
+  achievementAnnouncements: AchievementAnnouncement[] = [],
+): MutateSessionResult => {
   return {
     kind: "reply",
     content,
     ephemeral,
+    achievementAnnouncements,
   };
 };
 
@@ -235,9 +246,14 @@ export const invalidCasinoAction = (): MutateSessionResult => {
   return replyMutation("That casino action is not available right now.", true);
 };
 
-export const replyMessage = (content: string, ephemeral: boolean): DiceCasinoResult => {
+export const replyMessage = (
+  content: string,
+  ephemeral: boolean,
+  achievementAnnouncements: AchievementAnnouncement[] = [],
+): DiceCasinoResult => {
   return {
     kind: "reply",
+    achievementAnnouncements,
     payload: {
       type: "message",
       content,

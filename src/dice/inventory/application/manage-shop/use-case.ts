@@ -4,7 +4,10 @@ import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
 import type { DiceShopItem } from "../../../inventory/domain/shop";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
-import { formatAchievementUnlockText } from "../../../progression/application/achievement-text";
+import {
+  createAchievementAnnouncement,
+  type AchievementAnnouncement,
+} from "../../../progression/application/achievement-announcements";
 import { getDiceItemAchievementIds } from "../achievement-rules";
 import { isPassivePermanentItem } from "../../domain/passive-items";
 
@@ -102,7 +105,6 @@ export type DiceShopPurchaseReceipt = {
   ownedQuantity: number;
   remainingPips: number;
   changeSummary: string;
-  statusText?: string;
 };
 
 type DiceShopViewBase = {
@@ -138,6 +140,7 @@ export type DiceShopViewModel =
 export type DiceShopResult =
   | {
       kind: "reply";
+      achievementAnnouncements?: AchievementAnnouncement[];
       payload:
         | {
             type: "view";
@@ -152,6 +155,7 @@ export type DiceShopResult =
     }
   | {
       kind: "update" | "edit";
+      achievementAnnouncements?: AchievementAnnouncement[];
       payload:
         | {
             type: "view";
@@ -395,6 +399,9 @@ export const createDiceShopUseCase = ({
 
     return {
       kind: "update",
+      achievementAnnouncements: [
+        createAchievementAnnouncement(action.ownerId, purchase.newlyEarned),
+      ].flatMap((announcement) => (announcement ? [announcement] : [])),
       payload: {
         type: "view",
         view: buildPurchaseReceiptViewModel(shopCatalog, action.ownerId, purchase),
@@ -503,8 +510,6 @@ const buildPurchaseReceiptViewModel = (
   userId: string,
   purchase: Extract<ShopPurchaseAttempt, { ok: true }>,
 ): DiceShopViewModel => {
-  const achievementText = formatAchievementUnlockText(purchase.newlyEarned);
-
   return {
     screen: "purchase-receipt",
     ownerId: userId,
@@ -515,7 +520,6 @@ const buildPurchaseReceiptViewModel = (
       ownedQuantity: purchase.quantity,
       remainingPips: purchase.remainingPips,
       changeSummary: buildPurchaseChangeSummary(purchase.item),
-      statusText: achievementText || undefined,
     },
   };
 };

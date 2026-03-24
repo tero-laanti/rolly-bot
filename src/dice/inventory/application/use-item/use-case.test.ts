@@ -118,7 +118,7 @@ test("auto-roll item use defers achievement writes until startup is finalized", 
   }
 
   assert.equal(result.statusMessage, "Clockwork Croupier engaged.");
-  assert.equal(result.achievementText, undefined);
+  assert.deepEqual(result.achievementAnnouncements, undefined);
   assert.deepEqual(result.autoRollReservation, reservation);
   assert.equal(recordItemUseCalls, 0);
   assert.equal(awardAchievementCalls, 0);
@@ -168,7 +168,7 @@ test("finalizing auto-roll item use records item-use progress inside a transacti
   });
 
   assert.deepEqual(calls, ["transaction", `record:user-1:${autoRollItem.id}`]);
-  assert.equal(result.achievementText, undefined);
+  assert.deepEqual(result.achievementAnnouncements, []);
 });
 
 test("umbrella harness adds one extra Bad Luck Umbrella charge", async () => {
