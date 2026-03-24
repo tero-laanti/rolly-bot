@@ -201,3 +201,196 @@ test("raid join publishes achievement announcements even if the signup prompt ed
     }
   });
 });
+
+test("resolved raids publish achievement announcements even if the active prompt edit fails", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../app/discord/achievement-announcements",
+      "../../../shared/db",
+      "../../progression/application/achievement-awards",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const achievementAwards = moduleRequire(
+      "../../progression/application/achievement-awards",
+    ) as typeof import("../../progression/application/achievement-awards");
+    const originalAwardManualDiceAchievements = achievementAwards.awardManualDiceAchievements;
+    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+      (
+        achievementAwards as {
+          awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
+        }
+      ).awardManualDiceAchievements = (_progression, _userId, achievementIds) => {
+        if (achievementIds.includes("raid-first-clear")) {
+          return ["raid-resolve-test"];
+        }
+
+        return [];
+      };
+
+      const { createRaidsLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      const publishedPayloads: Array<{
+        content: string;
+        allowedMentions: {
+          parse: string[];
+          users: string[];
+        };
+      }> = [];
+      const announcementEdits: unknown[] = [];
+      let activeEditCalls = 0;
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => {
+          activeEditCalls += 1;
+          if (activeEditCalls >= 2) {
+            throw new Error("resolved active prompt edit failed");
+          }
+
+          return payload;
+        },
+        startThread: async () => ({
+          id: "raid-thread-1",
+        }),
+      };
+      const announcementMessage = {
+        id: "raid-message-1",
+        channelId: "raid-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => {
+          announcementEdits.push(payload);
+          return payload;
+        },
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const achievementsChannel = {
+        isTextBased: () => true,
+        send: async (options: {
+          content: string;
+          allowedMentions: {
+            parse: string[];
+            users: string[];
+          };
+        }) => {
+          publishedPayloads.push(options);
+          return {} as never;
+        },
+      };
+
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "raid-channel") {
+              return raidChannel;
+            }
+
+            if (channelId === "achievements-channel") {
+              return achievementsChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      runtime = createRaidsLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "raid-channel",
+          joinLeadMs: 10,
+          activeDurationMs: 60_000,
+          targetRaidsPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerRaidNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live raid to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `raid-join:${triggerResult.raidId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      publishedPayloads.length = 0;
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const result = runtime.applyDiceRoll({
+        channelId: "raid-thread-1",
+        userId: "user-1",
+        userMention: "<@user-1>",
+        damage: 1_000_000,
+      });
+
+      assert.equal(result.kind, "applied");
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      assert.deepEqual(publishedPayloads, [
+        {
+          content: "<@user-1> Achievement unlocked: raid-resolve-test.",
+          allowedMentions: {
+            parse: [],
+            users: ["user-1"],
+          },
+        },
+      ]);
+      assert.ok(announcementEdits.length >= 2);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      (
+        achievementAwards as {
+          awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
+        }
+      ).awardManualDiceAchievements = originalAwardManualDiceAchievements;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
