@@ -11,7 +11,11 @@ import type { DiceAnalyticsRepository } from "../../../analytics/application/por
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository } from "../../../inventory/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
-import { formatAchievementUnlockText } from "../../../progression/application/achievement-text";
+import {
+  createAchievementAnnouncement,
+  mergeAchievementAnnouncements,
+  type AchievementAnnouncement,
+} from "../../../progression/application/achievement-announcements";
 import {
   getDicePvpDieLabel,
   getDuelPunishmentMs,
@@ -54,7 +58,9 @@ export type DicePvpAction =
       challengeId: string;
     };
 
-export type DicePvpResult = ActionResult<DicePvpAction>;
+export type DicePvpResult = ActionResult<DicePvpAction> & {
+  achievementAnnouncements?: AchievementAnnouncement[];
+};
 
 type PublishChallenge = (view: ActionView<DicePvpAction>) => Promise<{ url: string }>;
 
@@ -644,10 +650,17 @@ const handleChallengeAccept = (
         opponentRoll,
         duelDieSides,
         challenge.wagerPips,
-        outcome.challengerNewlyEarned,
-        outcome.opponentNewlyEarned,
       ),
       true,
+      mergeAchievementAnnouncements(
+        [
+          createAchievementAnnouncement(
+            resolvedChallenge.challengerId,
+            outcome.challengerNewlyEarned,
+          ),
+          createAchievementAnnouncement(resolvedChallenge.opponentId, outcome.opponentNewlyEarned),
+        ].flatMap((announcement) => (announcement ? [announcement] : [])),
+      ),
     );
   }
 
@@ -664,10 +677,14 @@ const handleChallengeAccept = (
       outcome.winnerDoubleRollUntilMs,
       outcome.loserLockoutUntilMs,
       outcome.loserBlockedByShield,
-      outcome.winnerNewlyEarned,
-      outcome.loserNewlyEarned,
     ),
     true,
+    mergeAchievementAnnouncements(
+      [
+        createAchievementAnnouncement(outcome.winnerId, outcome.winnerNewlyEarned),
+        createAchievementAnnouncement(outcome.loserId, outcome.loserNewlyEarned),
+      ].flatMap((announcement) => (announcement ? [announcement] : [])),
+    ),
   );
 };
 
@@ -848,8 +865,6 @@ const buildDrawResultContent = (
   opponentRoll: number,
   duelDieSides: number,
   wagerPips: number,
-  challengerNewlyEarned: string[],
-  opponentNewlyEarned: string[],
 ): string => {
   return [
     "Duel ended in a draw.",
@@ -860,8 +875,6 @@ const buildDrawResultContent = (
     wagerPips > 0
       ? `Draw refund: both players get ${wagerPips} pip${wagerPips === 1 ? "" : "s"} back.`
       : "No effects were applied.",
-    formatUserAchievementUnlockLine(challenge.challengerId, challengerNewlyEarned),
-    formatUserAchievementUnlockLine(challenge.opponentId, opponentNewlyEarned),
   ]
     .filter((line) => line.length > 0)
     .join("\n");
@@ -879,8 +892,6 @@ const buildWinResultContent = (
   winnerDoubleRollUntilMs: number,
   loserLockoutUntilMs: number | null,
   loserBlockedByShield: boolean,
-  winnerNewlyEarned: string[],
-  loserNewlyEarned: string[],
 ): string => {
   return [
     "Duel complete.",
@@ -896,8 +907,6 @@ const buildWinResultContent = (
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
       : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
     `<@${winnerId}> has double buff on /roll. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
-    formatUserAchievementUnlockLine(winnerId, winnerNewlyEarned),
-    formatUserAchievementUnlockLine(loserId, loserNewlyEarned),
   ]
     .filter((line) => line.length > 0)
     .join("\n");
@@ -1018,14 +1027,6 @@ const formatMinutesOrHours = (durationMs: number): string => {
   return `${minutes}m`;
 };
 
-const formatUserAchievementUnlockLine = (
-  userId: string,
-  achievementIds: readonly string[],
-): string => {
-  const achievementText = formatAchievementUnlockText(achievementIds);
-  return achievementText ? `<@${userId}>: ${achievementText}` : "";
-};
-
 const replyMessage = (content: string, ephemeral: boolean): DicePvpResult => {
   return {
     kind: "reply",
@@ -1037,9 +1038,14 @@ const replyMessage = (content: string, ephemeral: boolean): DicePvpResult => {
   };
 };
 
-const updateMessage = (content: string, clearComponents: boolean): DicePvpResult => {
+const updateMessage = (
+  content: string,
+  clearComponents: boolean,
+  achievementAnnouncements: AchievementAnnouncement[] = [],
+): DicePvpResult => {
   return {
     kind: "update",
+    achievementAnnouncements,
     payload: {
       type: "message",
       content,

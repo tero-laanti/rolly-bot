@@ -5,6 +5,7 @@ type DiceAchievementDefinition = {
   id: DiceAchievementId;
   name: string;
   description: string;
+  hidden: boolean;
   category: DiceAchievementCategory;
   pipReward: number;
   unlockReasonText?: string;
@@ -74,6 +75,7 @@ export const diceAchievements: DiceAchievementDefinition[] = getDiceAchievements
     id: achievement.id,
     name: achievement.name,
     description: achievement.description,
+    hidden: achievement.hidden ?? false,
     category: achievement.category,
     pipReward: achievement.pipReward ?? 0,
     unlockReasonText: achievement.unlockReasonText,

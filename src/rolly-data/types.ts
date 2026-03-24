@@ -72,6 +72,7 @@ export type DiceAchievementData = {
   id: DiceAchievementId;
   name: string;
   description: string;
+  hidden?: boolean;
   category: DiceAchievementCategory;
   rule: DiceAchievementRule;
   pipReward?: number;

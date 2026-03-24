@@ -22,7 +22,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
-import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
+import { createAchievementAnnouncement } from "../../../../progression/application/achievement-announcements";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -181,6 +181,9 @@ const handleExactRollAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -191,17 +194,15 @@ const handleExactRollAction = (
             currentScreen: "result",
             exactRollFace: action.face,
             exactRollMode: "exact-face",
-            lastOutcome: appendAchievementUnlockText(
-              resolution.won
-                ? `Hit. Picked ${action.face}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
-                : `Missed. Picked ${action.face}, rolled ${rolledFace}.`,
-              newlyEarned,
-            ),
+            lastOutcome: resolution.won
+              ? `Hit. Picked ${action.face}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
+              : `Missed. Picked ${action.face}, rolled ${rolledFace}.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 
@@ -241,6 +242,9 @@ const handleExactRollAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -251,17 +255,15 @@ const handleExactRollAction = (
             currentScreen: "result",
             exactRollHighLowChoice: action.choice,
             exactRollMode: "high-low",
-            lastOutcome: appendAchievementUnlockText(
-              resolution.won
-                ? `Hit. Picked ${capitalize(action.choice)}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
-                : `Missed. Picked ${capitalize(action.choice)}, rolled ${rolledFace}.`,
-              newlyEarned,
-            ),
+            lastOutcome: resolution.won
+              ? `Hit. Picked ${capitalize(action.choice)}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
+              : `Missed. Picked ${capitalize(action.choice)}, rolled ${rolledFace}.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 

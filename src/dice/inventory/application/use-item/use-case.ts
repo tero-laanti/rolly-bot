@@ -10,11 +10,11 @@ import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-w
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
-import { getDiceItemAchievementIds } from "../achievement-rules";
 import {
-  appendAchievementUnlockText,
-  formatAchievementUnlockText,
-} from "../../../progression/application/achievement-text";
+  createAchievementAnnouncement,
+  type AchievementAnnouncement,
+} from "../../../progression/application/achievement-announcements";
+import { getDiceItemAchievementIds } from "../achievement-rules";
 import { getBadLuckUmbrellaCharges, getCleanseSaltShieldCharges } from "../../domain/passive-items";
 
 export type ReserveAutoRollSession = (input: {
@@ -36,7 +36,7 @@ export type UseDiceItemResult =
       item: DiceShopItem;
       remainingQuantity: number;
       statusMessage: string;
-      achievementText?: string;
+      achievementAnnouncements?: AchievementAnnouncement[];
       autoRollReservation?: AutoRollSessionReservation;
     };
 
@@ -57,7 +57,7 @@ type UseDiceItemDependencies = {
 };
 
 export type FinalizeAutoRollItemUseResult = {
-  achievementText?: string;
+  achievementAnnouncements?: AchievementAnnouncement[];
 };
 
 const recordDiceItemUseAchievements = ({
@@ -79,7 +79,7 @@ const recordDiceItemUseAchievements = ({
 
   return {
     newlyEarned,
-    achievementText: formatAchievementUnlockText(newlyEarned) || undefined,
+    achievementAnnouncement: createAchievementAnnouncement(userId, newlyEarned),
   };
 };
 
@@ -96,7 +96,7 @@ export const createFinalizeAutoRollItemUseUseCase = ({
     itemId: string;
   }): FinalizeAutoRollItemUseResult => {
     return unitOfWork.runInTransaction(() => {
-      const { achievementText } = recordDiceItemUseAchievements({
+      const { achievementAnnouncement } = recordDiceItemUseAchievements({
         inventory,
         progression,
         userId,
@@ -104,7 +104,7 @@ export const createFinalizeAutoRollItemUseUseCase = ({
       });
 
       return {
-        achievementText,
+        achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
       };
     });
   };
@@ -170,7 +170,7 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           charges: grantedCharges,
         });
-        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+        const { achievementAnnouncement } = recordDiceItemUseAchievements({
           inventory,
           progression,
           userId,
@@ -181,13 +181,11 @@ export const createUseDiceItemUseCase = ({
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: appendAchievementUnlockText(
+          statusMessage:
             grantedCharges > effect.charges
               ? `${item.name} opened. The next ${grantedCharges} negative effects will be blocked.`
               : `${item.name} opened. The next negative effect will be blocked.`,
-            newlyEarned,
-          ),
-          achievementText: achievementText || undefined,
+          achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
       });
     }
@@ -208,7 +206,7 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           uses: effect.uses,
         });
-        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+        const { achievementAnnouncement } = recordDiceItemUseAchievements({
           inventory,
           progression,
           userId,
@@ -219,11 +217,8 @@ export const createUseDiceItemUseCase = ({
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: appendAchievementUnlockText(
-            `${item.name} loaded. Your next ${effect.uses} /roll uses roll twice.`,
-            newlyEarned,
-          ),
-          achievementText: achievementText || undefined,
+          statusMessage: `${item.name} loaded. Your next ${effect.uses} /roll uses roll twice.`,
+          achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
       });
     }
@@ -244,7 +239,7 @@ export const createUseDiceItemUseCase = ({
           source: `item:${item.id}`,
           minutes: effect.minutes,
         });
-        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+        const { achievementAnnouncement } = recordDiceItemUseAchievements({
           inventory,
           progression,
           userId,
@@ -255,11 +250,8 @@ export const createUseDiceItemUseCase = ({
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: appendAchievementUnlockText(
-            `${item.name} activated. Your /roll uses roll twice for ${effect.minutes} minutes.`,
-            newlyEarned,
-          ),
-          achievementText: achievementText || undefined,
+          statusMessage: `${item.name} activated. Your /roll uses roll twice for ${effect.minutes} minutes.`,
+          achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
       });
     }
@@ -295,7 +287,7 @@ export const createUseDiceItemUseCase = ({
             charges: bonusShieldCharges,
           });
         }
-        const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+        const { achievementAnnouncement } = recordDiceItemUseAchievements({
           inventory,
           progression,
           userId,
@@ -316,18 +308,15 @@ export const createUseDiceItemUseCase = ({
           ok: true as const,
           item,
           remainingQuantity: consumed.remainingQuantity,
-          statusMessage: appendAchievementUnlockText(
-            [
-              `${item.name} removed ${clearedParts.join(" and ")}.`,
-              bonusShieldCharges > 0
-                ? `Clean Room Kit also granted ${bonusShieldCharges} Bad Luck Umbrella charge${bonusShieldCharges === 1 ? "" : "s"}.`
-                : "",
-            ]
-              .filter((part) => part.length > 0)
-              .join(" "),
-            newlyEarned,
-          ),
-          achievementText: achievementText || undefined,
+          statusMessage: [
+            `${item.name} removed ${clearedParts.join(" and ")}.`,
+            bonusShieldCharges > 0
+              ? `Clean Room Kit also granted ${bonusShieldCharges} Bad Luck Umbrella charge${bonusShieldCharges === 1 ? "" : "s"}.`
+              : "",
+          ]
+            .filter((part) => part.length > 0)
+            .join(" "),
+          achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
       });
     }
@@ -359,7 +348,7 @@ export const createUseDiceItemUseCase = ({
         };
       }
 
-      const { newlyEarned, achievementText } = recordDiceItemUseAchievements({
+      const { achievementAnnouncement } = recordDiceItemUseAchievements({
         inventory,
         progression,
         userId,
@@ -370,11 +359,8 @@ export const createUseDiceItemUseCase = ({
         ok: true,
         item,
         remainingQuantity: consumed.remainingQuantity,
-        statusMessage: appendAchievementUnlockText(
-          "Chaos Flare triggered a random group event.",
-          newlyEarned,
-        ),
-        achievementText: achievementText || undefined,
+        statusMessage: "Chaos Flare triggered a random group event.",
+        achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
       };
     }
 

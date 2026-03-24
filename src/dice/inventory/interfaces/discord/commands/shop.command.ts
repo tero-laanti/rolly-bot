@@ -6,7 +6,9 @@ import type {
 } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedButtonResult,
+  applyRenderedChatInputResult,
+  applyRenderedStringSelectMenuResult,
   applyStringSelectMenuResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
@@ -32,7 +34,7 @@ const handleDiceShopButton = async (interaction: ButtonInteraction): Promise<voi
     return;
   }
 
-  await applyButtonResult(
+  await applyRenderedButtonResult(
     interaction,
     renderDiceShopResult(shopUseCase.handleDiceShopAction(interaction.user.id, action)),
   );
@@ -54,7 +56,7 @@ const handleDiceShopSelectMenu = async (
     return;
   }
 
-  await applyStringSelectMenuResult(
+  await applyRenderedStringSelectMenuResult(
     interaction,
     renderDiceShopResult(shopUseCase.handleDiceShopAction(interaction.user.id, action)),
   );
@@ -66,7 +68,7 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const shopUseCase = createSqliteDiceShopUseCase(getDatabase());
-  await applyChatInputResult(
+  await applyRenderedChatInputResult(
     interaction,
     renderDiceShopResult(shopUseCase.createDiceShopReply(interaction.user.id)),
   );

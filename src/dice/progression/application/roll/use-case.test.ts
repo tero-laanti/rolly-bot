@@ -69,7 +69,13 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
       nowMs: 1_710_000_000_000,
     });
 
-    assert.equal(result.content.includes("peak-goblin"), true);
+    assert.equal(result.content.includes("peak-goblin"), false);
+    assert.deepEqual(result.achievementAnnouncements, [
+      {
+        userId: "user-1",
+        achievementIds: ["first-roll", "first-level-up", "peak-goblin"],
+      },
+    ]);
   } finally {
     Math.random = originalRandom;
   }

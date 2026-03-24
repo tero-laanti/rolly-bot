@@ -1,4 +1,5 @@
 import type { Message } from "discord.js";
+import type { AchievementAnnouncement } from "../../progression/application/achievement-announcements";
 import type { RaidOutcome, RaidStatus } from "../application/ports";
 import type { RaidRewardDefinition } from "../domain/raid";
 
@@ -31,7 +32,7 @@ export type ActiveRaidRecord = {
   closedAtMs: number | null;
   participantIds: Set<string>;
   rewardEligibleUserIds: Set<string>;
-  achievementLines: string[];
+  achievementAnnouncements: AchievementAnnouncement[];
   activeThreadId: string | null;
   boss: ActiveRaidBossRecord | null;
 };

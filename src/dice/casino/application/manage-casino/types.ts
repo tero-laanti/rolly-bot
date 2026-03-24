@@ -1,5 +1,6 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
+import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import type { DiceCasinoAnalyticsRepository } from "../ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import type {
@@ -81,7 +82,9 @@ export type DiceCasinoAction =
       type: "poker-cancel";
     } & DiceCasinoActionTarget);
 
-export type DiceCasinoResult = ActionResult<DiceCasinoAction>;
+export type DiceCasinoResult = ActionResult<DiceCasinoAction> & {
+  achievementAnnouncements?: AchievementAnnouncement[];
+};
 
 export type DiceCasinoActionRow = ActionView<DiceCasinoAction>["components"][number];
 export type DiceCasinoActionRows = ActionView<DiceCasinoAction>["components"];
@@ -91,11 +94,13 @@ export type MutateSessionResult =
       kind: "view";
       session: DiceCasinoSession;
       pips: number;
+      achievementAnnouncements?: AchievementAnnouncement[];
     }
   | {
       kind: "reply";
       content: string;
       ephemeral: boolean;
+      achievementAnnouncements?: AchievementAnnouncement[];
     }
   | {
       kind: "expired";

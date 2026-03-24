@@ -8,6 +8,11 @@ import type { DiceAnalyticsRepository } from "../../../analytics/application/por
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceItemEffectsService } from "../../../inventory/application/item-effects-service";
 import {
+  createAchievementAnnouncement,
+  mergeAchievementAnnouncements,
+  type AchievementAnnouncement,
+} from "../achievement-announcements";
+import {
   getAchievementPipRewardTotal,
   getDiceAchievementsForRoll,
 } from "../../../progression/domain/achievements-store";
@@ -27,7 +32,6 @@ import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { RaidDiceRollPort } from "../../../raids/application/ports";
 import {
   buildDiceRollReplyContent,
-  formatAchievementText,
   formatMatchingRollSummary,
   formatRewardText,
 } from "./reply-content";
@@ -45,6 +49,7 @@ export type DiceRollResult = {
   content: string;
   ephemeral: boolean;
   autoRollClassification: DiceAutoRollClassification;
+  achievementAnnouncements?: AchievementAnnouncement[];
 };
 
 type RollPassEffectSummary = {
@@ -256,7 +261,6 @@ export const createRunRollDiceUseCase = ({
       return { newlyEarned, fameReward, pipReward, levelAfter, fameAfter };
     });
 
-    const achievementText = formatAchievementText(result.newlyEarned);
     const chargeFactorText = formatMultiplierFactor(resolvedRollPassState.effectiveFactor);
     const rewardText = formatRewardText({
       fameReward: result.fameReward,
@@ -295,7 +299,6 @@ export const createRunRollDiceUseCase = ({
         : "";
 
     const baseContent = buildDiceRollReplyContent({
-      achievementText,
       multiplierFooter,
       unlockedFooter,
       doubleRollFooter,
@@ -325,12 +328,17 @@ export const createRunRollDiceUseCase = ({
       raidResult && raidResult.kind !== "no-raid"
         ? appendRaidSummaryWithinLimit(baseContent, raidResult.summary)
         : baseContent;
+    const achievementAnnouncements = mergeAchievementAnnouncements(
+      [
+        createAchievementAnnouncement(userId, result.newlyEarned),
+        ...(raidResult?.kind === "applied" ? (raidResult.achievementAnnouncements ?? []) : []),
+      ].flatMap((announcement) => (announcement ? [announcement] : [])),
+    );
 
     return {
       content,
       ephemeral: false,
       autoRollClassification: buildAutoRollClassification({
-        achievementText,
         rewardText,
         matchCount: allSameCount,
         totalRollSets: rollPassCount,
@@ -339,6 +347,7 @@ export const createRunRollDiceUseCase = ({
         unlockedFooter,
         prestigeFooter,
       }),
+      achievementAnnouncements,
     };
   };
 };
@@ -524,7 +533,6 @@ const formatMultiplierFactor = (value: number): string => {
 };
 
 const buildAutoRollClassification = ({
-  achievementText,
   rewardText,
   matchCount,
   totalRollSets,
@@ -533,7 +541,6 @@ const buildAutoRollClassification = ({
   unlockedFooter,
   prestigeFooter,
 }: {
-  achievementText: string;
   rewardText: string;
   matchCount: number;
   totalRollSets: number;
@@ -544,9 +551,6 @@ const buildAutoRollClassification = ({
 }): DiceAutoRollClassification => {
   const summaryParts: string[] = [];
 
-  if (achievementText) {
-    summaryParts.push(achievementText);
-  }
   if (rewardText) {
     summaryParts.push(rewardText);
   }

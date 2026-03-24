@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  parseDiceAchievements,
   parseDiceBalance,
   parseDiceItems,
   parseDiceRaidsData,
@@ -81,6 +82,22 @@ test("parseDiceBalance preserves firstDailyRollPipReward when provided", () => {
   const parsed = parseDiceBalance(input);
 
   assert.equal(parsed.firstDailyRollPipReward, 5);
+});
+
+test("parseDiceAchievements defaults hidden to false when omitted", () => {
+  const parsed = parseDiceAchievements([
+    {
+      id: "example-achievement",
+      name: "Example Achievement",
+      description: "Example description.",
+      category: "roll",
+      rule: {
+        type: "manual",
+      },
+    },
+  ]);
+
+  assert.equal(parsed[0]?.hidden, false);
 });
 
 test("parseRandomEventScenarios rejects invalid requiredReadyCount at load time", () => {

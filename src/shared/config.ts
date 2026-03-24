@@ -8,6 +8,12 @@ export type IntroPostsConfig = {
   channelId: string | null;
 };
 
+export type AchievementsChannelConfig = {
+  enabled: boolean;
+  inactiveReason: string | null;
+  channelId: string | null;
+};
+
 type QuietHoursConfig = {
   start: string;
   end: string;
@@ -149,6 +155,18 @@ export const introPostsConfig: IntroPostsConfig = {
   enabled: introPostsActivation.enabled,
   inactiveReason: introPostsActivation.inactiveReason,
   channelId: introPostsChannelId,
+};
+
+const achievementsChannelId = parseOptionalString(process.env.ACHIEVEMENTS_CHANNEL_ID);
+const achievementsChannelActivation = resolveFeatureActivation({
+  channelId: achievementsChannelId,
+  channelEnvName: "ACHIEVEMENTS_CHANNEL_ID",
+});
+
+export const achievementsChannelConfig: AchievementsChannelConfig = {
+  enabled: achievementsChannelActivation.enabled,
+  inactiveReason: achievementsChannelActivation.inactiveReason,
+  channelId: achievementsChannelId,
 };
 
 const randomEventsChannelId = parseOptionalString(process.env.RANDOM_EVENTS_CHANNEL_ID);

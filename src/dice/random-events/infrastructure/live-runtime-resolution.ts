@@ -1,3 +1,7 @@
+import {
+  mergeAchievementAnnouncements,
+  type AchievementAnnouncement,
+} from "../../progression/application/achievement-announcements";
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import type { DiceHostileEffectsService } from "../../progression/application/hostile-effects-service";
 import type { DiceEconomyRepository } from "../../economy/application/ports";
@@ -361,12 +365,12 @@ export const resolveRandomEvent = async ({
     userId: string;
     attemptResolution: RandomEventAttemptResolution;
     hadKeepOpenFailureBeforeSuccess: boolean;
-  }) => string | null | undefined;
-}): Promise<void> => {
+  }) => AchievementAnnouncement[] | null | undefined;
+}): Promise<AchievementAnnouncement[]> => {
   const context = activeEventsById.get(eventId);
   if (!context) {
     resolveActiveRandomEvent(state, eventId);
-    return;
+    return [];
   }
 
   activeEventsById.delete(eventId);
@@ -384,7 +388,7 @@ export const resolveRandomEvent = async ({
       ],
       components: [],
     });
-    return;
+    return [];
   }
 
   if (
@@ -402,7 +406,7 @@ export const resolveRandomEvent = async ({
       ],
       components: [],
     });
-    return;
+    return [];
   }
 
   const scenario = context.selection.scenario;
@@ -430,6 +434,7 @@ export const resolveRandomEvent = async ({
         })()
       : null;
 
+  const achievementAnnouncements: AchievementAnnouncement[] = [];
   const lines = participantsToResolve.map((userId) => {
     const attemptResolution =
       attemptResolutionsByUserId?.get(userId) ??
@@ -444,16 +449,16 @@ export const resolveRandomEvent = async ({
         resolutionNote: resolutionNotesByUserId?.get(userId) ?? null,
         sharedOutcomeSelection,
       });
-    const achievementText = onAttemptResolved?.({
-      userId,
-      attemptResolution,
-      hadKeepOpenFailureBeforeSuccess:
-        attemptResolution.resolution === "resolve-success" &&
-        context.failedAttemptUserIds.has(userId),
-    });
-    return achievementText
-      ? `${attemptResolution.finalLine}\n${achievementText}`
-      : attemptResolution.finalLine;
+    const resolvedAnnouncements =
+      onAttemptResolved?.({
+        userId,
+        attemptResolution,
+        hadKeepOpenFailureBeforeSuccess:
+          attemptResolution.resolution === "resolve-success" &&
+          context.failedAttemptUserIds.has(userId),
+      }) ?? [];
+    achievementAnnouncements.push(...resolvedAnnouncements);
+    return attemptResolution.finalLine;
   });
 
   await context.message.edit({
@@ -461,4 +466,6 @@ export const resolveRandomEvent = async ({
     embeds: [buildResolvedEventEmbed(context.selection, lines).toJSON()],
     components: [],
   });
+
+  return mergeAchievementAnnouncements(achievementAnnouncements);
 };

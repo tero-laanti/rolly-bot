@@ -23,7 +23,7 @@ import {
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
-import { appendAchievementUnlockText } from "../../../../progression/application/achievement-text";
+import { createAchievementAnnouncement } from "../../../../progression/application/achievement-announcements";
 import { getCasinoAchievementIds } from "../../achievement-rules";
 import type {
   DiceCasinoAction,
@@ -132,6 +132,9 @@ const startBlackjackRound = ({
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -141,17 +144,15 @@ const startBlackjackRound = ({
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
-                resolution.playerHand,
-              )}.`,
-              newlyEarned,
-            ),
+            lastOutcome: `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
+              resolution.playerHand,
+            )}.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 
@@ -221,6 +222,9 @@ const handleBlackjackAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -230,17 +234,15 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
-                resolution.playerHand,
-              )}.`,
-              newlyEarned,
-            ),
+            lastOutcome: `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
+              resolution.playerHand,
+            )}.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 
@@ -275,6 +277,9 @@ const handleBlackjackAction = (
       session.userId,
       getCasinoAchievementIds(achievementStats),
     );
+    const achievementAnnouncements = [
+      createAchievementAnnouncement(session.userId, newlyEarned),
+    ].flatMap((announcement) => (announcement ? [announcement] : []));
 
     return viewMutation(
       normalizeSessionBet(
@@ -284,17 +289,15 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: appendAchievementUnlockText(
-              `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
-                resolution.playerHand,
-              )}.`,
-              newlyEarned,
-            ),
+            lastOutcome: `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
+              resolution.playerHand,
+            )}.`,
           },
         },
         nextPips,
       ),
       nextPips,
+      achievementAnnouncements,
     );
   }
 

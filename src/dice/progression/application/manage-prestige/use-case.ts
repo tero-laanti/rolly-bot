@@ -13,7 +13,10 @@ import type {
 } from "../../../../shared-kernel/application/action-view";
 import { chunkActionButtons } from "../../../../shared-kernel/application/action-view";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
-import { formatAchievementUnlockText } from "../achievement-text";
+import {
+  createAchievementAnnouncement,
+  type AchievementAnnouncement,
+} from "../achievement-announcements";
 
 const prestigeButtonsPerRow = 5;
 
@@ -43,7 +46,9 @@ export type DicePrestigeAction =
       ownerId: string;
     };
 
-export type DicePrestigeResult = ActionResult<DicePrestigeAction>;
+export type DicePrestigeResult = ActionResult<DicePrestigeAction> & {
+  achievementAnnouncements?: AchievementAnnouncement[];
+};
 
 type ManagePrestigeDependencies = {
   analytics: Pick<
@@ -188,17 +193,17 @@ export const createDicePrestigeUseCase = ({
     });
 
     const refreshed = getPrestigeState(progression, action.ownerId);
-    const achievementText =
-      newlyEarned.length > 0 ? `\n${formatAchievementUnlockText(newlyEarned)}` : "";
+    const achievementAnnouncement = createAchievementAnnouncement(action.ownerId, newlyEarned);
 
     return {
       kind: "update",
+      achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
       payload: {
         type: "view",
         view: buildMainView(
           action.ownerId,
           refreshed,
-          `Prestige complete. Your active die is now d${getDiceSidesForPrestige(nextPrestige)} and prestige ${nextPrestige} starts at level 1.${achievementText}`,
+          `Prestige complete. Your active die is now d${getDiceSidesForPrestige(nextPrestige)} and prestige ${nextPrestige} starts at level 1.`,
         ),
       },
     };

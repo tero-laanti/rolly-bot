@@ -2,7 +2,8 @@ import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedButtonResult,
+  applyRenderedChatInputResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteDiceAdminUseCase } from "../../../infrastructure/sqlite/services";
@@ -29,7 +30,7 @@ const handleDiceAdminButton = async (interaction: ButtonInteraction): Promise<vo
   }
 
   const adminUseCase = createSqliteDiceAdminUseCase(getDatabase());
-  await applyButtonResult(
+  await applyRenderedButtonResult(
     interaction,
     renderDiceAdminResult(
       await adminUseCase.handleDiceAdminAction(
@@ -57,7 +58,7 @@ export const data = new SlashCommandBuilder()
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const adminUseCase = createSqliteDiceAdminUseCase(getDatabase());
   const targetUserId = interaction.options.getUser("user")?.id ?? interaction.user.id;
-  await applyChatInputResult(
+  await applyRenderedChatInputResult(
     interaction,
     renderDiceAdminResult(
       adminUseCase.createDiceAdminReply(getDiceAdminOwnerId(), interaction.user.id, targetUserId),

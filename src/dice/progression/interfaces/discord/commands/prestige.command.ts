@@ -2,7 +2,8 @@ import { SlashCommandBuilder } from "discord.js";
 import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js";
 import {
   applyButtonResult,
-  applyChatInputResult,
+  applyRenderedButtonResult,
+  applyRenderedChatInputResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteDicePrestigeUseCase } from "../../../infrastructure/sqlite/services";
@@ -23,7 +24,7 @@ const handleDicePrestigeButton = async (interaction: ButtonInteraction): Promise
     return;
   }
 
-  await applyButtonResult(
+  await applyRenderedButtonResult(
     interaction,
     renderDicePrestigeResult(prestigeUseCase.handleDicePrestigeAction(interaction.user.id, action)),
   );
@@ -35,7 +36,7 @@ export const data = new SlashCommandBuilder()
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const prestigeUseCase = createSqliteDicePrestigeUseCase(getDatabase());
-  await applyChatInputResult(
+  await applyRenderedChatInputResult(
     interaction,
     renderDicePrestigeResult(prestigeUseCase.createDicePrestigeReply(interaction.user.id)),
   );

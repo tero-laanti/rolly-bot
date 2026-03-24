@@ -1,9 +1,13 @@
 import type { ButtonInteraction, Client } from "discord.js";
+import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
-import { formatAchievementUnlockText } from "../../progression/application/achievement-text";
+import {
+  createAchievementAnnouncement,
+  type AchievementAnnouncement,
+} from "../../progression/application/achievement-announcements";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import { createSqlitePvpRepository } from "../../pvp/infrastructure/sqlite/pvp-repository";
@@ -232,9 +236,9 @@ export const createRandomEventsLiveRuntime = ({
       attemptResolution: RandomEventAttemptResolution;
       hadKeepOpenFailureBeforeSuccess: boolean;
     },
-  ): string | null => {
+  ): AchievementAnnouncement[] => {
     if (!context) {
-      return null;
+      return [];
     }
 
     const randomEventAchievementResult = recordRandomEventAchievementStats(db, {
@@ -251,7 +255,8 @@ export const createRandomEventsLiveRuntime = ({
         cursedEvening: randomEventAchievementResult.cursedEvening,
       }),
     );
-    return formatAchievementUnlockText(newlyEarned) || null;
+    const announcement = createAchievementAnnouncement(userId, newlyEarned);
+    return announcement ? [announcement] : [];
   };
 
   const resolveEvent = async ({
@@ -273,7 +278,7 @@ export const createRandomEventsLiveRuntime = ({
       context.sequenceChallenge = null;
     }
 
-    await resolveRandomEvent({
+    const achievementAnnouncements = await resolveRandomEvent({
       activeEventsById,
       state,
       economy,
@@ -286,6 +291,11 @@ export const createRandomEventsLiveRuntime = ({
       resolutionNotesByUserId,
       attemptResolutionsByUserId,
       onAttemptResolved: (input) => recordAttemptAchievements(context, input),
+    });
+    await publishAchievementAnnouncements({
+      client,
+      announcements: achievementAnnouncements,
+      logger,
     });
   };
 
@@ -380,18 +390,14 @@ export const createRandomEventsLiveRuntime = ({
     });
 
     if (attemptResolution.resolution === "keep-open-failure") {
-      const achievementText = recordAttemptAchievements(context, {
+      const achievementAnnouncements = recordAttemptAchievements(context, {
         userId,
         attemptResolution,
         hadKeepOpenFailureBeforeSuccess: false,
       });
       context.attemptedUserIds.add(userId);
       context.failedAttemptUserIds.add(userId);
-      context.failedAttemptLines.push(
-        achievementText
-          ? `${attemptResolution.failedAttemptLine}\n${achievementText}`
-          : attemptResolution.failedAttemptLine,
-      );
+      context.failedAttemptLines.push(attemptResolution.failedAttemptLine);
       clearSequenceChallengeTimer(context);
       context.sequenceChallenge = null;
 
@@ -401,7 +407,18 @@ export const createRandomEventsLiveRuntime = ({
           eventId,
           participants: [],
         });
+        await publishAchievementAnnouncements({
+          client,
+          announcements: achievementAnnouncements,
+          logger,
+        });
+        return;
       }
+      await publishAchievementAnnouncements({
+        client,
+        announcements: achievementAnnouncements,
+        logger,
+      });
       return;
     }
 

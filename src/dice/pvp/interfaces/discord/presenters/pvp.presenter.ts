@@ -1,4 +1,7 @@
-import type { InteractionResult } from "../../../../../app/discord/interaction-response";
+import type {
+  InteractionResult,
+  RenderedInteractionResult,
+} from "../../../../../app/discord/interaction-response";
 import {
   renderActionResult,
   renderActionView,
@@ -7,7 +10,7 @@ import type { DicePvpResult, DicePvpAction } from "../../../application/manage-c
 import { encodeDicePvpAction } from "../buttons/pvp-buttons";
 import type { ActionView } from "../../../../../shared-kernel/application/action-view";
 
-export const renderDicePvpResult = (result: DicePvpResult): InteractionResult => {
+export const renderDicePvpResult = (result: DicePvpResult): RenderedInteractionResult => {
   return renderActionResult(result, encodeDicePvpAction);
 };
 

@@ -1,6 +1,15 @@
-import type { InteractionResult } from "./interaction-response";
+import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
+import {
+  createRenderedInteractionResult,
+  type InteractionResult,
+  type RenderedInteractionResult,
+} from "./interaction-response";
 import { renderActionButtonRows } from "./render-action-button-rows";
 import type { ActionResult, ActionView } from "../../shared-kernel/application/action-view";
+
+type ActionResultWithAchievements<TAction> = ActionResult<TAction> & {
+  achievementAnnouncements?: AchievementAnnouncement[];
+};
 
 export const renderActionView = <TAction>(
   view: ActionView<TAction>,
@@ -13,41 +22,43 @@ export const renderActionView = <TAction>(
 };
 
 export const renderActionResult = <TAction>(
-  result: ActionResult<TAction>,
+  result: ActionResultWithAchievements<TAction>,
   encodeAction: (action: TAction) => string,
-): InteractionResult => {
+): RenderedInteractionResult => {
+  let interactionResult: InteractionResult;
+
   if (result.payload.type === "message") {
     if (result.kind === "reply") {
-      return {
+      interactionResult = {
         kind: "reply",
         payload: {
           content: result.payload.content,
           ephemeral: result.payload.ephemeral,
         },
       };
+    } else {
+      interactionResult = {
+        kind: result.kind,
+        payload: {
+          content: result.payload.content,
+          components: result.payload.clearComponents ? [] : undefined,
+        },
+      };
     }
-
-    return {
-      kind: result.kind,
-      payload: {
-        content: result.payload.content,
-        components: result.payload.clearComponents ? [] : undefined,
-      },
-    };
-  }
-
-  if (result.kind === "reply") {
-    return {
+  } else if (result.kind === "reply") {
+    interactionResult = {
       kind: "reply",
       payload: {
         ...renderActionView(result.payload.view, encodeAction),
         ephemeral: result.payload.ephemeral,
       },
     };
+  } else {
+    interactionResult = {
+      kind: result.kind,
+      payload: renderActionView(result.payload.view, encodeAction),
+    };
   }
 
-  return {
-    kind: result.kind,
-    payload: renderActionView(result.payload.view, encodeAction),
-  };
+  return createRenderedInteractionResult(interactionResult, result.achievementAnnouncements ?? []);
 };
