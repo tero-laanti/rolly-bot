@@ -274,6 +274,85 @@ test("currency outcomes award pip amounts within the configured range", () => {
   assert.match(attempt.finalLine, /Gained 4 pips\./);
 });
 
+test("consumable item outcomes grant inventory rewards and report them", () => {
+  const scenario: RandomEventScenario = {
+    id: "item-reward-test",
+    rarity: "common",
+    title: "Item Reward Test",
+    prompt: "A tin rattles in the gutter.",
+    claimLabel: "Open tin",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "stashed-tool",
+        resolution: "resolve-success",
+        message: "You find something useful inside.",
+        effects: [
+          {
+            type: "currency",
+            minAmount: 1,
+            maxAmount: 1,
+          },
+          {
+            type: "consumable-item",
+            itemId: "dice-revolver",
+            quantity: 1,
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario);
+  const grantedItems: Array<{ itemId: string; quantity?: number }> = [];
+
+  const attempt = resolveRandomEventAttempt({
+    economy: {
+      applyPipsDelta: ({ amount }) => amount,
+    },
+    inventory: {
+      grantInventoryItem: (input) => {
+        grantedItems.push(input);
+        return input.quantity ?? 1;
+      },
+    },
+    itemCatalog: {
+      getDiceShopItem: (itemId) =>
+        itemId === "dice-revolver"
+          ? {
+              id: "dice-revolver",
+              name: "Dice Revolver",
+              description: "Your next 6 /roll uses roll twice.",
+              pricePips: 6,
+              consumable: true,
+              effect: {
+                type: "double-roll-uses",
+                uses: 6,
+              },
+            }
+          : null,
+    },
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+    },
+    selection,
+    userId: "123",
+    random: () => 0,
+  });
+
+  assert.deepEqual(grantedItems, [{ itemId: "dice-revolver", quantity: 1, userId: "123" }]);
+  assert.match(attempt.finalLine, /Received 1x Dice Revolver\./);
+});
+
 test("attempt resolution detects an already-active negative effect before applying a new curse", () => {
   const scenario: RandomEventScenario = {
     id: "overlap-negative-test",

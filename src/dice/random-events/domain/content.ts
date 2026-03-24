@@ -19,6 +19,11 @@ export type RandomEventEffect =
       maxAmount: number;
     }
   | {
+      type: "consumable-item";
+      itemId: string;
+      quantity: number;
+    }
+  | {
       type: "temporary-roll-multiplier";
       multiplier: number;
       rolls: number;

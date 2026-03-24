@@ -1,6 +1,7 @@
 import type { DiceProgressionRepository } from "../../progression/application/ports";
 import type { DiceHostileEffectsService } from "../../progression/application/hostile-effects-service";
 import type { DiceEconomyRepository } from "../../economy/application/ports";
+import type { DiceInventoryRepository, DiceShopCatalog } from "../../inventory/application/ports";
 import type { DicePvpRepository } from "../../pvp/application/ports";
 import {
   hasRandomEventChallengeOutcomeBranching,
@@ -57,6 +58,9 @@ type RandomEventResolutionProgression = Pick<
 > &
   Partial<Pick<DiceProgressionRepository, "getActiveDiceTemporaryEffects">>;
 
+type RandomEventResolutionInventory = Pick<DiceInventoryRepository, "grantInventoryItem">;
+type RandomEventResolutionItemCatalog = Pick<DiceShopCatalog, "getDiceShopItem">;
+
 const getRandomIntInclusive = (min: number, max: number, random: () => number): number => {
   const lower = Math.min(min, max);
   const upper = Math.max(min, max);
@@ -79,6 +83,8 @@ const resolveCurrencyEffectAmounts = (
 const applyOutcomeEffectsToUser = (
   {
     economy,
+    inventory,
+    itemCatalog,
     progression,
     hostileEffects,
     nowMs,
@@ -86,6 +92,8 @@ const applyOutcomeEffectsToUser = (
     resolvedCurrencyAmounts,
   }: {
     economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
+    inventory?: RandomEventResolutionInventory;
+    itemCatalog?: RandomEventResolutionItemCatalog;
     progression: RandomEventResolutionProgression;
     hostileEffects: Pick<
       DiceHostileEffectsService,
@@ -119,6 +127,25 @@ const applyOutcomeEffectsToUser = (
         pipReward += amount;
         effectNotes.push(`Gained ${amount} pip${amount === 1 ? "" : "s"}.`);
       }
+      continue;
+    }
+
+    if (effect.type === "consumable-item") {
+      if (!inventory || !itemCatalog) {
+        throw new Error("Consumable item rewards require inventory and item catalog services.");
+      }
+
+      const item = itemCatalog.getDiceShopItem(effect.itemId);
+      if (!item || !item.consumable) {
+        throw new Error(`Consumable item reward '${effect.itemId}' is not available.`);
+      }
+
+      inventory.grantInventoryItem({
+        userId,
+        itemId: effect.itemId,
+        quantity: effect.quantity,
+      });
+      effectNotes.push(`Received ${effect.quantity}x ${item.name}.`);
       continue;
     }
 
@@ -222,6 +249,8 @@ const formatFailedAttemptLine = (resolution: RandomEventAttemptResolution): stri
 
 export const resolveRandomEventAttempt = ({
   economy,
+  inventory,
+  itemCatalog,
   progression,
   hostileEffects,
   pvp,
@@ -233,6 +262,8 @@ export const resolveRandomEventAttempt = ({
   random = Math.random,
 }: {
   economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  inventory?: RandomEventResolutionInventory;
+  itemCatalog?: RandomEventResolutionItemCatalog;
   progression: RandomEventResolutionProgression;
   hostileEffects: Pick<
     DiceHostileEffectsService,
@@ -292,6 +323,8 @@ export const resolveRandomEventAttempt = ({
   const { effectNotes, pipReward, appliedNegativeEffects } = applyOutcomeEffectsToUser(
     {
       economy,
+      inventory,
+      itemCatalog,
       progression,
       hostileEffects,
       nowMs,
@@ -333,6 +366,8 @@ export const resolveRandomEvent = async ({
   activeEventsById,
   state,
   economy,
+  inventory,
+  itemCatalog,
   progression,
   hostileEffects,
   pvp,
@@ -346,6 +381,8 @@ export const resolveRandomEvent = async ({
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
   economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  inventory?: RandomEventResolutionInventory;
+  itemCatalog?: RandomEventResolutionItemCatalog;
   progression: RandomEventResolutionProgression;
   hostileEffects: Pick<
     DiceHostileEffectsService,
@@ -435,6 +472,8 @@ export const resolveRandomEvent = async ({
       attemptResolutionsByUserId?.get(userId) ??
       resolveRandomEventAttempt({
         economy,
+        inventory,
+        itemCatalog,
         progression,
         hostileEffects,
         pvp,

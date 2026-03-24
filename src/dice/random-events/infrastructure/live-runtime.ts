@@ -2,6 +2,10 @@ import type { ButtonInteraction, Client } from "discord.js";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
+import {
+  createDiceShopCatalog,
+  createSqliteInventoryRepository,
+} from "../../inventory/infrastructure/sqlite/inventory-repository";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import { formatAchievementUnlockText } from "../../progression/application/achievement-text";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
@@ -134,6 +138,8 @@ export const createRandomEventsLiveRuntime = ({
   let nextSequenceChallengeSessionId = 1;
   const db = getDatabase();
   const economy = createSqliteEconomyRepository(db);
+  const inventory = createSqliteInventoryRepository(db);
+  const itemCatalog = createDiceShopCatalog();
   const progression = createSqliteProgressionRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
   const pvp = createSqlitePvpRepository(db);
@@ -277,6 +283,8 @@ export const createRandomEventsLiveRuntime = ({
       activeEventsById,
       state,
       economy,
+      inventory,
+      itemCatalog,
       progression,
       hostileEffects,
       pvp,
@@ -370,6 +378,8 @@ export const createRandomEventsLiveRuntime = ({
 
     const attemptResolution = resolveRandomEventAttempt({
       economy,
+      inventory,
+      itemCatalog,
       progression,
       hostileEffects,
       pvp,
