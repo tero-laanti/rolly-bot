@@ -26,6 +26,10 @@ export type DiceBansAction =
       ownerId: string;
     }
   | {
+      type: "request-clear-bans";
+      ownerId: string;
+    }
+  | {
       type: "clear-bans";
       ownerId: string;
     }
@@ -144,6 +148,17 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
           type: "message",
           content: "Dice ban menu closed.",
           clearComponents: true,
+        },
+      };
+    }
+
+    if (action.type === "request-clear-bans") {
+      const bans = progression.getDiceBans(action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildClearBansConfirmationView(action.ownerId, bans, unlockedSlots),
         },
       };
     }
@@ -368,10 +383,39 @@ const buildDieSelectionView = (
           style: "secondary",
         },
         {
-          action: { type: "clear-bans", ownerId },
+          action: { type: "request-clear-bans", ownerId },
           label: "Clear bans",
           style: "danger",
           disabled: !hasAnyBans,
+        },
+      ],
+    ],
+  };
+};
+
+const buildClearBansConfirmationView = (
+  ownerId: string,
+  bans: Map<number, Set<number>>,
+  unlockedSlots: number,
+): ActionView<DiceBansAction> => {
+  return {
+    content: [
+      "Clear all bans?",
+      "This will remove every banned value from every die.",
+      "",
+      buildDieSelectionContent({ bans, unlockedSlots }),
+    ].join("\n"),
+    components: [
+      [
+        {
+          action: { type: "clear-bans", ownerId },
+          label: "Yes, clear all",
+          style: "danger",
+        },
+        {
+          action: { type: "back", ownerId },
+          label: "No",
+          style: "secondary",
         },
       ],
     ],

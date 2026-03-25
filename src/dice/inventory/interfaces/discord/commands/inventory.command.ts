@@ -3,22 +3,16 @@ import type { ButtonInteraction, ChatInputCommandInteraction } from "discord.js"
 import {
   applyButtonResult,
   applyRenderedChatInputResult,
-  createRenderedInteractionResult,
 } from "../../../../../app/discord/interaction-response";
 import { publishAchievementAnnouncements } from "../../../../../app/discord/achievement-announcements";
-import {
-  buildAutoRollSessionStartingContent,
-  cancelActiveAutoRollSession,
-  releaseAutoRollSessionReservation,
-  reserveAutoRollSession,
-  startReservedAutoRollSession,
-} from "../../../infrastructure/auto-roller-runtime";
+import { reserveAutoRollSession } from "../../../infrastructure/auto-roller-runtime";
 import { getDatabase } from "../../../../../shared/db";
 import {
   createSqliteDiceInventoryCommandServices,
   createSqliteDiceInventoryUseCase,
 } from "../../../infrastructure/sqlite/services";
 import { diceInventoryButtonPrefix, parseDiceInventoryAction } from "../buttons/inventory-buttons";
+import { handleAutoRollSessionStart } from "./auto-roll-session.command";
 import { renderDiceInventoryResult } from "../presenters/inventory.presenter";
 
 const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promise<void> => {
@@ -46,82 +40,23 @@ const handleDiceInventoryButton = async (interaction: ButtonInteraction): Promis
     triggerRandomGroupEvent,
   });
 
-  if (!outcome.autoRollStart) {
+  if (
+    !(await handleAutoRollSessionStart({
+      interaction,
+      db,
+      autoRollStart: outcome.autoRollStart,
+      achievementAnnouncements: outcome.achievementAnnouncements,
+      finalizeAutoRollItemUse,
+      refundInventoryItem,
+    }))
+  ) {
     const rendered = renderDiceInventoryResult(outcome.result);
     await applyButtonResult(interaction, rendered.interactionResult);
     await publishAchievementAnnouncements({
       client: interaction.client,
       announcements: outcome.achievementAnnouncements ?? rendered.achievementAnnouncements ?? [],
     });
-    return;
   }
-
-  const started = await startReservedAutoRollSession(outcome.autoRollStart.reservation, {
-    db,
-    message: interaction.message,
-    userMention: interaction.user.toString(),
-  });
-  if (!started) {
-    releaseAutoRollSessionReservation(outcome.autoRollStart.reservation);
-    refundInventoryItem({
-      userId: interaction.user.id,
-      itemId: outcome.autoRollStart.itemId,
-      quantity: 1,
-    });
-    await applyButtonResult(interaction, {
-      kind: "reply",
-      payload: {
-        content: "Clockwork Croupier failed to start. The item was refunded.",
-        ephemeral: true,
-      },
-    });
-    return;
-  }
-
-  let achievementAnnouncements = outcome.achievementAnnouncements ?? [];
-  try {
-    achievementAnnouncements = [
-      ...achievementAnnouncements,
-      ...(finalizeAutoRollItemUse({
-        userId: interaction.user.id,
-        itemId: outcome.autoRollStart.itemId,
-      }).achievementAnnouncements ?? []),
-    ];
-  } catch (error) {
-    cancelActiveAutoRollSession(interaction.user.id);
-    refundInventoryItem({
-      userId: interaction.user.id,
-      itemId: outcome.autoRollStart.itemId,
-      quantity: 1,
-    });
-    console.error("Failed to finalize auto-roll session startup:", error);
-    await applyButtonResult(interaction, {
-      kind: "reply",
-      payload: {
-        content: "Clockwork Croupier failed to start. The item was refunded.",
-        ephemeral: true,
-      },
-    });
-    return;
-  }
-
-  await applyButtonResult(
-    interaction,
-    createRenderedInteractionResult(
-      {
-        kind: "update",
-        payload: {
-          content: buildAutoRollSessionStartingContent(outcome.autoRollStart.reservation),
-          components: [],
-        },
-      },
-      achievementAnnouncements,
-    ).interactionResult,
-  );
-  await publishAchievementAnnouncements({
-    client: interaction.client,
-    announcements: achievementAnnouncements,
-  });
 };
 
 export const data = new SlashCommandBuilder()

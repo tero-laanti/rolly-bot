@@ -102,3 +102,90 @@ test("first ban returns announcement metadata without inline achievement text", 
     assert.doesNotMatch(result.payload.view.content, /Achievement unlocked/i);
   });
 });
+
+test("clear bans requires an explicit confirmation step", () => {
+  withCustomRollyData((dataDir) => {
+    const { createDiceBansUseCase } = loadUseCase(dataDir);
+    const bans = new Map<number, Set<number>>([[1, new Set([2, 4])]]);
+    const useCase = createDiceBansUseCase({
+      economy: {
+        getFame: () => 100,
+      },
+      progression: {
+        clearDiceBan: () => undefined,
+        clearSingleDiceBan: () => undefined,
+        markFirstDiceBan: () => false,
+        awardAchievements: () => [],
+        getDiceBans: () => bans,
+        getDiceLevel: () => 1,
+        getDiceSides: () => 6,
+        setDiceBan: () => undefined,
+      },
+    });
+
+    const result = useCase.handleDiceBansAction("user-1", {
+      type: "request-clear-bans",
+      ownerId: "user-1",
+    });
+
+    assert.equal(result.kind, "update");
+    assert.equal(result.payload.type, "view");
+    if (result.payload.type !== "view") {
+      return;
+    }
+
+    assert.match(result.payload.view.content, /Clear all bans\?/);
+    assert.deepEqual(
+      result.payload.view.components[0]?.map((button) => button.label),
+      ["Yes, clear all", "No"],
+    );
+    assert.deepEqual(Array.from(bans.get(1) ?? []), [2, 4]);
+  });
+});
+
+test("confirmed clear bans removes all bans and returns to the die selection view", () => {
+  withCustomRollyData((dataDir) => {
+    const { createDiceBansUseCase } = loadUseCase(dataDir);
+    const bans = new Map<number, Set<number>>([
+      [1, new Set([2, 4])],
+      [2, new Set([1])],
+    ]);
+    const useCase = createDiceBansUseCase({
+      economy: {
+        getFame: () => 100,
+      },
+      progression: {
+        clearDiceBan: (userId, dieIndex) => {
+          if (userId === "user-1") {
+            bans.delete(dieIndex);
+          }
+        },
+        clearSingleDiceBan: () => undefined,
+        markFirstDiceBan: () => false,
+        awardAchievements: () => [],
+        getDiceBans: () => bans,
+        getDiceLevel: () => 2,
+        getDiceSides: () => 6,
+        setDiceBan: () => undefined,
+      },
+    });
+
+    const result = useCase.handleDiceBansAction("user-1", {
+      type: "clear-bans",
+      ownerId: "user-1",
+    });
+
+    assert.equal(result.kind, "update");
+    assert.equal(result.payload.type, "view");
+    if (result.payload.type !== "view") {
+      return;
+    }
+
+    assert.equal(bans.size, 0);
+    assert.match(result.payload.view.content, /All bans cleared\./);
+    assert.deepEqual(
+      result.payload.view.components.at(-1)?.map((button) => button.label),
+      ["Close", "Clear bans"],
+    );
+  });
+});

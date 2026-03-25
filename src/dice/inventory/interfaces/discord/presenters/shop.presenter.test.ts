@@ -156,7 +156,7 @@ test("item-detail renders one buy button plus navigation controls", () => {
   );
 });
 
-test("receipt renders success embed plus only Shop Home and Close", () => {
+test("receipt renders success embed plus buy another, use item, and close", () => {
   const interaction = renderDiceShopResult({
     kind: "update",
     payload: {
@@ -167,11 +167,14 @@ test("receipt renders success embed plus only Shop Home and Close", () => {
         balancePips: 34,
         categorySummaries,
         receipt: {
+          itemId: "dice-revolver",
+          categoryId: "consumables",
           itemName: "Dice Revolver",
           ownedQuantity: 1,
           remainingPips: 34,
           changeSummary:
             "The item was added to your inventory. Use /inventory when you want to activate it.",
+          canUseItemNow: true,
         },
       },
     },
@@ -184,7 +187,35 @@ test("receipt renders success embed plus only Shop Home and Close", () => {
   assert.equal(rows.length, 1);
   assert.deepEqual(
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
-    ["Shop Home", "Close"],
+    ["Buy Another", "Use Item", "Close"],
+  );
+});
+
+test("use-item confirmation renders yes and no buttons", () => {
+  const interaction = renderDiceShopResult({
+    kind: "update",
+    payload: {
+      type: "view",
+      view: {
+        screen: "use-item-confirmation",
+        ownerId: "user-1",
+        balancePips: 34,
+        categorySummaries,
+        categoryId: "consumables",
+        itemId: "dice-revolver",
+        itemName: "Dice Revolver",
+      },
+    },
+  }).interactionResult;
+
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
+  assert.equal(embed?.title, "Use Item Now?");
+
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
+  assert.equal(rows.length, 1);
+  assert.deepEqual(
+    rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
+    ["Yes", "No"],
   );
 });
 

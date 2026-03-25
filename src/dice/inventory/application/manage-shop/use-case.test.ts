@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiceShopItem } from "../../domain/shop";
 import { createDiceShopUseCase } from "./use-case";
+import type { UseDiceItemResult } from "../use-item/use-case";
 
 const diceRevolver: DiceShopItem = {
   id: "dice-revolver",
@@ -50,16 +51,24 @@ const createTestShopUseCase = ({
   initialPips = 40,
   initialInventory = new Map<string, number>(),
   onRunInTransaction,
+  onUseDiceItem,
 }: {
   initialPips?: number;
   initialInventory?: Map<string, number>;
   onRunInTransaction?: () => void;
+  onUseDiceItem?: (input: { userId: string; itemId: string }) => Promise<UseDiceItemResult>;
 } = {}) => {
   let pips = initialPips;
   const inventoryQuantities = new Map(initialInventory);
   let applyPipsDeltaCalls = 0;
   let grantInventoryItemCalls = 0;
   let recordShopPurchaseCalls = 0;
+  const useDiceItemCalls: string[] = [];
+  const shopCatalog = {
+    getDiceShopItem: (itemId: string) =>
+      [diceRevolver, cleanseSalt, umbrellaHarness].find((item) => item.id === itemId) ?? null,
+    getDiceShopItems: () => [diceRevolver, cleanseSalt, umbrellaHarness],
+  };
 
   const useCase = createDiceShopUseCase({
     economy: {
@@ -90,16 +99,50 @@ const createTestShopUseCase = ({
     progression: {
       awardAchievements: () => [],
     },
-    shopCatalog: {
-      getDiceShopItem: (itemId) =>
-        [diceRevolver, cleanseSalt, umbrellaHarness].find((item) => item.id === itemId) ?? null,
-      getDiceShopItems: () => [diceRevolver, cleanseSalt, umbrellaHarness],
-    },
+    shopCatalog,
     unitOfWork: {
       runInTransaction: (work) => {
         onRunInTransaction?.();
         return work();
       },
+    },
+    useDiceItem: async ({ userId, itemId }) => {
+      useDiceItemCalls.push(itemId);
+
+      if (onUseDiceItem) {
+        return onUseDiceItem({ userId, itemId });
+      }
+
+      const item = shopCatalog.getDiceShopItem(itemId);
+      if (!item) {
+        return {
+          ok: false,
+          message: "That inventory item does not exist.",
+        };
+      }
+
+      if (!item.consumable) {
+        return {
+          ok: false,
+          message: `${item.name} cannot be consumed.`,
+        };
+      }
+
+      const ownedQuantity = inventoryQuantities.get(itemId) ?? 0;
+      if (ownedQuantity < 1) {
+        return {
+          ok: false,
+          message: `You do not have any ${item.name} to use.`,
+        };
+      }
+
+      inventoryQuantities.set(itemId, ownedQuantity - 1);
+      return {
+        ok: true,
+        item,
+        remainingQuantity: ownedQuantity - 1,
+        statusMessage: `${item.name} used.`,
+      };
     },
   });
 
@@ -110,9 +153,21 @@ const createTestShopUseCase = ({
     getApplyPipsDeltaCalls: () => applyPipsDeltaCalls,
     getGrantInventoryItemCalls: () => grantInventoryItemCalls,
     getRecordShopPurchaseCalls: () => recordShopPurchaseCalls,
+    getUseDiceItemCalls: () => [...useDiceItemCalls],
     setPips: (nextPips: number) => {
       pips = nextPips;
     },
+    handleAction: (
+      action: Parameters<typeof useCase.handleDiceShopAction>[1],
+      actorId = "user-1",
+    ) =>
+      useCase.handleDiceShopAction(actorId, action, {
+        reserveAutoRollSession: () => null,
+        triggerRandomGroupEvent: async () => ({
+          ok: false,
+          reason: "unavailable",
+        }),
+      }),
   };
 };
 
@@ -149,73 +204,73 @@ test("landing state builds correctly", () => {
   });
 });
 
-test("category filtering splits consumables and permanent upgrades correctly", () => {
-  const { useCase } = createTestShopUseCase();
+test("category filtering splits consumables and permanent upgrades correctly", async () => {
+  const { handleAction } = createTestShopUseCase();
 
-  const consumables = useCase.handleDiceShopAction("user-1", {
+  const consumables = await handleAction({
     type: "open-category",
     ownerId: "user-1",
     categoryId: "consumables",
   });
-  const upgrades = useCase.handleDiceShopAction("user-1", {
+  const upgrades = await handleAction({
     type: "open-category",
     ownerId: "user-1",
     categoryId: "permanent-upgrades",
   });
 
-  assert.equal(consumables.kind, "update");
-  assert.equal(consumables.payload.type, "view");
-  assert.equal(upgrades.kind, "update");
-  assert.equal(upgrades.payload.type, "view");
-  if (consumables.payload.type !== "view" || upgrades.payload.type !== "view") {
+  assert.equal(consumables.result.kind, "update");
+  assert.equal(consumables.result.payload.type, "view");
+  assert.equal(upgrades.result.kind, "update");
+  assert.equal(upgrades.result.payload.type, "view");
+  if (consumables.result.payload.type !== "view" || upgrades.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(consumables.payload.view.screen, "category");
-  assert.equal(upgrades.payload.view.screen, "category");
+  assert.equal(consumables.result.payload.view.screen, "category");
+  assert.equal(upgrades.result.payload.view.screen, "category");
   if (
-    consumables.payload.view.screen !== "category" ||
-    upgrades.payload.view.screen !== "category"
+    consumables.result.payload.view.screen !== "category" ||
+    upgrades.result.payload.view.screen !== "category"
   ) {
     return;
   }
 
   assert.deepEqual(
-    consumables.payload.view.categoryItems.map((item) => item.id),
+    consumables.result.payload.view.categoryItems.map((item) => item.id),
     [diceRevolver.id, cleanseSalt.id],
   );
   assert.deepEqual(
-    upgrades.payload.view.categoryItems.map((item) => item.id),
+    upgrades.result.payload.view.categoryItems.map((item) => item.id),
     [umbrellaHarness.id],
   );
 });
 
-test("selecting an item returns the expected item-detail state", () => {
-  const { useCase } = createTestShopUseCase();
+test("selecting an item returns the expected item-detail state", async () => {
+  const { handleAction } = createTestShopUseCase();
 
-  const result = useCase.handleDiceShopAction("user-1", {
+  const result = await handleAction({
     type: "select-item",
     ownerId: "user-1",
     categoryId: "consumables",
     itemId: diceRevolver.id,
   });
 
-  assert.equal(result.kind, "update");
-  assert.equal(result.payload.type, "view");
-  if (result.payload.type !== "view") {
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(result.payload.view.screen, "item-detail");
-  if (result.payload.view.screen !== "item-detail") {
+  assert.equal(result.result.payload.view.screen, "item-detail");
+  if (result.result.payload.view.screen !== "item-detail") {
     return;
   }
 
-  assert.deepEqual(result.payload.view.itemNavigation, {
+  assert.deepEqual(result.result.payload.view.itemNavigation, {
     previousItemId: null,
     nextItemId: cleanseSalt.id,
   });
-  assert.deepEqual(result.payload.view.selectedItem, {
+  assert.deepEqual(result.result.payload.view.selectedItem, {
     id: diceRevolver.id,
     name: "Dice Revolver",
     description: "Your next 6 /roll uses roll twice.",
@@ -227,10 +282,10 @@ test("selecting an item returns the expected item-detail state", () => {
   });
 });
 
-test("adjacent item navigation moves within the selected category order", () => {
-  const { useCase } = createTestShopUseCase();
+test("adjacent item navigation moves within the selected category order", async () => {
+  const { handleAction } = createTestShopUseCase();
 
-  const result = useCase.handleDiceShopAction("user-1", {
+  const result = await handleAction({
     type: "view-adjacent-item",
     ownerId: "user-1",
     categoryId: "consumables",
@@ -238,59 +293,62 @@ test("adjacent item navigation moves within the selected category order", () => 
     direction: "next",
   });
 
-  assert.equal(result.kind, "update");
-  assert.equal(result.payload.type, "view");
-  if (result.payload.type !== "view") {
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(result.payload.view.screen, "item-detail");
-  if (result.payload.view.screen !== "item-detail") {
+  assert.equal(result.result.payload.view.screen, "item-detail");
+  if (result.result.payload.view.screen !== "item-detail") {
     return;
   }
 
-  assert.equal(result.payload.view.selectedItem.id, cleanseSalt.id);
-  assert.deepEqual(result.payload.view.itemNavigation, {
+  assert.equal(result.result.payload.view.selectedItem.id, cleanseSalt.id);
+  assert.deepEqual(result.result.payload.view.itemNavigation, {
     previousItemId: diceRevolver.id,
     nextItemId: null,
   });
 });
 
-test("successful purchase returns a purchase receipt with the updated balance and quantity", () => {
-  const { useCase, inventoryQuantities, getPips } = createTestShopUseCase({ initialPips: 40 });
+test("successful purchase returns a purchase receipt with the updated balance and quantity", async () => {
+  const { handleAction, inventoryQuantities, getPips } = createTestShopUseCase({ initialPips: 40 });
 
-  const result = useCase.handleDiceShopAction("user-1", {
+  const result = await handleAction({
     type: "buy-selected-item",
     ownerId: "user-1",
     categoryId: "consumables",
     itemId: diceRevolver.id,
   });
 
-  assert.equal(result.kind, "update");
-  assert.equal(result.payload.type, "view");
-  if (result.payload.type !== "view") {
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(result.payload.view.screen, "purchase-receipt");
-  if (result.payload.view.screen !== "purchase-receipt") {
+  assert.equal(result.result.payload.view.screen, "purchase-receipt");
+  if (result.result.payload.view.screen !== "purchase-receipt") {
     return;
   }
 
-  assert.deepEqual(result.payload.view.receipt, {
+  assert.deepEqual(result.result.payload.view.receipt, {
+    itemId: diceRevolver.id,
+    categoryId: "consumables",
     itemName: "Dice Revolver",
     ownedQuantity: 1,
     remainingPips: 34,
     changeSummary:
       "The item was added to your inventory. Use /inventory when you want to activate it.",
+    canUseItemNow: true,
   });
   assert.equal(inventoryQuantities.get(diceRevolver.id), 1);
   assert.equal(getPips(), 34);
 });
 
-test("shop purchases re-check pip balance inside the transaction before charging pips", () => {
+test("shop purchases re-check pip balance inside the transaction before charging pips", async () => {
   const {
-    useCase,
+    handleAction,
     getPips,
     getApplyPipsDeltaCalls,
     getGrantInventoryItemCalls,
@@ -303,38 +361,38 @@ test("shop purchases re-check pip balance inside the transaction before charging
     },
   });
 
-  const result = useCase.handleDiceShopAction("user-1", {
+  const result = await handleAction({
     type: "buy-selected-item",
     ownerId: "user-1",
     categoryId: "permanent-upgrades",
     itemId: umbrellaHarness.id,
   });
 
-  assert.equal(result.kind, "update");
-  assert.equal(result.payload.type, "view");
-  if (result.payload.type !== "view") {
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(result.payload.view.screen, "item-detail");
-  if (result.payload.view.screen !== "item-detail") {
+  assert.equal(result.result.payload.view.screen, "item-detail");
+  if (result.result.payload.view.screen !== "item-detail") {
     return;
   }
 
   assert.equal(
-    result.payload.view.statusMessage,
+    result.result.payload.view.statusMessage,
     `You need ${umbrellaHarness.pricePips} pips to buy ${umbrellaHarness.name}. Current balance: 10 pips.`,
   );
-  assert.equal(result.payload.view.selectedItem.buyable, false);
+  assert.equal(result.result.payload.view.selectedItem.buyable, false);
   assert.equal(getPips(), 10);
   assert.equal(getApplyPipsDeltaCalls(), 0);
   assert.equal(getGrantInventoryItemCalls(), 0);
   assert.equal(getRecordShopPurchaseCalls(), 0);
 });
 
-test("permanent upgrades still reject repeat purchase", () => {
+test("permanent upgrades still reject repeat purchase", async () => {
   const {
-    useCase,
+    handleAction,
     getApplyPipsDeltaCalls,
     getGrantInventoryItemCalls,
     getRecordShopPurchaseCalls,
@@ -343,44 +401,99 @@ test("permanent upgrades still reject repeat purchase", () => {
     initialInventory: new Map([[umbrellaHarness.id, 1]]),
   });
 
-  const result = useCase.handleDiceShopAction("user-1", {
+  const result = await handleAction({
     type: "buy-selected-item",
     ownerId: "user-1",
     categoryId: "permanent-upgrades",
     itemId: umbrellaHarness.id,
   });
 
-  assert.equal(result.kind, "update");
-  assert.equal(result.payload.type, "view");
-  if (result.payload.type !== "view") {
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(result.payload.view.screen, "item-detail");
-  if (result.payload.view.screen !== "item-detail") {
+  assert.equal(result.result.payload.view.screen, "item-detail");
+  if (result.result.payload.view.screen !== "item-detail") {
     return;
   }
 
   assert.equal(
-    result.payload.view.statusMessage,
+    result.result.payload.view.statusMessage,
     `${umbrellaHarness.name} is already owned. Permanent upgrades can only be bought once.`,
   );
-  assert.equal(result.payload.view.selectedItem.ownedQuantity, 1);
-  assert.equal(result.payload.view.selectedItem.buyable, false);
+  assert.equal(result.result.payload.view.selectedItem.ownedQuantity, 1);
+  assert.equal(result.result.payload.view.selectedItem.buyable, false);
   assert.equal(getApplyPipsDeltaCalls(), 0);
   assert.equal(getGrantInventoryItemCalls(), 0);
   assert.equal(getRecordShopPurchaseCalls(), 0);
 });
 
-test("close action clears interactivity", () => {
-  const { useCase } = createTestShopUseCase();
+test("use item prompt opens a yes/no confirmation screen", async () => {
+  const { handleAction } = createTestShopUseCase();
 
-  const result = useCase.handleDiceShopAction("user-1", {
+  const result = await handleAction({
+    type: "prompt-use-item",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    itemId: diceRevolver.id,
+  });
+
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.deepEqual(result.result.payload.view, {
+    screen: "use-item-confirmation",
+    ownerId: "user-1",
+    balancePips: 40,
+    categorySummaries: categorySummariesFromTestCatalog(),
+    categoryId: "consumables",
+    itemId: diceRevolver.id,
+    itemName: "Dice Revolver",
+  });
+});
+
+test("confirming use item applies the item and returns to the shop lobby", async () => {
+  const { handleAction, inventoryQuantities, getUseDiceItemCalls } = createTestShopUseCase({
+    initialInventory: new Map([[diceRevolver.id, 1]]),
+  });
+
+  const result = await handleAction({
+    type: "confirm-use-item",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    itemId: diceRevolver.id,
+  });
+
+  assert.deepEqual(getUseDiceItemCalls(), [diceRevolver.id]);
+  assert.equal(inventoryQuantities.get(diceRevolver.id), 0);
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.screen, "landing");
+  if (result.result.payload.view.screen !== "landing") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.statusMessage, "Dice Revolver used.");
+});
+
+test("close action clears interactivity", async () => {
+  const { handleAction } = createTestShopUseCase();
+
+  const result = await handleAction({
     type: "close",
     ownerId: "user-1",
   });
 
-  assert.deepEqual(result, {
+  assert.deepEqual(result.result, {
     kind: "update",
     payload: {
       type: "message",
@@ -389,3 +502,18 @@ test("close action clears interactivity", () => {
     },
   });
 });
+
+const categorySummariesFromTestCatalog = () => [
+  {
+    id: "consumables" as const,
+    label: "Consumables",
+    summary: "Single-use items and timed boosts for your next moves.",
+    itemCount: 2,
+  },
+  {
+    id: "permanent-upgrades" as const,
+    label: "Permanent Upgrades",
+    summary: "One-time passive upgrades that stay active once owned.",
+    itemCount: 1,
+  },
+];

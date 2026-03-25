@@ -65,11 +65,12 @@ export const createSqliteDiceInventoryCommandServices = (db: SqliteDatabase) => 
 };
 
 export const createSqliteDiceShopUseCase = (db: SqliteDatabase) => {
+  const unitOfWork = createSqliteUnitOfWork(db);
   const economy = createSqliteEconomyRepository(db);
   const inventory = createSqliteInventoryRepository(db);
   const progression = createSqliteProgressionRepository(db);
   const shopCatalog = createDiceShopCatalog();
-  const unitOfWork = createSqliteUnitOfWork(db);
+  const useDiceItem = createSqliteUseDiceItemUseCase(db);
 
   return createDiceShopUseCase({
     economy,
@@ -77,5 +78,26 @@ export const createSqliteDiceShopUseCase = (db: SqliteDatabase) => {
     progression,
     shopCatalog,
     unitOfWork,
+    useDiceItem,
   });
+};
+
+export const createSqliteDiceShopCommandServices = (db: SqliteDatabase) => {
+  const unitOfWork = createSqliteUnitOfWork(db);
+  const inventory = createSqliteInventoryRepository(db);
+  const progression = createSqliteProgressionRepository(db);
+  const shopUseCase = createSqliteDiceShopUseCase(db);
+  const finalizeAutoRollItemUse = createFinalizeAutoRollItemUseUseCase({
+    inventory,
+    progression,
+    unitOfWork,
+  });
+
+  return {
+    shopUseCase,
+    finalizeAutoRollItemUse,
+    refundInventoryItem: (input: { userId: string; itemId: string; quantity?: number }) =>
+      inventory.grantInventoryItem(input),
+    triggerRandomGroupEvent: triggerRandomGroupEventNow,
+  };
 };

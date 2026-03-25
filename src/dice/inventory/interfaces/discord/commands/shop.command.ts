@@ -12,8 +12,13 @@ import {
   applyStringSelectMenuResult,
 } from "../../../../../app/discord/interaction-response";
 import { getDatabase } from "../../../../../shared/db";
-import { createSqliteDiceShopUseCase } from "../../../infrastructure/sqlite/services";
+import { reserveAutoRollSession } from "../../../infrastructure/auto-roller-runtime";
+import {
+  createSqliteDiceShopCommandServices,
+  createSqliteDiceShopUseCase,
+} from "../../../infrastructure/sqlite/services";
 import { diceShopButtonPrefix, parseDiceShopButtonAction } from "../buttons/shop-buttons";
+import { handleAutoRollSessionStart } from "./auto-roll-session.command";
 import { renderDiceShopResult } from "../presenters/shop.presenter";
 import {
   diceShopSelectMenuPrefix,
@@ -21,7 +26,9 @@ import {
 } from "../select-menus/shop-select-menus";
 
 const handleDiceShopButton = async (interaction: ButtonInteraction): Promise<void> => {
-  const shopUseCase = createSqliteDiceShopUseCase(getDatabase());
+  const db = getDatabase();
+  const { shopUseCase, finalizeAutoRollItemUse, refundInventoryItem, triggerRandomGroupEvent } =
+    createSqliteDiceShopCommandServices(db);
   const action = parseDiceShopButtonAction(interaction.customId);
   if (!action) {
     await applyButtonResult(interaction, {
@@ -34,16 +41,31 @@ const handleDiceShopButton = async (interaction: ButtonInteraction): Promise<voi
     return;
   }
 
-  await applyRenderedButtonResult(
-    interaction,
-    renderDiceShopResult(shopUseCase.handleDiceShopAction(interaction.user.id, action)),
-  );
+  const outcome = await shopUseCase.handleDiceShopAction(interaction.user.id, action, {
+    reserveAutoRollSession,
+    triggerRandomGroupEvent,
+  });
+  if (
+    await handleAutoRollSessionStart({
+      interaction,
+      db,
+      autoRollStart: outcome.autoRollStart,
+      achievementAnnouncements: outcome.result.achievementAnnouncements,
+      finalizeAutoRollItemUse,
+      refundInventoryItem,
+    })
+  ) {
+    return;
+  }
+
+  await applyRenderedButtonResult(interaction, renderDiceShopResult(outcome.result));
 };
 
 const handleDiceShopSelectMenu = async (
   interaction: StringSelectMenuInteraction,
 ): Promise<void> => {
-  const shopUseCase = createSqliteDiceShopUseCase(getDatabase());
+  const { shopUseCase, triggerRandomGroupEvent } =
+    createSqliteDiceShopCommandServices(getDatabase());
   const action = parseDiceShopSelectMenuAction(interaction.customId, interaction.values);
   if (!action) {
     await applyStringSelectMenuResult(interaction, {
@@ -58,7 +80,14 @@ const handleDiceShopSelectMenu = async (
 
   await applyRenderedStringSelectMenuResult(
     interaction,
-    renderDiceShopResult(shopUseCase.handleDiceShopAction(interaction.user.id, action)),
+    renderDiceShopResult(
+      (
+        await shopUseCase.handleDiceShopAction(interaction.user.id, action, {
+          reserveAutoRollSession,
+          triggerRandomGroupEvent,
+        })
+      ).result,
+    ),
   );
 };
 

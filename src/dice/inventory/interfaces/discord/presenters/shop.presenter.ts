@@ -160,6 +160,17 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
     return embed;
   }
 
+  if (view.screen === "use-item-confirmation") {
+    return new EmbedBuilder()
+      .setTitle("Use Item Now?")
+      .setDescription(`Use **${view.itemName}** right away?`)
+      .addFields({
+        name: "Current Pips",
+        value: `${view.balancePips} pips`,
+        inline: false,
+      });
+  }
+
   const embed = new EmbedBuilder()
     .setTitle("Purchase Complete")
     .setDescription(`Bought **${view.receipt.itemName}**.`)
@@ -349,12 +360,46 @@ const buildDiceShopComponents = (
     ];
   }
 
+  if (view.screen === "use-item-confirmation") {
+    return [
+      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            encodeDiceShopButtonAction({
+              type: "confirm-use-item",
+              ownerId: view.ownerId,
+              categoryId: view.categoryId,
+              itemId: view.itemId,
+            }),
+          )
+          .setLabel("Yes")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(encodeDiceShopButtonAction({ type: "view-home", ownerId: view.ownerId }))
+          .setLabel("No")
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    ];
+  }
+
   return [
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(encodeDiceShopButtonAction({ type: "view-home", ownerId: view.ownerId }))
-        .setLabel("Shop Home")
-        .setStyle(ButtonStyle.Secondary),
+        .setLabel("Buy Another")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(
+          encodeDiceShopButtonAction({
+            type: "prompt-use-item",
+            ownerId: view.ownerId,
+            categoryId: view.receipt.categoryId,
+            itemId: view.receipt.itemId,
+          }),
+        )
+        .setLabel("Use Item")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(!view.receipt.canUseItemNow),
       new ButtonBuilder()
         .setCustomId(encodeDiceShopButtonAction({ type: "close", ownerId: view.ownerId }))
         .setLabel("Close")

@@ -20,6 +20,22 @@ export const encodeDiceShopButtonAction = (
         action.ownerId,
         action.categoryId,
       );
+    case "prompt-use-item":
+      return encodeActionId(
+        diceShopButtonPrefix,
+        "prompt-use-item",
+        action.ownerId,
+        action.categoryId,
+        action.itemId,
+      );
+    case "confirm-use-item":
+      return encodeActionId(
+        diceShopButtonPrefix,
+        "confirm-use-item",
+        action.ownerId,
+        action.categoryId,
+        action.itemId,
+      );
     case "buy-selected-item":
       return encodeActionId(
         diceShopButtonPrefix,
@@ -71,6 +87,14 @@ export const parseDiceShopButtonAction = (
 
   if (action === "open-category" && isDiceShopCategoryId(categoryId)) {
     return { type: "open-category", ownerId, categoryId };
+  }
+
+  if (action === "prompt-use-item" && isDiceShopCategoryId(categoryId) && itemId) {
+    return { type: "prompt-use-item", ownerId, categoryId, itemId };
+  }
+
+  if (action === "confirm-use-item" && isDiceShopCategoryId(categoryId) && itemId) {
+    return { type: "confirm-use-item", ownerId, categoryId, itemId };
   }
 
   if (action === "buy-selected-item" && isDiceShopCategoryId(categoryId) && itemId) {

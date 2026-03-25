@@ -12,6 +12,10 @@ export const encodeDiceBansAction = (action: DiceBansAction): string => {
     return encodeActionId(diceBansButtonPrefix, "close", action.ownerId);
   }
 
+  if (action.type === "request-clear-bans") {
+    return encodeActionId(diceBansButtonPrefix, "request-clear-bans", action.ownerId);
+  }
+
   if (action.type === "clear-bans") {
     return encodeActionId(diceBansButtonPrefix, "clear-bans", action.ownerId);
   }
@@ -57,6 +61,10 @@ export const parseDiceBansAction = (customId: string): DiceBansAction | null => 
 
   if (action === "close") {
     return { type: "close", ownerId };
+  }
+
+  if (action === "request-clear-bans") {
+    return { type: "request-clear-bans", ownerId };
   }
 
   if (action === "clear-bans") {

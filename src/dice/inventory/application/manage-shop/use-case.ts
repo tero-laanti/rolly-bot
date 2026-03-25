@@ -1,6 +1,7 @@
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository, DiceShopCatalog } from "../ports";
+import type { AutoRollSessionReservation } from "../ports";
 import type { DiceShopItem } from "../../../inventory/domain/shop";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
@@ -10,6 +11,11 @@ import {
 } from "../../../progression/application/achievement-announcements";
 import { getDiceItemAchievementIds } from "../achievement-rules";
 import { isPassivePermanentItem } from "../../domain/passive-items";
+import type {
+  ReserveAutoRollSession,
+  TriggerRandomGroupEvent,
+  UseDiceItemResult,
+} from "../use-item/use-case";
 
 export type DiceShopCategoryId = "consumables" | "permanent-upgrades";
 export type DiceShopItemNavigationDirection = "previous" | "next";
@@ -48,6 +54,18 @@ export type DiceShopAction =
     }
   | {
       type: "select-item";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+      itemId: string;
+    }
+  | {
+      type: "prompt-use-item";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+      itemId: string;
+    }
+  | {
+      type: "confirm-use-item";
       ownerId: string;
       categoryId: DiceShopCategoryId;
       itemId: string;
@@ -101,10 +119,13 @@ export type DiceShopItemNavigation = {
 };
 
 export type DiceShopPurchaseReceipt = {
+  itemId: string;
+  categoryId: DiceShopCategoryId;
   itemName: string;
   ownedQuantity: number;
   remainingPips: number;
   changeSummary: string;
+  canUseItemNow: boolean;
 };
 
 type DiceShopViewBase = {
@@ -135,7 +156,23 @@ export type DiceShopViewModel =
   | (DiceShopViewBase & {
       screen: "purchase-receipt";
       receipt: DiceShopPurchaseReceipt;
+    })
+  | (DiceShopViewBase & {
+      screen: "use-item-confirmation";
+      categoryId: DiceShopCategoryId;
+      itemId: string;
+      itemName: string;
     });
+
+export type DiceShopActionOutcome = {
+  result: DiceShopResult;
+  autoRollStart?:
+    | {
+        reservation: AutoRollSessionReservation;
+        itemId: string;
+      }
+    | undefined;
+};
 
 export type DiceShopResult =
   | {
@@ -197,6 +234,12 @@ type ManageShopDependencies = {
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   shopCatalog: DiceShopCatalog;
   unitOfWork: UnitOfWork;
+  useDiceItem: (input: {
+    userId: string;
+    itemId: string;
+    reserveAutoRollSession: ReserveAutoRollSession;
+    triggerRandomGroupEvent: TriggerRandomGroupEvent;
+  }) => Promise<UseDiceItemResult>;
 };
 
 export const createDiceShopUseCase = ({
@@ -205,6 +248,7 @@ export const createDiceShopUseCase = ({
   progression,
   shopCatalog,
   unitOfWork,
+  useDiceItem,
 }: ManageShopDependencies) => {
   const createDiceShopReply = (userId: string): DiceShopResult => {
     return {
@@ -217,35 +261,48 @@ export const createDiceShopUseCase = ({
     };
   };
 
-  const handleDiceShopAction = (actorId: string, action: DiceShopAction): DiceShopResult => {
+  const handleDiceShopAction = async (
+    actorId: string,
+    action: DiceShopAction,
+    options: {
+      reserveAutoRollSession: ReserveAutoRollSession;
+      triggerRandomGroupEvent: TriggerRandomGroupEvent;
+    },
+  ): Promise<DiceShopActionOutcome> => {
     if (actorId !== action.ownerId) {
       return {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: "This shop menu is not assigned to you.",
-          ephemeral: true,
+        result: {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "This shop menu is not assigned to you.",
+            ephemeral: true,
+          },
         },
       };
     }
 
     if (action.type === "close") {
       return {
-        kind: "update",
-        payload: {
-          type: "message",
-          content: "Shop closed.",
-          clearComponents: true,
+        result: {
+          kind: "update",
+          payload: {
+            type: "message",
+            content: "Shop closed.",
+            clearComponents: true,
+          },
         },
       };
     }
 
     if (action.type === "view-home") {
       return {
-        kind: "update",
-        payload: {
-          type: "view",
-          view: buildLandingViewModel(economy, shopCatalog, action.ownerId),
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildLandingViewModel(economy, shopCatalog, action.ownerId),
+          },
         },
       };
     }
@@ -253,21 +310,25 @@ export const createDiceShopUseCase = ({
     const category = getDiceShopCategoryDefinition(action.categoryId);
     if (!category) {
       return {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: "That shop category does not exist.",
-          ephemeral: true,
+        result: {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "That shop category does not exist.",
+            ephemeral: true,
+          },
         },
       };
     }
 
     if (action.type === "open-category") {
       return {
-        kind: "update",
-        payload: {
-          type: "view",
-          view: buildCategoryViewModel(economy, inventory, shopCatalog, action.ownerId, category),
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildCategoryViewModel(economy, inventory, shopCatalog, action.ownerId, category),
+          },
         },
       };
     }
@@ -275,28 +336,63 @@ export const createDiceShopUseCase = ({
     const item = shopCatalog.getDiceShopItem(action.itemId);
     if (!item || getDiceShopCategoryId(item) !== category.id) {
       return {
-        kind: "reply",
-        payload: {
-          type: "message",
-          content: "That shop item does not exist.",
-          ephemeral: true,
+        result: {
+          kind: "reply",
+          payload: {
+            type: "message",
+            content: "That shop item does not exist.",
+            ephemeral: true,
+          },
+        },
+      };
+    }
+
+    if (action.type === "prompt-use-item") {
+      if (!item.consumable) {
+        return {
+          result: {
+            kind: "reply",
+            payload: {
+              type: "message",
+              content: `${item.name} cannot be consumed.`,
+              ephemeral: true,
+            },
+          },
+        };
+      }
+
+      return {
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildUseItemConfirmationViewModel(
+              economy,
+              shopCatalog,
+              action.ownerId,
+              category,
+              item,
+            ),
+          },
         },
       };
     }
 
     if (action.type === "select-item") {
       return {
-        kind: "update",
-        payload: {
-          type: "view",
-          view: buildItemDetailViewModel(
-            economy,
-            inventory,
-            shopCatalog,
-            action.ownerId,
-            category,
-            item.id,
-          ),
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildItemDetailViewModel(
+              economy,
+              inventory,
+              shopCatalog,
+              action.ownerId,
+              category,
+              item.id,
+            ),
+          },
         },
       };
     }
@@ -310,27 +406,86 @@ export const createDiceShopUseCase = ({
       );
       if (!adjacentItem) {
         return {
-          kind: "reply",
-          payload: {
-            type: "message",
-            content: "That shop item does not exist.",
-            ephemeral: true,
+          result: {
+            kind: "reply",
+            payload: {
+              type: "message",
+              content: "That shop item does not exist.",
+              ephemeral: true,
+            },
           },
         };
       }
 
       return {
-        kind: "update",
-        payload: {
-          type: "view",
-          view: buildItemDetailViewModel(
-            economy,
-            inventory,
-            shopCatalog,
-            action.ownerId,
-            category,
-            adjacentItem.id,
-          ),
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildItemDetailViewModel(
+              economy,
+              inventory,
+              shopCatalog,
+              action.ownerId,
+              category,
+              adjacentItem.id,
+            ),
+          },
+        },
+      };
+    }
+
+    if (action.type === "confirm-use-item") {
+      const useResult = await useDiceItem({
+        userId: action.ownerId,
+        itemId: item.id,
+        reserveAutoRollSession: options.reserveAutoRollSession,
+        triggerRandomGroupEvent: options.triggerRandomGroupEvent,
+      });
+      if (!useResult.ok) {
+        return {
+          result: {
+            kind: "reply",
+            payload: {
+              type: "message",
+              content: useResult.message,
+              ephemeral: true,
+            },
+          },
+        };
+      }
+
+      if (useResult.autoRollReservation) {
+        return {
+          result: {
+            kind: "update",
+            achievementAnnouncements: useResult.achievementAnnouncements,
+            payload: {
+              type: "message",
+              content: `${useResult.item.name} engaged.`,
+              clearComponents: true,
+            },
+          },
+          autoRollStart: {
+            reservation: useResult.autoRollReservation,
+            itemId: useResult.item.id,
+          },
+        };
+      }
+
+      return {
+        result: {
+          kind: "update",
+          achievementAnnouncements: useResult.achievementAnnouncements,
+          payload: {
+            type: "view",
+            view: buildLandingViewModel(
+              economy,
+              shopCatalog,
+              action.ownerId,
+              useResult.statusMessage,
+            ),
+          },
         },
       };
     }
@@ -379,32 +534,36 @@ export const createDiceShopUseCase = ({
 
     if (!purchase.ok) {
       return {
-        kind: "update",
-        payload: {
-          type: "view",
-          view: buildItemDetailViewModel(
-            economy,
-            inventory,
-            shopCatalog,
-            action.ownerId,
-            category,
-            item.id,
-            purchase.reason === "already-owned"
-              ? buildAlreadyOwnedMessage(purchase.item)
-              : buildInsufficientPipsMessage(purchase.item, purchase.currentPips),
-          ),
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildItemDetailViewModel(
+              economy,
+              inventory,
+              shopCatalog,
+              action.ownerId,
+              category,
+              item.id,
+              purchase.reason === "already-owned"
+                ? buildAlreadyOwnedMessage(purchase.item)
+                : buildInsufficientPipsMessage(purchase.item, purchase.currentPips),
+            ),
+          },
         },
       };
     }
 
     return {
-      kind: "update",
-      achievementAnnouncements: [
-        createAchievementAnnouncement(action.ownerId, purchase.newlyEarned),
-      ].flatMap((announcement) => (announcement ? [announcement] : [])),
-      payload: {
-        type: "view",
-        view: buildPurchaseReceiptViewModel(shopCatalog, action.ownerId, purchase),
+      result: {
+        kind: "update",
+        achievementAnnouncements: [
+          createAchievementAnnouncement(action.ownerId, purchase.newlyEarned),
+        ].flatMap((announcement) => (announcement ? [announcement] : [])),
+        payload: {
+          type: "view",
+          view: buildPurchaseReceiptViewModel(shopCatalog, action.ownerId, purchase),
+        },
       },
     };
   };
@@ -516,11 +675,32 @@ const buildPurchaseReceiptViewModel = (
     balancePips: purchase.remainingPips,
     categorySummaries: buildCategorySummaries(shopCatalog),
     receipt: {
+      itemId: purchase.item.id,
+      categoryId: getDiceShopCategoryId(purchase.item),
       itemName: purchase.item.name,
       ownedQuantity: purchase.quantity,
       remainingPips: purchase.remainingPips,
       changeSummary: buildPurchaseChangeSummary(purchase.item),
+      canUseItemNow: purchase.item.consumable,
     },
+  };
+};
+
+const buildUseItemConfirmationViewModel = (
+  economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
+  shopCatalog: DiceShopCatalog,
+  userId: string,
+  category: DiceShopCategoryDefinition,
+  item: DiceShopItem,
+): DiceShopViewModel => {
+  return {
+    screen: "use-item-confirmation",
+    ownerId: userId,
+    balancePips: economy.getEconomySnapshot(userId).pips,
+    categorySummaries: buildCategorySummaries(shopCatalog),
+    categoryId: category.id,
+    itemId: item.id,
+    itemName: item.name,
   };
 };
 
