@@ -21,20 +21,20 @@ test("raid boss hp scales by 3 percent per boss level", () => {
   assert.equal(calculateRaidBossMaxHp(50), 511);
 });
 
-test("raid prestige strength uses the estimated prestige table", () => {
+test("raid prestige strength uses the configured prestige multiplier", () => {
   assert.equal(calculateRaidParticipantStrength(0), 1);
   assert.equal(calculateRaidParticipantStrength(1), 1.5);
-  assert.equal(calculateRaidParticipantStrength(2), 2);
-  assert.equal(calculateRaidParticipantStrength(3), 2.5);
-  assert.equal(calculateRaidParticipantStrength(4), 4);
-  assert.equal(calculateRaidParticipantStrength(5), 20);
-  assert.equal(calculateRaidParticipantStrength(99), 20);
+  assert.equal(calculateRaidParticipantStrength(2), 2.25);
+  assert.equal(calculateRaidParticipantStrength(3), 3.375);
+  assert.equal(calculateRaidParticipantStrength(4), 5.0625);
+  assert.equal(calculateRaidParticipantStrength(5), 7.59375);
+  assert.equal(calculateRaidParticipantStrength(8), 25.62890625);
 });
 
 test("raid boss hp scales by summed raider strength without a cap", () => {
   assert.equal(calculateRaidBossMaxHpForStrength(6, 1), 139);
   assert.equal(calculateRaidBossMaxHpForStrength(6, 2), 278);
-  assert.equal(calculateRaidBossMaxHpForStrength(1, 20), 2_400);
+  assert.equal(calculateRaidBossMaxHpForStrength(1, 7.59375), 911);
   assert.equal(
     calculateRaidBossMaxHpForStrength(
       1,
@@ -63,5 +63,5 @@ test("raid boss level roll is low-heavy and capped at level 50", () => {
   assert.equal(levelOneBoss.maxHp, 120);
   assert.equal(levelFiftyBoss.level, 50);
   assert.equal(levelFiftyBoss.maxHp, 511);
-  assert.equal(scaledBoss.maxHp, 540);
+  assert.equal(scaledBoss.maxHp, 570);
 });

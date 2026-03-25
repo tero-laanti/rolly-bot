@@ -138,6 +138,10 @@ export type DiceRaidBossBalanceData = {
   maxBossLevel: number;
 };
 
+export type DiceRaidParticipantStrengthData = {
+  prestigeMultiplier: number;
+};
+
 export type DiceBalanceData = {
   prestigeSides: number[];
   lowerPrestigeBaseLevel: number;
@@ -155,6 +159,7 @@ export type DiceRaidData = {
   reward: DiceRaidRewardData;
   bossNames: DiceRaidBossNamesData;
   bossBalance: DiceRaidBossBalanceData;
+  participantStrength: DiceRaidParticipantStrengthData;
 };
 
 export type DiceCasinoPayoutRatio = {

@@ -16,6 +16,7 @@ import type {
   DiceRaidBossBalanceData,
   DiceRaidBossNamesData,
   DiceRaidData,
+  DiceRaidParticipantStrengthData,
   DiceRaidPipRewardFormulaData,
   DiceRaidPipRewardTierData,
   DiceRaidRewardData,
@@ -930,6 +931,21 @@ const readRaidBossBalanceConfig = (value: unknown, label: string): DiceRaidBossB
   };
 };
 
+const readRaidParticipantStrengthConfig = (
+  value: unknown,
+  label: string,
+): DiceRaidParticipantStrengthData => {
+  const record = assertRecord(value, label);
+
+  return {
+    prestigeMultiplier: readFiniteNumberAtLeast(
+      record.prestigeMultiplier,
+      `${label}.prestigeMultiplier`,
+      1,
+    ),
+  };
+};
+
 export const parseDiceBalance = (value: unknown): DiceBalanceData => {
   const record = assertRecord(value, "diceBalance");
   const charge = assertRecord(record.charge, "diceBalance.charge");
@@ -1005,6 +1021,10 @@ export const parseDiceRaidsData = (value: unknown): DiceRaidData => {
     reward: readRaidRewardConfig(record.reward, "raids.reward"),
     bossNames: readRaidBossNamesConfig(record.bossNames, "raids.bossNames"),
     bossBalance: readRaidBossBalanceConfig(record.bossBalance, "raids.bossBalance"),
+    participantStrength: readRaidParticipantStrengthConfig(
+      record.participantStrength,
+      "raids.participantStrength",
+    ),
   };
 };
 

@@ -45,35 +45,7 @@ npm run deploy:commands
 npm run dev
 ```
 
-If you have a private `rolly-data` checkout, place it in `./rolly-data` or point `ROLLY_DATA_DIR` at it. Otherwise Rolly falls back to the public examples in [example-data/rolly-data/](example-data/rolly-data/).
-
-For the fuller local workflow, validation commands, and deployment notes, use [docs/development.md](docs/development.md).
-
-## Configuration
-
-Rolly reads runtime configuration from `.env`.
-
-- Required: `DISCORD_TOKEN`, `DISCORD_OWNER_ID`
-- Needed for command deployment: `DISCORD_CLIENT_ID`
-- Useful for local iteration: `DISCORD_GUILD_ID`
-- Gameplay data: `ROLLY_DATA_DIR`
-- Intro posts: `INTRO_POST_CHANNEL_ID`
-- Achievement posts: `ACHIEVEMENTS_CHANNEL_ID`
-- Random events: `RANDOM_EVENTS_CHANNEL_ID`, `RANDOM_EVENTS_TARGET_PER_DAY`, `RANDOM_EVENTS_MIN_GAP_MINUTES`, `RANDOM_EVENTS_MAX_ACTIVE`, `RANDOM_EVENTS_RETRY_DELAY_SECONDS`, `RANDOM_EVENTS_JITTER_RATIO`, `RANDOM_EVENTS_QUIET_HOURS_START`, `RANDOM_EVENTS_QUIET_HOURS_END`, `RANDOM_EVENTS_QUIET_HOURS_TIMEZONE`
-- Raids: `RAIDS_CHANNEL_ID`, `RAIDS_JOIN_LEAD_MINUTES`, `RAIDS_ACTIVE_DURATION_MINUTES`, `RAIDS_TARGET_PER_DAY`, `RAIDS_MIN_GAP_MINUTES`, `RAIDS_RETRY_DELAY_SECONDS`, `RAIDS_JITTER_RATIO`, `RAIDS_QUIET_HOURS_START`, `RAIDS_QUIET_HOURS_END`, `RAIDS_QUIET_HOURS_TIMEZONE`
-
-Use [`.env.example`](.env.example) for the exact variable list and [docs/development.md](docs/development.md) for defaults, units, and setup notes.
-
-## Data and Storage
-
-- Runtime state is stored in `./data/rolly-bot.sqlite`.
-- Gameplay data is loaded from `ROLLY_DATA_DIR`, then `./rolly-data`, then [example-data/rolly-data/](example-data/rolly-data/).
-- The public files under [example-data/rolly-data/](example-data/rolly-data/) are safe examples only. They document the contract and let the bot boot locally, but they are not intended to mirror private balance or spoiler-heavy content.
-- Raid boss balance in `raids.json` uses a weighted random boss level roll, per-level HP scaling, and joined-raider strength scaling locked at raid start; see [example-data/rolly-data/raids.md](example-data/rolly-data/raids.md) for the current contract.
-- Managed intro posts stay inactive until `INTRO_POST_CHANNEL_ID` is set.
-- Achievement posts stay inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.
-- Random events and raids are both inactive until their channel IDs are configured.
-- If `./rolly-data` or `ROLLY_DATA_DIR` points at a git checkout, `/self-update` refreshes that repo before rebuilding and redeploying commands.
+If you have a private `rolly-data` checkout, place it in `./rolly-data` or point `ROLLY_DATA_DIR` at it. Otherwise Rolly falls back to the public examples in [example-data/rolly-data/](example-data/rolly-data/). See [docs/development.md](docs/development.md) for more information.
 
 ## Further Reading
 

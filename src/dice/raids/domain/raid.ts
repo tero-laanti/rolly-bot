@@ -19,24 +19,7 @@ const getRaidBalance = () => {
 
 export const calculateRaidParticipantStrength = (prestige: number): number => {
   const normalizedPrestige = Math.max(0, Math.floor(prestige));
-
-  if (normalizedPrestige <= 0) {
-    return 1;
-  }
-  if (normalizedPrestige === 1) {
-    return 1.5;
-  }
-  if (normalizedPrestige === 2) {
-    return 2;
-  }
-  if (normalizedPrestige === 3) {
-    return 2.5;
-  }
-  if (normalizedPrestige === 4) {
-    return 4;
-  }
-
-  return 20;
+  return getRaidBalance().participantStrength.prestigeMultiplier ** normalizedPrestige;
 };
 
 const clampBossLevel = (value: number): number => {

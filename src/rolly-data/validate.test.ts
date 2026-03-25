@@ -177,6 +177,9 @@ test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
       levelHalfLifeLevels: 10,
       maxBossLevel: 50,
     },
+    participantStrength: {
+      prestigeMultiplier: 1.5,
+    },
   });
 
   assert.ok("pipsByBossLevel" in raids.reward);
@@ -184,6 +187,7 @@ test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
     { bossLevelAtLeast: 1, pips: 4 },
     { bossLevelAtLeast: 5, pips: 6 },
   ]);
+  assert.equal(raids.participantStrength.prestigeMultiplier, 1.5);
 });
 
 test("parseDiceItems rejects passive effects on consumable items", () => {

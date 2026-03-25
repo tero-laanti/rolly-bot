@@ -22,5 +22,8 @@
     "hpIncreasePerBossLevelPercent": 3,
     "levelHalfLifeLevels": 10,
     "maxBossLevel": 50
+  },
+  "participantStrength": {
+    "prestigeMultiplier": 1.5
   }
 }
