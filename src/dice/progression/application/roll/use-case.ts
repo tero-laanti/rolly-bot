@@ -106,6 +106,11 @@ type RunRollDiceDependencies = {
 const spamWindowMs = 2_000;
 const diceSpamTracker = new Map<string, number>();
 
+const formatDailyFirstRollBanner = (pipReward: number): string => {
+  const pipLabel = pipReward === 1 ? "Pip" : "Pips";
+  return `**Daily first roll bonus!** +${pipReward} ${pipLabel}.`;
+};
+
 export const createRunRollDiceUseCase = ({
   analytics,
   economy,
@@ -258,7 +263,14 @@ export const createRunRollDiceUseCase = ({
       }
       progression.setLastDiceRollAt(nowMs);
 
-      return { newlyEarned, fameReward, pipReward, levelAfter, fameAfter };
+      return {
+        newlyEarned,
+        fameReward,
+        pipReward,
+        levelAfter,
+        fameAfter,
+        dailyFirstRollAwarded: dailyPipGrant.awarded,
+      };
     });
 
     const chargeFactorText = formatMultiplierFactor(resolvedRollPassState.effectiveFactor);
@@ -267,6 +279,10 @@ export const createRunRollDiceUseCase = ({
       pipReward: result.pipReward,
       hasLevelUp,
     });
+    const dailyFirstRollBanner =
+      source === "manual" && result.dailyFirstRollAwarded && firstDailyRollPipReward > 0
+        ? formatDailyFirstRollBanner(firstDailyRollPipReward)
+        : "";
     const multiplierFooter = buildRollModifierFooter(resolvedRollPassState);
     const unlockedBansAfter = getUnlockedBanSlotsFromFame(
       result.fameAfter,
@@ -299,6 +315,7 @@ export const createRunRollDiceUseCase = ({
         : "";
 
     const baseContent = buildDiceRollReplyContent({
+      dailyFirstRollBanner,
       multiplierFooter,
       unlockedFooter,
       doubleRollFooter,

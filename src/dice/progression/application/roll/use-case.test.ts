@@ -140,6 +140,7 @@ test("first roll of the UTC day awards daily pips", () => {
     nowMs: 1_710_000_000_000,
   });
 
+  assert.match(result.content, /\*\*Daily first roll bonus!\*\*/);
   assert.match(result.content, new RegExp(`${firstDailyRollPipReward} Pips`));
 });
 
@@ -275,6 +276,7 @@ test("auto rolls do not grant the daily pip reward", () => {
   });
 
   assert.equal(dailyGrantCalled, false);
+  assert.doesNotMatch(result.content, /Daily first roll bonus!/);
   assert.doesNotMatch(result.content, /5 Pips/);
 });
 

@@ -16,6 +16,7 @@ type HighlightedRollSet = {
 };
 
 type BuildDiceRollReplyContentInput = {
+  dailyFirstRollBanner: string;
   multiplierFooter: string;
   unlockedFooter: string;
   doubleRollFooter: string;
@@ -53,6 +54,7 @@ export const formatRewardText = ({
 };
 
 export const buildDiceRollReplyContent = ({
+  dailyFirstRollBanner,
   multiplierFooter,
   unlockedFooter,
   doubleRollFooter,
@@ -80,7 +82,13 @@ export const buildDiceRollReplyContent = ({
     newlyUnlockedAchievementIdsByRollSet,
   });
 
-  const fixedContentParts = [multiplierFooter, unlockedFooter, doubleRollFooter, prestigeFooter];
+  const fixedContentParts = [
+    dailyFirstRollBanner,
+    multiplierFooter,
+    unlockedFooter,
+    doubleRollFooter,
+    prestigeFooter,
+  ];
   const initialRollSetOutputMode: RollSetOutputMode =
     rollPassCount > compactRollSetThreshold ? "compact" : "detailed";
 
@@ -97,6 +105,7 @@ export const buildDiceRollReplyContent = ({
   });
 
   let content = buildDiceReplyContent({
+    dailyFirstRollBanner,
     resultLines,
     multiplierFooter,
     unlockedFooter,
@@ -117,6 +126,7 @@ export const buildDiceRollReplyContent = ({
       rollSetOutputMode: "compact",
     });
     content = buildDiceReplyContent({
+      dailyFirstRollBanner,
       resultLines,
       multiplierFooter,
       unlockedFooter,
@@ -143,6 +153,7 @@ export const buildDiceRollReplyContent = ({
       maxResultLength,
     });
     content = buildDiceReplyContent({
+      dailyFirstRollBanner,
       resultLines,
       multiplierFooter,
       unlockedFooter,
@@ -505,6 +516,7 @@ const appendSuffixWithinLimit = (
 
 type BuildReplyContentInput = {
   resultLines: string[];
+  dailyFirstRollBanner: string;
   multiplierFooter: string;
   unlockedFooter: string;
   doubleRollFooter: string;
@@ -513,12 +525,14 @@ type BuildReplyContentInput = {
 
 const buildDiceReplyContent = ({
   resultLines,
+  dailyFirstRollBanner,
   multiplierFooter,
   unlockedFooter,
   doubleRollFooter,
   prestigeFooter,
 }: BuildReplyContentInput): string => {
   return [
+    dailyFirstRollBanner,
     resultLines.join("\n"),
     multiplierFooter,
     unlockedFooter,
