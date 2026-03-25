@@ -19,9 +19,9 @@ test("formatDice renders emoji dice sequences", () => {
 test("formatBlackjackDice renders ace values and hidden hole cards", () => {
   assert.equal(
     formatBlackjackDice([1, 9, 1], false),
-    "[11] <:d9:1486276864791285850> <:d1:1486276117118845019>",
+    "<:d11:1486277124665901106> <:d9:1486276864791285850> <:d1:1486276117118845019>",
   );
-  assert.equal(formatBlackjackDice([1, 6], true), "[11] [?]");
+  assert.equal(formatBlackjackDice([1, 6], true), "<:d11:1486277124665901106> [?]");
   assert.equal(
     formatBlackjackDice([1, 10, 10], false),
     "<:d1:1486276117118845019> <:d10:1486276997129965629> <:d10:1486276997129965629>",

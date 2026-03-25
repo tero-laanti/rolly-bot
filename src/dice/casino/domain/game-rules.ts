@@ -569,7 +569,7 @@ export const formatBlackjackDice = (dice: number[], hideHoleCard: boolean): stri
       }
 
       if (displayValue.asEleven) {
-        return "[11]";
+        return formatDieFace(11);
       }
 
       return formatDieFace(displayValue.value);
