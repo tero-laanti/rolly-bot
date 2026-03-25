@@ -33,11 +33,11 @@ type BuildDiceRollReplyContentInput = {
 export const formatRewardText = ({
   fameReward,
   pipReward,
-  hasLevelUp,
+  hasDiceCountIncrease,
 }: {
   fameReward: number;
   pipReward: number;
-  hasLevelUp: boolean;
+  hasDiceCountIncrease: boolean;
 }): string => {
   const rewardParts: string[] = [];
   if (fameReward > 0) {
@@ -46,7 +46,7 @@ export const formatRewardText = ({
   if (pipReward > 0) {
     rewardParts.push(`${pipReward} Pip${pipReward === 1 ? "" : "s"}`);
   }
-  if (hasLevelUp) {
+  if (hasDiceCountIncrease) {
     rewardParts.push("a new die");
   }
 

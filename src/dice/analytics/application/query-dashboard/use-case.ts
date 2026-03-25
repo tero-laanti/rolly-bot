@@ -11,7 +11,7 @@ type QueryDiceAnalyticsDependencies = {
   analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics">;
   progression: Pick<
     DiceProgressionRepository,
-    "getActiveDicePrestige" | "getDiceLevel" | "getDicePrestige"
+    "getActiveDicePrestige" | "getDiceCount" | "getDicePrestige"
   >;
 };
 
@@ -31,16 +31,16 @@ export const createQueryDiceAnalyticsUseCase = ({
     nowMs = Date.now(),
   }: QueryDiceAnalyticsInput): DiceAnalyticsView => {
     const analyticsView = analytics.getDiceAnalytics(userId);
-    const level = progression.getDiceLevel(userId);
+    const diceCount = progression.getDiceCount(userId);
     const highestPrestige = progression.getDicePrestige(userId);
     const activePrestige = progression.getActiveDicePrestige(userId);
 
     const lines = [
       `Dice analytics for ${userMention}:`,
-      `Current level: ${level}.`,
-      `Time on current level: ${formatElapsed(analyticsView.levelStartedAt, nowMs)}.`,
-      `Roll sets on current level: ${analyticsView.rollsCurrentLevel}.`,
-      `One-off level-up roll sets on current level: ${analyticsView.nearLevelupRollsCurrentLevel}.`,
+      `Current dice: ${diceCount}.`,
+      `Time at current dice count: ${formatElapsed(analyticsView.diceCountStartedAt, nowMs)}.`,
+      `Roll sets at current dice count: ${analyticsView.rollSetsCurrentDiceCount}.`,
+      `One-off roll sets at current dice count: ${analyticsView.nearDiceCountIncreaseRollSetsCurrentDiceCount}.`,
       `Active prestige: ${activePrestige}.`,
       `Highest prestige: ${highestPrestige}.`,
       `Time on current prestige: ${formatElapsed(analyticsView.prestigeStartedAt, nowMs)}.`,

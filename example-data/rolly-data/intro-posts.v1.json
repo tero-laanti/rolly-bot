@@ -1,7 +1,7 @@
 {
   "messages": [
     {
-      "content": "# Welcome to Rolly\nUse `/roll` to roll, level up, and grow your dice."
+      "content": "# Welcome to Rolly\nUse `/roll` to roll your dice. Match all your rolls to gain another die, then use `/prestige` to unlock higher die tiers."
     },
     {
       "content": "Check `/shop`, `/inventory`, `/pvp`, and `/casino` for the side systems that feed back into the main loop."

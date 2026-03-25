@@ -7,13 +7,14 @@ Prestige progression:
 ```json
 {
   "prestigeSides": [6, 8, 12, 20],
-  "lowerPrestigeBaseLevel": 5
+  "lowerPrestigeBaseDiceCount": 5
 }
 ```
 
 - `prestigeSides[0]` is prestige `0`, `prestigeSides[1]` is prestige `1`, and so on.
 - Max prestige is `prestigeSides.length - 1`.
-- `lowerPrestigeBaseLevel` is used when a player switches down to a previously unlocked lower prestige. Those lower prestiges start at this base level instead of level `1`.
+- Within a prestige, dice count is the player's current number of dice. Dice count `1` means rolling `1` die, dice count `2` means rolling `2` dice, and so on.
+- `lowerPrestigeBaseDiceCount` is used when a player switches down to a previously unlocked lower prestige. Those lower prestiges start at this base dice count instead of `1`.
 
 Fame and bans:
 
@@ -25,17 +26,17 @@ Fame and bans:
 
 - Ban slots are calculated as `floor(fame / banStep)`.
 - Higher fame unlocks more ban slots.
-- Level and die size are not part of the unlock formula.
+- Dice count and die size are not part of the unlock formula.
 
-Level-up and roll-pass tuning:
+Dice-count and roll-pass tuning:
 
-- `levelUpReward`: Fame granted on level-up.
+- `diceCountIncreaseReward`: Fame granted when the player gains another die.
 - `firstDailyRollPipReward`: Pips granted by the first manual `/roll` of the UTC day.
 - `maxRollPassCount`: hard cap for total roll passes after charge or other roll-pass modifiers are applied.
 
 ```json
 {
-  "levelUpReward": 1,
+  "diceCountIncreaseReward": 1,
   "firstDailyRollPipReward": 5,
   "maxRollPassCount": 500
 }

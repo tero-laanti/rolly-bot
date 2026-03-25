@@ -144,9 +144,9 @@ export type DiceRaidParticipantStrengthData = {
 
 export type DiceBalanceData = {
   prestigeSides: number[];
-  lowerPrestigeBaseLevel: number;
+  lowerPrestigeBaseDiceCount: number;
   banStep: number;
-  levelUpReward: number;
+  diceCountIncreaseReward: number;
   firstDailyRollPipReward: number;
   maxRollPassCount: number;
   charge: {

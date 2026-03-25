@@ -1,13 +1,13 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type {
-  DiceLevelByPrestigeUpdate,
+  DiceCountByPrestigeUpdate,
+  DiceCountUpdate,
   DicePrestigeLeaderboardEntry,
-  DiceLevelUpdate,
   DicePrestigeUpdate,
   DiceProgressionRepository,
 } from "../../application/ports";
 import {
-  getDicePrestigeBaseLevel,
+  getDicePrestigeBaseDiceCount,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
 } from "../../domain/game-rules";
@@ -16,18 +16,18 @@ const normalizePrestige = (prestige: number): number => {
   return Math.min(getMaxDicePrestige(), Math.max(0, Math.floor(prestige)));
 };
 
-const normalizeLevel = (level: number): number => {
-  return Math.max(1, Math.floor(level));
+const normalizeDiceCount = (diceCount: number): number => {
+  return Math.max(1, Math.floor(diceCount));
 };
 
 export const createSqliteProgressionStateRepository = (
   db: SqliteDatabase,
 ): Pick<
   DiceProgressionRepository,
-  | "getDiceLevel"
-  | "getDiceLevelForPrestige"
-  | "setDiceLevel"
-  | "setDiceLevelForPrestige"
+  | "getDiceCount"
+  | "getDiceCountForPrestige"
+  | "setDiceCount"
+  | "setDiceCountForPrestige"
   | "getDicePrestige"
   | "getTopPrestigeEntries"
   | "setDicePrestige"
@@ -73,22 +73,22 @@ export const createSqliteProgressionStateRepository = (
         WITH tracked_users AS (
           SELECT user_id FROM dice_prestige
           UNION
-          SELECT user_id FROM dice_levels_by_prestige
+          SELECT user_id FROM dice_counts_by_prestige
         )
         SELECT
           tracked_users.user_id AS userId,
           COALESCE(dice_prestige.prestige, 0) AS prestige,
-          COALESCE(highest_level.level, 1) AS level
+          COALESCE(highest_dice_count.dice_count, 1) AS diceCount
         FROM tracked_users
         LEFT JOIN dice_prestige
           ON dice_prestige.user_id = tracked_users.user_id
-        LEFT JOIN dice_levels_by_prestige AS highest_level
-          ON highest_level.user_id = tracked_users.user_id
-         AND highest_level.prestige = COALESCE(dice_prestige.prestige, 0)
+        LEFT JOIN dice_counts_by_prestige AS highest_dice_count
+          ON highest_dice_count.user_id = tracked_users.user_id
+         AND highest_dice_count.prestige = COALESCE(dice_prestige.prestige, 0)
         ORDER BY
           COALESCE(dice_prestige.prestige, 0) DESC,
-          COALESCE(highest_level.level, 1) DESC,
-          COALESCE(highest_level.updated_at, dice_prestige.updated_at) ASC,
+          COALESCE(highest_dice_count.dice_count, 1) DESC,
+          COALESCE(highest_dice_count.updated_at, dice_prestige.updated_at) ASC,
           tracked_users.user_id ASC
         LIMIT ?
       `,
@@ -132,67 +132,71 @@ export const createSqliteProgressionStateRepository = (
     return normalizedActive;
   };
 
-  const setDiceLevelForPrestige = ({
+  const setDiceCountForPrestige = ({
     userId,
     prestige,
-    level,
-  }: DiceLevelByPrestigeUpdate): void => {
+    diceCount,
+  }: DiceCountByPrestigeUpdate): void => {
     const updatedAt = new Date().toISOString();
 
     db.prepare(
       `
-      INSERT INTO dice_levels_by_prestige (user_id, prestige, level, updated_at)
-      VALUES (@userId, @prestige, @level, @updatedAt)
+      INSERT INTO dice_counts_by_prestige (user_id, prestige, dice_count, updated_at)
+      VALUES (@userId, @prestige, @diceCount, @updatedAt)
       ON CONFLICT(user_id, prestige)
-      DO UPDATE SET level = excluded.level, updated_at = excluded.updated_at
+      DO UPDATE SET dice_count = excluded.dice_count, updated_at = excluded.updated_at
     `,
     ).run({
       userId,
       prestige: normalizePrestige(prestige),
-      level: normalizeLevel(level),
+      diceCount: normalizeDiceCount(diceCount),
       updatedAt,
     });
   };
 
-  const getDiceLevelForPrestige = (userId: string, prestige: number): number => {
+  const getDiceCountForPrestige = (userId: string, prestige: number): number => {
     const normalizedPrestige = normalizePrestige(prestige);
     const highestPrestige = getDicePrestige(userId);
     const row = db
-      .prepare("SELECT level FROM dice_levels_by_prestige WHERE user_id = ? AND prestige = ?")
-      .get(userId, normalizedPrestige) as { level: number } | undefined;
+      .prepare("SELECT dice_count FROM dice_counts_by_prestige WHERE user_id = ? AND prestige = ?")
+      .get(userId, normalizedPrestige) as { dice_count: number } | undefined;
 
     if (row) {
-      const normalizedValue = normalizeLevel(row.level);
-      if (normalizedPrestige < highestPrestige && normalizedValue < getDicePrestigeBaseLevel()) {
-        setDiceLevelForPrestige({
+      const normalizedValue = normalizeDiceCount(row.dice_count);
+      if (
+        normalizedPrestige < highestPrestige &&
+        normalizedValue < getDicePrestigeBaseDiceCount()
+      ) {
+        setDiceCountForPrestige({
           userId,
           prestige: normalizedPrestige,
-          level: getDicePrestigeBaseLevel(),
+          diceCount: getDicePrestigeBaseDiceCount(),
         });
-        return getDicePrestigeBaseLevel();
+        return getDicePrestigeBaseDiceCount();
       }
 
       return normalizedValue;
     }
 
-    const initialLevel = normalizedPrestige === highestPrestige ? 1 : getDicePrestigeBaseLevel();
-    setDiceLevelForPrestige({
+    const initialDiceCount =
+      normalizedPrestige === highestPrestige ? 1 : getDicePrestigeBaseDiceCount();
+    setDiceCountForPrestige({
       userId,
       prestige: normalizedPrestige,
-      level: initialLevel,
+      diceCount: initialDiceCount,
     });
-    return initialLevel;
+    return initialDiceCount;
   };
 
-  const getDiceLevel = (userId: string): number => {
-    return getDiceLevelForPrestige(userId, getActiveDicePrestige(userId));
+  const getDiceCount = (userId: string): number => {
+    return getDiceCountForPrestige(userId, getActiveDicePrestige(userId));
   };
 
-  const setDiceLevel = ({ userId, level }: DiceLevelUpdate): void => {
-    setDiceLevelForPrestige({
+  const setDiceCount = ({ userId, diceCount }: DiceCountUpdate): void => {
+    setDiceCountForPrestige({
       userId,
       prestige: getActiveDicePrestige(userId),
-      level,
+      diceCount,
     });
   };
 
@@ -205,10 +209,10 @@ export const createSqliteProgressionStateRepository = (
   };
 
   return {
-    getDiceLevel,
-    getDiceLevelForPrestige,
-    setDiceLevel,
-    setDiceLevelForPrestige,
+    getDiceCount,
+    getDiceCountForPrestige,
+    setDiceCount,
+    setDiceCountForPrestige,
     getDicePrestige,
     getTopPrestigeEntries,
     setDicePrestige,

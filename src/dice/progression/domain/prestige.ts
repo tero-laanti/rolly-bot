@@ -1,18 +1,18 @@
 import {
-  getDicePrestigeBaseLevel,
+  getDicePrestigeBaseDiceCount,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
 } from "./game-rules";
 
-export type DiceLevelUpdate = {
+export type DiceCountUpdate = {
   userId: string;
-  level: number;
+  diceCount: number;
 };
 
-export type DiceLevelByPrestigeUpdate = {
+export type DiceCountByPrestigeUpdate = {
   userId: string;
   prestige: number;
-  level: number;
+  diceCount: number;
 };
 
 export type DicePrestigeUpdate = {
@@ -33,19 +33,24 @@ export const normalizeActiveDicePrestige = (prestige: number, highestPrestige: n
   return Math.min(normalizeDicePrestige(highestPrestige), normalizeDicePrestige(prestige));
 };
 
-export const normalizeDiceLevel = (level: number): number => {
-  return Math.max(1, Math.floor(level));
+export const normalizeDiceCount = (diceCount: number): number => {
+  return Math.max(1, Math.floor(diceCount));
 };
 
-export const shouldUsePrestigeBaseLevel = (prestige: number, highestPrestige: number): boolean => {
+export const shouldUsePrestigeBaseDiceCount = (
+  prestige: number,
+  highestPrestige: number,
+): boolean => {
   return normalizeDicePrestige(prestige) < normalizeDicePrestige(highestPrestige);
 };
 
-export const getInitialDiceLevelForPrestige = (
+export const getInitialDiceCountForPrestige = (
   prestige: number,
   highestPrestige: number,
 ): number => {
-  return shouldUsePrestigeBaseLevel(prestige, highestPrestige) ? getDicePrestigeBaseLevel() : 1;
+  return shouldUsePrestigeBaseDiceCount(prestige, highestPrestige)
+    ? getDicePrestigeBaseDiceCount()
+    : 1;
 };
 
 export const getDiceSidesForActivePrestige = (prestige: number): number => {

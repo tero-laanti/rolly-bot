@@ -32,7 +32,7 @@ const handleDicePrestigeButton = async (interaction: ButtonInteraction): Promise
 
 export const data = new SlashCommandBuilder()
   .setName("prestige")
-  .setDescription("Manage your prestige progression and active prestige level.");
+  .setDescription("Manage your prestige progression and active prestige.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const prestigeUseCase = createSqliteDicePrestigeUseCase(getDatabase());

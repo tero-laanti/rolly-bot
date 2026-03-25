@@ -87,10 +87,10 @@ test("resolved duels return announcement metadata for both players", async () =>
 
     const getAnalytics = (userId: string): DiceAnalytics =>
       analytics.get(userId) ?? {
-        levelStartedAt: new Date(0).toISOString(),
+        diceCountStartedAt: new Date(0).toISOString(),
         prestigeStartedAt: new Date(0).toISOString(),
-        rollsCurrentLevel: 0,
-        nearLevelupRollsCurrentLevel: 0,
+        rollSetsCurrentDiceCount: 0,
+        nearDiceCountIncreaseRollSetsCurrentDiceCount: 0,
         diceRolledCurrentPrestige: 0,
         totalDiceRolled: 0,
         pvpWins: 0,

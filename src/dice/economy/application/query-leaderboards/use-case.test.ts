@@ -88,8 +88,8 @@ test("leaderboards switch to prestige ordering when the prestige toggle is press
     },
     progression: {
       getTopPrestigeEntries: () => [
-        { userId: "user-9", prestige: 4, level: 2 },
-        { userId: "user-3", prestige: 3, level: 6 },
+        { userId: "user-9", prestige: 4, diceCount: 2 },
+        { userId: "user-3", prestige: 3, diceCount: 6 },
       ],
     },
   });
@@ -106,12 +106,12 @@ test("leaderboards switch to prestige ordering when the prestige toggle is press
     {
       rank: 1,
       userId: "user-9",
-      summary: "Prestige 4 | Level 2",
+      summary: "Prestige 4 | Dice: 2",
     },
     {
       rank: 2,
       userId: "user-3",
-      summary: "Prestige 3 | Level 6",
+      summary: "Prestige 3 | Dice: 6",
     },
   ]);
   assert.equal(result.payload.view.components[0]?.[0]?.disabled, false);

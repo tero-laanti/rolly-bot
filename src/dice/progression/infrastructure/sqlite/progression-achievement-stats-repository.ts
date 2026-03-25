@@ -8,10 +8,10 @@ import type {
 type DiceProgressionAchievementStatsRow = {
   user_id: string;
   roll_commands_total: number;
-  near_levelup_rolls_total: number;
+  near_dice_count_increase_rolls_total: number;
   highest_charge_multiplier: number;
   highest_roll_pass_count: number;
-  level_ups_total: number;
+  dice_count_increases_total: number;
   first_ban_at: string | null;
   updated_at: string;
 };
@@ -19,10 +19,10 @@ type DiceProgressionAchievementStatsRow = {
 const defaultStats = (): DiceProgressionAchievementStats => {
   return {
     rollCommandsTotal: 0,
-    nearLevelupRollsTotal: 0,
+    nearDiceCountIncreaseRollsTotal: 0,
     highestChargeMultiplier: 1,
     highestRollPassCount: 1,
-    levelUpsTotal: 0,
+    diceCountIncreasesTotal: 0,
     firstBanAt: null,
   };
 };
@@ -30,10 +30,10 @@ const defaultStats = (): DiceProgressionAchievementStats => {
 const mapRow = (row: DiceProgressionAchievementStatsRow): DiceProgressionAchievementStats => {
   return {
     rollCommandsTotal: row.roll_commands_total,
-    nearLevelupRollsTotal: row.near_levelup_rolls_total,
+    nearDiceCountIncreaseRollsTotal: row.near_dice_count_increase_rolls_total,
     highestChargeMultiplier: row.highest_charge_multiplier,
     highestRollPassCount: row.highest_roll_pass_count,
-    levelUpsTotal: row.level_ups_total,
+    diceCountIncreasesTotal: row.dice_count_increases_total,
     firstBanAt: row.first_ban_at,
   };
 };
@@ -48,10 +48,10 @@ const getStatsRow = (
       SELECT
         user_id,
         roll_commands_total,
-        near_levelup_rolls_total,
+        near_dice_count_increase_rolls_total,
         highest_charge_multiplier,
         highest_roll_pass_count,
-        level_ups_total,
+        dice_count_increases_total,
         first_ban_at,
         updated_at
       FROM dice_progression_achievement_stats
@@ -76,10 +76,10 @@ const getOrCreateStatsRow = (
     INSERT INTO dice_progression_achievement_stats (
       user_id,
       roll_commands_total,
-      near_levelup_rolls_total,
+      near_dice_count_increase_rolls_total,
       highest_charge_multiplier,
       highest_roll_pass_count,
-      level_ups_total,
+      dice_count_increases_total,
       first_ban_at,
       updated_at
     )
@@ -93,10 +93,10 @@ const getOrCreateStatsRow = (
     getStatsRow(db, userId) ?? {
       user_id: userId,
       roll_commands_total: 0,
-      near_levelup_rolls_total: 0,
+      near_dice_count_increase_rolls_total: 0,
       highest_charge_multiplier: 1,
       highest_roll_pass_count: 1,
-      level_ups_total: 0,
+      dice_count_increases_total: 0,
       first_ban_at: null,
       updated_at: updatedAt,
     }
@@ -115,18 +115,19 @@ const recordDiceProgressionAchievementStats = (
   db: SqliteDatabase,
   {
     userId,
-    nearLevelupRollCount,
+    nearDiceCountIncreaseRollCount,
     chargeMultiplier,
     rollPassCount,
-    levelUpsGained,
+    diceCountIncreasesGained,
   }: RecordDiceProgressionAchievementStatsInput,
 ): DiceProgressionAchievementStats => {
   const stats = getOrCreateStatsRow(db, userId);
   const updatedAt = new Date().toISOString();
   const nextStats: DiceProgressionAchievementStats = {
     rollCommandsTotal: stats.roll_commands_total + 1,
-    nearLevelupRollsTotal:
-      stats.near_levelup_rolls_total + Math.max(0, Math.floor(nearLevelupRollCount)),
+    nearDiceCountIncreaseRollsTotal:
+      stats.near_dice_count_increase_rolls_total +
+      Math.max(0, Math.floor(nearDiceCountIncreaseRollCount)),
     highestChargeMultiplier: Math.max(
       stats.highest_charge_multiplier,
       Math.max(1, Math.floor(chargeMultiplier)),
@@ -135,7 +136,8 @@ const recordDiceProgressionAchievementStats = (
       stats.highest_roll_pass_count,
       Math.max(1, Math.floor(rollPassCount)),
     ),
-    levelUpsTotal: stats.level_ups_total + Math.max(0, Math.floor(levelUpsGained)),
+    diceCountIncreasesTotal:
+      stats.dice_count_increases_total + Math.max(0, Math.floor(diceCountIncreasesGained)),
     firstBanAt: stats.first_ban_at,
   };
 
@@ -144,10 +146,10 @@ const recordDiceProgressionAchievementStats = (
     UPDATE dice_progression_achievement_stats
     SET
       roll_commands_total = @rollCommandsTotal,
-      near_levelup_rolls_total = @nearLevelupRollsTotal,
+      near_dice_count_increase_rolls_total = @nearDiceCountIncreaseRollsTotal,
       highest_charge_multiplier = @highestChargeMultiplier,
       highest_roll_pass_count = @highestRollPassCount,
-      level_ups_total = @levelUpsTotal,
+      dice_count_increases_total = @diceCountIncreasesTotal,
       updated_at = @updatedAt
     WHERE user_id = @userId
   `,

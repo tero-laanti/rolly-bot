@@ -19,9 +19,9 @@ import {
 import {
   getBaseRollPassCount,
   getFirstDailyRollPipReward,
-  getDiceLevelUpReward,
+  getDiceCountIncreaseReward,
   getDiceMaxRollPassCount,
-  getDicePrestigeBaseLevel,
+  getDicePrestigeBaseDiceCount,
   getDoubleBuffRollPassCount,
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
@@ -79,7 +79,7 @@ type RunRollDiceUseCaseInput = {
 type RunRollDiceDependencies = {
   analytics: Pick<
     DiceAnalyticsRepository,
-    "recordDiceRollAnalytics" | "resetDiceLevelAnalyticsProgress"
+    "recordDiceRollAnalytics" | "resetDiceCountAnalyticsProgress"
   >;
   economy: Pick<DiceEconomyRepository, "applyFameDelta" | "getFame" | "grantDailyPipsIfEligible">;
   itemEffects: Pick<DiceItemEffectsService, "consumeOneDoubleRollUse" | "getItemDoubleRollStatus">;
@@ -90,12 +90,12 @@ type RunRollDiceDependencies = {
     | "recordDiceProgressionAchievementStats"
     | "getActiveDiceTemporaryEffects"
     | "getDiceBans"
-    | "getDiceLevel"
+    | "getDiceCount"
     | "getDicePrestige"
     | "getDiceSides"
     | "getLastDiceRollAt"
     | "getUserDiceAchievements"
-    | "setDiceLevel"
+    | "setDiceCount"
     | "setLastDiceRollAt"
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
@@ -155,9 +155,9 @@ export const createRunRollDiceUseCase = ({
       };
     }
 
-    const level = progression.getDiceLevel(userId);
+    const diceCount = progression.getDiceCount(userId);
     const highestPrestige = progression.getDicePrestige(userId);
-    const baseDiceCount = Math.max(1, level);
+    const baseDiceCount = Math.max(1, diceCount);
     const pvpDoubleRollUntil = pvp.getActiveDoubleRoll(userId, nowMs);
     const itemDoubleRollStatus = itemEffects.getItemDoubleRollStatus(userId, nowMs);
     const lastDiceRollAt = progression.getLastDiceRollAt();
@@ -177,7 +177,7 @@ export const createRunRollDiceUseCase = ({
     const { rollPassCount, didUseChargeRoll } = resolvedRollPassState;
     const dieSides = progression.getDiceSides(userId);
     const fameBefore = economy.getFame(userId);
-    const unlockedBansBefore = getUnlockedBanSlotsFromFame(fameBefore, level, dieSides);
+    const unlockedBansBefore = getUnlockedBanSlotsFromFame(fameBefore, diceCount, dieSides);
     const bans = progression.getDiceBans(userId);
 
     const rollPasses = Array.from({ length: rollPassCount }, () =>
@@ -195,31 +195,33 @@ export const createRunRollDiceUseCase = ({
     const allSameCount = rollPasses.filter((rolls) =>
       rolls.every((roll) => roll === rolls[0]),
     ).length;
-    const hasLevelUp = allSameCount > 0;
-    const levelIncrease = hasLevelUp ? 1 : 0;
-    const nearLevelupRollCount = rollPasses.filter((rolls) => isOneOffLevelupRoll(rolls)).length;
+    const hasDiceCountIncrease = allSameCount > 0;
+    const diceCountIncrease = hasDiceCountIncrease ? 1 : 0;
+    const nearDiceCountIncreaseRollCount = rollPasses.filter((rolls) =>
+      isOneOffDiceCountIncreaseRoll(rolls),
+    ).length;
     const diceRolledCount = rollPasses.reduce((total, rolls) => total + rolls.length, 0);
     const earnedAchievements = rollPassAchievementIds.flatMap((achievementIds) => achievementIds);
 
     const result = unitOfWork.runInTransaction(() => {
       const progressionAchievementStats = progression.recordDiceProgressionAchievementStats({
         userId,
-        nearLevelupRollCount,
+        nearDiceCountIncreaseRollCount,
         chargeMultiplier,
         rollPassCount,
-        levelUpsGained: levelIncrease,
+        diceCountIncreasesGained: diceCountIncrease,
       });
       const newlyEarned = progression.awardAchievements(userId, [
         ...earnedAchievements,
         ...getManualProgressionAchievementIds(progressionAchievementStats),
       ]);
       const achievementPipReward = getAchievementPipRewardTotal(newlyEarned);
-      const levelAfter = level + levelIncrease;
-      if (hasLevelUp) {
-        progression.setDiceLevel({ userId, level: levelAfter });
+      const diceCountAfter = diceCount + diceCountIncrease;
+      if (hasDiceCountIncrease) {
+        progression.setDiceCount({ userId, diceCount: diceCountAfter });
       }
 
-      const fameReward = newlyEarned.length + levelIncrease * getDiceLevelUpReward();
+      const fameReward = newlyEarned.length + diceCountIncrease * getDiceCountIncreaseReward();
       const fameAfter =
         fameReward > 0 ? economy.applyFameDelta({ userId, amount: fameReward }) : fameBefore;
       const dailyPipGrant =
@@ -240,11 +242,11 @@ export const createRunRollDiceUseCase = ({
       analytics.recordDiceRollAnalytics({
         userId,
         rollSetCount: rollPassCount,
-        nearLevelupRollCount,
+        nearDiceCountIncreaseRollCount,
         diceRolledCount,
       });
-      if (hasLevelUp) {
-        analytics.resetDiceLevelAnalyticsProgress(userId);
+      if (hasDiceCountIncrease) {
+        analytics.resetDiceCountAnalyticsProgress(userId);
       }
 
       if (
@@ -267,7 +269,7 @@ export const createRunRollDiceUseCase = ({
         newlyEarned,
         fameReward,
         pipReward,
-        levelAfter,
+        diceCountAfter,
         fameAfter,
         dailyFirstRollAwarded: dailyPipGrant.awarded,
       };
@@ -277,7 +279,7 @@ export const createRunRollDiceUseCase = ({
     const rewardText = formatRewardText({
       fameReward: result.fameReward,
       pipReward: result.pipReward,
-      hasLevelUp,
+      hasDiceCountIncrease,
     });
     const dailyFirstRollBanner =
       source === "manual" && result.dailyFirstRollAwarded && firstDailyRollPipReward > 0
@@ -286,7 +288,7 @@ export const createRunRollDiceUseCase = ({
     const multiplierFooter = buildRollModifierFooter(resolvedRollPassState);
     const unlockedBansAfter = getUnlockedBanSlotsFromFame(
       result.fameAfter,
-      result.levelAfter,
+      result.diceCountAfter,
       dieSides,
     );
     const unlockedFooter = unlockedBansAfter > unlockedBansBefore ? "New ban slot unlocked." : "";
@@ -310,7 +312,8 @@ export const createRunRollDiceUseCase = ({
     }
     const doubleRollFooter = doubleRollFooterParts.join(" ");
     const prestigeFooter =
-      result.levelAfter >= getDicePrestigeBaseLevel() && level < getDicePrestigeBaseLevel()
+      result.diceCountAfter >= getDicePrestigeBaseDiceCount() &&
+      diceCount < getDicePrestigeBaseDiceCount()
         ? "Prestige is now available. Use /prestige to advance."
         : "";
 
@@ -376,21 +379,21 @@ const getManualProgressionAchievementIds = (stats: DiceProgressionAchievementSta
     achievementIds.push("first-roll");
   }
 
-  if (stats.levelUpsTotal >= 1) {
-    achievementIds.push("first-level-up");
+  if (stats.diceCountIncreasesTotal >= 1) {
+    achievementIds.push("first-extra-die");
   }
 
-  if (stats.nearLevelupRollsTotal >= 1) {
-    achievementIds.push("near-level-up-1");
+  if (stats.nearDiceCountIncreaseRollsTotal >= 1) {
+    achievementIds.push("near-extra-die-1");
   }
-  if (stats.nearLevelupRollsTotal >= 10) {
-    achievementIds.push("near-level-up-10");
+  if (stats.nearDiceCountIncreaseRollsTotal >= 10) {
+    achievementIds.push("near-extra-die-10");
   }
-  if (stats.nearLevelupRollsTotal >= 25) {
-    achievementIds.push("near-level-up-25");
+  if (stats.nearDiceCountIncreaseRollsTotal >= 25) {
+    achievementIds.push("near-extra-die-25");
   }
-  if (stats.nearLevelupRollsTotal >= 100) {
-    achievementIds.push("near-level-up-100");
+  if (stats.nearDiceCountIncreaseRollsTotal >= 100) {
+    achievementIds.push("near-extra-die-100");
   }
 
   if (stats.highestChargeMultiplier >= 2) {
@@ -630,7 +633,7 @@ const formatRemainingTime = (durationMs: number): string => {
   return formatDurationWords(durationMs);
 };
 
-const isOneOffLevelupRoll = (rolls: number[]): boolean => {
+const isOneOffDiceCountIncreaseRoll = (rolls: number[]): boolean => {
   if (rolls.length < 2) {
     return false;
   }

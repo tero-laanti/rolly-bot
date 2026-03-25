@@ -14,7 +14,7 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
     const useCase = createRunRollDiceUseCase({
       analytics: {
         recordDiceRollAnalytics: () => {},
-        resetDiceLevelAnalyticsProgress: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
       },
       economy: {
         applyFameDelta: ({ amount }) => amount,
@@ -38,20 +38,20 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
           rollCommandsTotal: 1,
-          nearLevelupRollsTotal: 0,
+          nearDiceCountIncreaseRollsTotal: 0,
           highestChargeMultiplier: 1,
           highestRollPassCount: 2,
-          levelUpsTotal: 1,
+          diceCountIncreasesTotal: 1,
           firstBanAt: null,
         }),
         getActiveDiceTemporaryEffects: () => [],
         getDiceBans: () => new Map(),
-        getDiceLevel: () => 1,
+        getDiceCount: () => 1,
         getDicePrestige: () => 1,
         getDiceSides: () => 6,
         getLastDiceRollAt: () => Date.now(),
         getUserDiceAchievements: () => [],
-        setDiceLevel: () => {},
+        setDiceCount: () => {},
         setLastDiceRollAt: () => {},
       },
       pvp: {
@@ -73,7 +73,7 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
     assert.deepEqual(result.achievementAnnouncements, [
       {
         userId: "user-1",
-        achievementIds: ["first-roll", "first-level-up", "peak-goblin"],
+        achievementIds: ["first-roll", "first-extra-die", "peak-goblin"],
       },
     ]);
   } finally {
@@ -85,7 +85,7 @@ test("first roll of the UTC day awards daily pips", () => {
   const useCase = createRunRollDiceUseCase({
     analytics: {
       recordDiceRollAnalytics: () => {},
-      resetDiceLevelAnalyticsProgress: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
     },
     economy: {
       applyFameDelta: ({ amount }) => amount,
@@ -109,20 +109,20 @@ test("first roll of the UTC day awards daily pips", () => {
       consumeDiceTemporaryEffectsForRoll: () => 0,
       recordDiceProgressionAchievementStats: () => ({
         rollCommandsTotal: 1,
-        nearLevelupRollsTotal: 0,
+        nearDiceCountIncreaseRollsTotal: 0,
         highestChargeMultiplier: 1,
         highestRollPassCount: 1,
-        levelUpsTotal: 0,
+        diceCountIncreasesTotal: 0,
         firstBanAt: null,
       }),
       getActiveDiceTemporaryEffects: () => [],
       getDiceBans: () => new Map(),
-      getDiceLevel: () => 1,
+      getDiceCount: () => 1,
       getDicePrestige: () => 0,
       getDiceSides: () => 6,
       getLastDiceRollAt: () => null,
       getUserDiceAchievements: () => [],
-      setDiceLevel: () => {},
+      setDiceCount: () => {},
       setLastDiceRollAt: () => {},
     },
     pvp: {
@@ -149,7 +149,7 @@ test("blocked rolls do not consume or grant the daily pip reward", () => {
   const useCase = createRunRollDiceUseCase({
     analytics: {
       recordDiceRollAnalytics: () => {},
-      resetDiceLevelAnalyticsProgress: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
     },
     economy: {
       applyFameDelta: ({ amount }) => amount,
@@ -176,20 +176,20 @@ test("blocked rolls do not consume or grant the daily pip reward", () => {
       consumeDiceTemporaryEffectsForRoll: () => 0,
       recordDiceProgressionAchievementStats: () => ({
         rollCommandsTotal: 0,
-        nearLevelupRollsTotal: 0,
+        nearDiceCountIncreaseRollsTotal: 0,
         highestChargeMultiplier: 1,
         highestRollPassCount: 1,
-        levelUpsTotal: 0,
+        diceCountIncreasesTotal: 0,
         firstBanAt: null,
       }),
       getActiveDiceTemporaryEffects: () => [],
       getDiceBans: () => new Map(),
-      getDiceLevel: () => 1,
+      getDiceCount: () => 1,
       getDicePrestige: () => 0,
       getDiceSides: () => 6,
       getLastDiceRollAt: () => null,
       getUserDiceAchievements: () => [],
-      setDiceLevel: () => {},
+      setDiceCount: () => {},
       setLastDiceRollAt: () => {},
     },
     pvp: {
@@ -216,7 +216,7 @@ test("auto rolls do not grant the daily pip reward", () => {
   const useCase = createRunRollDiceUseCase({
     analytics: {
       recordDiceRollAnalytics: () => {},
-      resetDiceLevelAnalyticsProgress: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
     },
     economy: {
       applyFameDelta: ({ amount }) => amount,
@@ -243,20 +243,20 @@ test("auto rolls do not grant the daily pip reward", () => {
       consumeDiceTemporaryEffectsForRoll: () => 0,
       recordDiceProgressionAchievementStats: () => ({
         rollCommandsTotal: 1,
-        nearLevelupRollsTotal: 0,
+        nearDiceCountIncreaseRollsTotal: 0,
         highestChargeMultiplier: 1,
         highestRollPassCount: 1,
-        levelUpsTotal: 0,
+        diceCountIncreasesTotal: 0,
         firstBanAt: null,
       }),
       getActiveDiceTemporaryEffects: () => [],
       getDiceBans: () => new Map(),
-      getDiceLevel: () => 1,
+      getDiceCount: () => 1,
       getDicePrestige: () => 0,
       getDiceSides: () => 6,
       getLastDiceRollAt: () => null,
       getUserDiceAchievements: () => [],
-      setDiceLevel: () => {},
+      setDiceCount: () => {},
       setLastDiceRollAt: () => {},
     },
     pvp: {
@@ -284,13 +284,13 @@ test("reward text includes both fame and pip rewards when both are earned", () =
   const originalRandom = Math.random;
   Math.random = () => 0;
   const achievementPipReward =
-    getAchievementPipRewardTotal(["first-roll", "first-level-up"]) + firstDailyRollPipReward;
+    getAchievementPipRewardTotal(["first-roll", "first-extra-die"]) + firstDailyRollPipReward;
 
   try {
     const useCase = createRunRollDiceUseCase({
       analytics: {
         recordDiceRollAnalytics: () => {},
-        resetDiceLevelAnalyticsProgress: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
       },
       economy: {
         applyFameDelta: ({ amount }) => amount,
@@ -314,20 +314,20 @@ test("reward text includes both fame and pip rewards when both are earned", () =
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
           rollCommandsTotal: 1,
-          nearLevelupRollsTotal: 0,
+          nearDiceCountIncreaseRollsTotal: 0,
           highestChargeMultiplier: 1,
           highestRollPassCount: 1,
-          levelUpsTotal: 1,
+          diceCountIncreasesTotal: 1,
           firstBanAt: null,
         }),
         getActiveDiceTemporaryEffects: () => [],
         getDiceBans: () => new Map(),
-        getDiceLevel: () => 1,
+        getDiceCount: () => 1,
         getDicePrestige: () => 0,
         getDiceSides: () => 6,
         getLastDiceRollAt: () => null,
         getUserDiceAchievements: () => [],
-        setDiceLevel: () => {},
+        setDiceCount: () => {},
         setLastDiceRollAt: () => {},
       },
       pvp: {
@@ -370,7 +370,7 @@ test("raid damage uses the highest roll set total instead of summing all roll se
     const useCase = createRunRollDiceUseCase({
       analytics: {
         recordDiceRollAnalytics: () => {},
-        resetDiceLevelAnalyticsProgress: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
       },
       economy: {
         applyFameDelta: ({ amount }) => amount,
@@ -394,20 +394,20 @@ test("raid damage uses the highest roll set total instead of summing all roll se
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
           rollCommandsTotal: 1,
-          nearLevelupRollsTotal: 0,
+          nearDiceCountIncreaseRollsTotal: 0,
           highestChargeMultiplier: 1,
           highestRollPassCount: 2,
-          levelUpsTotal: 0,
+          diceCountIncreasesTotal: 0,
           firstBanAt: null,
         }),
         getActiveDiceTemporaryEffects: () => [],
         getDiceBans: () => new Map(),
-        getDiceLevel: () => 2,
+        getDiceCount: () => 2,
         getDicePrestige: () => 1,
         getDiceSides: () => 6,
         getLastDiceRollAt: () => null,
         getUserDiceAchievements: () => [],
-        setDiceLevel: () => {},
+        setDiceCount: () => {},
         setLastDiceRollAt: () => {},
       },
       pvp: {

@@ -5,10 +5,10 @@ import { getMaxDicePrestige } from "../../../progression/domain/game-rules";
 
 type DiceAnalyticsRow = {
   user_id: string;
-  level_started_at: string;
+  dice_count_started_at: string;
   prestige_started_at: string;
-  rolls_current_level: number;
-  near_levelup_rolls_current_level: number;
+  roll_sets_current_dice_count: number;
+  near_dice_count_increase_roll_sets_current_dice_count: number;
   dice_rolled_current_prestige: number;
   total_dice_rolled: number;
   pvp_wins: number;
@@ -20,7 +20,7 @@ type DiceAnalyticsRow = {
 type DiceRollAnalyticsUpdate = {
   userId: string;
   rollSetCount: number;
-  nearLevelupRollCount: number;
+  nearDiceCountIncreaseRollCount: number;
   diceRolledCount: number;
 };
 
@@ -80,10 +80,11 @@ const getActiveDicePrestige = (db: SqliteDatabase, userId: string): number => {
 
 const mapDiceAnalyticsRow = (row: DiceAnalyticsRow): DiceAnalytics => {
   return {
-    levelStartedAt: row.level_started_at,
+    diceCountStartedAt: row.dice_count_started_at,
     prestigeStartedAt: row.prestige_started_at,
-    rollsCurrentLevel: row.rolls_current_level,
-    nearLevelupRollsCurrentLevel: row.near_levelup_rolls_current_level,
+    rollSetsCurrentDiceCount: row.roll_sets_current_dice_count,
+    nearDiceCountIncreaseRollSetsCurrentDiceCount:
+      row.near_dice_count_increase_roll_sets_current_dice_count,
     diceRolledCurrentPrestige: row.dice_rolled_current_prestige,
     totalDiceRolled: row.total_dice_rolled,
     pvpWins: row.pvp_wins,
@@ -98,10 +99,10 @@ const getDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAnalyticsR
       `
       SELECT
         user_id,
-        level_started_at,
+        dice_count_started_at,
         prestige_started_at,
-        rolls_current_level,
-        near_levelup_rolls_current_level,
+        roll_sets_current_dice_count,
+        near_dice_count_increase_roll_sets_current_dice_count,
         dice_rolled_current_prestige,
         total_dice_rolled,
         pvp_wins,
@@ -115,10 +116,10 @@ const getDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAnalyticsR
     .get(userId) as DiceAnalyticsRow | undefined;
 };
 
-const getCurrentLevelUpdatedAt = (db: SqliteDatabase, userId: string): string | null => {
+const getCurrentDiceCountUpdatedAt = (db: SqliteDatabase, userId: string): string | null => {
   const activePrestige = getActiveDicePrestige(db, userId);
   const row = db
-    .prepare("SELECT updated_at FROM dice_levels_by_prestige WHERE user_id = ? AND prestige = ?")
+    .prepare("SELECT updated_at FROM dice_counts_by_prestige WHERE user_id = ? AND prestige = ?")
     .get(userId, activePrestige) as { updated_at: string } | undefined;
 
   return row?.updated_at ?? null;
@@ -139,17 +140,17 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
   }
 
   const nowIso = new Date().toISOString();
-  const levelStartedAt = getCurrentLevelUpdatedAt(db, userId) ?? nowIso;
+  const diceCountStartedAt = getCurrentDiceCountUpdatedAt(db, userId) ?? nowIso;
   const prestigeStartedAt = getCurrentPrestigeUpdatedAt(db, userId) ?? nowIso;
 
   db.prepare(
     `
     INSERT INTO dice_analytics (
       user_id,
-      level_started_at,
+      dice_count_started_at,
       prestige_started_at,
-      rolls_current_level,
-      near_levelup_rolls_current_level,
+      roll_sets_current_dice_count,
+      near_dice_count_increase_roll_sets_current_dice_count,
       dice_rolled_current_prestige,
       total_dice_rolled,
       pvp_wins,
@@ -159,7 +160,7 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
     )
     VALUES (
       @userId,
-      @levelStartedAt,
+      @diceCountStartedAt,
       @prestigeStartedAt,
       0,
       0,
@@ -175,7 +176,7 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
   `,
   ).run({
     userId,
-    levelStartedAt,
+    diceCountStartedAt,
     prestigeStartedAt,
     updatedAt: nowIso,
   });
@@ -194,10 +195,18 @@ const getDiceAnalytics = (db: SqliteDatabase, userId: string): DiceAnalytics => 
 
 const recordDiceRollAnalytics = (
   db: SqliteDatabase,
-  { userId, rollSetCount, nearLevelupRollCount, diceRolledCount }: DiceRollAnalyticsUpdate,
+  {
+    userId,
+    rollSetCount,
+    nearDiceCountIncreaseRollCount,
+    diceRolledCount,
+  }: DiceRollAnalyticsUpdate,
 ): void => {
   const normalizedRollSetCount = Math.max(0, Math.floor(rollSetCount));
-  const normalizedNearLevelupRollCount = Math.max(0, Math.floor(nearLevelupRollCount));
+  const normalizedNearDiceCountIncreaseRollCount = Math.max(
+    0,
+    Math.floor(nearDiceCountIncreaseRollCount),
+  );
   const normalizedDiceRolledCount = Math.max(0, Math.floor(diceRolledCount));
   if (normalizedRollSetCount < 1 && normalizedDiceRolledCount < 1) {
     return;
@@ -210,8 +219,8 @@ const recordDiceRollAnalytics = (
     `
     UPDATE dice_analytics
     SET
-      rolls_current_level = @rollsCurrentLevel,
-      near_levelup_rolls_current_level = @nearLevelupRollsCurrentLevel,
+      roll_sets_current_dice_count = @rollSetsCurrentDiceCount,
+      near_dice_count_increase_roll_sets_current_dice_count = @nearDiceCountIncreaseRollSetsCurrentDiceCount,
       dice_rolled_current_prestige = @diceRolledCurrentPrestige,
       total_dice_rolled = @totalDiceRolled,
       updated_at = @updatedAt
@@ -219,16 +228,17 @@ const recordDiceRollAnalytics = (
   `,
   ).run({
     userId,
-    rollsCurrentLevel: analytics.rolls_current_level + normalizedRollSetCount,
-    nearLevelupRollsCurrentLevel:
-      analytics.near_levelup_rolls_current_level + normalizedNearLevelupRollCount,
+    rollSetsCurrentDiceCount: analytics.roll_sets_current_dice_count + normalizedRollSetCount,
+    nearDiceCountIncreaseRollSetsCurrentDiceCount:
+      analytics.near_dice_count_increase_roll_sets_current_dice_count +
+      normalizedNearDiceCountIncreaseRollCount,
     diceRolledCurrentPrestige: analytics.dice_rolled_current_prestige + normalizedDiceRolledCount,
     totalDiceRolled: analytics.total_dice_rolled + normalizedDiceRolledCount,
     updatedAt,
   });
 };
 
-const resetDiceLevelAnalyticsProgress = (db: SqliteDatabase, userId: string): void => {
+const resetDiceCountAnalyticsProgress = (db: SqliteDatabase, userId: string): void => {
   getOrCreateDiceAnalyticsRow(db, userId);
   const nowIso = new Date().toISOString();
 
@@ -236,9 +246,9 @@ const resetDiceLevelAnalyticsProgress = (db: SqliteDatabase, userId: string): vo
     `
     UPDATE dice_analytics
     SET
-      level_started_at = @nowIso,
-      rolls_current_level = 0,
-      near_levelup_rolls_current_level = 0,
+      dice_count_started_at = @nowIso,
+      roll_sets_current_dice_count = 0,
+      near_dice_count_increase_roll_sets_current_dice_count = 0,
       updated_at = @nowIso
     WHERE user_id = @userId
   `,
@@ -253,10 +263,10 @@ const resetDicePrestigeAnalyticsProgress = (db: SqliteDatabase, userId: string):
     `
     UPDATE dice_analytics
     SET
-      level_started_at = @nowIso,
+      dice_count_started_at = @nowIso,
       prestige_started_at = @nowIso,
-      rolls_current_level = 0,
-      near_levelup_rolls_current_level = 0,
+      roll_sets_current_dice_count = 0,
+      near_dice_count_increase_roll_sets_current_dice_count = 0,
       dice_rolled_current_prestige = 0,
       updated_at = @nowIso
     WHERE user_id = @userId
@@ -301,7 +311,7 @@ export const createSqliteAnalyticsRepository = (db: SqliteDatabase): DiceAnalyti
   return {
     getDiceAnalytics: (userId) => getDiceAnalytics(db, userId),
     recordDiceRollAnalytics: (update) => recordDiceRollAnalytics(db, update),
-    resetDiceLevelAnalyticsProgress: (userId) => resetDiceLevelAnalyticsProgress(db, userId),
+    resetDiceCountAnalyticsProgress: (userId) => resetDiceCountAnalyticsProgress(db, userId),
     resetDicePrestigeAnalyticsProgress: (userId) => resetDicePrestigeAnalyticsProgress(db, userId),
     updateDicePvpStats: (update) => updateDicePvpStats(db, update),
   };

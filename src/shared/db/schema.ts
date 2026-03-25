@@ -1,6 +1,18 @@
 import type { SqliteDatabase } from "../db";
 
+const currentSchemaVersion = 1;
+
+const levelAchievementIdRewrites = new Map<string, string>([
+  ["first-level-up", "first-extra-die"],
+  ["near-level-up-1", "near-extra-die-1"],
+  ["near-level-up-10", "near-extra-die-10"],
+  ["near-level-up-25", "near-extra-die-25"],
+  ["near-level-up-100", "near-extra-die-100"],
+]);
+
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
+  assertNoLegacySchemaArtifacts(db);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS balances (
       user_id TEXT PRIMARY KEY,
@@ -20,10 +32,10 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       PRIMARY KEY (user_id, item_id)
     );
 
-    CREATE TABLE IF NOT EXISTS dice_levels_by_prestige (
+    CREATE TABLE IF NOT EXISTS dice_counts_by_prestige (
       user_id TEXT NOT NULL,
       prestige INTEGER NOT NULL,
-      level INTEGER NOT NULL DEFAULT 1,
+      dice_count INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL,
       PRIMARY KEY (user_id, prestige)
     );
@@ -76,10 +88,10 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
 
     CREATE TABLE IF NOT EXISTS dice_analytics (
       user_id TEXT PRIMARY KEY,
-      level_started_at TEXT NOT NULL,
+      dice_count_started_at TEXT NOT NULL,
       prestige_started_at TEXT NOT NULL,
-      rolls_current_level INTEGER NOT NULL DEFAULT 0,
-      near_levelup_rolls_current_level INTEGER NOT NULL DEFAULT 0,
+      roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
+      near_dice_count_increase_roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
       dice_rolled_current_prestige INTEGER NOT NULL DEFAULT 0,
       total_dice_rolled INTEGER NOT NULL DEFAULT 0,
       pvp_wins INTEGER NOT NULL DEFAULT 0,
@@ -144,10 +156,10 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
     CREATE TABLE IF NOT EXISTS dice_progression_achievement_stats (
       user_id TEXT PRIMARY KEY,
       roll_commands_total INTEGER NOT NULL DEFAULT 0,
-      near_levelup_rolls_total INTEGER NOT NULL DEFAULT 0,
+      near_dice_count_increase_rolls_total INTEGER NOT NULL DEFAULT 0,
       highest_charge_multiplier INTEGER NOT NULL DEFAULT 1,
       highest_roll_pass_count INTEGER NOT NULL DEFAULT 1,
-      level_ups_total INTEGER NOT NULL DEFAULT 0,
+      dice_count_increases_total INTEGER NOT NULL DEFAULT 0,
       first_ban_at TEXT,
       updated_at TEXT NOT NULL
     );
@@ -226,4 +238,307 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL
     );
   `);
+
+  assertCurrentSchemaArtifacts(db);
+  db.pragma(`user_version = ${currentSchemaVersion}`);
+};
+
+export const migrateLegacyDatabaseSchema = (db: SqliteDatabase): boolean => {
+  const blockingIssues = getMigrationBlockingIssues(db);
+  if (blockingIssues.length > 0) {
+    throw buildSchemaError(
+      "Cannot run the offline dice-count migration on a partially migrated database.",
+      blockingIssues,
+    );
+  }
+
+  const legacyArtifacts = getLegacySchemaArtifacts(db);
+  if (legacyArtifacts.length < 1) {
+    assertCurrentSchemaArtifacts(db);
+    db.pragma(`user_version = ${currentSchemaVersion}`);
+    return false;
+  }
+
+  db.transaction(() => {
+    migrateLegacyProgressionStateTable(db);
+    migrateLegacyAnalyticsColumns(db);
+    migrateLegacyProgressionAchievementStatsColumns(db);
+    rewriteLegacyAchievementIds(db);
+
+    const remainingLegacyArtifacts = getLegacySchemaArtifacts(db);
+    if (remainingLegacyArtifacts.length > 0) {
+      throw buildSchemaError(
+        "Offline dice-count migration did not fully clear legacy schema artifacts.",
+        remainingLegacyArtifacts,
+      );
+    }
+
+    assertCurrentSchemaArtifacts(db);
+    db.pragma(`user_version = ${currentSchemaVersion}`);
+  })();
+
+  return true;
+};
+
+const migrateLegacyProgressionStateTable = (db: SqliteDatabase): void => {
+  const hasLegacyTable = hasTable(db, "dice_levels_by_prestige");
+  const hasCurrentTable = hasTable(db, "dice_counts_by_prestige");
+
+  if (hasLegacyTable && hasCurrentTable) {
+    throw new Error(
+      "Both dice_levels_by_prestige and dice_counts_by_prestige exist. Resolve the duplicate progression tables before continuing.",
+    );
+  }
+
+  if (hasLegacyTable) {
+    db.exec("ALTER TABLE dice_levels_by_prestige RENAME TO dice_counts_by_prestige");
+  }
+
+  renameColumnIfExists(db, "dice_counts_by_prestige", "level", "dice_count");
+};
+
+const migrateLegacyAnalyticsColumns = (db: SqliteDatabase): void => {
+  renameColumnIfExists(db, "dice_analytics", "level_started_at", "dice_count_started_at");
+  renameColumnIfExists(db, "dice_analytics", "rolls_current_level", "roll_sets_current_dice_count");
+  renameColumnIfExists(
+    db,
+    "dice_analytics",
+    "near_levelup_rolls_current_level",
+    "near_dice_count_increase_roll_sets_current_dice_count",
+  );
+};
+
+const migrateLegacyProgressionAchievementStatsColumns = (db: SqliteDatabase): void => {
+  renameColumnIfExists(
+    db,
+    "dice_progression_achievement_stats",
+    "near_levelup_rolls_total",
+    "near_dice_count_increase_rolls_total",
+  );
+  renameColumnIfExists(
+    db,
+    "dice_progression_achievement_stats",
+    "level_ups_total",
+    "dice_count_increases_total",
+  );
+};
+
+const rewriteLegacyAchievementIds = (db: SqliteDatabase): void => {
+  if (!hasTable(db, "user_achievements")) {
+    return;
+  }
+
+  for (const [legacyId, currentId] of levelAchievementIdRewrites) {
+    db.prepare(
+      `
+      INSERT INTO user_achievements (user_id, achievement_id, earned_at)
+      SELECT user_id, @currentId, earned_at
+      FROM user_achievements
+      WHERE achievement_id = @legacyId
+      ON CONFLICT(user_id, achievement_id)
+      DO UPDATE SET earned_at = MIN(user_achievements.earned_at, excluded.earned_at)
+    `,
+    ).run({ legacyId, currentId });
+
+    db.prepare("DELETE FROM user_achievements WHERE achievement_id = ?").run(legacyId);
+  }
+};
+
+const assertNoLegacySchemaArtifacts = (db: SqliteDatabase): void => {
+  const legacyArtifacts = getLegacySchemaArtifacts(db);
+  if (legacyArtifacts.length < 1) {
+    return;
+  }
+
+  throw buildSchemaError(
+    "Legacy dice progression schema detected. Run the offline dice-count migration before starting the bot.",
+    legacyArtifacts,
+  );
+};
+
+const assertCurrentSchemaArtifacts = (db: SqliteDatabase): void => {
+  const issues = getCurrentSchemaIssues(db);
+  if (issues.length < 1) {
+    return;
+  }
+
+  throw buildSchemaError("Current dice-count schema is incomplete or invalid.", issues);
+};
+
+const getLegacySchemaArtifacts = (db: SqliteDatabase): string[] => {
+  const artifacts: string[] = [];
+
+  if (hasTable(db, "dice_levels_by_prestige")) {
+    artifacts.push("Legacy table dice_levels_by_prestige exists.");
+  }
+  if (hasColumn(db, "dice_counts_by_prestige", "level")) {
+    artifacts.push("Legacy column dice_counts_by_prestige.level exists.");
+  }
+  if (hasColumn(db, "dice_analytics", "level_started_at")) {
+    artifacts.push("Legacy column dice_analytics.level_started_at exists.");
+  }
+  if (hasColumn(db, "dice_analytics", "rolls_current_level")) {
+    artifacts.push("Legacy column dice_analytics.rolls_current_level exists.");
+  }
+  if (hasColumn(db, "dice_analytics", "near_levelup_rolls_current_level")) {
+    artifacts.push("Legacy column dice_analytics.near_levelup_rolls_current_level exists.");
+  }
+  if (hasColumn(db, "dice_progression_achievement_stats", "near_levelup_rolls_total")) {
+    artifacts.push(
+      "Legacy column dice_progression_achievement_stats.near_levelup_rolls_total exists.",
+    );
+  }
+  if (hasColumn(db, "dice_progression_achievement_stats", "level_ups_total")) {
+    artifacts.push("Legacy column dice_progression_achievement_stats.level_ups_total exists.");
+  }
+
+  const legacyAchievementCount = getLegacyAchievementIdCount(db);
+  if (legacyAchievementCount > 0) {
+    const rowLabel = legacyAchievementCount === 1 ? "row" : "rows";
+    artifacts.push(
+      `Legacy achievement ids remain in user_achievements (${legacyAchievementCount} ${rowLabel}).`,
+    );
+  }
+
+  return artifacts;
+};
+
+const getCurrentSchemaIssues = (db: SqliteDatabase): string[] => {
+  const issues: string[] = [];
+
+  if (!hasColumn(db, "dice_counts_by_prestige", "dice_count")) {
+    issues.push("Missing current column dice_counts_by_prestige.dice_count.");
+  }
+  if (!hasColumn(db, "dice_analytics", "dice_count_started_at")) {
+    issues.push("Missing current column dice_analytics.dice_count_started_at.");
+  }
+  if (!hasColumn(db, "dice_analytics", "roll_sets_current_dice_count")) {
+    issues.push("Missing current column dice_analytics.roll_sets_current_dice_count.");
+  }
+  if (!hasColumn(db, "dice_analytics", "near_dice_count_increase_roll_sets_current_dice_count")) {
+    issues.push(
+      "Missing current column dice_analytics.near_dice_count_increase_roll_sets_current_dice_count.",
+    );
+  }
+  if (
+    !hasColumn(db, "dice_progression_achievement_stats", "near_dice_count_increase_rolls_total")
+  ) {
+    issues.push(
+      "Missing current column dice_progression_achievement_stats.near_dice_count_increase_rolls_total.",
+    );
+  }
+  if (!hasColumn(db, "dice_progression_achievement_stats", "dice_count_increases_total")) {
+    issues.push(
+      "Missing current column dice_progression_achievement_stats.dice_count_increases_total.",
+    );
+  }
+
+  return issues;
+};
+
+const getMigrationBlockingIssues = (db: SqliteDatabase): string[] => {
+  const issues: string[] = [];
+
+  if (hasTable(db, "dice_levels_by_prestige") && hasTable(db, "dice_counts_by_prestige")) {
+    issues.push("Both dice_levels_by_prestige and dice_counts_by_prestige exist.");
+  }
+  pushMixedColumnIssue(db, issues, "dice_counts_by_prestige", "level", "dice_count");
+  pushMixedColumnIssue(db, issues, "dice_analytics", "level_started_at", "dice_count_started_at");
+  pushMixedColumnIssue(
+    db,
+    issues,
+    "dice_analytics",
+    "rolls_current_level",
+    "roll_sets_current_dice_count",
+  );
+  pushMixedColumnIssue(
+    db,
+    issues,
+    "dice_analytics",
+    "near_levelup_rolls_current_level",
+    "near_dice_count_increase_roll_sets_current_dice_count",
+  );
+  pushMixedColumnIssue(
+    db,
+    issues,
+    "dice_progression_achievement_stats",
+    "near_levelup_rolls_total",
+    "near_dice_count_increase_rolls_total",
+  );
+  pushMixedColumnIssue(
+    db,
+    issues,
+    "dice_progression_achievement_stats",
+    "level_ups_total",
+    "dice_count_increases_total",
+  );
+
+  return issues;
+};
+
+const pushMixedColumnIssue = (
+  db: SqliteDatabase,
+  issues: string[],
+  tableName: string,
+  legacyColumnName: string,
+  currentColumnName: string,
+): void => {
+  if (hasColumn(db, tableName, legacyColumnName) && hasColumn(db, tableName, currentColumnName)) {
+    issues.push(
+      `Both ${tableName}.${legacyColumnName} and ${tableName}.${currentColumnName} exist.`,
+    );
+  }
+};
+
+const getLegacyAchievementIdCount = (db: SqliteDatabase): number => {
+  if (!hasTable(db, "user_achievements")) {
+    return 0;
+  }
+
+  const legacyAchievementIds = Array.from(levelAchievementIdRewrites.keys());
+  const placeholders = legacyAchievementIds.map(() => "?").join(", ");
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM user_achievements WHERE achievement_id IN (${placeholders})`,
+    )
+    .get(...legacyAchievementIds) as { count: number };
+
+  return row.count;
+};
+
+const buildSchemaError = (message: string, details: string[]): Error => {
+  const lines = [message, ...details.map((detail) => `- ${detail}`)];
+  return new Error(lines.join("\n"));
+};
+
+const hasTable = (db: SqliteDatabase, tableName: string): boolean => {
+  const row = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(tableName) as { name: string } | undefined;
+  return Boolean(row);
+};
+
+const hasColumn = (db: SqliteDatabase, tableName: string, columnName: string): boolean => {
+  if (!hasTable(db, tableName)) {
+    return false;
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  return columns.some((column) => column.name === columnName);
+};
+
+const renameColumnIfExists = (
+  db: SqliteDatabase,
+  tableName: string,
+  legacyColumnName: string,
+  currentColumnName: string,
+): void => {
+  const hasLegacyColumn = hasColumn(db, tableName, legacyColumnName);
+  const hasCurrentColumn = hasColumn(db, tableName, currentColumnName);
+
+  if (!hasLegacyColumn || hasCurrentColumn) {
+    return;
+  }
+
+  db.exec(`ALTER TABLE ${tableName} RENAME COLUMN ${legacyColumnName} TO ${currentColumnName}`);
 };

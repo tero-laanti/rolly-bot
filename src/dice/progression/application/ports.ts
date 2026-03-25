@@ -6,15 +6,15 @@ import type {
   GetActiveDiceTemporaryEffectsInput,
 } from "../domain/temporary-effects";
 
-export type DiceLevelUpdate = {
+export type DiceCountUpdate = {
   userId: string;
-  level: number;
+  diceCount: number;
 };
 
-export type DiceLevelByPrestigeUpdate = {
+export type DiceCountByPrestigeUpdate = {
   userId: string;
   prestige: number;
-  level: number;
+  diceCount: number;
 };
 
 export type DicePrestigeUpdate = {
@@ -25,7 +25,7 @@ export type DicePrestigeUpdate = {
 export type DicePrestigeLeaderboardEntry = {
   userId: string;
   prestige: number;
-  level: number;
+  diceCount: number;
 };
 
 export type DiceBanUpdate = {
@@ -36,26 +36,26 @@ export type DiceBanUpdate = {
 
 export type DiceProgressionAchievementStats = {
   rollCommandsTotal: number;
-  nearLevelupRollsTotal: number;
+  nearDiceCountIncreaseRollsTotal: number;
   highestChargeMultiplier: number;
   highestRollPassCount: number;
-  levelUpsTotal: number;
+  diceCountIncreasesTotal: number;
   firstBanAt: string | null;
 };
 
 export type RecordDiceProgressionAchievementStatsInput = {
   userId: string;
-  nearLevelupRollCount: number;
+  nearDiceCountIncreaseRollCount: number;
   chargeMultiplier: number;
   rollPassCount: number;
-  levelUpsGained: number;
+  diceCountIncreasesGained: number;
 };
 
 export type DiceProgressionRepository = {
-  getDiceLevel: (userId: string) => number;
-  getDiceLevelForPrestige: (userId: string, prestige: number) => number;
-  setDiceLevel: (update: DiceLevelUpdate) => void;
-  setDiceLevelForPrestige: (update: DiceLevelByPrestigeUpdate) => void;
+  getDiceCount: (userId: string) => number;
+  getDiceCountForPrestige: (userId: string, prestige: number) => number;
+  setDiceCount: (update: DiceCountUpdate) => void;
+  setDiceCountForPrestige: (update: DiceCountByPrestigeUpdate) => void;
   getDicePrestige: (userId: string) => number;
   getTopPrestigeEntries: (limit: number) => DicePrestigeLeaderboardEntry[];
   setDicePrestige: (update: DicePrestigeUpdate) => void;

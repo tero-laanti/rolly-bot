@@ -79,6 +79,6 @@ Manual prestige awards:
 }
 ```
 
-- `manualAward.prestige` maps a prestige level to one achievement id.
+- `manualAward.prestige` maps a prestige number to one achievement id.
 - Each prestige number must be unique across the file.
 - Omit `manualAward` for achievements that should only come from roll evaluation.

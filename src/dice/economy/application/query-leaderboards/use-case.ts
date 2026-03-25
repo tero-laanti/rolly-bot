@@ -154,7 +154,7 @@ const formatEntry = (metric: "fame" | "pips", entry: EconomyLeaderboardEntry): s
 };
 
 const formatPrestigeEntry = (entry: DicePrestigeLeaderboardEntry): string => {
-  return `Prestige ${entry.prestige} | Level ${entry.level}`;
+  return `Prestige ${entry.prestige} | Dice: ${entry.diceCount}`;
 };
 
 const formatMetricLabel = (metric: EconomyLeaderboardMetric): string => {

@@ -65,7 +65,7 @@ type ManageBansDependencies = {
     | "markFirstDiceBan"
     | "awardAchievements"
     | "getDiceBans"
-    | "getDiceLevel"
+    | "getDiceCount"
     | "getDiceSides"
     | "setDiceBan"
   >;
@@ -73,11 +73,11 @@ type ManageBansDependencies = {
 
 export const createDiceBansUseCase = ({ economy, progression }: ManageBansDependencies) => {
   const createDiceBansReply = (userId: string): DiceBansResult => {
-    const diceLevel = progression.getDiceLevel(userId);
+    const diceCount = progression.getDiceCount(userId);
     const dieSides = progression.getDiceSides(userId);
     const fame = economy.getFame(userId);
     const bans = progression.getDiceBans(userId);
-    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceLevel, dieSides);
+    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceCount, dieSides);
     const usedCount = countUsedBans(bans);
 
     if (unlockedSlots < 1 && usedCount === 0) {
@@ -95,7 +95,7 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
       kind: "reply",
       payload: {
         type: "view",
-        view: buildDieSelectionView(userId, diceLevel, bans, unlockedSlots),
+        view: buildDieSelectionView(userId, diceCount, bans, unlockedSlots),
         ephemeral: false,
       },
     };
@@ -113,10 +113,10 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
       };
     }
 
-    const diceLevel = progression.getDiceLevel(action.ownerId);
+    const diceCount = progression.getDiceCount(action.ownerId);
     const dieSides = progression.getDiceSides(action.ownerId);
     const fame = economy.getFame(action.ownerId);
-    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceLevel, dieSides);
+    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceCount, dieSides);
 
     if (action.type === "back") {
       const bans = progression.getDiceBans(action.ownerId);
@@ -136,7 +136,7 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
         kind: "update",
         payload: {
           type: "view",
-          view: buildDieSelectionView(action.ownerId, diceLevel, bans, unlockedSlots),
+          view: buildDieSelectionView(action.ownerId, diceCount, bans, unlockedSlots),
         },
       };
     }
@@ -178,7 +178,7 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
           type: "view",
           view: buildDieSelectionView(
             action.ownerId,
-            diceLevel,
+            diceCount,
             updatedBans,
             unlockedSlots,
             "All bans cleared.",
@@ -200,7 +200,7 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
 
     const currentBans = progression.getDiceBans(action.ownerId);
     const hasBansOnSelectedDie = (currentBans.get(action.dieIndex)?.size ?? 0) > 0;
-    if (action.dieIndex > diceLevel && !hasBansOnSelectedDie) {
+    if (action.dieIndex > diceCount && !hasBansOnSelectedDie) {
       return {
         kind: "reply",
         payload: {
@@ -345,7 +345,7 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
 
 const buildDieSelectionView = (
   ownerId: string,
-  diceLevel: number,
+  diceCount: number,
   bans: Map<number, Set<number>>,
   unlockedSlots: number,
   prefixMessage?: string,
@@ -354,7 +354,7 @@ const buildDieSelectionView = (
   const banDieIndexes = Array.from(bans.entries())
     .filter(([, values]) => values.size > 0)
     .map(([dieIndex]) => dieIndex);
-  const maxVisibleDieIndex = Math.max(diceLevel, ...banDieIndexes, 0);
+  const maxVisibleDieIndex = Math.max(diceCount, ...banDieIndexes, 0);
   const dieButtons = Array.from({ length: maxVisibleDieIndex }, (_, index) => {
     const dieIndex = index + 1;
     const banCount = bans.get(dieIndex)?.size ?? 0;

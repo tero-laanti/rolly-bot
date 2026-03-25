@@ -1,7 +1,7 @@
 import { getPrestigeAchievementId } from "../../../progression/domain/achievements";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import {
-  getDicePrestigeBaseLevel,
+  getDicePrestigeBaseDiceCount,
   getDiceSidesForPrestige,
   getMaxDicePrestige,
 } from "../../../progression/domain/game-rules";
@@ -23,7 +23,7 @@ const prestigeButtonsPerRow = 5;
 type PrestigeState = {
   activePrestige: number;
   highestPrestige: number;
-  activeLevel: number;
+  activeDiceCount: number;
   canPrestigeUp: boolean;
 };
 
@@ -53,16 +53,16 @@ export type DicePrestigeResult = ActionResult<DicePrestigeAction> & {
 type ManagePrestigeDependencies = {
   analytics: Pick<
     DiceAnalyticsRepository,
-    "resetDiceLevelAnalyticsProgress" | "resetDicePrestigeAnalyticsProgress"
+    "resetDiceCountAnalyticsProgress" | "resetDicePrestigeAnalyticsProgress"
   >;
   progression: Pick<
     DiceProgressionRepository,
     | "awardAchievements"
     | "getActiveDicePrestige"
-    | "getDiceLevel"
+    | "getDiceCount"
     | "getDicePrestige"
     | "setActiveDicePrestige"
-    | "setDiceLevelForPrestige"
+    | "setDiceCountForPrestige"
     | "setDicePrestige"
   >;
   unitOfWork: UnitOfWork;
@@ -140,7 +140,7 @@ export const createDicePrestigeUseCase = ({
           kind: "reply",
           payload: {
             type: "message",
-            content: "You have not unlocked that prestige level.",
+            content: "You have not unlocked that prestige.",
             ephemeral: true,
           },
         };
@@ -150,7 +150,7 @@ export const createDicePrestigeUseCase = ({
         userId: action.ownerId,
         prestige: action.prestige,
       });
-      analytics.resetDiceLevelAnalyticsProgress(action.ownerId);
+      analytics.resetDiceCountAnalyticsProgress(action.ownerId);
 
       const state = getPrestigeState(progression, action.ownerId);
       return {
@@ -177,10 +177,10 @@ export const createDicePrestigeUseCase = ({
     const newlyEarned = unitOfWork.runInTransaction(() => {
       progression.setDicePrestige({ userId: action.ownerId, prestige: nextPrestige });
       progression.setActiveDicePrestige({ userId: action.ownerId, prestige: nextPrestige });
-      progression.setDiceLevelForPrestige({
+      progression.setDiceCountForPrestige({
         userId: action.ownerId,
         prestige: nextPrestige,
-        level: 1,
+        diceCount: 1,
       });
       analytics.resetDicePrestigeAnalyticsProgress(action.ownerId);
 
@@ -203,7 +203,7 @@ export const createDicePrestigeUseCase = ({
         view: buildMainView(
           action.ownerId,
           refreshed,
-          `Prestige complete. Your active die is now d${getDiceSidesForPrestige(nextPrestige)} and prestige ${nextPrestige} starts at level 1.`,
+          `Prestige complete. Your active die is now d${getDiceSidesForPrestige(nextPrestige)} and prestige ${nextPrestige} starts with 1 die.`,
         ),
       },
     };
@@ -218,23 +218,23 @@ export const createDicePrestigeUseCase = ({
 const getPrestigeState = (
   progression: Pick<
     DiceProgressionRepository,
-    "getActiveDicePrestige" | "getDiceLevel" | "getDicePrestige"
+    "getActiveDicePrestige" | "getDiceCount" | "getDicePrestige"
   >,
   userId: string,
 ): PrestigeState => {
   const highestPrestige = progression.getDicePrestige(userId);
   const activePrestige = progression.getActiveDicePrestige(userId);
-  const activeLevel = progression.getDiceLevel(userId);
+  const activeDiceCount = progression.getDiceCount(userId);
   const maxDicePrestige = getMaxDicePrestige();
   const canPrestigeUp =
     activePrestige === highestPrestige &&
     highestPrestige < maxDicePrestige &&
-    activeLevel >= getDicePrestigeBaseLevel();
+    activeDiceCount >= getDicePrestigeBaseDiceCount();
 
   return {
     activePrestige,
     highestPrestige,
-    activeLevel,
+    activeDiceCount,
     canPrestigeUp,
   };
 };
@@ -269,7 +269,7 @@ const buildMainView = (
 };
 
 const buildSelectView = (userId: string, state: PrestigeState): ActionView<DicePrestigeAction> => {
-  const levelButtons: ActionButtonSpec<DicePrestigeAction>[] = Array.from(
+  const prestigeButtons: ActionButtonSpec<DicePrestigeAction>[] = Array.from(
     { length: state.highestPrestige + 1 },
     (_, index) => {
       const prestige = index;
@@ -283,7 +283,7 @@ const buildSelectView = (userId: string, state: PrestigeState): ActionView<DiceP
     },
   );
 
-  const rows = chunkActionButtons(levelButtons, prestigeButtonsPerRow);
+  const rows = chunkActionButtons(prestigeButtons, prestigeButtonsPerRow);
 
   rows.push([
     {
@@ -307,13 +307,13 @@ const buildMainContent = (userId: string, state: PrestigeState): string => {
       ? "Maximum prestige reached."
       : state.activePrestige !== state.highestPrestige
         ? `Prestige up unavailable. Select prestige ${state.highestPrestige} to continue progression.`
-        : state.activeLevel >= getDicePrestigeBaseLevel()
+        : state.activeDiceCount >= getDicePrestigeBaseDiceCount()
           ? `Prestige up available: ${state.highestPrestige} -> ${nextPrestige} (d${getDiceSidesForPrestige(nextPrestige)}).`
-          : `Prestige up requires level ${getDicePrestigeBaseLevel()} on prestige ${state.highestPrestige}.`;
+          : `Prestige up requires ${getDicePrestigeBaseDiceCount()} dice on prestige ${state.highestPrestige}.`;
 
   return [
     `Dice prestige for <@${userId}>:`,
-    `Active prestige: ${state.activePrestige} (d${getDiceSidesForPrestige(state.activePrestige)}), level ${state.activeLevel}.`,
+    `Active prestige: ${state.activePrestige} (d${getDiceSidesForPrestige(state.activePrestige)}), dice: ${state.activeDiceCount}.`,
     `Highest unlocked prestige: ${state.highestPrestige} (d${getDiceSidesForPrestige(state.highestPrestige)}).`,
     requirementLine,
   ].join("\n");
@@ -322,7 +322,7 @@ const buildMainContent = (userId: string, state: PrestigeState): string => {
 const buildSelectContent = (userId: string, state: PrestigeState): string => {
   return [
     `Choose active prestige for <@${userId}>.`,
-    `Current: ${state.activePrestige} (d${getDiceSidesForPrestige(state.activePrestige)}), level ${state.activeLevel}.`,
+    `Current: ${state.activePrestige} (d${getDiceSidesForPrestige(state.activePrestige)}), dice: ${state.activeDiceCount}.`,
     `Unlocked range: 0-${state.highestPrestige}.`,
   ].join("\n");
 };

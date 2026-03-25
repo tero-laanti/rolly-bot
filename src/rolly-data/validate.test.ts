@@ -54,9 +54,9 @@ const createRandomEventScenarioInput = (): RandomEventScenarioInput => {
 
 const createDiceBalanceInput = () => ({
   prestigeSides: [6, 8, 12, 20],
-  lowerPrestigeBaseLevel: 5,
+  lowerPrestigeBaseDiceCount: 5,
   banStep: 4,
-  levelUpReward: 1,
+  diceCountIncreaseReward: 1,
   firstDailyRollPipReward: 5,
   maxRollPassCount: 500,
   charge: {
@@ -138,9 +138,9 @@ test("parseRandomEventScenarios rejects stray challengeOutcomeIds without a roll
 test("parseDiceBalance defaults firstDailyRollPipReward to zero when omitted", () => {
   const parsed = parseDiceBalance({
     prestigeSides: [6, 8, 12, 20],
-    lowerPrestigeBaseLevel: 5,
+    lowerPrestigeBaseDiceCount: 5,
     banStep: 4,
-    levelUpReward: 1,
+    diceCountIncreaseReward: 1,
     maxRollPassCount: 500,
     charge: {
       startAfterMinutes: 10,

@@ -29,12 +29,12 @@ export const getDicePvpChallengeExpireMs = (): number => {
   return getDicePvpData().challengeExpireMinutes * minuteMs;
 };
 
-export const getDicePrestigeBaseLevel = (): number => {
-  return getDiceBalanceData().lowerPrestigeBaseLevel;
+export const getDicePrestigeBaseDiceCount = (): number => {
+  return getDiceBalanceData().lowerPrestigeBaseDiceCount;
 };
 
-export const getDiceLevelUpReward = (): number => {
-  return getDiceBalanceData().levelUpReward;
+export const getDiceCountIncreaseReward = (): number => {
+  return getDiceBalanceData().diceCountIncreaseReward;
 };
 
 export const getFirstDailyRollPipReward = (): number => {
@@ -79,10 +79,10 @@ export const getMaxBansPerDie = (dieSides: number): number => {
 
 export const getUnlockedBanSlotsFromFame = (
   fame: number,
-  _level: number,
+  _diceCount: number,
   _dieSides: number,
 ): number => {
-  void _level;
+  void _diceCount;
   void _dieSides;
   return Math.max(0, Math.floor(fame / getBanStep()));
 };

@@ -1,8 +1,8 @@
 export type DiceAnalytics = {
-  levelStartedAt: string;
+  diceCountStartedAt: string;
   prestigeStartedAt: string;
-  rollsCurrentLevel: number;
-  nearLevelupRollsCurrentLevel: number;
+  rollSetsCurrentDiceCount: number;
+  nearDiceCountIncreaseRollSetsCurrentDiceCount: number;
   diceRolledCurrentPrestige: number;
   totalDiceRolled: number;
   pvpWins: number;

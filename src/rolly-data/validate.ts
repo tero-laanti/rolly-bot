@@ -952,13 +952,17 @@ export const parseDiceBalance = (value: unknown): DiceBalanceData => {
 
   const parsed: DiceBalanceData = {
     prestigeSides: readIntegerArray(record.prestigeSides, "diceBalance.prestigeSides", 2),
-    lowerPrestigeBaseLevel: readInteger(
-      record.lowerPrestigeBaseLevel,
-      "diceBalance.lowerPrestigeBaseLevel",
+    lowerPrestigeBaseDiceCount: readInteger(
+      record.lowerPrestigeBaseDiceCount,
+      "diceBalance.lowerPrestigeBaseDiceCount",
       1,
     ),
     banStep: readInteger(record.banStep, "diceBalance.banStep", 1),
-    levelUpReward: readInteger(record.levelUpReward, "diceBalance.levelUpReward", 0),
+    diceCountIncreaseReward: readInteger(
+      record.diceCountIncreaseReward,
+      "diceBalance.diceCountIncreaseReward",
+      0,
+    ),
     firstDailyRollPipReward:
       readOptionalInteger(
         record.firstDailyRollPipReward,
