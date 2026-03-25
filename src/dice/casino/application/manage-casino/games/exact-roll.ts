@@ -1,6 +1,8 @@
 import {
-  getExactRollDieSides,
   getDiceCasinoBetTier,
+  formatDieFace,
+  getExactRollDieSides,
+  getDieFaceButtonEmoji,
   getExactRollFacePayout,
   getExactRollFacePayoutRatio,
   getExactRollHighLowPayout,
@@ -42,7 +44,7 @@ const buildExactRollDescriptionLines = (
     `Mode: ${session.state.exactRollMode === "exact-face" ? "Exact Face" : "High / Low"}.`,
     `Exact Face total return: floor(${getExactRollFacePayoutRatio().numerator} * bet / ${getExactRollFacePayoutRatio().denominator}) = ${getExactRollFacePayout(session.bet)}.`,
     `High / Low total return: floor(${getExactRollHighLowPayoutRatio().numerator} * bet / ${getExactRollHighLowPayoutRatio().denominator}) = ${getExactRollHighLowPayout(session.bet)}.`,
-    `Current exact face: ${session.state.exactRollFace}.`,
+    `Current exact face: ${formatDieFace(session.state.exactRollFace)}.`,
     `Current High / Low pick: ${capitalize(session.state.exactRollHighLowChoice)}.`,
     "Use the buttons below to place the bet directly.",
   ];
@@ -82,8 +84,9 @@ const buildExactRollComponentRows = ({
     ).map((face) => ({
       action: { type: "exact-face", ...actionTarget, face } as const,
       label: `${face}`,
-      style: session.state.exactRollFace === face ? "primary" : "secondary",
+      style: "success",
       disabled: !hasAffordableBet,
+      emoji: getDieFaceButtonEmoji(face),
     }));
     const modeRowFaceCapacity = 5 - exactModeRow.length;
     exactModeRow.push(...faceButtons.slice(-modeRowFaceCapacity));
@@ -103,13 +106,13 @@ const buildExactRollComponentRows = ({
       {
         action: { type: "exact-high-low", ...actionTarget, choice: "low" } as const,
         label: `Low (1-${getExactRollLowMaxFace()})`,
-        style: session.state.exactRollHighLowChoice === "low" ? "primary" : "secondary",
+        style: "success",
         disabled: !hasAffordableBet,
       },
       {
         action: { type: "exact-high-low", ...actionTarget, choice: "high" } as const,
         label: `High (${getExactRollHighMinFace()}-${getExactRollDieSides()})`,
-        style: session.state.exactRollHighLowChoice === "high" ? "primary" : "secondary",
+        style: "success",
         disabled: !hasAffordableBet,
       },
     ];
@@ -195,8 +198,8 @@ const handleExactRollAction = (
             exactRollFace: action.face,
             exactRollMode: "exact-face",
             lastOutcome: resolution.won
-              ? `Hit. Picked ${action.face}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
-              : `Missed. Picked ${action.face}, rolled ${rolledFace}.`,
+              ? `Hit. Picked ${formatDieFace(action.face)}, rolled ${formatDieFace(rolledFace)}. Paid ${resolution.payout} pips.`
+              : `Missed. Picked ${formatDieFace(action.face)}, rolled ${formatDieFace(rolledFace)}.`,
           },
         },
         nextPips,
@@ -256,8 +259,10 @@ const handleExactRollAction = (
             exactRollHighLowChoice: action.choice,
             exactRollMode: "high-low",
             lastOutcome: resolution.won
-              ? `Hit. Picked ${capitalize(action.choice)}, rolled ${rolledFace}. Paid ${resolution.payout} pips.`
-              : `Missed. Picked ${capitalize(action.choice)}, rolled ${rolledFace}.`,
+              ? `Hit. Picked ${capitalize(action.choice)}, rolled ${formatDieFace(
+                  rolledFace,
+                )}. Paid ${resolution.payout} pips.`
+              : `Missed. Picked ${capitalize(action.choice)}, rolled ${formatDieFace(rolledFace)}.`,
           },
         },
         nextPips,

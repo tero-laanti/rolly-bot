@@ -3,7 +3,9 @@ import {
   dicePokerDieSides,
   describePokerResult,
   dicePokerDiceCount,
+  formatDieFace,
   formatDice,
+  getDieFaceButtonEmoji,
   getDiceCasinoBetTier,
   getDicePokerPayoutMultiplier,
   rerollDicePokerRound,
@@ -47,7 +49,7 @@ const buildDicePokerDescriptionLines = (
     lines.push("", "Initial roll:");
     for (const [index, value] of round.initialRoll.entries()) {
       lines.push(
-        `Die ${index + 1}: [${value}] ${round.heldIndices.includes(index) ? "(held)" : ""}`.trim(),
+        `Die ${index + 1}: ${formatDieFace(value)} ${round.heldIndices.includes(index) ? "(held)" : ""}`.trim(),
       );
     }
   }
@@ -67,10 +69,11 @@ const buildDicePokerComponentRows = ({
     ownerId: session.userId,
     sessionToken: session.state.sessionToken,
   } as const;
-  const holdRow: DiceCasinoActionRow = round.initialRoll.map((_, index) => ({
+  const holdRow: DiceCasinoActionRow = round.initialRoll.map((value, index) => ({
     action: { type: "poker-toggle-hold", ...actionTarget, index } as const,
-    label: round.heldIndices.includes(index) ? `Held ${index + 1}` : `Hold ${index + 1}`,
+    label: round.heldIndices.includes(index) ? "Held" : "Hold",
     style: round.heldIndices.includes(index) ? "primary" : "secondary",
+    emoji: getDieFaceButtonEmoji(value),
   }));
   const actionRow: DiceCasinoActionRow = [
     {

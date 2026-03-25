@@ -17,13 +17,18 @@ export const renderActionButtonRows = <TAction>(
 ): ActionRowBuilder<ButtonBuilder>[] => {
   return rows.map((row) =>
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      ...row.map((button) =>
-        new ButtonBuilder()
+      ...row.map((button) => {
+        const builder = new ButtonBuilder()
           .setCustomId(encodeAction(button.action))
           .setLabel(button.label)
           .setStyle(buttonStyleMap[button.style])
-          .setDisabled(Boolean(button.disabled)),
-      ),
+          .setDisabled(Boolean(button.disabled));
+        if (button.emoji) {
+          builder.setEmoji(button.emoji);
+        }
+
+        return builder;
+      }),
     ),
   );
 };

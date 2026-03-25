@@ -1,5 +1,6 @@
 import { getDiceCasinoData } from "../../../rolly-data/load";
 import { minuteMs } from "../../../shared/time";
+import type { ActionButtonEmojiSpec } from "../../../shared-kernel/application/action-view";
 import type {
   BlackjackRoundState,
   DiceCasinoGame,
@@ -516,12 +517,64 @@ export const classifyDicePokerHand = (roll: number[], bet: number): DicePokerRes
   return { kind: "loss", payout: 0 };
 };
 
+const dieFaceEmojiByValue: Record<number, ActionButtonEmojiSpec> = {
+  1: { name: "d1", id: "1486276117118845019" },
+  2: { name: "d2", id: "1486276192490491975" },
+  3: { name: "d3", id: "1486276367552348200" },
+  4: { name: "d4", id: "1486276456525856809" },
+  5: { name: "d5", id: "1486276551896076319" },
+  6: { name: "d6", id: "1486278558862147664" },
+  7: { name: "d7", id: "1486276682183872512" },
+  8: { name: "d8", id: "1486276768921944146" },
+  9: { name: "d9", id: "1486276864791285850" },
+  10: { name: "d10", id: "1486276997129965629" },
+  11: { name: "d11", id: "1486277124665901106" },
+  12: { name: "d12", id: "1486277231771648032" },
+};
+
+export const formatDieFace = (value: number): string => {
+  const emoji = dieFaceEmojiByValue[value];
+  return emoji ? `<:${emoji.name}:${emoji.id}>` : `[${value}]`;
+};
+
+export const getDieFaceButtonEmoji = (value: number): ActionButtonEmojiSpec | undefined => {
+  return dieFaceEmojiByValue[value];
+};
+
 export const formatDice = (dice: number[]): string => {
-  return dice.map((value) => `[${value}]`).join(" ");
+  return dice.map(formatDieFace).join(" ");
 };
 
 export const formatBlackjackDice = (dice: number[], hideHoleCard: boolean): string => {
-  return dice.map((value, index) => (hideHoleCard && index === 1 ? "[?]" : `[${value}]`)).join(" ");
+  const displayValues = dice.map((value, index) => ({
+    value,
+    hidden: hideHoleCard && index === 1,
+    asEleven: false,
+  }));
+  let total = dice.reduce((sum, value) => sum + (value === 1 ? 1 : value), 0);
+
+  for (const displayValue of displayValues) {
+    if (displayValue.hidden || displayValue.value !== 1 || total + 10 > 21) {
+      continue;
+    }
+
+    displayValue.asEleven = true;
+    total += 10;
+  }
+
+  return displayValues
+    .map((displayValue) => {
+      if (displayValue.hidden) {
+        return "[?]";
+      }
+
+      if (displayValue.asEleven) {
+        return "[11]";
+      }
+
+      return formatDieFace(displayValue.value);
+    })
+    .join(" ");
 };
 
 export const describePokerResult = (result: DicePokerResult): string => {

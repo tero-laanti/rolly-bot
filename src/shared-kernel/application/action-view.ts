@@ -2,11 +2,18 @@ export type ButtonStyleSpec = "primary" | "secondary" | "success" | "danger";
 
 export const maxActionButtonsPerRow = 5;
 
+export type ActionButtonEmojiSpec = {
+  name: string;
+  id?: string;
+  animated?: boolean;
+};
+
 export type ActionButtonSpec<TAction> = {
   action: TAction;
   label: string;
   style: ButtonStyleSpec;
   disabled?: boolean;
+  emoji?: ActionButtonEmojiSpec;
 };
 
 export type ActionButtonRowSpec<TAction> = ActionButtonSpec<TAction>[];

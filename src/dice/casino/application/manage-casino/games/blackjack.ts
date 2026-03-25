@@ -1,7 +1,7 @@
 import {
   createBlackjackRound,
+  formatDieFace,
   formatBlackjackDice,
-  formatDice,
   getBlackjackDealerStandOnTotal,
   getBlackjackHandTotals,
   getBlackjackDieSides,
@@ -52,7 +52,7 @@ const buildBlackjackDescriptionLines = (
     lines.push(
       "",
       `Dealer: ${formatBlackjackDice(round.dealerHand, true)}.`,
-      `Your hand: ${formatDice(round.playerHand)} (${getBlackjackHandTotals(round.playerHand).total}).`,
+      `Your hand: ${formatBlackjackDice(round.playerHand, false)} (${getBlackjackHandTotals(round.playerHand).total}).`,
     );
   }
 
@@ -144,8 +144,9 @@ const startBlackjackRound = ({
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
+            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
               resolution.playerHand,
+              false,
             )}.`,
           },
         },
@@ -189,7 +190,9 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "setup",
             activeRound: resolution.round,
-            lastOutcome: `You drew ${resolution.round.playerHand.at(-1) ?? resolution.round.playerHand[0]}.`,
+            lastOutcome: `You drew ${formatDieFace(
+              resolution.round.playerHand.at(-1) ?? resolution.round.playerHand[0]!,
+            )}.`,
           },
         },
         pips,
@@ -234,8 +237,9 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
+            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
               resolution.playerHand,
+              false,
             )}.`,
           },
         },
@@ -289,8 +293,9 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}\nDealer: ${formatDice(resolution.dealerHand)}.\nYou: ${formatDice(
+            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
               resolution.playerHand,
+              false,
             )}.`,
           },
         },

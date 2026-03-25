@@ -8,7 +8,9 @@ import {
   dicePokerDiceCount,
   dicePokerDieSides,
   formatBlackjackDice,
+  formatDieFace,
   formatDice,
+  getDieFaceButtonEmoji,
   getBlackjackHandTotals,
   getBlackjackNaturalPayout,
   getBlackjackWinPayoutMultiplier,
@@ -104,11 +106,7 @@ const buildLobbyLines = (session: DiceCasinoSession): string[] => {
     ];
   }
 
-  return [
-    "Choose a game.",
-    `Selected: ${getDiceCasinoGameLabel(session.state.selectedGame)}.`,
-    "Use a game button below to open its setup screen.",
-  ];
+  return ["Choose a game.", "Use a game button below to open its setup screen."];
 };
 
 const describeRoundInLobby = (session: DiceCasinoSession): string => {
@@ -135,7 +133,7 @@ const buildSetupLines = (session: DiceCasinoSession, pips: number): string[] => 
   switch (session.state.selectedGame) {
     case "exact-roll":
       return [
-        `Mode: ${session.state.exactRollMode === "exact-face" ? "Exact Face" : "High / Low"} • Pick: ${getExactRollPickLabel(session)}`,
+        `Mode: ${session.state.exactRollMode === "exact-face" ? "Exact Face" : "High / Low"}.`,
         `Exact Face pays ${formatPips(getExactRollFacePayout(session.bet))}.`,
         `High / Low pays ${formatPips(getExactRollHighLowPayout(session.bet))}.`,
         canStartCasinoRound(session.bet, pips)
@@ -157,7 +155,6 @@ const buildSetupLines = (session: DiceCasinoSession, pips: number): string[] => 
       return [
         "Beat the dealer without going over 21.",
         `Win pays ${formatPips(session.bet * getBlackjackWinPayoutMultiplier())}.`,
-        `Push returns ${formatPips(session.bet)}.`,
         `Natural 21 pays ${formatPips(getBlackjackNaturalPayout(session.bet))}.`,
       ];
     case "dice-poker":
@@ -249,7 +246,7 @@ const buildActiveRoundLines = (session: DiceCasinoSession): string[] => {
       const playerTotals = getBlackjackHandTotals(round.playerHand);
       const lines = [
         `Dealer: ${formatBlackjackDice(round.dealerHand, true)}.`,
-        `You: ${formatDice(round.playerHand)} = ${playerTotals.total}${playerTotals.isSoft ? " (soft)" : ""}.`,
+        `You: ${formatBlackjackDice(round.playerHand, false)} = ${playerTotals.total}${playerTotals.isSoft ? " (soft)" : ""}.`,
       ];
       const updateLine = getActiveUpdateLine(session.state.lastOutcome);
       if (updateLine) {
@@ -266,7 +263,7 @@ const buildActiveRoundLines = (session: DiceCasinoSession): string[] => {
 
       const heldDice =
         round.heldIndices.length > 0
-          ? round.heldIndices.map((index) => index + 1).join(", ")
+          ? round.heldIndices.map((index) => formatDieFace(round.initialRoll[index]!)).join(", ")
           : "none";
       const lines = [
         `Roll: ${formatDice(round.initialRoll)}.`,
@@ -434,14 +431,14 @@ const buildExactRollSetupComponents = (
     rows.push([
       {
         action: { ...buildActionTarget(session, "exact-high-low"), choice: "low" },
-        label: `Low (${getExactRollLowMaxFace()})`,
-        style: session.state.exactRollHighLowChoice === "low" ? "primary" : "secondary",
+        label: `Low (1-${getExactRollLowMaxFace()})`,
+        style: "success",
         disabled: !canStartCasinoRound(session.bet, pips),
       },
       {
         action: { ...buildActionTarget(session, "exact-high-low"), choice: "high" },
-        label: `High (${getExactRollHighMinFace()}+)`,
-        style: session.state.exactRollHighLowChoice === "high" ? "primary" : "secondary",
+        label: `High (${getExactRollHighMinFace()}-${getExactRollDieSides()})`,
+        style: "success",
         disabled: !canStartCasinoRound(session.bet, pips),
       },
     ]);
@@ -454,8 +451,9 @@ const buildExactRollSetupComponents = (
   ).map((face) => ({
     action: { ...buildActionTarget(session, "exact-face"), face },
     label: `${face}`,
-    style: session.state.exactRollFace === face ? "primary" : "secondary",
+    style: "success",
     disabled: !canStartCasinoRound(session.bet, pips),
+    emoji: getDieFaceButtonEmoji(face),
   }));
   const buttonsPerRow = Math.ceil(faceButtons.length / 2);
   rows.push(...chunkActionButtons(faceButtons, buttonsPerRow));
@@ -541,25 +539,25 @@ const buildGameSelectionRow = (
     {
       action: { ...buildActionTarget(session, "select-game"), game: "exact-roll" },
       label: getDiceCasinoGameLabel("exact-roll"),
-      style: session.state.selectedGame === "exact-roll" ? "primary" : "secondary",
+      style: "success",
       disabled,
     },
     {
       action: { ...buildActionTarget(session, "select-game"), game: "push-your-luck" },
       label: getDiceCasinoGameLabel("push-your-luck"),
-      style: session.state.selectedGame === "push-your-luck" ? "primary" : "secondary",
+      style: "success",
       disabled,
     },
     {
       action: { ...buildActionTarget(session, "select-game"), game: "blackjack" },
       label: getDiceCasinoGameLabel("blackjack"),
-      style: session.state.selectedGame === "blackjack" ? "primary" : "secondary",
+      style: "success",
       disabled,
     },
     {
       action: { ...buildActionTarget(session, "select-game"), game: "dice-poker" },
       label: getDiceCasinoGameLabel("dice-poker"),
-      style: session.state.selectedGame === "dice-poker" ? "primary" : "secondary",
+      style: "success",
       disabled,
     },
     {
@@ -649,14 +647,6 @@ const buildActionTarget = <TType extends DiceCasinoAction["type"]>(
     ownerId: session.userId,
     sessionToken: session.state.sessionToken,
   } as Extract<DiceCasinoAction, { type: TType }>;
-};
-
-const getExactRollPickLabel = (session: DiceCasinoSession): string => {
-  if (session.state.exactRollMode === "exact-face") {
-    return String(session.state.exactRollFace);
-  }
-
-  return session.state.exactRollHighLowChoice === "low" ? "Low" : "High";
 };
 
 const formatPips = (pips: number): string => {
