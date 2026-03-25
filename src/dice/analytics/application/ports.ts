@@ -5,6 +5,7 @@ export type DiceRollAnalyticsUpdate = {
   rollSetCount: number;
   nearDiceCountIncreaseRollCount: number;
   diceRolledCount: number;
+  rollCommandCount: number;
 };
 
 export type DicePvpStatsUpdate = {

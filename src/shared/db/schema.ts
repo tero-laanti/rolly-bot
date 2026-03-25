@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 1;
+const currentSchemaVersion = 2;
 
 const levelAchievementIdRewrites = new Map<string, string>([
   ["first-level-up", "first-extra-die"],
@@ -12,6 +12,12 @@ const levelAchievementIdRewrites = new Map<string, string>([
 
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   assertNoLegacySchemaArtifacts(db);
+
+  if (hasExistingUserTables(db)) {
+    assertCurrentSchemaArtifacts(db);
+    db.pragma(`user_version = ${currentSchemaVersion}`);
+    return;
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS balances (
@@ -94,10 +100,24 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       near_dice_count_increase_roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
       dice_rolled_current_prestige INTEGER NOT NULL DEFAULT 0,
       total_dice_rolled INTEGER NOT NULL DEFAULT 0,
+      total_dice_sets_rolled INTEGER NOT NULL DEFAULT 0,
+      total_roll_commands_called INTEGER NOT NULL DEFAULT 0,
       pvp_wins INTEGER NOT NULL DEFAULT 0,
       pvp_losses INTEGER NOT NULL DEFAULT 0,
       pvp_draws INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_analytics_by_prestige (
+      user_id TEXT NOT NULL,
+      prestige INTEGER NOT NULL,
+      prestige_started_at TEXT NOT NULL,
+      dice_count_started_at TEXT NOT NULL,
+      roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
+      near_dice_count_increase_roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
+      dice_rolled_current_prestige INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, prestige)
     );
 
     CREATE TABLE IF NOT EXISTS dice_charge_state (
@@ -253,7 +273,13 @@ export const migrateLegacyDatabaseSchema = (db: SqliteDatabase): boolean => {
   }
 
   const legacyArtifacts = getLegacySchemaArtifacts(db);
-  if (legacyArtifacts.length < 1) {
+  const currentSchemaIssues = getCurrentSchemaIssues(db);
+  const hasPendingAnalyticsPrestigeBackfill = hasPendingDiceAnalyticsPrestigeBackfill(db);
+  if (
+    legacyArtifacts.length < 1 &&
+    currentSchemaIssues.length < 1 &&
+    !hasPendingAnalyticsPrestigeBackfill
+  ) {
     assertCurrentSchemaArtifacts(db);
     db.pragma(`user_version = ${currentSchemaVersion}`);
     return false;
@@ -264,6 +290,8 @@ export const migrateLegacyDatabaseSchema = (db: SqliteDatabase): boolean => {
     migrateLegacyAnalyticsColumns(db);
     migrateLegacyProgressionAchievementStatsColumns(db);
     rewriteLegacyAchievementIds(db);
+    migrateCurrentAnalyticsSchema(db);
+    backfillDiceAnalyticsByPrestige(db);
 
     const remainingLegacyArtifacts = getLegacySchemaArtifacts(db);
     if (remainingLegacyArtifacts.length > 0) {
@@ -271,6 +299,12 @@ export const migrateLegacyDatabaseSchema = (db: SqliteDatabase): boolean => {
         "Offline dice-count migration did not fully clear legacy schema artifacts.",
         remainingLegacyArtifacts,
       );
+    }
+
+    if (hasPendingDiceAnalyticsPrestigeBackfill(db)) {
+      throw buildSchemaError("Offline dice analytics backfill did not fully seed prestige rows.", [
+        "Some dice_analytics rows are still missing matching dice_analytics_by_prestige rows.",
+      ]);
     }
 
     assertCurrentSchemaArtifacts(db);
@@ -308,6 +342,62 @@ const migrateLegacyAnalyticsColumns = (db: SqliteDatabase): void => {
   );
 };
 
+const migrateCurrentAnalyticsSchema = (db: SqliteDatabase): void => {
+  addColumnIfMissing(db, "dice_analytics", "total_dice_sets_rolled", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(
+    db,
+    "dice_analytics",
+    "total_roll_commands_called",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dice_analytics_by_prestige (
+      user_id TEXT NOT NULL,
+      prestige INTEGER NOT NULL,
+      prestige_started_at TEXT NOT NULL,
+      dice_count_started_at TEXT NOT NULL,
+      roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
+      near_dice_count_increase_roll_sets_current_dice_count INTEGER NOT NULL DEFAULT 0,
+      dice_rolled_current_prestige INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, prestige)
+    );
+  `);
+
+  addColumnIfMissing(
+    db,
+    "dice_analytics_by_prestige",
+    "prestige_started_at",
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  addColumnIfMissing(
+    db,
+    "dice_analytics_by_prestige",
+    "dice_count_started_at",
+    "TEXT NOT NULL DEFAULT ''",
+  );
+  addColumnIfMissing(
+    db,
+    "dice_analytics_by_prestige",
+    "roll_sets_current_dice_count",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+  addColumnIfMissing(
+    db,
+    "dice_analytics_by_prestige",
+    "near_dice_count_increase_roll_sets_current_dice_count",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+  addColumnIfMissing(
+    db,
+    "dice_analytics_by_prestige",
+    "dice_rolled_current_prestige",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+  addColumnIfMissing(db, "dice_analytics_by_prestige", "updated_at", "TEXT NOT NULL DEFAULT ''");
+};
+
 const migrateLegacyProgressionAchievementStatsColumns = (db: SqliteDatabase): void => {
   renameColumnIfExists(
     db,
@@ -341,6 +431,83 @@ const rewriteLegacyAchievementIds = (db: SqliteDatabase): void => {
     ).run({ legacyId, currentId });
 
     db.prepare("DELETE FROM user_achievements WHERE achievement_id = ?").run(legacyId);
+  }
+};
+
+const backfillDiceAnalyticsByPrestige = (db: SqliteDatabase): void => {
+  if (!hasTable(db, "dice_analytics") || !hasTable(db, "dice_analytics_by_prestige")) {
+    return;
+  }
+
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        user_id,
+        prestige_started_at,
+        dice_count_started_at,
+        roll_sets_current_dice_count,
+        near_dice_count_increase_roll_sets_current_dice_count,
+        dice_rolled_current_prestige,
+        updated_at
+      FROM dice_analytics
+    `,
+    )
+    .all() as Array<{
+    user_id: string;
+    prestige_started_at: string;
+    dice_count_started_at: string;
+    roll_sets_current_dice_count: number;
+    near_dice_count_increase_roll_sets_current_dice_count: number;
+    dice_rolled_current_prestige: number;
+    updated_at: string;
+  }>;
+
+  const insert = db.prepare(
+    `
+      INSERT INTO dice_analytics_by_prestige (
+        user_id,
+        prestige,
+        prestige_started_at,
+        dice_count_started_at,
+        roll_sets_current_dice_count,
+        near_dice_count_increase_roll_sets_current_dice_count,
+        dice_rolled_current_prestige,
+        updated_at
+      )
+      VALUES (
+        @userId,
+        @prestige,
+        @prestigeStartedAt,
+        @diceCountStartedAt,
+        @rollSetsCurrentDiceCount,
+        @nearDiceCountIncreaseRollSetsCurrentDiceCount,
+        @diceRolledCurrentPrestige,
+        @updatedAt
+      )
+      ON CONFLICT(user_id, prestige)
+      DO UPDATE SET
+        prestige_started_at = excluded.prestige_started_at,
+        dice_count_started_at = excluded.dice_count_started_at,
+        roll_sets_current_dice_count = excluded.roll_sets_current_dice_count,
+        near_dice_count_increase_roll_sets_current_dice_count = excluded.near_dice_count_increase_roll_sets_current_dice_count,
+        dice_rolled_current_prestige = excluded.dice_rolled_current_prestige,
+        updated_at = excluded.updated_at
+    `,
+  );
+
+  for (const row of rows) {
+    insert.run({
+      userId: row.user_id,
+      prestige: resolveAnalyticsBackfillPrestige(db, row.user_id),
+      prestigeStartedAt: row.prestige_started_at,
+      diceCountStartedAt: row.dice_count_started_at,
+      rollSetsCurrentDiceCount: row.roll_sets_current_dice_count,
+      nearDiceCountIncreaseRollSetsCurrentDiceCount:
+        row.near_dice_count_increase_roll_sets_current_dice_count,
+      diceRolledCurrentPrestige: row.dice_rolled_current_prestige,
+      updatedAt: row.updated_at,
+    });
   }
 };
 
@@ -420,6 +587,41 @@ const getCurrentSchemaIssues = (db: SqliteDatabase): string[] => {
       "Missing current column dice_analytics.near_dice_count_increase_roll_sets_current_dice_count.",
     );
   }
+  if (!hasColumn(db, "dice_analytics", "total_dice_sets_rolled")) {
+    issues.push("Missing current column dice_analytics.total_dice_sets_rolled.");
+  }
+  if (!hasColumn(db, "dice_analytics", "total_roll_commands_called")) {
+    issues.push("Missing current column dice_analytics.total_roll_commands_called.");
+  }
+  if (!hasTable(db, "dice_analytics_by_prestige")) {
+    issues.push("Missing current table dice_analytics_by_prestige.");
+  }
+  if (!hasColumn(db, "dice_analytics_by_prestige", "prestige_started_at")) {
+    issues.push("Missing current column dice_analytics_by_prestige.prestige_started_at.");
+  }
+  if (!hasColumn(db, "dice_analytics_by_prestige", "dice_count_started_at")) {
+    issues.push("Missing current column dice_analytics_by_prestige.dice_count_started_at.");
+  }
+  if (!hasColumn(db, "dice_analytics_by_prestige", "roll_sets_current_dice_count")) {
+    issues.push("Missing current column dice_analytics_by_prestige.roll_sets_current_dice_count.");
+  }
+  if (
+    !hasColumn(
+      db,
+      "dice_analytics_by_prestige",
+      "near_dice_count_increase_roll_sets_current_dice_count",
+    )
+  ) {
+    issues.push(
+      "Missing current column dice_analytics_by_prestige.near_dice_count_increase_roll_sets_current_dice_count.",
+    );
+  }
+  if (!hasColumn(db, "dice_analytics_by_prestige", "dice_rolled_current_prestige")) {
+    issues.push("Missing current column dice_analytics_by_prestige.dice_rolled_current_prestige.");
+  }
+  if (!hasColumn(db, "dice_analytics_by_prestige", "updated_at")) {
+    issues.push("Missing current column dice_analytics_by_prestige.updated_at.");
+  }
   if (
     !hasColumn(db, "dice_progression_achievement_stats", "near_dice_count_increase_rolls_total")
   ) {
@@ -434,6 +636,68 @@ const getCurrentSchemaIssues = (db: SqliteDatabase): string[] => {
   }
 
   return issues;
+};
+
+const hasPendingDiceAnalyticsPrestigeBackfill = (db: SqliteDatabase): boolean => {
+  if (!hasTable(db, "dice_analytics")) {
+    return false;
+  }
+
+  if (!hasTable(db, "dice_analytics_by_prestige")) {
+    const analyticsRowCount = db.prepare("SELECT COUNT(*) AS count FROM dice_analytics").get() as {
+      count: number;
+    };
+    return analyticsRowCount.count > 0;
+  }
+
+  const rows = db.prepare("SELECT user_id FROM dice_analytics").all() as Array<{ user_id: string }>;
+  const selectPrestigeRow = db.prepare(
+    "SELECT 1 FROM dice_analytics_by_prestige WHERE user_id = ? AND prestige = ?",
+  );
+
+  return rows.some(({ user_id: userId }) => {
+    const prestige = resolveAnalyticsBackfillPrestige(db, userId);
+    return !selectPrestigeRow.get(userId, prestige);
+  });
+};
+
+const resolveAnalyticsBackfillPrestige = (db: SqliteDatabase, userId: string): number => {
+  const activePrestige = getOptionalPrestigeValue(
+    db,
+    "dice_active_prestige",
+    "SELECT prestige FROM dice_active_prestige WHERE user_id = ?",
+    userId,
+  );
+  const highestUnlockedPrestige = getOptionalPrestigeValue(
+    db,
+    "dice_prestige",
+    "SELECT prestige FROM dice_prestige WHERE user_id = ?",
+    userId,
+  );
+  const currentTrackedPrestige = getOptionalPrestigeValue(
+    db,
+    "dice_counts_by_prestige",
+    "SELECT MAX(prestige) AS prestige FROM dice_counts_by_prestige WHERE user_id = ?",
+    userId,
+  );
+  const legacyTrackedPrestige = getOptionalPrestigeValue(
+    db,
+    "dice_levels_by_prestige",
+    "SELECT MAX(prestige) AS prestige FROM dice_levels_by_prestige WHERE user_id = ?",
+    userId,
+  );
+  const resolvedHighestPrestige =
+    highestUnlockedPrestige ??
+    currentTrackedPrestige ??
+    legacyTrackedPrestige ??
+    activePrestige ??
+    0;
+
+  if (activePrestige === null) {
+    return resolvedHighestPrestige;
+  }
+
+  return Math.max(0, Math.min(activePrestige, resolvedHighestPrestige));
 };
 
 const getMigrationBlockingIssues = (db: SqliteDatabase): string[] => {
@@ -511,11 +775,38 @@ const buildSchemaError = (message: string, details: string[]): Error => {
   return new Error(lines.join("\n"));
 };
 
+const hasExistingUserTables = (db: SqliteDatabase): boolean => {
+  const row = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1",
+    )
+    .get() as { 1: number } | undefined;
+  return Boolean(row);
+};
+
 const hasTable = (db: SqliteDatabase, tableName: string): boolean => {
   const row = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
     .get(tableName) as { name: string } | undefined;
   return Boolean(row);
+};
+
+const getOptionalPrestigeValue = (
+  db: SqliteDatabase,
+  tableName: string,
+  query: string,
+  userId: string,
+): number | null => {
+  if (!hasTable(db, tableName)) {
+    return null;
+  }
+
+  const row = db.prepare(query).get(userId) as { prestige: number | null } | undefined;
+  if (!row || row.prestige === null || Number.isNaN(row.prestige)) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor(row.prestige));
 };
 
 const hasColumn = (db: SqliteDatabase, tableName: string, columnName: string): boolean => {
@@ -525,6 +816,19 @@ const hasColumn = (db: SqliteDatabase, tableName: string, columnName: string): b
 
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
   return columns.some((column) => column.name === columnName);
+};
+
+const addColumnIfMissing = (
+  db: SqliteDatabase,
+  tableName: string,
+  columnName: string,
+  columnDefinition: string,
+): void => {
+  if (!hasTable(db, tableName) || hasColumn(db, tableName, columnName)) {
+    return;
+  }
+
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
 };
 
 const renameColumnIfExists = (

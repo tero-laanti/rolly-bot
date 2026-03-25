@@ -444,3 +444,149 @@ test("raid damage uses the highest roll set total instead of summing all roll se
     Math.random = originalRandom;
   }
 });
+
+test("manual rolls increment total /roll call analytics", () => {
+  const originalRandom = Math.random;
+  let recordedRollCommandCount = -1;
+  Math.random = () => 0;
+
+  try {
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: (update) => {
+          recordedRollCommandCount = update.rollCommandCount;
+        },
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      progression: {
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 1,
+          diceCountIncreasesTotal: 1,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 1,
+        getDicePrestige: () => 0,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    useCase({
+      userId: "user-manual",
+      userMention: "<@user-manual>",
+      source: "manual",
+      nowMs: 1_710_000_000_000,
+    });
+
+    assert.equal(recordedRollCommandCount, 1);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test("auto rolls do not increment total /roll call analytics", () => {
+  const originalRandom = Math.random;
+  let recordedRollCommandCount = -1;
+  Math.random = () => 0;
+
+  try {
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: (update) => {
+          recordedRollCommandCount = update.rollCommandCount;
+        },
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      progression: {
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 1,
+          diceCountIncreasesTotal: 1,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 1,
+        getDicePrestige: () => 0,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    useCase({
+      userId: "user-auto-analytics",
+      userMention: "<@user-auto-analytics>",
+      source: "auto",
+      nowMs: 1_710_000_000_000,
+    });
+
+    assert.equal(recordedRollCommandCount, 0);
+  } finally {
+    Math.random = originalRandom;
+  }
+});

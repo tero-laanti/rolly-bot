@@ -61,6 +61,8 @@ const createHarness = ({
       nearDiceCountIncreaseRollSetsCurrentDiceCount: 0,
       diceRolledCurrentPrestige: 0,
       totalDiceRolled: 0,
+      totalDiceSetsRolled: 0,
+      totalRollCommandsCalled: 0,
       pvpWins: 0,
       pvpLosses: 0,
       pvpDraws: 0,

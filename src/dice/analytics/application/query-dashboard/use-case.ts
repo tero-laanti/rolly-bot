@@ -46,6 +46,8 @@ export const createQueryDiceAnalyticsUseCase = ({
       `Time on current prestige: ${formatElapsed(analyticsView.prestigeStartedAt, nowMs)}.`,
       `Dice rolled on current prestige: ${analyticsView.diceRolledCurrentPrestige}.`,
       `Total dice rolled: ${analyticsView.totalDiceRolled}.`,
+      `Total dice sets rolled: ${analyticsView.totalDiceSetsRolled}.`,
+      `Total /roll calls: ${analyticsView.totalRollCommandsCalled}.`,
       `PvP stats: ${analyticsView.pvpWins}W / ${analyticsView.pvpLosses}L / ${analyticsView.pvpDraws}D.`,
     ];
 

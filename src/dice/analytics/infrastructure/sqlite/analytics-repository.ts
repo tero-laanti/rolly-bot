@@ -1,5 +1,9 @@
 import type { SqliteDatabase } from "../../../../shared/db";
-import type { DiceAnalyticsRepository } from "../../application/ports";
+import type {
+  DiceAnalyticsRepository,
+  DicePvpStatsUpdate,
+  DiceRollAnalyticsUpdate,
+} from "../../application/ports";
 import type { DiceAnalytics } from "../../domain/analytics";
 import { getMaxDicePrestige } from "../../../progression/domain/game-rules";
 
@@ -11,24 +15,23 @@ type DiceAnalyticsRow = {
   near_dice_count_increase_roll_sets_current_dice_count: number;
   dice_rolled_current_prestige: number;
   total_dice_rolled: number;
+  total_dice_sets_rolled: number;
+  total_roll_commands_called: number;
   pvp_wins: number;
   pvp_losses: number;
   pvp_draws: number;
   updated_at: string;
 };
 
-type DiceRollAnalyticsUpdate = {
-  userId: string;
-  rollSetCount: number;
-  nearDiceCountIncreaseRollCount: number;
-  diceRolledCount: number;
-};
-
-type DicePvpStatsUpdate = {
-  userId: string;
-  wins?: number;
-  losses?: number;
-  draws?: number;
+type DiceAnalyticsByPrestigeRow = {
+  user_id: string;
+  prestige: number;
+  prestige_started_at: string;
+  dice_count_started_at: string;
+  roll_sets_current_dice_count: number;
+  near_dice_count_increase_roll_sets_current_dice_count: number;
+  dice_rolled_current_prestige: number;
+  updated_at: string;
 };
 
 const normalizePrestige = (prestige: number): number => {
@@ -78,15 +81,20 @@ const getActiveDicePrestige = (db: SqliteDatabase, userId: string): number => {
   return normalizedActive;
 };
 
-const mapDiceAnalyticsRow = (row: DiceAnalyticsRow): DiceAnalytics => {
+const mapDiceAnalyticsRow = (
+  row: DiceAnalyticsRow,
+  prestigeRow: DiceAnalyticsByPrestigeRow,
+): DiceAnalytics => {
   return {
-    diceCountStartedAt: row.dice_count_started_at,
-    prestigeStartedAt: row.prestige_started_at,
-    rollSetsCurrentDiceCount: row.roll_sets_current_dice_count,
+    diceCountStartedAt: prestigeRow.dice_count_started_at,
+    prestigeStartedAt: prestigeRow.prestige_started_at,
+    rollSetsCurrentDiceCount: prestigeRow.roll_sets_current_dice_count,
     nearDiceCountIncreaseRollSetsCurrentDiceCount:
-      row.near_dice_count_increase_roll_sets_current_dice_count,
-    diceRolledCurrentPrestige: row.dice_rolled_current_prestige,
+      prestigeRow.near_dice_count_increase_roll_sets_current_dice_count,
+    diceRolledCurrentPrestige: prestigeRow.dice_rolled_current_prestige,
     totalDiceRolled: row.total_dice_rolled,
+    totalDiceSetsRolled: row.total_dice_sets_rolled,
+    totalRollCommandsCalled: row.total_roll_commands_called,
     pvpWins: row.pvp_wins,
     pvpLosses: row.pvp_losses,
     pvpDraws: row.pvp_draws,
@@ -105,6 +113,8 @@ const getDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAnalyticsR
         near_dice_count_increase_roll_sets_current_dice_count,
         dice_rolled_current_prestige,
         total_dice_rolled,
+        total_dice_sets_rolled,
+        total_roll_commands_called,
         pvp_wins,
         pvp_losses,
         pvp_draws,
@@ -114,6 +124,30 @@ const getDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAnalyticsR
     `,
     )
     .get(userId) as DiceAnalyticsRow | undefined;
+};
+
+const getDiceAnalyticsByPrestigeRow = (
+  db: SqliteDatabase,
+  userId: string,
+  prestige: number,
+): DiceAnalyticsByPrestigeRow | undefined => {
+  return db
+    .prepare(
+      `
+      SELECT
+        user_id,
+        prestige,
+        prestige_started_at,
+        dice_count_started_at,
+        roll_sets_current_dice_count,
+        near_dice_count_increase_roll_sets_current_dice_count,
+        dice_rolled_current_prestige,
+        updated_at
+      FROM dice_analytics_by_prestige
+      WHERE user_id = ? AND prestige = ?
+    `,
+    )
+    .get(userId, prestige) as DiceAnalyticsByPrestigeRow | undefined;
 };
 
 const getCurrentDiceCountUpdatedAt = (db: SqliteDatabase, userId: string): string | null => {
@@ -153,6 +187,8 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
       near_dice_count_increase_roll_sets_current_dice_count,
       dice_rolled_current_prestige,
       total_dice_rolled,
+      total_dice_sets_rolled,
+      total_roll_commands_called,
       pvp_wins,
       pvp_losses,
       pvp_draws,
@@ -162,6 +198,8 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
       @userId,
       @diceCountStartedAt,
       @prestigeStartedAt,
+      0,
+      0,
       0,
       0,
       0,
@@ -189,8 +227,71 @@ const getOrCreateDiceAnalyticsRow = (db: SqliteDatabase, userId: string): DiceAn
   return created;
 };
 
+const getOrCreateDiceAnalyticsByPrestigeRow = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceAnalyticsByPrestigeRow => {
+  const activePrestige = getActiveDicePrestige(db, userId);
+  const highestPrestige = getDicePrestige(db, userId);
+  const existing = getDiceAnalyticsByPrestigeRow(db, userId, activePrestige);
+  if (existing) {
+    return existing;
+  }
+
+  const nowIso = new Date().toISOString();
+  const diceCountStartedAt = getCurrentDiceCountUpdatedAt(db, userId) ?? nowIso;
+  const prestigeStartedAt =
+    activePrestige === highestPrestige
+      ? (getCurrentPrestigeUpdatedAt(db, userId) ?? nowIso)
+      : nowIso;
+
+  db.prepare(
+    `
+    INSERT INTO dice_analytics_by_prestige (
+      user_id,
+      prestige,
+      prestige_started_at,
+      dice_count_started_at,
+      roll_sets_current_dice_count,
+      near_dice_count_increase_roll_sets_current_dice_count,
+      dice_rolled_current_prestige,
+      updated_at
+    )
+    VALUES (
+      @userId,
+      @prestige,
+      @prestigeStartedAt,
+      @diceCountStartedAt,
+      0,
+      0,
+      0,
+      @updatedAt
+    )
+    ON CONFLICT(user_id, prestige)
+    DO NOTHING
+  `,
+  ).run({
+    userId,
+    prestige: activePrestige,
+    prestigeStartedAt,
+    diceCountStartedAt,
+    updatedAt: nowIso,
+  });
+
+  const created = getDiceAnalyticsByPrestigeRow(db, userId, activePrestige);
+  if (!created) {
+    throw new Error(
+      `Failed to initialize dice analytics for user ${userId} on prestige ${activePrestige}`,
+    );
+  }
+
+  return created;
+};
+
 const getDiceAnalytics = (db: SqliteDatabase, userId: string): DiceAnalytics => {
-  return mapDiceAnalyticsRow(getOrCreateDiceAnalyticsRow(db, userId));
+  const analyticsRow = getOrCreateDiceAnalyticsRow(db, userId);
+  const analyticsByPrestigeRow = getOrCreateDiceAnalyticsByPrestigeRow(db, userId);
+  return mapDiceAnalyticsRow(analyticsRow, analyticsByPrestigeRow);
 };
 
 const recordDiceRollAnalytics = (
@@ -200,6 +301,7 @@ const recordDiceRollAnalytics = (
     rollSetCount,
     nearDiceCountIncreaseRollCount,
     diceRolledCount,
+    rollCommandCount,
   }: DiceRollAnalyticsUpdate,
 ): void => {
   const normalizedRollSetCount = Math.max(0, Math.floor(rollSetCount));
@@ -208,38 +310,78 @@ const recordDiceRollAnalytics = (
     Math.floor(nearDiceCountIncreaseRollCount),
   );
   const normalizedDiceRolledCount = Math.max(0, Math.floor(diceRolledCount));
-  if (normalizedRollSetCount < 1 && normalizedDiceRolledCount < 1) {
+  const normalizedRollCommandCount = Math.max(0, Math.floor(rollCommandCount));
+  if (
+    normalizedRollSetCount < 1 &&
+    normalizedDiceRolledCount < 1 &&
+    normalizedRollCommandCount < 1
+  ) {
     return;
   }
 
   const analytics = getOrCreateDiceAnalyticsRow(db, userId);
+  const analyticsByPrestige = getOrCreateDiceAnalyticsByPrestigeRow(db, userId);
   const updatedAt = new Date().toISOString();
 
   db.prepare(
     `
     UPDATE dice_analytics
     SET
+      dice_count_started_at = @diceCountStartedAt,
+      prestige_started_at = @prestigeStartedAt,
       roll_sets_current_dice_count = @rollSetsCurrentDiceCount,
       near_dice_count_increase_roll_sets_current_dice_count = @nearDiceCountIncreaseRollSetsCurrentDiceCount,
       dice_rolled_current_prestige = @diceRolledCurrentPrestige,
       total_dice_rolled = @totalDiceRolled,
+      total_dice_sets_rolled = @totalDiceSetsRolled,
+      total_roll_commands_called = @totalRollCommandsCalled,
       updated_at = @updatedAt
     WHERE user_id = @userId
   `,
   ).run({
     userId,
-    rollSetsCurrentDiceCount: analytics.roll_sets_current_dice_count + normalizedRollSetCount,
+    diceCountStartedAt: analyticsByPrestige.dice_count_started_at,
+    prestigeStartedAt: analyticsByPrestige.prestige_started_at,
+    rollSetsCurrentDiceCount:
+      analyticsByPrestige.roll_sets_current_dice_count + normalizedRollSetCount,
     nearDiceCountIncreaseRollSetsCurrentDiceCount:
-      analytics.near_dice_count_increase_roll_sets_current_dice_count +
+      analyticsByPrestige.near_dice_count_increase_roll_sets_current_dice_count +
       normalizedNearDiceCountIncreaseRollCount,
-    diceRolledCurrentPrestige: analytics.dice_rolled_current_prestige + normalizedDiceRolledCount,
+    diceRolledCurrentPrestige:
+      analyticsByPrestige.dice_rolled_current_prestige + normalizedDiceRolledCount,
     totalDiceRolled: analytics.total_dice_rolled + normalizedDiceRolledCount,
+    totalDiceSetsRolled: analytics.total_dice_sets_rolled + normalizedRollSetCount,
+    totalRollCommandsCalled: analytics.total_roll_commands_called + normalizedRollCommandCount,
+    updatedAt,
+  });
+
+  db.prepare(
+    `
+    UPDATE dice_analytics_by_prestige
+    SET
+      roll_sets_current_dice_count = @rollSetsCurrentDiceCount,
+      near_dice_count_increase_roll_sets_current_dice_count = @nearDiceCountIncreaseRollSetsCurrentDiceCount,
+      dice_rolled_current_prestige = @diceRolledCurrentPrestige,
+      updated_at = @updatedAt
+    WHERE user_id = @userId AND prestige = @prestige
+  `,
+  ).run({
+    userId,
+    prestige: analyticsByPrestige.prestige,
+    rollSetsCurrentDiceCount:
+      analyticsByPrestige.roll_sets_current_dice_count + normalizedRollSetCount,
+    nearDiceCountIncreaseRollSetsCurrentDiceCount:
+      analyticsByPrestige.near_dice_count_increase_roll_sets_current_dice_count +
+      normalizedNearDiceCountIncreaseRollCount,
+    diceRolledCurrentPrestige:
+      analyticsByPrestige.dice_rolled_current_prestige + normalizedDiceRolledCount,
     updatedAt,
   });
 };
 
 const resetDiceCountAnalyticsProgress = (db: SqliteDatabase, userId: string): void => {
   getOrCreateDiceAnalyticsRow(db, userId);
+  const analyticsByPrestige = getOrCreateDiceAnalyticsByPrestigeRow(db, userId);
   const nowIso = new Date().toISOString();
 
   db.prepare(
@@ -253,10 +395,31 @@ const resetDiceCountAnalyticsProgress = (db: SqliteDatabase, userId: string): vo
     WHERE user_id = @userId
   `,
   ).run({ userId, nowIso });
+
+  db.prepare(
+    `
+    UPDATE dice_analytics_by_prestige
+    SET
+      prestige_started_at = @prestigeStartedAt,
+      dice_count_started_at = @nowIso,
+      roll_sets_current_dice_count = 0,
+      near_dice_count_increase_roll_sets_current_dice_count = 0,
+      dice_rolled_current_prestige = @diceRolledCurrentPrestige,
+      updated_at = @nowIso
+    WHERE user_id = @userId AND prestige = @prestige
+  `,
+  ).run({
+    userId,
+    prestige: analyticsByPrestige.prestige,
+    prestigeStartedAt: analyticsByPrestige.prestige_started_at,
+    diceRolledCurrentPrestige: analyticsByPrestige.dice_rolled_current_prestige,
+    nowIso,
+  });
 };
 
 const resetDicePrestigeAnalyticsProgress = (db: SqliteDatabase, userId: string): void => {
   getOrCreateDiceAnalyticsRow(db, userId);
+  const analyticsByPrestige = getOrCreateDiceAnalyticsByPrestigeRow(db, userId);
   const nowIso = new Date().toISOString();
 
   db.prepare(
@@ -272,6 +435,24 @@ const resetDicePrestigeAnalyticsProgress = (db: SqliteDatabase, userId: string):
     WHERE user_id = @userId
   `,
   ).run({ userId, nowIso });
+
+  db.prepare(
+    `
+    UPDATE dice_analytics_by_prestige
+    SET
+      prestige_started_at = @nowIso,
+      dice_count_started_at = @nowIso,
+      roll_sets_current_dice_count = 0,
+      near_dice_count_increase_roll_sets_current_dice_count = 0,
+      dice_rolled_current_prestige = 0,
+      updated_at = @nowIso
+    WHERE user_id = @userId AND prestige = @prestige
+  `,
+  ).run({
+    userId,
+    prestige: analyticsByPrestige.prestige,
+    nowIso,
+  });
 };
 
 const updateDicePvpStats = (

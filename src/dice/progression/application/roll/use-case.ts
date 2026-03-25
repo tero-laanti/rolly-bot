@@ -244,6 +244,7 @@ export const createRunRollDiceUseCase = ({
         rollSetCount: rollPassCount,
         nearDiceCountIncreaseRollCount,
         diceRolledCount,
+        rollCommandCount: source === "manual" ? 1 : 0,
       });
       if (hasDiceCountIncrease) {
         analytics.resetDiceCountAnalyticsProgress(userId);

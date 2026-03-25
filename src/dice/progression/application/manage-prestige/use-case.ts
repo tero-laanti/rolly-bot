@@ -51,10 +51,7 @@ export type DicePrestigeResult = ActionResult<DicePrestigeAction> & {
 };
 
 type ManagePrestigeDependencies = {
-  analytics: Pick<
-    DiceAnalyticsRepository,
-    "resetDiceCountAnalyticsProgress" | "resetDicePrestigeAnalyticsProgress"
-  >;
+  analytics: Pick<DiceAnalyticsRepository, "resetDicePrestigeAnalyticsProgress">;
   progression: Pick<
     DiceProgressionRepository,
     | "awardAchievements"
@@ -150,7 +147,6 @@ export const createDicePrestigeUseCase = ({
         userId: action.ownerId,
         prestige: action.prestige,
       });
-      analytics.resetDiceCountAnalyticsProgress(action.ownerId);
 
       const state = getPrestigeState(progression, action.ownerId);
       return {
