@@ -22,7 +22,6 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "db:migrate:dice-count": "npm run build && node scripts/migrate-dice-count-schema.mjs",
     "dev": "npm run build && concurrently -k \"tsc --watch\" \"node --watch --env-file=.env dist/index.js\"",
     "deploy:commands": "npm run build && node --env-file=.env dist/deploy-commands.js",
     "format": "prettier --write .",
