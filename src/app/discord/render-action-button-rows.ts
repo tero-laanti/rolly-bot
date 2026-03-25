@@ -20,9 +20,11 @@ export const renderActionButtonRows = <TAction>(
       ...row.map((button) => {
         const builder = new ButtonBuilder()
           .setCustomId(encodeAction(button.action))
-          .setLabel(button.label)
           .setStyle(buttonStyleMap[button.style])
           .setDisabled(Boolean(button.disabled));
+        if (button.label) {
+          builder.setLabel(button.label);
+        }
         if (button.emoji) {
           builder.setEmoji(button.emoji);
         }

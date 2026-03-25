@@ -450,7 +450,6 @@ const buildExactRollSetupComponents = (
     (_, index) => index + 1,
   ).map((face) => ({
     action: { ...buildActionTarget(session, "exact-face"), face },
-    label: `${face}`,
     style: "success",
     disabled: !canStartCasinoRound(session.bet, pips),
     emoji: getDieFaceButtonEmoji(face),

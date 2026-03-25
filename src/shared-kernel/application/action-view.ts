@@ -10,7 +10,7 @@ export type ActionButtonEmojiSpec = {
 
 export type ActionButtonSpec<TAction> = {
   action: TAction;
-  label: string;
+  label?: string;
   style: ButtonStyleSpec;
   disabled?: boolean;
   emoji?: ActionButtonEmojiSpec;
