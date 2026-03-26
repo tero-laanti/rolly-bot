@@ -42,6 +42,66 @@ Scenario-level fields:
 - `retryPolicy`: only used on first-click events that can stay open after a failed attempt.
   - `once-per-user`: a user gets one failed attempt, then someone else has to try.
   - `allow-retry`: the same user can keep trying while the event remains open.
+- `flow`: optional staged or offer flow definition. Omit it for the default `single-resolution` behavior.
+
+Staged and offer flows:
+
+```json
+{
+  "flow": {
+    "type": "solo-ladder",
+    "timeoutResolution": "resolve-current-stage",
+    "stages": [
+      {
+        "id": "first-swing",
+        "label": "First swing",
+        "prompt": "Roll 4+ on d6 to crack the shell.",
+        "actionLabel": "Swing",
+        "rollChallenge": {
+          "id": "example-ladder-step-one",
+          "mode": "single-step",
+          "steps": [
+            {
+              "id": "swing-one",
+              "label": "Roll 4+ on d6",
+              "source": { "type": "static-die", "sides": 6 },
+              "target": 4,
+              "comparator": "gte"
+            }
+          ]
+        },
+        "successMessage": "Candy spills free.",
+        "successEffects": [{ "type": "currency", "minAmount": 3, "maxAmount": 3 }],
+        "failureMessage": "The rebound rattles your arm.",
+        "failureEffects": [
+          {
+            "type": "temporary-roll-penalty",
+            "divisor": 2,
+            "rolls": 3,
+            "stackMode": "refresh"
+          }
+        ]
+      }
+    ]
+  },
+  "outcomes": []
+}
+```
+
+- `flow.type`:
+  - `single-resolution`: default current behavior and the only mode that uses top-level `outcomes`.
+  - `solo-ladder`: one owner clears authored stages in sequence and receives each cleared stage reward immediately.
+  - `solo-push-your-luck`: one owner banks stage currency into an unclaimed pot and can `Cash out`.
+  - `group-meter`: joined-player thresholds award staged group payouts as the crowd grows.
+  - `stake-offer`: reserved for later wager-style offers.
+- Staged flows must leave top-level `outcomes` empty and author rewards on `flow.stages`.
+- `solo-ladder` timeout resolution must be `resolve-current-stage`.
+- `solo-push-your-luck` timeout resolution must be `cash-out-current-pot`.
+- `group-meter` timeout resolution must be `resolve-current-stage`.
+- `group-meter` stages must define `requiredSuccesses`.
+- `group-meter` stages may define a single-step `rollChallenge`. If they do, they must also define `failureMessage` and `failureEffects`, and may set `failureResolution` to `keep-open` or `resolve-event`.
+- `group-meter` may use `participantRewardPolicy = "all-equal" | "finisher-bonus"`. If omitted, the runtime defaults to `finisher-bonus`.
+- `finisher-bonus` pays the last joining player an extra `20%` of the final stage pip payout, minimum `1` pip.
 
 Text variables:
 
@@ -186,6 +246,59 @@ Example threshold-based multi-user event:
       "effects": []
     }
   ]
+}
+```
+
+Example staged group-meter event:
+
+```json
+{
+  "claimPolicy": "multi-user",
+  "flow": {
+    "type": "group-meter",
+    "timeoutResolution": "resolve-current-stage",
+    "participantRewardPolicy": "finisher-bonus",
+    "stages": [
+      {
+        "id": "chorus-starts",
+        "label": "The chorus starts",
+        "requiredSuccesses": 2,
+        "rollChallenge": {
+          "id": "chorus-start-check",
+          "mode": "single-step",
+          "steps": [
+            {
+              "id": "chorus-start-step",
+              "label": "Roll 3+ on d6",
+              "source": { "type": "static-die", "sides": 6 },
+              "target": 3,
+              "comparator": "gte"
+            }
+          ]
+        },
+        "successMessage": "The fire catches the harmony.",
+        "successEffects": [{ "type": "currency", "minAmount": 4, "maxAmount": 4 }],
+        "failureMessage": "You come in off-beat.",
+        "failureEffects": [
+          {
+            "type": "temporary-roll-penalty",
+            "divisor": 2,
+            "rolls": 3,
+            "stackMode": "refresh"
+          }
+        ],
+        "failureResolution": "keep-open"
+      },
+      {
+        "id": "chorus-swells",
+        "label": "The chorus swells",
+        "requiredSuccesses": 4,
+        "successMessage": "The full chorus lands.",
+        "successEffects": [{ "type": "currency", "minAmount": 7, "maxAmount": 7 }]
+      }
+    ]
+  },
+  "outcomes": []
 }
 ```
 

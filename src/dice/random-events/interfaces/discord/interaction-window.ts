@@ -9,6 +9,7 @@ import type { RandomEventClaimPolicy } from "../../domain/claim-policy";
 export type { RandomEventClaimPolicy } from "../../domain/claim-policy";
 
 export const randomEventButtonPrefix = "random-event:";
+export type RandomEventButtonAction = "claim" | "join" | "continue" | "cash-out";
 export type RandomEventWindowStatus = "active" | "resolved" | "expired";
 
 export type RandomEventInteractionWindowSnapshot = {
@@ -367,17 +368,52 @@ export const createRandomEventInteractionWindowManager = ({
   };
 };
 
-export const buildRandomEventClaimButtonId = (windowId: string): string => {
-  return `${randomEventButtonPrefix}${windowId}`;
+export const buildRandomEventActionButtonId = (
+  windowId: string,
+  action: RandomEventButtonAction,
+): string => {
+  return `${randomEventButtonPrefix}${windowId}:${action}`;
 };
 
-export const parseRandomEventClaimButtonId = (customId: string): string | null => {
+export const buildRandomEventClaimButtonId = (windowId: string): string => {
+  return buildRandomEventActionButtonId(windowId, "claim");
+};
+
+export const parseRandomEventActionButtonId = (
+  customId: string,
+): { windowId: string; action: RandomEventButtonAction } | null => {
   if (!customId.startsWith(randomEventButtonPrefix)) {
     return null;
   }
 
-  const windowId = customId.slice(randomEventButtonPrefix.length);
-  return windowId.length > 0 ? windowId : null;
+  const encoded = customId.slice(randomEventButtonPrefix.length);
+  const separatorIndex = encoded.lastIndexOf(":");
+  if (separatorIndex < 1 || separatorIndex >= encoded.length - 1) {
+    return null;
+  }
+
+  const windowId = encoded.slice(0, separatorIndex);
+  const action = encoded.slice(separatorIndex + 1);
+  if (action !== "claim" && action !== "join" && action !== "continue" && action !== "cash-out") {
+    return null;
+  }
+
+  return {
+    windowId,
+    action,
+  };
+};
+
+export const parseRandomEventClaimButtonId = (customId: string): string | null => {
+  const parsed = parseRandomEventActionButtonId(customId);
+  return parsed?.action === "claim" ? parsed.windowId : null;
+};
+
+export type RandomEventPromptButton = {
+  customId: string;
+  label: string;
+  style?: ButtonStyle;
+  disabled?: boolean;
 };
 
 export type BuildRandomEventClaimPromptInput = {
@@ -385,6 +421,7 @@ export type BuildRandomEventClaimPromptInput = {
   description: string;
   buttonCustomId: string;
   buttonLabel: string;
+  buttons?: RandomEventPromptButton[];
   color?: number;
   footerText?: string;
 };
@@ -394,6 +431,7 @@ export const buildRandomEventClaimPrompt = ({
   description,
   buttonCustomId,
   buttonLabel,
+  buttons,
   color,
   footerText,
 }: BuildRandomEventClaimPromptInput): {
@@ -407,11 +445,24 @@ export const buildRandomEventClaimPrompt = ({
   if (footerText) {
     embed.setFooter({ text: footerText });
   }
+  const resolvedButtons =
+    buttons && buttons.length > 0
+      ? buttons
+      : [
+          {
+            customId: buttonCustomId,
+            label: buttonLabel,
+            style: ButtonStyle.Primary,
+          },
+        ];
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(buttonCustomId)
-      .setLabel(buttonLabel)
-      .setStyle(ButtonStyle.Primary),
+    ...resolvedButtons.map((button) =>
+      new ButtonBuilder()
+        .setCustomId(button.customId)
+        .setLabel(button.label)
+        .setStyle(button.style ?? ButtonStyle.Primary)
+        .setDisabled(button.disabled ?? false),
+    ),
   );
 
   return {

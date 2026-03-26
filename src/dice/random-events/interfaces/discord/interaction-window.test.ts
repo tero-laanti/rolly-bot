@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildRandomEventActionButtonId,
+  buildRandomEventClaimPrompt,
   createRandomEventInteractionWindowManager,
+  parseRandomEventActionButtonId,
   type RandomEventInteractionWindowLifecycleContext,
 } from "./interaction-window";
 
@@ -152,4 +155,36 @@ test("first-click window can reopen from onResolved before the next claim is han
   assert.equal(secondResult.becameResolved, true);
   assert.deepEqual(resolvedContexts[1]?.snapshot.participants, ["222"]);
   assert.equal(manager.getWindow("retryable-first-click"), null);
+});
+
+test("random-event action button ids round-trip action and event id", () => {
+  const customId = buildRandomEventActionButtonId("event-42", "cash-out");
+
+  assert.deepEqual(parseRandomEventActionButtonId(customId), {
+    windowId: "event-42",
+    action: "cash-out",
+  });
+});
+
+test("claim prompt can render multiple staged action buttons", () => {
+  const prompt = buildRandomEventClaimPrompt({
+    title: "Prompt",
+    description: "Desc",
+    buttonCustomId: "unused",
+    buttonLabel: "unused",
+    buttons: [
+      {
+        customId: buildRandomEventActionButtonId("event-42", "continue"),
+        label: "Keep diving",
+      },
+      {
+        customId: buildRandomEventActionButtonId("event-42", "cash-out"),
+        label: "Cash out",
+      },
+    ],
+  });
+
+  const row = prompt.components[0];
+  assert.ok(row);
+  assert.equal(row.components.length, 2);
 });

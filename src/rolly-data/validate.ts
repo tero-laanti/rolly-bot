@@ -25,10 +25,14 @@ import {
   validateRandomEventScenarios,
   type RandomEventClaimActivityTemplates,
   type RandomEventEffect,
+  type RandomEventFlow,
   type RandomEventOutcome,
   type RandomEventOutcomeResolution,
+  type RandomEventParticipantRewardPolicy,
   type RandomEventRetryPolicy,
   type RandomEventScenario,
+  type RandomEventStage,
+  type RandomEventTimeoutResolution,
 } from "../dice/random-events/domain/content";
 import type {
   RandomEventRollChallengeDefinition,
@@ -59,6 +63,12 @@ const randomEventOutcomeResolutions = [
   "keep-open-failure",
 ] as const;
 const randomEventRetryPolicies = ["once-per-user", "allow-retry"] as const;
+const randomEventParticipantRewardPolicies = ["all-equal", "finisher-bonus"] as const;
+const randomEventTimeoutResolutions = [
+  "resolve-current-stage",
+  "cash-out-current-pot",
+  "expire-event",
+] as const;
 const achievementCategories = [
   "progression",
   "roll",
@@ -215,7 +225,35 @@ const collectScenarioRenderVariables = (
   };
   const referencedKeys = new Set<string>();
 
-  for (const template of [scenario.title, scenario.prompt, scenario.claimLabel]) {
+  const flowTemplates: string[] = [];
+  if (scenario.flow?.type === "stake-offer") {
+    flowTemplates.push(
+      scenario.flow.acceptLabel ?? scenario.claimLabel,
+      scenario.flow.declineLabel,
+      scenario.flow.declineMessage,
+    );
+  }
+
+  if (
+    scenario.flow?.type === "solo-ladder" ||
+    scenario.flow?.type === "solo-push-your-luck" ||
+    scenario.flow?.type === "group-meter"
+  ) {
+    for (const stage of scenario.flow.stages) {
+      for (const template of [
+        stage.prompt,
+        stage.actionLabel,
+        stage.successMessage,
+        stage.failureMessage,
+      ]) {
+        if (typeof template === "string") {
+          flowTemplates.push(template);
+        }
+      }
+    }
+  }
+
+  for (const template of [scenario.title, scenario.prompt, scenario.claimLabel, ...flowTemplates]) {
     for (const match of template.matchAll(randomEventTemplateVariablePattern)) {
       const key = match[1];
       if (key) {
@@ -547,6 +585,171 @@ const readRandomEventOutcome = (value: unknown, label: string): RandomEventOutco
   };
 };
 
+const readRandomEventParticipantRewardPolicy = (
+  value: unknown,
+  label: string,
+): RandomEventParticipantRewardPolicy | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = readNonEmptyString(value, label);
+  if (
+    !randomEventParticipantRewardPolicies.includes(parsed as RandomEventParticipantRewardPolicy)
+  ) {
+    throw new Error(`${label} must be one of ${randomEventParticipantRewardPolicies.join(", ")}.`);
+  }
+
+  return parsed as RandomEventParticipantRewardPolicy;
+};
+
+const readRandomEventTimeoutResolution = (
+  value: unknown,
+  label: string,
+): RandomEventTimeoutResolution | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = readNonEmptyString(value, label);
+  if (!randomEventTimeoutResolutions.includes(parsed as RandomEventTimeoutResolution)) {
+    throw new Error(`${label} must be one of ${randomEventTimeoutResolutions.join(", ")}.`);
+  }
+
+  return parsed as RandomEventTimeoutResolution;
+};
+
+const readRandomEventStage = (value: unknown, label: string): RandomEventStage => {
+  const record = assertRecord(value, label);
+  if (!Array.isArray(record.successEffects)) {
+    throw new Error(`${label}.successEffects must be an array.`);
+  }
+
+  if (record.failureEffects !== undefined && !Array.isArray(record.failureEffects)) {
+    throw new Error(`${label}.failureEffects must be an array.`);
+  }
+
+  const failureResolution =
+    record.failureResolution === undefined
+      ? undefined
+      : readNonEmptyString(record.failureResolution, `${label}.failureResolution`);
+  if (
+    failureResolution !== undefined &&
+    failureResolution !== "resolve-event" &&
+    failureResolution !== "keep-open"
+  ) {
+    throw new Error(`${label}.failureResolution must be "resolve-event" or "keep-open".`);
+  }
+
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    label: readNonEmptyString(record.label, `${label}.label`),
+    prompt: readOptionalNonEmptyString(record.prompt, `${label}.prompt`),
+    actionLabel: readOptionalNonEmptyString(record.actionLabel, `${label}.actionLabel`),
+    rollChallenge: readRollChallengeDefinition(record.rollChallenge, `${label}.rollChallenge`),
+    successMessage: readNonEmptyString(record.successMessage, `${label}.successMessage`),
+    successEffects: record.successEffects.map((entry, index) =>
+      readRandomEventEffect(entry, `${label}.successEffects[${index}]`),
+    ),
+    failureMessage: readOptionalNonEmptyString(record.failureMessage, `${label}.failureMessage`),
+    failureEffects:
+      record.failureEffects === undefined
+        ? undefined
+        : record.failureEffects.map((entry, index) =>
+            readRandomEventEffect(entry, `${label}.failureEffects[${index}]`),
+          ),
+    failureResolution,
+    requiredSuccesses: readOptionalInteger(
+      record.requiredSuccesses,
+      `${label}.requiredSuccesses`,
+      2,
+    ),
+  };
+};
+
+const readRandomEventFlow = (value: unknown, label: string): RandomEventFlow | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, label);
+  const type = readNonEmptyString(record.type, `${label}.type`);
+
+  if (type === "single-resolution") {
+    return { type };
+  }
+
+  if (type === "solo-ladder" || type === "solo-push-your-luck" || type === "group-meter") {
+    if (!Array.isArray(record.stages)) {
+      throw new Error(`${label}.stages must be an array.`);
+    }
+
+    const stages = record.stages.map((entry, index) =>
+      readRandomEventStage(entry, `${label}.stages[${index}]`),
+    );
+    const timeoutResolution = readRandomEventTimeoutResolution(
+      record.timeoutResolution,
+      `${label}.timeoutResolution`,
+    );
+
+    if (type === "solo-ladder") {
+      if (timeoutResolution && timeoutResolution !== "resolve-current-stage") {
+        throw new Error(
+          `${label}.timeoutResolution must be "resolve-current-stage" for solo-ladder flows.`,
+        );
+      }
+
+      return {
+        type,
+        stages,
+        timeoutResolution,
+      };
+    }
+
+    if (type === "solo-push-your-luck") {
+      if (timeoutResolution && timeoutResolution !== "cash-out-current-pot") {
+        throw new Error(
+          `${label}.timeoutResolution must be "cash-out-current-pot" for solo-push-your-luck flows.`,
+        );
+      }
+
+      return {
+        type,
+        stages,
+        timeoutResolution,
+      };
+    }
+
+    if (timeoutResolution && timeoutResolution !== "resolve-current-stage") {
+      throw new Error(
+        `${label}.timeoutResolution must be "resolve-current-stage" for group-meter flows.`,
+      );
+    }
+
+    return {
+      type,
+      stages,
+      timeoutResolution,
+      participantRewardPolicy: readRandomEventParticipantRewardPolicy(
+        record.participantRewardPolicy,
+        `${label}.participantRewardPolicy`,
+      ),
+    };
+  }
+
+  if (type === "stake-offer") {
+    return {
+      type,
+      stakePips: readInteger(record.stakePips, `${label}.stakePips`, 1),
+      acceptLabel: readOptionalNonEmptyString(record.acceptLabel, `${label}.acceptLabel`),
+      declineLabel: readNonEmptyString(record.declineLabel, `${label}.declineLabel`),
+      declineMessage: readNonEmptyString(record.declineMessage, `${label}.declineMessage`),
+    };
+  }
+
+  throw new Error(`${label}.type is invalid.`);
+};
+
 const readRandomEventScenario = (value: unknown, label: string): RandomEventScenario => {
   const record = assertRecord(value, label);
   if (!Array.isArray(record.outcomes)) {
@@ -573,6 +776,7 @@ const readRandomEventScenario = (value: unknown, label: string): RandomEventScen
     ),
     weight: readOptionalFiniteNumber(record.weight, `${label}.weight`),
     retryPolicy: readRandomEventRetryPolicy(record.retryPolicy, `${label}.retryPolicy`),
+    flow: readRandomEventFlow(record.flow, `${label}.flow`),
     textVariables: readTextVariables(record.textVariables, `${label}.textVariables`),
     rollChallenge: readRollChallengeDefinition(record.rollChallenge, `${label}.rollChallenge`),
     challengeOutcomeIds:
@@ -838,6 +1042,7 @@ const validateRandomEventScenarioDiscordText = (
   scenario: RandomEventScenario,
   label: string,
 ): void => {
+  const flow = scenario.flow;
   const scenarioRenderVariables = collectScenarioRenderVariables(scenario);
   const renderedTitle = renderRandomEventTemplateWithLongestValues(
     scenario.title,
@@ -867,6 +1072,70 @@ const validateRandomEventScenarioDiscordText = (
     `${label}.claimLabel as rendered in Discord`,
     discordButtonLabelCharacterLimit,
   );
+
+  if (flow?.type === "stake-offer") {
+    const renderedAcceptLabel = renderRandomEventTemplateWithLongestValues(
+      flow.acceptLabel ?? scenario.claimLabel,
+      scenarioRenderVariables,
+    );
+    const renderedDeclineLabel = renderRandomEventTemplateWithLongestValues(
+      flow.declineLabel,
+      scenarioRenderVariables,
+    );
+
+    assertDiscordTextLength(
+      renderedAcceptLabel,
+      `${label}.flow.acceptLabel as rendered in Discord`,
+      discordButtonLabelCharacterLimit,
+    );
+    assertDiscordTextLength(
+      renderedDeclineLabel,
+      `${label}.flow.declineLabel as rendered in Discord`,
+      discordButtonLabelCharacterLimit,
+    );
+    assertDiscordTextLength(
+      renderRandomEventTemplateWithLongestValues(flow.declineMessage, scenarioRenderVariables),
+      `${label}.flow.declineMessage as rendered in Discord`,
+      discordEmbedDescriptionCharacterLimit,
+    );
+  }
+
+  if (
+    flow?.type === "solo-ladder" ||
+    flow?.type === "solo-push-your-luck" ||
+    flow?.type === "group-meter"
+  ) {
+    flow.stages.forEach((stage, stageIndex) => {
+      assertDiscordTextLength(
+        renderRandomEventTemplateWithLongestValues(
+          stage.prompt ?? stage.successMessage,
+          scenarioRenderVariables,
+        ),
+        `${label}.flow.stages[${stageIndex}].prompt as rendered in Discord`,
+        discordEmbedDescriptionCharacterLimit,
+      );
+      assertDiscordTextLength(
+        renderRandomEventTemplateWithLongestValues(
+          stage.actionLabel ?? scenario.claimLabel,
+          scenarioRenderVariables,
+        ),
+        `${label}.flow.stages[${stageIndex}].actionLabel as rendered in Discord`,
+        discordButtonLabelCharacterLimit,
+      );
+      assertDiscordTextLength(
+        renderRandomEventTemplateWithLongestValues(stage.successMessage, scenarioRenderVariables),
+        `${label}.flow.stages[${stageIndex}].successMessage as rendered in Discord`,
+        discordEmbedDescriptionCharacterLimit,
+      );
+      if (stage.failureMessage) {
+        assertDiscordTextLength(
+          renderRandomEventTemplateWithLongestValues(stage.failureMessage, scenarioRenderVariables),
+          `${label}.flow.stages[${stageIndex}].failureMessage as rendered in Discord`,
+          discordEmbedDescriptionCharacterLimit,
+        );
+      }
+    });
+  }
 
   scenario.outcomes.forEach((outcome, outcomeIndex) => {
     const renderedOutcomeMessage = renderRandomEventTemplateWithLongestValues(

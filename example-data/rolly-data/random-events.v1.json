@@ -15,8 +15,8 @@
         "effects": [
           {
             "type": "currency",
-            "minAmount": 1,
-            "maxAmount": 3
+            "minAmount": 2,
+            "maxAmount": 4
           },
           {
             "type": "consumable-item",
@@ -35,8 +35,15 @@
         "id": "example-empty",
         "weight": 0.5,
         "resolution": "resolve-failure",
-        "message": "Example failure outcome: the crate is empty and nothing else happens.",
-        "effects": []
+        "message": "Example failure outcome: the crate is empty and you bruise your hand on the latch.",
+        "effects": [
+          {
+            "type": "temporary-roll-penalty",
+            "divisor": 2,
+            "rolls": 1,
+            "stackMode": "no-stack"
+          }
+        ]
       }
     ],
     "activityTemplates": {
@@ -93,8 +100,8 @@
         "effects": [
           {
             "type": "currency",
-            "minAmount": 7,
-            "maxAmount": 10
+            "minAmount": 10,
+            "maxAmount": 14
           },
           {
             "type": "temporary-roll-multiplier",
@@ -112,61 +119,280 @@
           {
             "type": "temporary-roll-penalty",
             "divisor": 2,
-            "rolls": 1,
+            "rolls": 3,
             "stackMode": "no-stack"
           }
         ]
       }
-    ],
-    "activityTemplates": {
-      "accepted": [
-        "<@{userId}> starts the example challenge.",
-        "<@{userId}> takes the example attempt."
-      ],
-      "alreadyReady": [
-        "<@{userId}> is already taking this example challenge.",
-        "<@{userId}> is already in this example attempt."
-      ]
-    }
+    ]
   },
   {
-    "id": "example-group-threshold",
-    "rarity": "epic",
-    "title": "Example Group Threshold",
-    "prompt": "A sealed vault hums with three keyholes. Gather a team to open it?",
-    "claimLabel": "Ready up",
-    "claimPolicy": "multi-user",
-    "claimWindowSeconds": 80,
-    "requiredReadyCount": 3,
-    "outcomes": [
-      {
-        "id": "example-group-open",
-        "resolution": "resolve-success",
-        "message": "The vault opens the moment the third hand lands on it, and everyone inside catches a strong roll buff.",
-        "effects": [
-          {
-            "type": "currency",
-            "minAmount": 11,
-            "maxAmount": 20
+    "id": "example-solo-ladder",
+    "rarity": "rare",
+    "title": "Example Solo Ladder",
+    "prompt": "A painted pinata hangs over the square. Keep smacking it for bigger rewards?",
+    "claimLabel": "Smack pinata",
+    "claimPolicy": "first-click",
+    "claimWindowSeconds": 45,
+    "flow": {
+      "type": "solo-ladder",
+      "timeoutResolution": "resolve-current-stage",
+      "stages": [
+        {
+          "id": "first-swing",
+          "label": "First swing",
+          "prompt": "Roll 4+ on d6 to crack the shell.",
+          "actionLabel": "Swing",
+          "rollChallenge": {
+            "id": "example-ladder-step-one",
+            "mode": "single-step",
+            "steps": [
+              {
+                "id": "swing-one",
+                "label": "Roll 4+ on d6",
+                "source": { "type": "static-die", "sides": 6 },
+                "target": 4,
+                "comparator": "gte"
+              }
+            ]
           },
-          {
-            "type": "temporary-roll-multiplier",
-            "multiplier": 5,
-            "rolls": 2,
-            "stackMode": "refresh"
-          }
-        ]
-      }
-    ],
-    "activityTemplates": {
-      "accepted": [
-        "<@{userId}> gets into position at the vault.",
-        "<@{userId}> takes one of the keyholes."
-      ],
-      "alreadyReady": [
-        "<@{userId}> is already ready at the vault.",
-        "<@{userId}> is already holding a keyhole."
+          "successMessage": "Candy spills free.",
+          "successEffects": [
+            {
+              "type": "currency",
+              "minAmount": 3,
+              "maxAmount": 3
+            }
+          ],
+          "failureMessage": "The rebound rattles your arm.",
+          "failureEffects": [
+            {
+              "type": "temporary-roll-penalty",
+              "divisor": 2,
+              "rolls": 3,
+              "stackMode": "refresh"
+            }
+          ]
+        },
+        {
+          "id": "big-finish",
+          "label": "Big finish",
+          "prompt": "Roll 5+ on d6 to burst the core.",
+          "actionLabel": "Swing again",
+          "rollChallenge": {
+            "id": "example-ladder-step-two",
+            "mode": "single-step",
+            "steps": [
+              {
+                "id": "swing-two",
+                "label": "Roll 5+ on d6",
+                "source": { "type": "static-die", "sides": 6 },
+                "target": 5,
+                "comparator": "gte"
+              }
+            ]
+          },
+          "successMessage": "The whole thing bursts open.",
+          "successEffects": [
+            {
+              "type": "currency",
+              "minAmount": 6,
+              "maxAmount": 6
+            }
+          ],
+          "failureMessage": "You mistime the last swing and take a nasty whack.",
+          "failureEffects": [
+            {
+              "type": "temporary-roll-penalty",
+              "divisor": 3,
+              "rolls": 4,
+              "stackMode": "replace"
+            }
+          ]
+        }
       ]
-    }
+    },
+    "outcomes": []
+  },
+  {
+    "id": "example-push-your-luck",
+    "rarity": "epic",
+    "title": "Example Treasure Dive",
+    "prompt": "An example bell rope drops into black water. Dive deeper for a bigger haul, or cash out early?",
+    "claimLabel": "Dive",
+    "claimPolicy": "first-click",
+    "claimWindowSeconds": 45,
+    "flow": {
+      "type": "solo-push-your-luck",
+      "timeoutResolution": "cash-out-current-pot",
+      "stages": [
+        {
+          "id": "shallow-pull",
+          "label": "Shallow pull",
+          "prompt": "Roll 4+ on d8 to come back with something useful.",
+          "actionLabel": "Dive",
+          "rollChallenge": {
+            "id": "example-push-step-one",
+            "mode": "single-step",
+            "steps": [
+              {
+                "id": "dive-one",
+                "label": "Roll 4+ on d8",
+                "source": { "type": "static-die", "sides": 8 },
+                "target": 4,
+                "comparator": "gte"
+              }
+            ]
+          },
+          "successMessage": "You surface with a glittering stash.",
+          "successEffects": [
+            {
+              "type": "currency",
+              "minAmount": 5,
+              "maxAmount": 5
+            }
+          ],
+          "failureMessage": "The undertow clips your ankle.",
+          "failureEffects": [
+            {
+              "type": "temporary-roll-penalty",
+              "divisor": 3,
+              "rolls": 6,
+              "stackMode": "replace"
+            }
+          ]
+        },
+        {
+          "id": "deep-pull",
+          "label": "Deep pull",
+          "prompt": "Roll 6+ on d8 to drag up the heavy chest.",
+          "actionLabel": "Dive deeper",
+          "rollChallenge": {
+            "id": "example-push-step-two",
+            "mode": "single-step",
+            "steps": [
+              {
+                "id": "dive-two",
+                "label": "Roll 6+ on d8",
+                "source": { "type": "static-die", "sides": 8 },
+                "target": 6,
+                "comparator": "gte"
+              }
+            ]
+          },
+          "successMessage": "A bigger chest breaks free from the silt.",
+          "successEffects": [
+            {
+              "type": "currency",
+              "minAmount": 9,
+              "maxAmount": 9
+            }
+          ],
+          "failureMessage": "The cold closes over your grip and the whole haul slips away.",
+          "failureEffects": [
+            {
+              "type": "temporary-roll-penalty",
+              "divisor": 4,
+              "rolls": 8,
+              "stackMode": "replace"
+            }
+          ]
+        }
+      ]
+    },
+    "outcomes": []
+  },
+  {
+    "id": "example-group-meter",
+    "rarity": "rare",
+    "title": "Example Group Meter",
+    "prompt": "An example bonfire answers louder voices. The more people join in, the bigger the reward.",
+    "claimLabel": "Join chorus",
+    "claimPolicy": "multi-user",
+    "claimWindowSeconds": 60,
+    "flow": {
+      "type": "group-meter",
+      "timeoutResolution": "resolve-current-stage",
+      "participantRewardPolicy": "finisher-bonus",
+      "stages": [
+        {
+          "id": "chorus-starts",
+          "label": "The chorus starts",
+          "prompt": "Reach 2 successful joins.",
+          "actionLabel": "Join chorus",
+          "requiredSuccesses": 2,
+          "rollChallenge": {
+            "id": "example-chorus-step-one",
+            "mode": "single-step",
+            "steps": [
+              {
+                "id": "chorus-one",
+                "label": "Roll 3+ on d6",
+                "source": { "type": "static-die", "sides": 6 },
+                "target": 3,
+                "comparator": "gte"
+              }
+            ]
+          },
+          "successMessage": "The fire catches the harmony and throws sparks of luck to everyone present.",
+          "successEffects": [
+            {
+              "type": "currency",
+              "minAmount": 4,
+              "maxAmount": 4
+            }
+          ],
+          "failureMessage": "You come in off-beat and the chorus has to recover around you.",
+          "failureEffects": [
+            {
+              "type": "temporary-roll-penalty",
+              "divisor": 2,
+              "rolls": 3,
+              "stackMode": "refresh"
+            }
+          ],
+          "failureResolution": "keep-open"
+        },
+        {
+          "id": "chorus-swells",
+          "label": "The chorus swells",
+          "prompt": "Reach 4 successful joins.",
+          "actionLabel": "Join louder",
+          "requiredSuccesses": 4,
+          "rollChallenge": {
+            "id": "example-chorus-step-two",
+            "mode": "single-step",
+            "steps": [
+              {
+                "id": "chorus-two",
+                "label": "Roll 4+ on d6",
+                "source": { "type": "static-die", "sides": 6 },
+                "target": 4,
+                "comparator": "gte"
+              }
+            ]
+          },
+          "successMessage": "The full chorus lands and the bonfire pays out a stronger reward.",
+          "successEffects": [
+            {
+              "type": "currency",
+              "minAmount": 7,
+              "maxAmount": 7
+            }
+          ],
+          "failureMessage": "The next voice slips and the chorus has to hold without you.",
+          "failureEffects": [
+            {
+              "type": "temporary-roll-penalty",
+              "divisor": 2,
+              "rolls": 3,
+              "stackMode": "refresh"
+            }
+          ],
+          "failureResolution": "keep-open"
+        }
+      ]
+    },
+    "outcomes": []
   }
 ]

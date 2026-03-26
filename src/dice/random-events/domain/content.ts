@@ -46,6 +46,11 @@ export type RandomEventOutcomeResolution =
   | "keep-open-failure";
 
 export type RandomEventRetryPolicy = "once-per-user" | "allow-retry";
+export type RandomEventParticipantRewardPolicy = "all-equal" | "finisher-bonus";
+export type RandomEventTimeoutResolution =
+  | "resolve-current-stage"
+  | "cash-out-current-pot"
+  | "expire-event";
 
 export type RandomEventTextVariables = Record<string, string[]>;
 
@@ -68,6 +73,48 @@ export type RandomEventChallengeOutcomeIds = {
   failure: string[];
 };
 
+export type RandomEventStage = {
+  id: string;
+  label: string;
+  prompt?: string;
+  actionLabel?: string;
+  rollChallenge?: RandomEventRollChallengeDefinition;
+  successMessage: string;
+  successEffects: RandomEventEffect[];
+  failureMessage?: string;
+  failureEffects?: RandomEventEffect[];
+  failureResolution?: "resolve-event" | "keep-open";
+  requiredSuccesses?: number;
+};
+
+export type RandomEventFlow =
+  | {
+      type: "single-resolution";
+    }
+  | {
+      type: "solo-ladder";
+      stages: RandomEventStage[];
+      timeoutResolution?: Extract<RandomEventTimeoutResolution, "resolve-current-stage">;
+    }
+  | {
+      type: "solo-push-your-luck";
+      stages: RandomEventStage[];
+      timeoutResolution?: Extract<RandomEventTimeoutResolution, "cash-out-current-pot">;
+    }
+  | {
+      type: "group-meter";
+      stages: RandomEventStage[];
+      timeoutResolution?: Extract<RandomEventTimeoutResolution, "resolve-current-stage">;
+      participantRewardPolicy?: RandomEventParticipantRewardPolicy;
+    }
+  | {
+      type: "stake-offer";
+      stakePips: number;
+      acceptLabel?: string;
+      declineLabel: string;
+      declineMessage: string;
+    };
+
 export type RandomEventScenario = {
   id: string;
   rarity: RandomEventRarityTier;
@@ -79,6 +126,7 @@ export type RandomEventScenario = {
   requiredReadyCount?: number;
   weight?: number;
   retryPolicy?: RandomEventRetryPolicy;
+  flow?: RandomEventFlow;
   textVariables?: RandomEventTextVariables;
   rollChallenge?: RandomEventRollChallengeDefinition;
   challengeOutcomeIds?: RandomEventChallengeOutcomeIds;
@@ -291,8 +339,124 @@ export const getRandomEventRetryPolicy = (
   return scenario.retryPolicy ?? "once-per-user";
 };
 
+export const getRandomEventFlow = (scenario: RandomEventScenario): RandomEventFlow => {
+  return scenario.flow ?? { type: "single-resolution" };
+};
+
+export const isRandomEventStagedFlow = (
+  flow: RandomEventFlow,
+): flow is Exclude<RandomEventFlow, { type: "single-resolution" } | { type: "stake-offer" }> => {
+  return (
+    flow.type === "solo-ladder" ||
+    flow.type === "solo-push-your-luck" ||
+    flow.type === "group-meter"
+  );
+};
+
+export const isRandomEventStagedScenario = (
+  scenario: RandomEventScenario,
+): scenario is RandomEventScenario & {
+  flow: Exclude<RandomEventFlow, { type: "single-resolution" } | { type: "stake-offer" }>;
+} => {
+  return isRandomEventStagedFlow(getRandomEventFlow(scenario));
+};
+
 export const isRandomEventKeepOpenFailure = (outcome: RandomEventOutcome): boolean => {
   return outcome.resolution === "keep-open-failure";
+};
+
+const validateStage = (
+  scenarioId: string,
+  flow: RandomEventFlow,
+  stage: RandomEventStage,
+): void => {
+  if (stage.id.trim().length < 1) {
+    throw new Error(`Scenario ${scenarioId} has a staged flow with an empty stage id.`);
+  }
+
+  if (stage.label.trim().length < 1) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} must have a label.`);
+  }
+
+  if (stage.prompt !== undefined && stage.prompt.trim().length < 1) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} prompt must not be empty.`);
+  }
+
+  if (stage.actionLabel !== undefined && stage.actionLabel.trim().length < 1) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} actionLabel must not be empty.`);
+  }
+
+  if (stage.successMessage.trim().length < 1) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} must have a successMessage.`);
+  }
+
+  if (flow.type === "group-meter") {
+    if (!Number.isInteger(stage.requiredSuccesses) || (stage.requiredSuccesses ?? 0) < 2) {
+      throw new Error(
+        `Scenario ${scenarioId} group-meter stage ${stage.id} must define requiredSuccesses >= 2.`,
+      );
+    }
+
+    if (stage.rollChallenge) {
+      validateRollChallengeDefinition(stage.rollChallenge);
+      if (stage.rollChallenge.mode !== "single-step") {
+        throw new Error(
+          `Scenario ${scenarioId} stage ${stage.id} must use a single-step rollChallenge.`,
+        );
+      }
+    }
+
+    const hasFailureBranch =
+      stage.failureMessage !== undefined ||
+      stage.failureEffects !== undefined ||
+      stage.failureResolution !== undefined;
+    if (stage.rollChallenge && (stage.failureMessage === undefined || !stage.failureEffects)) {
+      throw new Error(
+        `Scenario ${scenarioId} group-meter stage ${stage.id} must define failureMessage and failureEffects when it uses a rollChallenge.`,
+      );
+    }
+
+    if (!stage.rollChallenge && hasFailureBranch) {
+      throw new Error(
+        `Scenario ${scenarioId} group-meter stage ${stage.id} cannot define failure branches without a rollChallenge.`,
+      );
+    }
+
+    if (stage.failureMessage !== undefined && stage.failureMessage.trim().length < 1) {
+      throw new Error(`Scenario ${scenarioId} stage ${stage.id} must have a failureMessage.`);
+    }
+
+    if (stage.failureEffects !== undefined && stage.failureEffects.length < 1) {
+      throw new Error(`Scenario ${scenarioId} stage ${stage.id} must define failureEffects.`);
+    }
+
+    return;
+  }
+
+  if (!stage.rollChallenge) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} must define a rollChallenge.`);
+  }
+
+  validateRollChallengeDefinition(stage.rollChallenge);
+  if (stage.rollChallenge.mode !== "single-step") {
+    throw new Error(
+      `Scenario ${scenarioId} stage ${stage.id} must use a single-step rollChallenge.`,
+    );
+  }
+
+  if (stage.failureMessage === undefined || stage.failureMessage.trim().length < 1) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} must have a failureMessage.`);
+  }
+
+  if (!stage.failureEffects) {
+    throw new Error(`Scenario ${scenarioId} stage ${stage.id} must define failureEffects.`);
+  }
+
+  if (stage.requiredSuccesses !== undefined) {
+    throw new Error(
+      `Scenario ${scenarioId} stage ${stage.id} requiredSuccesses is only valid for group-meter flows.`,
+    );
+  }
 };
 
 const validateScenario = (scenario: RandomEventScenario): void => {
@@ -328,9 +492,8 @@ const validateScenario = (scenario: RandomEventScenario): void => {
     }
   }
 
-  if (scenario.outcomes.length < 1) {
-    throw new Error(`Random event scenario ${scenario.id} must define at least one outcome.`);
-  }
+  const flow = getRandomEventFlow(scenario);
+  const isStagedScenario = isRandomEventStagedFlow(flow);
 
   if (scenario.rollChallenge) {
     validateRollChallengeDefinition(scenario.rollChallenge);
@@ -368,6 +531,109 @@ const validateScenario = (scenario: RandomEventScenario): void => {
     if (outcome.resolution === "keep-open-failure") {
       hasKeepOpenFailure = true;
       keepOpenFailureOutcomeIds.add(outcome.id);
+    }
+  }
+
+  if (!isStagedScenario && scenario.outcomes.length < 1) {
+    throw new Error(`Random event scenario ${scenario.id} must define at least one outcome.`);
+  }
+
+  if (isStagedScenario && scenario.outcomes.length > 0) {
+    throw new Error(
+      `Scenario ${scenario.id} staged flows must define stage rewards instead of top-level outcomes.`,
+    );
+  }
+
+  if (isStagedScenario) {
+    if (scenario.rollChallenge || scenario.challengeOutcomeIds || scenario.retryPolicy) {
+      throw new Error(
+        `Scenario ${scenario.id} staged flows cannot use top-level rollChallenge, challengeOutcomeIds, or retryPolicy.`,
+      );
+    }
+
+    if (flow.stages.length < 1) {
+      throw new Error(`Scenario ${scenario.id} staged flows must define at least one stage.`);
+    }
+
+    const stageIds = new Set<string>();
+    let previousRequiredSuccesses = 1;
+    for (const stage of flow.stages) {
+      validateStage(scenario.id, flow, stage);
+      if (stageIds.has(stage.id)) {
+        throw new Error(`Scenario ${scenario.id} has duplicate stage id ${stage.id}.`);
+      }
+
+      stageIds.add(stage.id);
+
+      if (flow.type === "solo-push-your-luck") {
+        if (stage.successEffects.length !== 1 || stage.successEffects[0]?.type !== "currency") {
+          throw new Error(
+            `Scenario ${scenario.id} stage ${stage.id} solo-push-your-luck rewards must be exactly one currency effect.`,
+          );
+        }
+      }
+
+      if (flow.type === "group-meter") {
+        const requiredSuccesses = stage.requiredSuccesses ?? 0;
+        if (requiredSuccesses <= previousRequiredSuccesses) {
+          throw new Error(
+            `Scenario ${scenario.id} group-meter stages must increase requiredSuccesses strictly.`,
+          );
+        }
+
+        previousRequiredSuccesses = requiredSuccesses;
+      }
+    }
+
+    if (flow.type === "group-meter") {
+      if (scenario.claimPolicy !== "multi-user") {
+        throw new Error(
+          `Scenario ${scenario.id} group-meter flows must use multi-user claimPolicy.`,
+        );
+      }
+
+      if (scenario.requiredReadyCount !== undefined) {
+        throw new Error(
+          `Scenario ${scenario.id} group-meter flows cannot use requiredReadyCount; use stage thresholds instead.`,
+        );
+      }
+
+      if (
+        flow.participantRewardPolicy === "finisher-bonus" &&
+        !flow.stages[flow.stages.length - 1]?.successEffects.some(
+          (effect) => effect.type === "currency",
+        )
+      ) {
+        throw new Error(
+          `Scenario ${scenario.id} finisher-bonus group-meter flows must pay currency on the final stage.`,
+        );
+      }
+    } else if (scenario.claimPolicy !== "first-click") {
+      throw new Error(
+        `Scenario ${scenario.id} ${flow.type} flows must use first-click claimPolicy.`,
+      );
+    }
+  }
+
+  if (flow.type === "stake-offer") {
+    if (scenario.claimPolicy !== "first-click") {
+      throw new Error(
+        `Scenario ${scenario.id} stake-offer flows must use first-click claimPolicy.`,
+      );
+    }
+
+    if (scenario.requiredReadyCount !== undefined) {
+      throw new Error(`Scenario ${scenario.id} stake-offer flows cannot use requiredReadyCount.`);
+    }
+
+    if (flow.stakePips < 1) {
+      throw new Error(`Scenario ${scenario.id} stake-offer stakePips must be at least 1.`);
+    }
+
+    if (flow.declineLabel.trim().length < 1 || flow.declineMessage.trim().length < 1) {
+      throw new Error(
+        `Scenario ${scenario.id} stake-offer flows must define both declineLabel and declineMessage.`,
+      );
     }
   }
 

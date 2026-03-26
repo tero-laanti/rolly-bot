@@ -4,7 +4,7 @@ import { getRandomEventBalanceData } from "../../../rolly-data/load";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { secondMs } from "../../../shared/time";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
-import { selectRandomEventScenario } from "../domain/content";
+import { getRandomEventFlow, selectRandomEventScenario } from "../domain/content";
 import type { RandomEventVarietyState } from "../domain/variety";
 import {
   buildRandomEventClaimButtonId,
@@ -128,25 +128,63 @@ export const triggerRandomEventOpportunity = async ({
     return { created: false };
   }
 
-  const openedWindow = windowManager.openWindow({
-    windowId: eventId,
-    durationMs: claimWindowDurationMs,
-    policy: selection.scenario.claimPolicy,
-    maxParticipants: selection.scenario.requiredReadyCount,
-    callbacks: {
-      onResolved: async (context) => {
-        await onResolved(eventId, context);
-      },
-    },
-  });
+  const flow = getRandomEventFlow(selection.scenario);
+  const openedWindow =
+    flow.type === "single-resolution"
+      ? windowManager.openWindow({
+          windowId: eventId,
+          durationMs: claimWindowDurationMs,
+          policy: selection.scenario.claimPolicy,
+          maxParticipants: selection.scenario.requiredReadyCount,
+          callbacks: {
+            onResolved: async (context) => {
+              await onResolved(eventId, context);
+            },
+          },
+        })
+      : null;
 
   copyVarietyState(contentState, candidateVarietyState);
   activeEventsById.set(eventId, {
     eventId,
     selection,
     message,
+    flowState:
+      flow.type === "single-resolution"
+        ? { type: "single-resolution" }
+        : flow.type === "solo-ladder"
+          ? {
+              type: "solo-ladder",
+              ownerUserId: null,
+              stageIndex: 0,
+              resolvedLines: [],
+            }
+          : flow.type === "solo-push-your-luck"
+            ? {
+                type: "solo-push-your-luck",
+                ownerUserId: null,
+                stageIndex: 0,
+                resolvedLines: [],
+                potEffects: [],
+              }
+            : flow.type === "group-meter"
+              ? {
+                  type: "group-meter",
+                  stageIndex: 0,
+                  stageProgress: 0,
+                  resolvedLines: [],
+                  participantUserIds: new Set(),
+                  currentStageContributorUserIds: new Set(),
+                  currentStageAttemptedUserIds: new Set(),
+                }
+              : {
+                  type: "stake-offer",
+                  ownerUserId: null,
+                },
     sequenceChallenge: null,
-    currentPhaseExpiresAtMs: openedWindow.expiresAtMs,
+    phaseTimer: null,
+    baseDurationMs: claimWindowDurationMs,
+    currentPhaseExpiresAtMs: openedWindow?.expiresAtMs ?? estimatedExpiresAtMs,
     attemptedUserIds: new Set(),
     failedAttemptLines: [],
     failedAttemptUserIds: new Set(),
@@ -155,6 +193,6 @@ export const triggerRandomEventOpportunity = async ({
   return {
     created: true,
     eventId,
-    expiresAt: new Date(openedWindow.expiresAtMs),
+    expiresAt: new Date(openedWindow?.expiresAtMs ?? estimatedExpiresAtMs),
   };
 };

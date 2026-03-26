@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getRandomEventContentPackV1 } from "../../../rolly-data/load";
-import type { RandomEventScenario } from "./content";
+import { getRandomEventFlow, type RandomEventEffect, type RandomEventScenario } from "./content";
+import type { RandomEventRarityTier } from "./variety";
 
 const rewardBands = {
   common: {
@@ -63,6 +64,33 @@ const penaltyBands = {
 
 type RewardProfile = "baseline" | "challenge" | "sequence" | "multi-user";
 
+const stagedGroupMeterTotalBands: Partial<
+  Record<RandomEventRarityTier, { min: number; max: number }>
+> = {
+  rare: { min: 16, max: 20 },
+  epic: { min: 24, max: 34 },
+  legendary: { min: 34, max: 44 },
+};
+
+const sumCurrencyEffects = (
+  effects: RandomEventEffect[],
+): { minAmount: number; maxAmount: number; count: number } => {
+  return effects.reduce(
+    (sum, effect) => {
+      if (effect.type !== "currency") {
+        return sum;
+      }
+
+      return {
+        minAmount: sum.minAmount + effect.minAmount,
+        maxAmount: sum.maxAmount + effect.maxAmount,
+        count: sum.count + 1,
+      };
+    },
+    { minAmount: 0, maxAmount: 0, count: 0 },
+  );
+};
+
 const getRewardProfile = (scenario: RandomEventScenario): RewardProfile => {
   if (scenario.claimPolicy === "multi-user") {
     return "multi-user";
@@ -103,15 +131,43 @@ test("successful random-event outcomes award pip ranges that match rarity profil
       continue;
     }
 
-    const expected = getExpectedRewardBand(scenario);
+    const flow = getRandomEventFlow(scenario);
 
+    if (flow.type === "solo-ladder" || flow.type === "solo-push-your-luck") {
+      const expected = getExpectedRewardBand({
+        ...scenario,
+        rollChallenge: { id: `${scenario.id}-staged`, mode: "sequence", steps: [] },
+      });
+      const totalCurrency = sumCurrencyEffects(
+        flow.stages.flatMap((stage) => stage.successEffects),
+      );
+      assert.ok(totalCurrency.count > 0, `${scenario.id} should award currency across its stages`);
+      assert.equal(totalCurrency.minAmount, expected.min, `${scenario.id} total staged min payout`);
+      assert.equal(totalCurrency.maxAmount, expected.max, `${scenario.id} total staged max payout`);
+      continue;
+    }
+
+    if (flow.type === "group-meter") {
+      const expected =
+        stagedGroupMeterTotalBands[scenario.rarity] ?? getExpectedRewardBand(scenario);
+      const totalCurrency = sumCurrencyEffects(
+        flow.stages.flatMap((stage) => stage.successEffects),
+      );
+      assert.ok(totalCurrency.count > 0, `${scenario.id} should award currency across its stages`);
+      assert.ok(
+        totalCurrency.minAmount >= expected.min && totalCurrency.maxAmount <= expected.max,
+        `${scenario.id} staged group-meter total ${totalCurrency.minAmount}-${totalCurrency.maxAmount} is outside ${expected.min}-${expected.max}`,
+      );
+      continue;
+    }
+
+    const expected = getExpectedRewardBand(scenario);
     for (const outcome of scenario.outcomes) {
       if (outcome.resolution !== "resolve-success") {
         continue;
       }
 
       const currencyEffects = outcome.effects.filter((effect) => effect.type === "currency");
-
       assert.equal(
         currencyEffects.length,
         1,
@@ -130,29 +186,40 @@ test("failure penalties stay inside the rarity ladder", () => {
     }
 
     const expected = penaltyBands[scenario.rarity];
+    const flow = getRandomEventFlow(scenario);
+    const failureEntries =
+      flow.type === "single-resolution" || flow.type === "stake-offer"
+        ? scenario.outcomes
+            .filter((outcome) => outcome.resolution !== "resolve-success")
+            .map((outcome) => ({
+              id: outcome.id,
+              effects: outcome.effects,
+            }))
+        : flow.stages
+            .filter((stage) => (stage.failureEffects?.length ?? 0) > 0)
+            .map((stage) => ({
+              id: stage.id,
+              effects: stage.failureEffects ?? [],
+            }));
 
-    for (const outcome of scenario.outcomes) {
-      if (outcome.resolution === "resolve-success") {
-        continue;
-      }
-
-      const negativeEffects = outcome.effects.filter(
+    for (const entry of failureEntries) {
+      const negativeEffects = entry.effects.filter(
         (effect) => effect.type === "temporary-roll-penalty" || effect.type === "temporary-lockout",
       );
       assert.ok(
         negativeEffects.length > 0,
-        `${scenario.id}/${outcome.id} should include a negative effect`,
+        `${scenario.id}/${entry.id} should include a negative effect`,
       );
 
-      for (const effect of outcome.effects) {
+      for (const effect of entry.effects) {
         if (effect.type === "temporary-roll-penalty") {
           assert.ok(
             effect.divisor >= expected.divisor.min && effect.divisor <= expected.divisor.max,
-            `${scenario.id}/${outcome.id} divisor ${effect.divisor} is outside ${expected.divisor.min}-${expected.divisor.max}`,
+            `${scenario.id}/${entry.id} divisor ${effect.divisor} is outside ${expected.divisor.min}-${expected.divisor.max}`,
           );
           assert.ok(
             effect.rolls >= expected.rolls.min && effect.rolls <= expected.rolls.max,
-            `${scenario.id}/${outcome.id} rolls ${effect.rolls} is outside ${expected.rolls.min}-${expected.rolls.max}`,
+            `${scenario.id}/${entry.id} rolls ${effect.rolls} is outside ${expected.rolls.min}-${expected.rolls.max}`,
           );
         }
 
@@ -160,7 +227,7 @@ test("failure penalties stay inside the rarity ladder", () => {
           assert.ok(
             effect.durationMinutes >= expected.lockoutMinutes.min &&
               effect.durationMinutes <= expected.lockoutMinutes.max,
-            `${scenario.id}/${outcome.id} lockout ${effect.durationMinutes} is outside ${expected.lockoutMinutes.min}-${expected.lockoutMinutes.max}`,
+            `${scenario.id}/${entry.id} lockout ${effect.durationMinutes} is outside ${expected.lockoutMinutes.min}-${expected.lockoutMinutes.max}`,
           );
         }
       }

@@ -10,6 +10,7 @@ import type { DicePvpRepository } from "../../pvp/application/ports";
 import {
   hasRandomEventChallengeOutcomeBranching,
   renderRandomEventOutcome,
+  type RandomEventEffect,
   selectRandomEventOutcomeForScenario,
   type RandomEventOutcome,
   type RandomEventOutcomeResolution,
@@ -72,10 +73,10 @@ const getRandomIntInclusive = (min: number, max: number, random: () => number): 
 };
 
 const resolveCurrencyEffectAmounts = (
-  outcome: RandomEventOutcome,
+  effects: RandomEventEffect[],
   random: () => number,
 ): number[] => {
-  return outcome.effects.flatMap((effect) => {
+  return effects.flatMap((effect) => {
     if (effect.type !== "currency") {
       return [];
     }
@@ -84,7 +85,14 @@ const resolveCurrencyEffectAmounts = (
   });
 };
 
-const applyOutcomeEffectsToUser = (
+export const resolveRandomEventCurrencyEffectAmounts = (
+  effects: RandomEventEffect[],
+  random: () => number,
+): number[] => {
+  return resolveCurrencyEffectAmounts(effects, random);
+};
+
+export const applyRandomEventEffectsToUser = (
   {
     economy,
     inventory,
@@ -109,7 +117,8 @@ const applyOutcomeEffectsToUser = (
   },
   userId: string,
   scenarioId: string,
-  outcome: RandomEventOutcome,
+  effectSourceId: string,
+  effects: RandomEventEffect[],
 ): {
   effectNotes: string[];
   pipReward: number;
@@ -120,7 +129,7 @@ const applyOutcomeEffectsToUser = (
   let currencyEffectIndex = 0;
   const appliedNegativeEffects: RandomEventAppliedNegativeEffect[] = [];
 
-  for (const effect of outcome.effects) {
+  for (const effect of effects) {
     if (effect.type === "currency") {
       const amount =
         resolvedCurrencyAmounts?.[currencyEffectIndex] ??
@@ -158,7 +167,7 @@ const applyOutcomeEffectsToUser = (
         userId,
         effectCode: "roll-pass-multiplier",
         kind: "positive",
-        source: `random-event:${scenarioId}:${outcome.id}`,
+        source: `random-event:${scenarioId}:${effectSourceId}`,
         magnitude: effect.multiplier,
         remainingRolls: effect.rolls,
         consumeOnCommand: "dice",
@@ -171,7 +180,7 @@ const applyOutcomeEffectsToUser = (
     if (effect.type === "temporary-roll-penalty") {
       const result = hostileEffects.applyShieldableNegativeRollPenalty({
         userId,
-        source: `random-event:${scenarioId}:${outcome.id}`,
+        source: `random-event:${scenarioId}:${effectSourceId}`,
         divisor: effect.divisor,
         rolls: effect.rolls,
         stackMode: effect.stackMode,
@@ -324,7 +333,7 @@ export const resolveRandomEventAttempt = ({
       })
       ?.some((effect) => effect.kind === "negative") === true ||
     (pvp?.getActiveDiceLockout(userId, nowMs) ?? null) !== null;
-  const { effectNotes, pipReward, appliedNegativeEffects } = applyOutcomeEffectsToUser(
+  const { effectNotes, pipReward, appliedNegativeEffects } = applyRandomEventEffectsToUser(
     {
       economy,
       inventory,
@@ -337,7 +346,8 @@ export const resolveRandomEventAttempt = ({
     },
     userId,
     scenario.id,
-    renderedOutcome.selectedOutcome,
+    renderedOutcome.selectedOutcome.id,
+    renderedOutcome.selectedOutcome.effects,
   );
   const attemptResolution: RandomEventAttemptResolution = {
     userId,
@@ -464,7 +474,7 @@ export const resolveRandomEvent = async ({
             selectedOutcome: renderedOutcome.selectedOutcome,
             renderedOutcomeMessage: renderedOutcome.renderedOutcomeMessage,
             resolvedCurrencyAmounts: resolveCurrencyEffectAmounts(
-              renderedOutcome.selectedOutcome,
+              renderedOutcome.selectedOutcome.effects,
               Math.random,
             ),
           };

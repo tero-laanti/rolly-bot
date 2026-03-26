@@ -119,6 +119,117 @@ test("scenario validation rejects requiredReadyCount on first-click events", () 
   assert.throws(() => validateRandomEventScenarios([scenario]), /only valid for multi-user/i);
 });
 
+test("scenario validation rejects non-currency push-your-luck stage rewards", () => {
+  const scenario: RandomEventScenario = {
+    id: "push-your-luck-invalid",
+    rarity: "epic",
+    title: "Push Your Luck Invalid",
+    prompt: "Dive for treasure?",
+    claimLabel: "Dive",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 45,
+    flow: {
+      type: "solo-push-your-luck",
+      stages: [
+        {
+          id: "deep-one",
+          label: "Deep One",
+          rollChallenge: {
+            id: "deep-one-roll",
+            mode: "single-step",
+            steps: [
+              {
+                id: "deep-one-step",
+                label: "Roll 4+ on d6",
+                source: { type: "static-die", sides: 6 },
+                target: 4,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "You find a trinket.",
+          successEffects: [
+            {
+              type: "temporary-roll-multiplier",
+              multiplier: 2,
+              rolls: 1,
+              stackMode: "refresh",
+            },
+          ],
+          failureMessage: "You get dragged under.",
+          failureEffects: [
+            {
+              type: "temporary-roll-penalty",
+              divisor: 3,
+              rolls: 6,
+              stackMode: "replace",
+            },
+          ],
+        },
+      ],
+    },
+    outcomes: [],
+  };
+
+  assert.throws(() => validateRandomEventScenarios([scenario]), /exactly one currency effect/i);
+});
+
+test("scenario validation accepts group-meter stages that define roll challenges", () => {
+  const scenario: RandomEventScenario = {
+    id: "group-meter-valid",
+    rarity: "rare",
+    title: "Group Meter Valid",
+    prompt: "Gather a crowd?",
+    claimLabel: "Join in",
+    claimPolicy: "multi-user",
+    claimWindowSeconds: 45,
+    flow: {
+      type: "group-meter",
+      stages: [
+        {
+          id: "crowd-starts",
+          label: "Crowd starts",
+          requiredSuccesses: 2,
+          rollChallenge: {
+            id: "join-check",
+            mode: "single-step",
+            steps: [
+              {
+                id: "join-step",
+                label: "Roll 4+ on d6",
+                source: { type: "static-die", sides: 6 },
+                target: 4,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "The crowd gets loud.",
+          successEffects: [
+            {
+              type: "currency",
+              minAmount: 4,
+              maxAmount: 4,
+            },
+          ],
+          failureMessage: "You miss the beat.",
+          failureEffects: [
+            {
+              type: "temporary-roll-penalty",
+              divisor: 2,
+              rolls: 3,
+              stackMode: "refresh",
+            },
+          ],
+          failureResolution: "keep-open",
+        },
+      ],
+    },
+    outcomes: [],
+  };
+
+  assert.doesNotThrow(() => validateRandomEventScenarios([scenario]));
+});
+
 test("keep-open attempt resolution logs a neutral failed-attempt history line", () => {
   const scenario = createChallengeScenario();
   const selection = renderRandomEventScenario(scenario);
@@ -906,7 +1017,10 @@ const resolveMultiUserScenarioDescription = async (
         eventId: "event-1",
         selection,
         message,
+        flowState: { type: "single-resolution" as const },
         sequenceChallenge: null,
+        phaseTimer: null,
+        baseDurationMs: 60_000,
         currentPhaseExpiresAtMs: Date.now() + 60_000,
         attemptedUserIds: new Set<string>(),
         failedAttemptLines: [],
@@ -1021,7 +1135,10 @@ test("multi-user events reuse one currency amount for all participants in a shar
         eventId: "event-shared-currency",
         selection,
         message,
+        flowState: { type: "single-resolution" as const },
         sequenceChallenge: null,
+        phaseTimer: null,
+        baseDurationMs: 60_000,
         currentPhaseExpiresAtMs: Date.now() + 60_000,
         attemptedUserIds: new Set<string>(),
         failedAttemptLines: [],
@@ -1150,7 +1267,10 @@ test("threshold multi-user events expire if the required ready count is not met"
         eventId: "event-2",
         selection,
         message,
+        flowState: { type: "single-resolution" as const },
         sequenceChallenge: null,
+        phaseTimer: null,
+        baseDurationMs: 60_000,
         currentPhaseExpiresAtMs: Date.now() + 60_000,
         attemptedUserIds: new Set<string>(),
         failedAttemptLines: [],
@@ -1225,7 +1345,10 @@ test("resolved event lines place unlocked achievements on a new line", async () 
         eventId: "event-achievement-newline",
         selection,
         message,
+        flowState: { type: "single-resolution" as const },
         sequenceChallenge: null,
+        phaseTimer: null,
+        baseDurationMs: 60_000,
         currentPhaseExpiresAtMs: Date.now() + 60_000,
         attemptedUserIds: new Set<string>(),
         failedAttemptLines: [],
@@ -1335,7 +1458,10 @@ test("keep-open comeback progress only counts when the same user failed before s
           eventId,
           selection,
           message,
+          flowState: { type: "single-resolution" as const },
           sequenceChallenge: null,
+          phaseTimer: null,
+          baseDurationMs: 60_000,
           currentPhaseExpiresAtMs: Date.now() + 60_000,
           attemptedUserIds: new Set<string>(),
           failedAttemptLines: ["<@111> failed: The gate stays shut."],

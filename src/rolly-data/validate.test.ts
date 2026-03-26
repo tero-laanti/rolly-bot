@@ -21,6 +21,7 @@ type RandomEventScenarioInput = {
   textVariables?: Record<string, string[]>;
   requiredReadyCount?: number;
   retryPolicy?: string;
+  flow?: unknown;
   challengeOutcomeIds?: {
     success: string[];
     failure: string[];
@@ -135,6 +136,136 @@ test("parseRandomEventScenarios rejects stray challengeOutcomeIds without a roll
     () => parseRandomEventScenarios([scenario]),
     /challengeOutcomeIds require an explicit rollChallenge/i,
   );
+});
+
+test("parseRandomEventScenarios accepts solo-ladder staged flows", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "first-click";
+  scenario.outcomes = [];
+  scenario.flow = {
+    type: "solo-ladder",
+    stages: [
+      {
+        id: "stage-one",
+        label: "Swing",
+        prompt: "Take a swing.",
+        actionLabel: "Swing",
+        rollChallenge: {
+          id: "pinata-swing",
+          mode: "single-step",
+          steps: [
+            {
+              id: "pinata-hit",
+              label: "Roll 4+",
+              source: { type: "static-die", sides: 10 },
+              target: 4,
+              comparator: "gte",
+            },
+          ],
+        },
+        successMessage: "Candy spills out.",
+        successEffects: [{ type: "currency", minAmount: 1, maxAmount: 1 }],
+        failureMessage: "You whiff.",
+        failureEffects: [
+          { type: "temporary-roll-penalty", divisor: 2, rolls: 3, stackMode: "refresh" },
+        ],
+      },
+    ],
+  };
+
+  const parsed = parseRandomEventScenarios([scenario]);
+  assert.equal(parsed[0]?.flow?.type, "solo-ladder");
+});
+
+test("parseRandomEventScenarios rejects staged flows with top-level outcomes", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "first-click";
+  scenario.flow = {
+    type: "solo-ladder",
+    stages: [
+      {
+        id: "stage-one",
+        label: "Swing",
+        prompt: "Take a swing.",
+        actionLabel: "Swing",
+        rollChallenge: {
+          id: "pinata-swing",
+          mode: "single-step",
+          steps: [
+            {
+              id: "pinata-hit",
+              label: "Roll 4+",
+              source: { type: "static-die", sides: 10 },
+              target: 4,
+              comparator: "gte",
+            },
+          ],
+        },
+        successMessage: "Candy spills out.",
+        successEffects: [{ type: "currency", minAmount: 1, maxAmount: 1 }],
+        failureMessage: "You whiff.",
+        failureEffects: [
+          { type: "temporary-roll-penalty", divisor: 2, rolls: 3, stackMode: "refresh" },
+        ],
+      },
+    ],
+  };
+
+  assert.throws(
+    () => parseRandomEventScenarios([scenario]),
+    /staged flows must define stage rewards instead of top-level outcomes/i,
+  );
+});
+
+test("parseRandomEventScenarios rejects group-meter stages without requiredSuccesses", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "multi-user";
+  scenario.outcomes = [];
+  scenario.flow = {
+    type: "group-meter",
+    participantRewardPolicy: "finisher-bonus",
+    stages: [
+      {
+        id: "meter-one",
+        label: "Warm-up",
+        prompt: "Sing together.",
+        actionLabel: "Sing",
+        successMessage: "The chorus catches.",
+        successEffects: [{ type: "currency", minAmount: 4, maxAmount: 4 }],
+      },
+    ],
+  };
+
+  assert.throws(() => parseRandomEventScenarios([scenario]), /requiredSuccesses >= 2/i);
+});
+
+test("parseRandomEventScenarios accepts stake-offer flows", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "first-click";
+  scenario.flow = {
+    type: "stake-offer",
+    stakePips: 4,
+    acceptLabel: "Take bet",
+    declineLabel: "Walk away",
+    declineMessage: "The bookmaker shrugs and turns to the next mark.",
+  };
+  scenario.outcomes = [
+    {
+      id: "bookmaker-win",
+      resolution: "resolve-success",
+      message: "Your side wins the imaginary bout.",
+      effects: [{ type: "currency", minAmount: 6, maxAmount: 7 }],
+    },
+    {
+      id: "bookmaker-loss",
+      resolution: "resolve-failure",
+      message: "The imaginary underdog gets flattened instantly.",
+      effects: [],
+    },
+  ];
+
+  const parsed = parseRandomEventScenarios([scenario]);
+  assert.equal(parsed[0]?.flow?.type, "stake-offer");
 });
 
 test("parseRandomEventScenarios rejects rendered claim labels that exceed Discord button limits", () => {
