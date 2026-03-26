@@ -115,6 +115,17 @@ When implementing a new feature:
 - Prefer manual Discord validation for behavior-heavy changes such as dice progression, PvP flows, random events, admin panels, and self-update behavior.
 - Unit tests are optional. Add them when logic is complex enough that tests improve clarity or confidence.
 
+## Committing Guidelines
+
+- Prefer small, reviewable commits with one clear purpose each.
+- Split commits by concern when the changes are independently understandable. Do not split tightly coupled code and tests into separate commits unless they still make sense on their own.
+- Write commit subjects that describe the actual change, not the workflow around it. Avoid subjects such as `Fix review issues`, `Address feedback`, or `Misc cleanup`.
+- Use the imperative mood in commit subjects and focus on the behavioral change or constraint being introduced.
+- Add a commit body when the subject alone does not explain the reason, the tradeoff, or the important behavior change.
+- In commit bodies, explain why the change exists and what behavior changed. Do not restate the diff file by file.
+- If a commit adds a fail-fast guard, pagination, validation, schema change, or gameplay behavior change, call that out directly in the subject or body.
+- Follow-up commits from review should still describe the concrete fix they contain, not the fact that they came from review.
+
 ## Planning
 
 - Use spec files only for non-trivial tasks: multi-file features, gameplay changes, schema changes, larger refactors, or work with unclear requirements.
