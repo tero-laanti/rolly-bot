@@ -21,8 +21,8 @@ Minimal shape:
       "effects": [
         {
           "type": "currency",
-          "minAmount": 1,
-          "maxAmount": 3
+          "minAmount": 2,
+          "maxAmount": 4
         }
       ]
     }
@@ -208,11 +208,25 @@ Effect types:
 
 Recommended pip reward bands for successful outcomes:
 
-- `common`: `1-3`
-- `uncommon`: `4-6`
-- `rare`: `7-10`
-- `epic`: `11-20`
-- `legendary`: `25-50`
+- `common`: `baseline 2-4`, `challenge 3-5`
+- `uncommon`: `baseline 4-6`, `challenge 6-8`, `multi-user 6-9`
+- `rare`: `baseline 7-10`, `challenge 9-13`, `sequence/multi-user 10-14`
+- `epic`: `baseline 11-18`, `challenge 14-20`, `sequence/multi-user 16-24`
+- `legendary`: `baseline 20-30`, `challenge 24-34`, `sequence/multi-user 28-40`
+
+Recommended negative-effect ladder:
+
+- `common`: penalties should stay around `divisor 2-3` for `1-2` rolls, with lockouts only for obvious severe mistakes at `2-4` minutes.
+- `uncommon`: penalties should stay around `divisor 2-3` for `2-3` rolls, with lockouts at `3-5` minutes.
+- `rare`: penalties should stay around `divisor 2-4` for `3-5` rolls, with lockouts at `5-8` minutes.
+- `epic`: prefer `divisor 3-4` for `6-10` rolls; use `8-12` minute lockouts only for total collapse outcomes.
+- `legendary`: prefer `divisor 4-6` for `8-12` rolls; use `12-18` minute lockouts only for true catastrophic failure.
+
+Sequence challenge guardrails:
+
+- Do not stack more than one `eq` step in a single sequence.
+- If a sequence uses an `eq` step, keep it at `d10` or smaller.
+- For harder epic and legendary sequences, prefer longer active penalties over stacking multiple lockouts.
 
 `stackMode` for multiplier and penalty effects:
 

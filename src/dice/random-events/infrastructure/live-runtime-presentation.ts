@@ -313,7 +313,10 @@ export const buildActiveClaimButtonLabel = ({
 
   if (hasKeepOpenFailures) {
     const prefix = retryMode === "same-user-can-retry" ? "Try again: " : "Next try: ";
-    return truncateDiscordText(`${prefix}${rollLabel ?? claimLabel}`, discordButtonLabelCharacterLimit);
+    return truncateDiscordText(
+      `${prefix}${rollLabel ?? claimLabel}`,
+      discordButtonLabelCharacterLimit,
+    );
   }
 
   return rollLabel ?? claimLabel;
@@ -355,7 +358,10 @@ export const buildSequenceChallengeDescription = ({
     if (!progress.completed) {
       const nextStep = challenge.steps[progress.nextStepIndex];
       if (nextStep) {
-        lines.push("", `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`);
+        lines.push(
+          "",
+          `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`,
+        );
       }
     }
 
