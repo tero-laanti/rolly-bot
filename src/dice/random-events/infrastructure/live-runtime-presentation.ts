@@ -10,6 +10,7 @@ import type {
   RandomEventRollChallengeDefinition,
   RandomEventRollChallengeProgress,
   RandomEventRollChallengeStepResult,
+  RandomEventRollSource,
 } from "../domain/roll-challenges";
 import type { RandomEventRarityTier } from "../domain/variety";
 
@@ -87,6 +88,41 @@ const formatSequenceStepLine = (
   return `${status} Step ${index + 1}: **${stepResult.label}** — rolled ${stepResult.rolledValue} on d${stepResult.dieSides} (needed ${formatComparator(stepResult.comparator, stepResult.target)}).`;
 };
 
+const formatRollSourceLabel = (source: RandomEventRollSource): string => {
+  if (source.type === "player-die") {
+    return "your die";
+  }
+
+  return `d${Math.max(2, Math.floor(source.sides))}`;
+};
+
+const buildChallengePromptLines = (
+  challenge: RandomEventRollChallengeDefinition,
+  stepIndex: number,
+): string[] => {
+  const step = challenge.steps[stepIndex];
+  if (!step) {
+    return [];
+  }
+
+  if (challenge.steps.length === 1) {
+    return [
+      `🎲 Die: ${formatRollSourceLabel(step.source)}`,
+      `Goal: ${formatComparator(step.comparator, step.target)}`,
+    ];
+  }
+
+  return [
+    `🎲 Die: ${formatRollSourceLabel(step.source)}`,
+    `Step: ${stepIndex + 1}/${challenge.steps.length}`,
+    `Goal: ${formatComparator(step.comparator, step.target)}`,
+  ];
+};
+
+const getRollButtonLabelForSource = (source: RandomEventRollSource): string => {
+  return `Roll ${formatRollSourceLabel(source)}`;
+};
+
 const formatVisibleLines = ({
   lines,
   maxVisible,
@@ -152,6 +188,7 @@ export const buildActiveClaimDescription = (
   participants: string[] = [],
   failedAttemptLines: string[] = [],
   requiredReadyCount: number | null = null,
+  challenge: RandomEventRollChallengeDefinition | null = null,
 ): string => {
   const buildDescription = ({
     participantMaxVisible,
@@ -161,6 +198,11 @@ export const buildActiveClaimDescription = (
     failedAttemptMaxVisible: number;
   }): string => {
     const lines = [prompt];
+
+    const challengePromptLines = challenge ? buildChallengePromptLines(challenge, 0) : [];
+    if (challengePromptLines.length > 0) {
+      lines.push("", ...challengePromptLines);
+    }
 
     if (typeof requiredReadyCount === "number") {
       const remainingPlayers = Math.max(requiredReadyCount - participants.length, 0);
@@ -235,11 +277,11 @@ export const buildActiveClaimDescription = (
 };
 
 export const buildSequenceChallengeButtonLabel = (
+  challenge: RandomEventRollChallengeDefinition,
   progress: RandomEventRollChallengeProgress,
-  totalSteps: number,
 ): string => {
-  const nextStepNumber = Math.min(progress.nextStepIndex + 1, totalSteps);
-  return `Roll step ${nextStepNumber}/${totalSteps}`;
+  const nextStep = challenge.steps[Math.min(progress.nextStepIndex, challenge.steps.length - 1)];
+  return nextStep ? getRollButtonLabelForSource(nextStep.source) : "Roll";
 };
 
 export const buildActiveClaimButtonLabel = ({
@@ -248,13 +290,20 @@ export const buildActiveClaimButtonLabel = ({
   requiredReadyCount,
   hasKeepOpenFailures,
   retryMode,
+  challenge,
 }: {
   claimLabel: string;
   participantCount: number;
   requiredReadyCount: number | null;
   hasKeepOpenFailures: boolean;
   retryMode: "same-user-can-retry" | "next-user-must-try";
+  challenge?: RandomEventRollChallengeDefinition | null;
 }): string => {
+  const rollLabel =
+    challenge?.mode === "single-step" && challenge.steps[0] !== undefined
+      ? getRollButtonLabelForSource(challenge.steps[0].source)
+      : null;
+
   if (typeof requiredReadyCount === "number" && participantCount > 0) {
     return truncateDiscordText(
       `${claimLabel} (${participantCount}/${requiredReadyCount})`,
@@ -264,10 +313,10 @@ export const buildActiveClaimButtonLabel = ({
 
   if (hasKeepOpenFailures) {
     const prefix = retryMode === "same-user-can-retry" ? "Try again: " : "Next try: ";
-    return truncateDiscordText(`${prefix}${claimLabel}`, discordButtonLabelCharacterLimit);
+    return truncateDiscordText(`${prefix}${rollLabel ?? claimLabel}`, discordButtonLabelCharacterLimit);
   }
 
-  return claimLabel;
+  return rollLabel ?? claimLabel;
 };
 
 export const buildSequenceChallengeDescription = ({
@@ -285,6 +334,11 @@ export const buildSequenceChallengeDescription = ({
 }): string => {
   const buildDescription = (maxVisibleStepLines: number): string => {
     const lines = [selection.renderedPrompt, "", `<@${userId}> is taking the challenge.`];
+    const challengePromptLines = buildChallengePromptLines(challenge, progress.nextStepIndex);
+    if (challengePromptLines.length > 0) {
+      lines.push("", ...challengePromptLines);
+    }
+
     const revealedRollLines = formatVisibleLines({
       lines: progress.stepResults.map((stepResult, index) =>
         formatSequenceStepLine(stepResult, index),
@@ -301,12 +355,7 @@ export const buildSequenceChallengeDescription = ({
     if (!progress.completed) {
       const nextStep = challenge.steps[progress.nextStepIndex];
       if (nextStep) {
-        lines.push(
-          "",
-          `**Next step ${progress.nextStepIndex + 1}/${challenge.steps.length}:** ${nextStep.label}`,
-          `Need ${formatComparator(nextStep.comparator, nextStep.target)}.`,
-          `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`,
-        );
+        lines.push("", `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`);
       }
     }
 

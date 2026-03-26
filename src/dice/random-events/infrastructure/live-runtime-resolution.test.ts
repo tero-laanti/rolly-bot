@@ -15,6 +15,7 @@ import {
   buildActiveClaimDescription,
   buildExpiredEventEmbed,
   buildResolvedEventEmbed,
+  buildSequenceChallengeDescription,
 } from "./live-runtime-presentation";
 import { createRandomEventsState, registerActiveRandomEvent } from "./state-store";
 import {
@@ -184,8 +185,21 @@ test("active claim button label changes after keep-open failures", () => {
       requiredReadyCount: null,
       hasKeepOpenFailures: true,
       retryMode: "next-user-must-try",
+      challenge: {
+        id: "gate-roll",
+        mode: "single-step",
+        steps: [
+          {
+            id: "step-one",
+            label: "Roll 4 or lower",
+            source: { type: "static-die", sides: 6 },
+            target: 4,
+            comparator: "lte",
+          },
+        ],
+      },
     }),
-    "Next try: Push gate",
+    "Next try: Roll d6",
   );
 
   assert.equal(
@@ -195,8 +209,80 @@ test("active claim button label changes after keep-open failures", () => {
       requiredReadyCount: null,
       hasKeepOpenFailures: true,
       retryMode: "same-user-can-retry",
+      challenge: {
+        id: "gate-roll",
+        mode: "single-step",
+        steps: [
+          {
+            id: "step-one",
+            label: "Roll 4 or lower",
+            source: { type: "static-die", sides: 6 },
+            target: 4,
+            comparator: "lte",
+          },
+        ],
+      },
     }),
-    "Try again: Push gate",
+    "Try again: Roll d6",
+  );
+});
+
+test("active claim button label uses the roll die for roll challenges", () => {
+  assert.equal(
+    buildActiveClaimButtonLabel({
+      claimLabel: "Reach in",
+      participantCount: 0,
+      requiredReadyCount: null,
+      hasKeepOpenFailures: false,
+      retryMode: "next-user-must-try",
+      challenge: {
+        id: "barrel-roll",
+        mode: "single-step",
+        steps: [
+          {
+            id: "step-one",
+            label: "Roll 4 or lower",
+            source: { type: "static-die", sides: 6 },
+            target: 4,
+            comparator: "lte",
+          },
+        ],
+      },
+    }),
+    "Roll d6",
+  );
+});
+
+test("active claim button label keeps the non-roll action for sequence challenges", () => {
+  assert.equal(
+    buildActiveClaimButtonLabel({
+      claimLabel: "Climb stair",
+      participantCount: 0,
+      requiredReadyCount: null,
+      hasKeepOpenFailures: false,
+      retryMode: "next-user-must-try",
+      challenge: {
+        id: "bell-sequence",
+        mode: "sequence",
+        steps: [
+          {
+            id: "step-one",
+            label: "Roll 6+",
+            source: { type: "static-die", sides: 20 },
+            target: 6,
+            comparator: "gte",
+          },
+          {
+            id: "step-two",
+            label: "Roll exactly 7",
+            source: { type: "static-die", sides: 20 },
+            target: 7,
+            comparator: "eq",
+          },
+        ],
+      },
+    }),
+    "Climb stair",
   );
 });
 
@@ -661,6 +747,130 @@ test("active event prompt trims oversized failed-attempt text without losing the
 
   assert.ok(description.length <= 4_096);
   assert.match(description, /Test prompt/);
+});
+
+test("active event prompt shows a single roll summary for static single-step challenges", () => {
+  const description = buildActiveClaimDescription(
+    "Reach in and fish it out with a 4 or lower roll?",
+    null,
+    null,
+    [],
+    [],
+    null,
+    {
+      id: "test-roll",
+      mode: "single-step",
+      steps: [
+        {
+          id: "step-one",
+          label: "Roll 4 or lower",
+          source: { type: "static-die", sides: 6 },
+          target: 4,
+          comparator: "lte",
+        },
+      ],
+    },
+  );
+
+  assert.match(description, /🎲 Die: d6/);
+  assert.match(description, /Goal: 4 or lower/);
+});
+
+test("sequence challenge prompt shows one shared die summary when all steps use the same die", () => {
+  const scenario = createChallengeScenario();
+  scenario.prompt = "Clear two checks before the bridge gives way: 5+, then exact 2.";
+  scenario.rollChallenge = {
+    id: "bridge-sequence",
+    mode: "sequence",
+    steps: [
+      {
+        id: "step-one",
+        label: "Roll 5+",
+        source: { type: "static-die", sides: 10 },
+        target: 5,
+        comparator: "gte",
+      },
+      {
+        id: "step-two",
+        label: "Roll exactly 2",
+        source: { type: "static-die", sides: 10 },
+        target: 2,
+        comparator: "eq",
+      },
+    ],
+  };
+
+  const selection = renderRandomEventScenario(scenario);
+  const description = buildSequenceChallengeDescription({
+    selection,
+    userId: "123",
+    challenge: scenario.rollChallenge,
+    progress: {
+      challengeId: "bridge-sequence",
+      mode: "sequence",
+      nextStepIndex: 0,
+      stepResults: [],
+      completed: false,
+      succeeded: null,
+    },
+    expiresAtMs: Date.now() + 60_000,
+  });
+
+  assert.match(description, /🎲 Die: d10/);
+  assert.match(description, /Step: 1\/2/);
+  assert.match(description, /Goal: 5 or higher/);
+});
+
+test("sequence challenge prompt shows only the active die for mixed-die sequences", () => {
+  const scenario = createChallengeScenario();
+  scenario.prompt = "Clear three checks before the route folds shut: 5+, 4 or lower, then exact 6.";
+  scenario.rollChallenge = {
+    id: "mixed-sequence",
+    mode: "sequence",
+    steps: [
+      {
+        id: "step-one",
+        label: "Roll 5+",
+        source: { type: "static-die", sides: 12 },
+        target: 5,
+        comparator: "gte",
+      },
+      {
+        id: "step-two",
+        label: "Roll 4 or lower",
+        source: { type: "static-die", sides: 12 },
+        target: 4,
+        comparator: "lte",
+      },
+      {
+        id: "step-three",
+        label: "Roll exactly 6",
+        source: { type: "static-die", sides: 8 },
+        target: 6,
+        comparator: "eq",
+      },
+    ],
+  };
+
+  const selection = renderRandomEventScenario(scenario);
+  const description = buildSequenceChallengeDescription({
+    selection,
+    userId: "123",
+    challenge: scenario.rollChallenge,
+    progress: {
+      challengeId: "mixed-sequence",
+      mode: "sequence",
+      nextStepIndex: 0,
+      stepResults: [],
+      completed: false,
+      succeeded: null,
+    },
+    expiresAtMs: Date.now() + 60_000,
+  });
+
+  assert.match(description, /🎲 Die: d12/);
+  assert.match(description, /Step: 1\/3/);
+  assert.match(description, /Goal: 5 or higher/);
 });
 
 test("resolved event embed trims excess result lines while preserving the outcome header", () => {

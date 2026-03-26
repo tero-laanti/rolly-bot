@@ -192,6 +192,7 @@ export const createRandomEventsLiveRuntime = ({
         participants,
         context.failedAttemptLines,
         context.selection.scenario.requiredReadyCount ?? null,
+        context.selection.scenario.rollChallenge ?? null,
       ),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
       buttonLabel: buildActiveClaimButtonLabel({
@@ -203,6 +204,7 @@ export const createRandomEventsLiveRuntime = ({
           getRandomEventRetryPolicy(context.selection.scenario) === "allow-retry"
             ? "same-user-can-retry"
             : "next-user-must-try",
+        challenge: context.selection.scenario.rollChallenge ?? null,
       }),
       color: rarityPresentation.color,
       footerText: rarityPresentation.label,
@@ -232,7 +234,7 @@ export const createRandomEventsLiveRuntime = ({
         expiresAtMs: getActiveRandomEventCurrentPhaseExpiryMs(context),
       }),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
-      buttonLabel: buildSequenceChallengeButtonLabel(session.progress, challenge.steps.length),
+      buttonLabel: buildSequenceChallengeButtonLabel(challenge, session.progress),
       color: rarityPresentation.color,
       footerText: `${rarityPresentation.label} • Challenge`,
     });

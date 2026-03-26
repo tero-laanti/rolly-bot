@@ -84,9 +84,10 @@ Roll challenges:
     "steps": [
       {
         "id": "example-step",
-        "label": "Roll 5+ on your die",
+        "label": "Roll 5+",
         "source": {
-          "type": "player-die"
+          "type": "static-die",
+          "sides": 8
         },
         "target": 5,
         "comparator": "gte"
@@ -101,10 +102,11 @@ Roll challenges:
 - `single-step` must contain exactly one step.
 - `failOnFirstMiss` defaults to `true` if omitted.
 - `comparator` can be `gte`, `lte`, or `eq`.
-- `source.type = "player-die"` rolls the user's current die.
+- `source.type = "player-die"` rolls the user's current die. Use `static-die` when challenge odds should stay independent from player progression.
 - `source.dieIndex` defaults to `1` when bans are consulted.
 - `source.useBans` defaults to `false`.
 - `source.type = "static-die"` rolls an independent die with the given `sides`.
+- The prompt UI surfaces challenge mechanics in a dedicated block. Prompts and step labels can focus on the target, for example `Reach in and fish it out with a 4 or lower roll?` with UI lines such as `🎲 Die: d6` and `Goal: 4 or lower`.
 
 Challenge outcomes:
 
@@ -135,15 +137,15 @@ Example keep-open challenge:
     "steps": [
       {
         "id": "step-one",
-        "label": "Step 1: roll 5+ on your die",
-        "source": { "type": "player-die" },
+        "label": "Roll 5+",
+        "source": { "type": "static-die", "sides": 10 },
         "target": 5,
         "comparator": "gte"
       },
       {
         "id": "step-two",
-        "label": "Step 2: roll 3+ on your die",
-        "source": { "type": "player-die" },
+        "label": "Roll 3+",
+        "source": { "type": "static-die", "sides": 10 },
         "target": 3,
         "comparator": "gte"
       }
