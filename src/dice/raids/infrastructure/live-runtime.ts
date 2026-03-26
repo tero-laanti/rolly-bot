@@ -27,7 +27,7 @@ import {
   createRaidBoss,
   describeRaidReward,
 } from "../domain/raid";
-import { parseRaidJoinButtonId } from "../interfaces/discord/button-ids";
+import { parseRaidJoinButtonId, parseRaidLeaveButtonId } from "../interfaces/discord/button-ids";
 import {
   buildRaidActivePrompt,
   buildRaidAnnouncementPrompt,
@@ -963,6 +963,7 @@ export const createRaidsLiveRuntime = ({
         expiresAtMs: null,
         closedAtMs: null,
         participantIds: new Set<string>(),
+        joinedUserIds: new Set<string>(),
         rewardEligibleUserIds: new Set<string>(),
         achievementAnnouncements: [],
         activeThreadId: null,
@@ -1005,13 +1006,20 @@ export const createRaidsLiveRuntime = ({
   };
 
   const handleButtonInteraction = async (interaction: ButtonInteraction): Promise<void> => {
-    const raidId = parseRaidJoinButtonId(interaction.customId);
-    if (!raidId) {
+    const joinRaidId = parseRaidJoinButtonId(interaction.customId);
+    const leaveRaidId = parseRaidLeaveButtonId(interaction.customId);
+    const buttonAction =
+      joinRaidId !== null
+        ? { type: "join" as const, raidId: joinRaidId }
+        : leaveRaidId !== null
+          ? { type: "leave" as const, raidId: leaveRaidId }
+          : null;
+    if (!buttonAction) {
       await interaction.deferUpdate();
       return;
     }
 
-    const context = liveRaidsById.get(raidId);
+    const context = liveRaidsById.get(buttonAction.raidId);
     if (
       !context ||
       stopping ||
@@ -1025,6 +1033,25 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
+    if (buttonAction.type === "leave") {
+      if (!context.raid.participantIds.has(interaction.user.id)) {
+        await interaction.reply({
+          content: "You're not signed up for this raid.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      context.raid.participantIds.delete(interaction.user.id);
+      await interaction.deferUpdate();
+      await queueAnnouncementRender({
+        context,
+        allowedStatuses: ["joining"],
+        logFailureMessage: "[raids] Failed to refresh raid announcement prompt.",
+      });
+      return;
+    }
+
     if (context.raid.participantIds.has(interaction.user.id)) {
       await interaction.reply({
         content: "You're already signed up for this raid.",
@@ -1034,14 +1061,20 @@ export const createRaidsLiveRuntime = ({
     }
 
     context.raid.participantIds.add(interaction.user.id);
-    const newlyEarned = awardManualDiceAchievements(
-      progression,
-      interaction.user.id,
-      getDiceRaidAchievementIds(recordRaidJoin(db, interaction.user.id)),
-    );
-    const achievementAnnouncements = [
-      createAchievementAnnouncement(interaction.user.id, newlyEarned),
-    ].flatMap((announcement) => (announcement ? [announcement] : []));
+    const isFirstJoinForRaid = !context.raid.joinedUserIds.has(interaction.user.id);
+    context.raid.joinedUserIds.add(interaction.user.id);
+    const achievementAnnouncements = isFirstJoinForRaid
+      ? [
+          createAchievementAnnouncement(
+            interaction.user.id,
+            awardManualDiceAchievements(
+              progression,
+              interaction.user.id,
+              getDiceRaidAchievementIds(recordRaidJoin(db, interaction.user.id)),
+            ),
+          ),
+        ].flatMap((announcement) => (announcement ? [announcement] : []))
+      : [];
     await interaction.deferUpdate();
     await queueAnnouncementRender({
       context,

@@ -29,7 +29,10 @@ import {
   clearRaidsAdminController,
   registerRaidsAdminController,
 } from "../../dice/raids/infrastructure/admin-controller";
-import { raidJoinButtonPrefix } from "../../dice/raids/interfaces/discord/button-ids";
+import {
+  raidJoinButtonPrefix,
+  raidLeaveButtonPrefix,
+} from "../../dice/raids/interfaces/discord/button-ids";
 import { createRaidsState } from "../../dice/raids/infrastructure/state-store";
 import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastructure/challenge-expiration-runtime";
 import { syncIntroPostsOnStartup } from "../../system/intro-posts/infrastructure/startup-sync";
@@ -89,6 +92,7 @@ const registerDiscordButtonHandlers = (): void => {
 
   registerButtonHandler(randomEventButtonPrefix, handleRandomEventButton);
   registerButtonHandler(raidJoinButtonPrefix, handleRaidJoinButton);
+  registerButtonHandler(raidLeaveButtonPrefix, handleRaidJoinButton);
 };
 
 const registerDiscordStringSelectMenuHandlers = (): void => {

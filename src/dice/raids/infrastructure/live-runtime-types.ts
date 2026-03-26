@@ -31,6 +31,7 @@ export type ActiveRaidRecord = {
   expiresAtMs: number | null;
   closedAtMs: number | null;
   participantIds: Set<string>;
+  joinedUserIds: Set<string>;
   rewardEligibleUserIds: Set<string>;
   achievementAnnouncements: AchievementAnnouncement[];
   activeThreadId: string | null;

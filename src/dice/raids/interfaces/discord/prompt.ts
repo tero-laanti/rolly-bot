@@ -14,7 +14,7 @@ import {
   truncateDiscordText,
 } from "../../../../shared/discord";
 import type { RaidOutcome } from "../../application/ports";
-import { buildRaidJoinButtonId } from "./button-ids";
+import { buildRaidJoinButtonId, buildRaidLeaveButtonId } from "./button-ids";
 
 const raidColor = 0xb33a3a;
 const successColor = 0x2f9e44;
@@ -219,8 +219,13 @@ export const buildRaidAnnouncementPrompt = ({
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(buildRaidJoinButtonId(raidId))
-      .setLabel(participantIds.length < 1 ? "Join raid" : `Join raid (${participantIds.length})`)
-      .setStyle(ButtonStyle.Danger)
+      .setLabel("Join raid")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId(buildRaidLeaveButtonId(raidId))
+      .setLabel("Leave raid")
+      .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled),
   );
 

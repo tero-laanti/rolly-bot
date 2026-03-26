@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { APIEmbed, JSONEncodable } from "discord.js";
-import { buildRaidActivePrompt, buildRaidResolvedPrompt } from "./prompt";
+import type {
+  APIEmbed,
+  ActionRowBuilder,
+  BaseMessageOptions,
+  ButtonBuilder,
+  JSONEncodable,
+} from "discord.js";
+import {
+  buildRaidActivePrompt,
+  buildRaidAnnouncementPrompt,
+  buildRaidResolvedPrompt,
+} from "./prompt";
 
 const getEmbedDescription = (embed: APIEmbed | JSONEncodable<APIEmbed> | undefined) => {
   if (!embed) {
@@ -9,6 +19,18 @@ const getEmbedDescription = (embed: APIEmbed | JSONEncodable<APIEmbed> | undefin
   }
 
   return "toJSON" in embed ? embed.toJSON().description : embed.description;
+};
+
+const getButtonLabels = (prompt: BaseMessageOptions) => {
+  return (prompt.components ?? []).flatMap((row) =>
+    "toJSON" in row
+      ? (row as ActionRowBuilder<ButtonBuilder>)
+          .toJSON()
+          .components.flatMap((component) =>
+            "label" in component && typeof component.label === "string" ? [component.label] : [],
+          )
+      : [],
+  );
 };
 
 test("active raid prompt trims long contribution sections without dropping the core raid status", () => {
@@ -82,4 +104,14 @@ test("active raid prompt omits the damage leaders section when no damage has bee
   assert.ok(description);
   assert.doesNotMatch(description, /\*\*Damage leaders\*\*/);
   assert.doesNotMatch(description, /No damage logged yet\./);
+});
+
+test("raid announcement prompt renders join and leave signup buttons", () => {
+  const prompt = buildRaidAnnouncementPrompt({
+    raidId: "raid-1",
+    participantIds: ["user-1"],
+    scheduledStartAtMs: 60_000,
+  });
+
+  assert.deepEqual(getButtonLabels(prompt), ["Join raid", "Leave raid"]);
 });
