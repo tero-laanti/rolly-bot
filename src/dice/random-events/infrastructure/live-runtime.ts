@@ -15,6 +15,7 @@ import {
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import {
   createAchievementAnnouncement,
+  mergeAchievementAnnouncements,
   type AchievementAnnouncement,
 } from "../../progression/application/achievement-announcements";
 import { createSqliteDiceHostileEffectsService } from "../../progression/infrastructure/sqlite/hostile-effects-service";
@@ -62,6 +63,7 @@ import {
   resolveRandomEvent,
   resolveRandomEventCurrencyEffectAmounts,
   resolveRandomEventAttempt,
+  type RandomEventAppliedNegativeEffect,
   type RandomEventAttemptResolution,
 } from "./live-runtime-resolution";
 import { recordRandomEventAchievementStats } from "./achievement-stats-repository";
@@ -247,6 +249,16 @@ export const createRandomEventsLiveRuntime = ({
 }: CreateRandomEventsLiveRuntimeInput): RandomEventsLiveRuntime => {
   const contentState = createRandomEventContentState();
   const activeEventsById = new Map<string, ActiveRandomEventContext>();
+  const customFlowAchievementStateByEventId = new Map<
+    string,
+    Map<
+      string,
+      {
+        appliedNegativeEffects: RandomEventAppliedNegativeEffect[];
+        hadActiveNegativeEffectBeforeAttempt: boolean;
+      }
+    >
+  >();
   const clickCooldownByUserId = new Map<string, number>();
   let nextSequenceChallengeSessionId = 1;
   const db = getDatabase();
@@ -270,10 +282,10 @@ export const createRandomEventsLiveRuntime = ({
     clickCooldownByUserId.set(userId, Date.now());
   };
 
-  const schedulePhaseExpiry = (eventId: string, durationMs: number): void => {
+  const schedulePhaseExpiry = (eventId: string, durationMs: number): number | null => {
     const context = activeEventsById.get(eventId);
     if (!context) {
-      return;
+      return null;
     }
 
     clearPhaseTimer(context);
@@ -285,6 +297,7 @@ export const createRandomEventsLiveRuntime = ({
         logger.warn("[random-events] Failed to resolve staged phase timeout.", error);
       });
     }, durationMs);
+    return expiresAtMs;
   };
 
   const resetPhaseExpiry = (eventId: string): void => {
@@ -296,15 +309,90 @@ export const createRandomEventsLiveRuntime = ({
     schedulePhaseExpiry(eventId, context.baseDurationMs);
   };
 
-  const resolveCustomEvent = async (eventId: string, lines: string[]): Promise<void> => {
+  type RandomEventAchievementAttemptResolution = Pick<
+    RandomEventAttemptResolution,
+    "appliedNegativeEffects" | "hadActiveNegativeEffectBeforeAttempt" | "resolution"
+  >;
+
+  type ResolvedCustomEventAchievementAttempt = {
+    userId: string;
+    attemptResolution: RandomEventAchievementAttemptResolution;
+    hadKeepOpenFailureBeforeSuccess: boolean;
+  };
+
+  const buildCustomFlowAchievementAttemptResolution = ({
+    eventId,
+    userId,
+    resolution,
+    currentAppliedNegativeEffects = [],
+    currentHadActiveNegativeEffectBeforeAttempt = false,
+  }: {
+    eventId: string;
+    userId: string;
+    resolution: RandomEventAchievementAttemptResolution["resolution"];
+    currentAppliedNegativeEffects?: RandomEventAppliedNegativeEffect[];
+    currentHadActiveNegativeEffectBeforeAttempt?: boolean;
+  }): RandomEventAchievementAttemptResolution => {
+    const existingState = customFlowAchievementStateByEventId.get(eventId)?.get(userId);
+    return {
+      resolution,
+      appliedNegativeEffects: [
+        ...(existingState?.appliedNegativeEffects ?? []),
+        ...currentAppliedNegativeEffects,
+      ],
+      hadActiveNegativeEffectBeforeAttempt:
+        (existingState?.hadActiveNegativeEffectBeforeAttempt ?? false) ||
+        (currentAppliedNegativeEffects.length > 0 && currentHadActiveNegativeEffectBeforeAttempt),
+    };
+  };
+
+  const publishAchievementAnnouncementsForAttempts = async (
+    context: ActiveRandomEventContext | undefined,
+    attempts: readonly ResolvedCustomEventAchievementAttempt[],
+  ): Promise<void> => {
+    if (!context || attempts.length < 1) {
+      return;
+    }
+
+    const announcements = mergeAchievementAnnouncements(
+      attempts.flatMap((attempt) =>
+        recordAttemptAchievements(context, {
+          userId: attempt.userId,
+          attemptResolution: attempt.attemptResolution,
+          hadKeepOpenFailureBeforeSuccess: attempt.hadKeepOpenFailureBeforeSuccess,
+        }),
+      ),
+    );
+    if (announcements.length < 1) {
+      return;
+    }
+
+    await publishAchievementAnnouncements({
+      client,
+      announcements,
+      logger,
+    });
+  };
+
+  const resolveCustomEvent = async ({
+    eventId,
+    lines,
+    achievementAttempts = [],
+  }: {
+    eventId: string;
+    lines: string[];
+    achievementAttempts?: readonly ResolvedCustomEventAchievementAttempt[];
+  }): Promise<void> => {
     const context = activeEventsById.get(eventId);
     if (!context) {
+      customFlowAchievementStateByEventId.delete(eventId);
       return;
     }
 
     clearSequenceChallengeTimer(context);
     clearPhaseTimer(context);
     activeEventsById.delete(eventId);
+    customFlowAchievementStateByEventId.delete(eventId);
     resolveActiveRandomEvent(state, eventId);
 
     await context.message
@@ -315,17 +403,20 @@ export const createRandomEventsLiveRuntime = ({
       .catch((error) => {
         logger.warn("[random-events] Failed to update resolved staged event message.", error);
       });
+    await publishAchievementAnnouncementsForAttempts(context, achievementAttempts);
   };
 
   const expireCustomEvent = async (eventId: string, lines: string[] = []): Promise<void> => {
     const context = activeEventsById.get(eventId);
     if (!context) {
+      customFlowAchievementStateByEventId.delete(eventId);
       return;
     }
 
     clearSequenceChallengeTimer(context);
     clearPhaseTimer(context);
     activeEventsById.delete(eventId);
+    customFlowAchievementStateByEventId.delete(eventId);
     resolveActiveRandomEvent(state, eventId);
 
     const embed =
@@ -704,7 +795,7 @@ export const createRandomEventsLiveRuntime = ({
       hadKeepOpenFailureBeforeSuccess,
     }: {
       userId: string;
-      attemptResolution: RandomEventAttemptResolution;
+      attemptResolution: RandomEventAchievementAttemptResolution;
       hadKeepOpenFailureBeforeSuccess: boolean;
     },
   ): AchievementAnnouncement[] => {
@@ -744,6 +835,7 @@ export const createRandomEventsLiveRuntime = ({
     attemptResolutionsByUserId?: ReadonlyMap<string, RandomEventAttemptResolution>;
   }): Promise<void> => {
     const context = activeEventsById.get(eventId);
+    customFlowAchievementStateByEventId.delete(eventId);
     clearSequenceChallengeTimer(context);
     clearPhaseTimer(context);
     if (context) {
@@ -1034,22 +1126,63 @@ export const createRandomEventsLiveRuntime = ({
     effects: RandomEventEffect[];
     resolvedCurrencyAmounts?: number[];
   }) => {
-    return applyRandomEventEffectsToUser(
-      {
-        economy,
-        inventory,
-        itemCatalog,
-        progression,
-        hostileEffects,
-        nowMs: Date.now(),
-        random: Math.random,
-        resolvedCurrencyAmounts,
-      },
-      userId,
-      scenarioId,
-      effectSourceId,
-      effects,
-    );
+    const nowMs = Date.now();
+    const hadActiveNegativeEffectBeforeAttempt =
+      progression
+        .getActiveDiceTemporaryEffects?.({
+          userId,
+          nowMs,
+        })
+        ?.some((effect) => effect.kind === "negative") === true ||
+      pvp.getActiveDiceLockout(userId, nowMs) !== null;
+    return {
+      ...applyRandomEventEffectsToUser(
+        {
+          economy,
+          inventory,
+          itemCatalog,
+          progression,
+          hostileEffects,
+          nowMs,
+          random: Math.random,
+          resolvedCurrencyAmounts,
+        },
+        userId,
+        scenarioId,
+        effectSourceId,
+        effects,
+      ),
+      hadActiveNegativeEffectBeforeAttempt,
+    };
+  };
+
+  const recordCustomFlowEffectApplication = ({
+    eventId,
+    userId,
+    appliedNegativeEffects,
+    hadActiveNegativeEffectBeforeAttempt,
+  }: {
+    eventId: string;
+    userId: string;
+    appliedNegativeEffects: RandomEventAppliedNegativeEffect[];
+    hadActiveNegativeEffectBeforeAttempt: boolean;
+  }): void => {
+    const existingByUserId = customFlowAchievementStateByEventId.get(eventId);
+    const byUserId = existingByUserId ?? new Map();
+    if (!existingByUserId) {
+      customFlowAchievementStateByEventId.set(eventId, byUserId);
+    }
+
+    const existing = byUserId.get(userId);
+    byUserId.set(userId, {
+      appliedNegativeEffects: [
+        ...(existing?.appliedNegativeEffects ?? []),
+        ...appliedNegativeEffects,
+      ],
+      hadActiveNegativeEffectBeforeAttempt:
+        (existing?.hadActiveNegativeEffectBeforeAttempt ?? false) ||
+        (appliedNegativeEffects.length > 0 && hadActiveNegativeEffectBeforeAttempt),
+    });
   };
 
   const resolveStageChallenge = ({
@@ -1105,7 +1238,24 @@ export const createRandomEventsLiveRuntime = ({
       effects: context.flowState.potEffects,
     });
     const payoutLine = `<@${userId}>: ${reasonLine} ${payout.effectNotes.join(" ")}`.trim();
-    await resolveCustomEvent(eventId, [...context.flowState.resolvedLines, payoutLine]);
+    await resolveCustomEvent({
+      eventId,
+      lines: [...context.flowState.resolvedLines, payoutLine],
+      achievementAttempts: [
+        {
+          userId,
+          attemptResolution: buildCustomFlowAchievementAttemptResolution({
+            eventId,
+            userId,
+            resolution: "resolve-success",
+            currentAppliedNegativeEffects: payout.appliedNegativeEffects,
+            currentHadActiveNegativeEffectBeforeAttempt:
+              payout.hadActiveNegativeEffectBeforeAttempt,
+          }),
+          hadKeepOpenFailureBeforeSuccess: false,
+        },
+      ],
+    });
   };
 
   const completeGroupMeterStage = async ({
@@ -1149,6 +1299,12 @@ export const createRandomEventsLiveRuntime = ({
           effects: stage.successEffects,
           resolvedCurrencyAmounts: baseCurrencyAmounts,
         });
+        recordCustomFlowEffectApplication({
+          eventId,
+          userId: participantId,
+          appliedNegativeEffects: result.appliedNegativeEffects,
+          hadActiveNegativeEffectBeforeAttempt: result.hadActiveNegativeEffectBeforeAttempt,
+        });
         lines.push(
           `<@${participantId}>: ${stage.successMessage} ${result.effectNotes.join(" ")}`.trim(),
         );
@@ -1187,7 +1343,19 @@ export const createRandomEventsLiveRuntime = ({
     context.flowState.stageProgress = context.flowState.participantUserIds.size;
 
     if (context.flowState.stageIndex >= flow.stages.length) {
-      await resolveCustomEvent(eventId, context.flowState.resolvedLines);
+      await resolveCustomEvent({
+        eventId,
+        lines: context.flowState.resolvedLines,
+        achievementAttempts: participantIds.map((participantId) => ({
+          userId: participantId,
+          attemptResolution: buildCustomFlowAchievementAttemptResolution({
+            eventId,
+            userId: participantId,
+            resolution: "resolve-success",
+          }),
+          hadKeepOpenFailureBeforeSuccess: context.failedAttemptUserIds.has(participantId),
+        })),
+      });
       return;
     }
 
@@ -1235,10 +1403,30 @@ export const createRandomEventsLiveRuntime = ({
       });
 
       if (progress.succeeded === true) {
+        recordCustomFlowEffectApplication({
+          eventId,
+          userId: context.flowState.ownerUserId,
+          appliedNegativeEffects: result.appliedNegativeEffects,
+          hadActiveNegativeEffectBeforeAttempt: result.hadActiveNegativeEffectBeforeAttempt,
+        });
         context.flowState.resolvedLines.push(line);
         context.flowState.stageIndex += 1;
         if (context.flowState.stageIndex >= flow.stages.length) {
-          await resolveCustomEvent(eventId, context.flowState.resolvedLines);
+          await resolveCustomEvent({
+            eventId,
+            lines: context.flowState.resolvedLines,
+            achievementAttempts: [
+              {
+                userId: context.flowState.ownerUserId,
+                attemptResolution: buildCustomFlowAchievementAttemptResolution({
+                  eventId,
+                  userId: context.flowState.ownerUserId,
+                  resolution: "resolve-success",
+                }),
+                hadKeepOpenFailureBeforeSuccess: false,
+              },
+            ],
+          });
           return;
         }
 
@@ -1247,7 +1435,24 @@ export const createRandomEventsLiveRuntime = ({
         return;
       }
 
-      await resolveCustomEvent(eventId, [...context.flowState.resolvedLines, line]);
+      await resolveCustomEvent({
+        eventId,
+        lines: [...context.flowState.resolvedLines, line],
+        achievementAttempts: [
+          {
+            userId: context.flowState.ownerUserId,
+            attemptResolution: buildCustomFlowAchievementAttemptResolution({
+              eventId,
+              userId: context.flowState.ownerUserId,
+              resolution: "resolve-failure",
+              currentAppliedNegativeEffects: result.appliedNegativeEffects,
+              currentHadActiveNegativeEffectBeforeAttempt:
+                result.hadActiveNegativeEffectBeforeAttempt,
+            }),
+            hadKeepOpenFailureBeforeSuccess: false,
+          },
+        ],
+      });
       return;
     }
 
@@ -1272,11 +1477,10 @@ export const createRandomEventsLiveRuntime = ({
         context.flowState.stageProgress > 0
           ? `The group stalled at ${context.flowState.stageProgress}/${threshold} successes before time ran out.`
           : "No one held the line together before time ran out.";
-      await resolveCustomEvent(eventId, [
-        ...context.flowState.resolvedLines,
-        ...context.failedAttemptLines,
-        timeoutLine,
-      ]);
+      await resolveCustomEvent({
+        eventId,
+        lines: [...context.flowState.resolvedLines, ...context.failedAttemptLines, timeoutLine],
+      });
       return;
     }
 
@@ -1330,11 +1534,31 @@ export const createRandomEventsLiveRuntime = ({
     });
 
     if (progress.succeeded) {
+      recordCustomFlowEffectApplication({
+        eventId,
+        userId,
+        appliedNegativeEffects: result.appliedNegativeEffects,
+        hadActiveNegativeEffectBeforeAttempt: result.hadActiveNegativeEffectBeforeAttempt,
+      });
       context.flowState.resolvedLines.push(line);
       context.flowState.stageIndex += 1;
       context.failedAttemptLines = [];
       if (context.flowState.stageIndex >= flow.stages.length) {
-        await resolveCustomEvent(eventId, context.flowState.resolvedLines);
+        await resolveCustomEvent({
+          eventId,
+          lines: context.flowState.resolvedLines,
+          achievementAttempts: [
+            {
+              userId,
+              attemptResolution: buildCustomFlowAchievementAttemptResolution({
+                eventId,
+                userId,
+                resolution: "resolve-success",
+              }),
+              hadKeepOpenFailureBeforeSuccess: false,
+            },
+          ],
+        });
         return "handled";
       }
 
@@ -1343,7 +1567,24 @@ export const createRandomEventsLiveRuntime = ({
       return "handled";
     }
 
-    await resolveCustomEvent(eventId, [...context.flowState.resolvedLines, line]);
+    await resolveCustomEvent({
+      eventId,
+      lines: [...context.flowState.resolvedLines, line],
+      achievementAttempts: [
+        {
+          userId,
+          attemptResolution: buildCustomFlowAchievementAttemptResolution({
+            eventId,
+            userId,
+            resolution: "resolve-failure",
+            currentAppliedNegativeEffects: result.appliedNegativeEffects,
+            currentHadActiveNegativeEffectBeforeAttempt:
+              result.hadActiveNegativeEffectBeforeAttempt,
+          }),
+          hadKeepOpenFailureBeforeSuccess: false,
+        },
+      ],
+    });
     return "handled";
   };
 
@@ -1401,7 +1642,24 @@ export const createRandomEventsLiveRuntime = ({
         progress,
         effectNotes: result.effectNotes,
       });
-      await resolveCustomEvent(eventId, [...context.flowState.resolvedLines, line]);
+      await resolveCustomEvent({
+        eventId,
+        lines: [...context.flowState.resolvedLines, line],
+        achievementAttempts: [
+          {
+            userId,
+            attemptResolution: buildCustomFlowAchievementAttemptResolution({
+              eventId,
+              userId,
+              resolution: "resolve-failure",
+              currentAppliedNegativeEffects: result.appliedNegativeEffects,
+              currentHadActiveNegativeEffectBeforeAttempt:
+                result.hadActiveNegativeEffectBeforeAttempt,
+            }),
+            hadKeepOpenFailureBeforeSuccess: false,
+          },
+        ],
+      });
       return "handled";
     }
 
@@ -1488,11 +1746,42 @@ export const createRandomEventsLiveRuntime = ({
         });
 
         if (stage.failureResolution === "resolve-event") {
-          await resolveCustomEvent(eventId, [...context.flowState.resolvedLines, line]);
+          await resolveCustomEvent({
+            eventId,
+            lines: [...context.flowState.resolvedLines, line],
+            achievementAttempts: [
+              {
+                userId,
+                attemptResolution: buildCustomFlowAchievementAttemptResolution({
+                  eventId,
+                  userId,
+                  resolution: "resolve-failure",
+                  currentAppliedNegativeEffects: result.appliedNegativeEffects,
+                  currentHadActiveNegativeEffectBeforeAttempt:
+                    result.hadActiveNegativeEffectBeforeAttempt,
+                }),
+                hadKeepOpenFailureBeforeSuccess: false,
+              },
+            ],
+          });
           return "handled";
         }
 
+        context.failedAttemptUserIds.add(userId);
         context.failedAttemptLines.push(line);
+        await publishAchievementAnnouncementsForAttempts(context, [
+          {
+            userId,
+            attemptResolution: {
+              resolution: "resolve-failure",
+              appliedNegativeEffects: result.appliedNegativeEffects,
+              hadActiveNegativeEffectBeforeAttempt:
+                result.appliedNegativeEffects.length > 0 &&
+                result.hadActiveNegativeEffectBeforeAttempt,
+            },
+            hadKeepOpenFailureBeforeSuccess: false,
+          },
+        ]);
         resetPhaseExpiry(eventId);
         await refreshNonWindowPrompt(eventId);
         return "handled";
@@ -1548,11 +1837,16 @@ export const createRandomEventsLiveRuntime = ({
     }
 
     if (action === "cash-out") {
-      await resolveCustomEvent(eventId, [`<@${userId}>: ${flow.declineMessage}`]);
+      await resolveCustomEvent({
+        eventId,
+        lines: [`<@${userId}>: ${flow.declineMessage}`],
+      });
       return "handled";
     }
 
     if (economy.getPips(userId) < flow.stakePips) {
+      context.flowState.ownerUserId = null;
+      await refreshNonWindowPrompt(eventId);
       return "insufficient-pips";
     }
 
@@ -1568,7 +1862,17 @@ export const createRandomEventsLiveRuntime = ({
       userId,
       resolutionNote: `Paid ${flow.stakePips} pips to play.`,
     });
-    await resolveCustomEvent(eventId, [attemptResolution.finalLine]);
+    await resolveCustomEvent({
+      eventId,
+      lines: [attemptResolution.finalLine],
+      achievementAttempts: [
+        {
+          userId,
+          attemptResolution,
+          hadKeepOpenFailureBeforeSuccess: false,
+        },
+      ],
+    });
     return "handled";
   };
 
@@ -1592,7 +1896,10 @@ export const createRandomEventsLiveRuntime = ({
     if (result?.created && result.eventId) {
       const activeContext = activeEventsById.get(result.eventId);
       if (activeContext && activeContext.flowState.type !== "single-resolution") {
-        schedulePhaseExpiry(result.eventId, activeContext.baseDurationMs);
+        const expiresAtMs =
+          schedulePhaseExpiry(result.eventId, activeContext.baseDurationMs) ??
+          activeContext.currentPhaseExpiresAtMs;
+        result.expiresAt = new Date(expiresAtMs);
         await refreshNonWindowPrompt(result.eventId);
       }
     }
@@ -1837,6 +2144,7 @@ export const createRandomEventsLiveRuntime = ({
   const stop = (): void => {
     windowManager.stop();
     clickCooldownByUserId.clear();
+    customFlowAchievementStateByEventId.clear();
     for (const context of activeEventsById.values()) {
       clearSequenceChallengeTimer(context);
       clearPhaseTimer(context);

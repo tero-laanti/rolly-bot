@@ -1684,8 +1684,31 @@ export const validateRandomEventConsumableRewards = (
   const itemsById = new Map(items.map((item) => [item.id, item]));
 
   for (const scenario of scenarios) {
-    for (const outcome of scenario.outcomes) {
-      for (const effect of outcome.effects) {
+    const effectSets = scenario.outcomes.map((outcome) => ({
+      locationLabel: `outcome ${outcome.id}`,
+      effects: outcome.effects,
+    }));
+    if (
+      scenario.flow?.type === "solo-ladder" ||
+      scenario.flow?.type === "solo-push-your-luck" ||
+      scenario.flow?.type === "group-meter"
+    ) {
+      for (const stage of scenario.flow.stages) {
+        effectSets.push({
+          locationLabel: `stage ${stage.id} successEffects`,
+          effects: stage.successEffects,
+        });
+        if (stage.failureEffects) {
+          effectSets.push({
+            locationLabel: `stage ${stage.id} failureEffects`,
+            effects: stage.failureEffects,
+          });
+        }
+      }
+    }
+
+    for (const effectSet of effectSets) {
+      for (const effect of effectSet.effects) {
         if (effect.type !== "consumable-item") {
           continue;
         }
@@ -1693,13 +1716,13 @@ export const validateRandomEventConsumableRewards = (
         const item = itemsById.get(effect.itemId);
         if (!item) {
           throw new Error(
-            `Scenario ${scenario.id} outcome ${outcome.id} references unknown consumable item '${effect.itemId}'.`,
+            `Scenario ${scenario.id} ${effectSet.locationLabel} references unknown consumable item '${effect.itemId}'.`,
           );
         }
 
         if (!item.consumable) {
           throw new Error(
-            `Scenario ${scenario.id} outcome ${outcome.id} must reference a consumable item, but '${effect.itemId}' is passive.`,
+            `Scenario ${scenario.id} ${effectSet.locationLabel} must reference a consumable item, but '${effect.itemId}' is passive.`,
           );
         }
       }

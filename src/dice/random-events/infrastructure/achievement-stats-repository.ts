@@ -107,7 +107,10 @@ export const recordRandomEventAchievementStats = (
   }: {
     selection: RandomEventScenarioRender;
     userId: string;
-    attemptResolution: RandomEventAttemptResolution;
+    attemptResolution: Pick<
+      RandomEventAttemptResolution,
+      "appliedNegativeEffects" | "hadActiveNegativeEffectBeforeAttempt" | "resolution"
+    >;
     hadKeepOpenFailureBeforeSuccess: boolean;
     nowMs: number;
   },

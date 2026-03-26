@@ -526,6 +526,114 @@ test("validateRandomEventConsumableRewards rejects passive item rewards", () => 
   );
 });
 
+test("validateRandomEventConsumableRewards rejects unknown staged success item ids", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "first-click";
+  scenario.outcomes = [];
+  scenario.flow = {
+    type: "solo-ladder",
+    stages: [
+      {
+        id: "stage-one",
+        label: "Open crate",
+        prompt: "Pry the crate open.",
+        actionLabel: "Open crate",
+        rollChallenge: {
+          id: "crate-check",
+          mode: "single-step",
+          steps: [
+            {
+              id: "crate-step",
+              label: "Roll 2+ on d6",
+              source: { type: "static-die", sides: 6 },
+              target: 2,
+              comparator: "gte",
+            },
+          ],
+        },
+        successMessage: "The crate cracks open.",
+        successEffects: [
+          {
+            type: "consumable-item",
+            itemId: "missing-stage-item",
+            quantity: 1,
+          },
+        ],
+        failureMessage: "The lid slams shut.",
+        failureEffects: [],
+      },
+    ],
+  };
+
+  const parsedScenarios = parseRandomEventScenarios([scenario]);
+  const parsedItems = parseDiceItems([
+    {
+      id: "dice-revolver",
+      name: "Dice Revolver",
+      description: "Your next few /roll uses roll twice.",
+      pricePips: 6,
+      consumable: true,
+      effect: {
+        type: "double-roll-uses",
+        uses: 6,
+      },
+    },
+  ]);
+
+  assert.throws(
+    () => validateRandomEventConsumableRewards(parsedScenarios, parsedItems),
+    /stage stage-one successEffects references unknown consumable item 'missing-stage-item'/i,
+  );
+});
+
+test("validateRandomEventConsumableRewards rejects passive staged failure item rewards", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "first-click";
+  scenario.outcomes = [];
+  scenario.flow = {
+    type: "solo-ladder",
+    stages: [
+      {
+        id: "stage-one",
+        label: "Open crate",
+        prompt: "Pry the crate open.",
+        actionLabel: "Open crate",
+        rollChallenge: {
+          id: "crate-check",
+          mode: "single-step",
+          steps: [
+            {
+              id: "crate-step",
+              label: "Roll 5+ on d6",
+              source: { type: "static-die", sides: 6 },
+              target: 5,
+              comparator: "gte",
+            },
+          ],
+        },
+        successMessage: "The crate cracks open.",
+        successEffects: [{ type: "currency", minAmount: 1, maxAmount: 1 }],
+        failureMessage: "The lid slams shut.",
+        failureEffects: [
+          {
+            type: "consumable-item",
+            itemId: "padded-bracers",
+            quantity: 1,
+          },
+        ],
+      },
+    ],
+  };
+
+  const parsedScenarios = parseRandomEventScenarios([scenario]);
+  const parsedItems = parseDiceItems([createDiceItemInput()]);
+
+  assert.throws(
+    () => validateRandomEventConsumableRewards(parsedScenarios, parsedItems),
+    /stage stage-one failureEffects must reference a consumable item/i,
+  );
+});
+
 test("parseIntroPostsV1Data accepts valid intro posts", () => {
   const parsed = parseIntroPostsV1Data({
     messages: [{ content: "# Welcome to Rolly" }, { content: "Use /roll to get started." }],
