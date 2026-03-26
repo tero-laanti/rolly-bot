@@ -47,14 +47,18 @@ const emptyItemAchievementStats = {
   usedCleanseItem: false,
 };
 
+const defaultShopItems = [diceRevolver, cleanseSalt, umbrellaHarness];
+
 const createTestShopUseCase = ({
   initialPips = 40,
   initialInventory = new Map<string, number>(),
+  catalogItems = defaultShopItems,
   onRunInTransaction,
   onUseDiceItem,
 }: {
   initialPips?: number;
   initialInventory?: Map<string, number>;
+  catalogItems?: DiceShopItem[];
   onRunInTransaction?: () => void;
   onUseDiceItem?: (input: { userId: string; itemId: string }) => Promise<UseDiceItemResult>;
 } = {}) => {
@@ -65,9 +69,8 @@ const createTestShopUseCase = ({
   let recordShopPurchaseCalls = 0;
   const useDiceItemCalls: string[] = [];
   const shopCatalog = {
-    getDiceShopItem: (itemId: string) =>
-      [diceRevolver, cleanseSalt, umbrellaHarness].find((item) => item.id === itemId) ?? null,
-    getDiceShopItems: () => [diceRevolver, cleanseSalt, umbrellaHarness],
+    getDiceShopItem: (itemId: string) => catalogItems.find((item) => item.id === itemId) ?? null,
+    getDiceShopItems: () => catalogItems,
   };
 
   const useCase = createDiceShopUseCase({
@@ -239,10 +242,14 @@ test("category filtering splits consumables and permanent upgrades correctly", a
     consumables.result.payload.view.categoryItems.map((item) => item.id),
     [diceRevolver.id, cleanseSalt.id],
   );
+  assert.equal(consumables.result.payload.view.currentPage, 0);
+  assert.equal(consumables.result.payload.view.totalPages, 1);
   assert.deepEqual(
     upgrades.result.payload.view.categoryItems.map((item) => item.id),
     [umbrellaHarness.id],
   );
+  assert.equal(upgrades.result.payload.view.currentPage, 0);
+  assert.equal(upgrades.result.payload.view.totalPages, 1);
 });
 
 test("selecting an item returns the expected item-detail state", async () => {
@@ -280,6 +287,8 @@ test("selecting an item returns the expected item-detail state", async () => {
     buyable: true,
     buyDisabledReason: undefined,
   });
+  assert.equal(result.result.payload.view.categoryPage, 0);
+  assert.equal(result.result.payload.view.categoryTotalPages, 1);
 });
 
 test("adjacent item navigation moves within the selected category order", async () => {
@@ -305,6 +314,8 @@ test("adjacent item navigation moves within the selected category order", async 
   }
 
   assert.equal(result.result.payload.view.selectedItem.id, cleanseSalt.id);
+  assert.equal(result.result.payload.view.categoryPage, 0);
+  assert.equal(result.result.payload.view.categoryTotalPages, 1);
   assert.deepEqual(result.result.payload.view.itemNavigation, {
     previousItemId: diceRevolver.id,
     nextItemId: null,
@@ -455,6 +466,126 @@ test("use item prompt opens a yes/no confirmation screen", async () => {
     itemId: diceRevolver.id,
     itemName: "Dice Revolver",
   });
+});
+
+test("category paging splits once a category grows beyond Discord's select option limit", async () => {
+  const catalogItems: DiceShopItem[] = Array.from({ length: 26 }, (_, index) => ({
+    id: `consumable-${index + 1}`,
+    name: `Consumable ${index + 1}`,
+    description: `Consumable ${index + 1} description.`,
+    pricePips: index + 1,
+    consumable: true,
+    effect: {
+      type: "double-roll-uses",
+      uses: index + 1,
+    },
+  }));
+  const { handleAction } = createTestShopUseCase({ catalogItems });
+
+  const firstPage = await handleAction({
+    type: "open-category",
+    ownerId: "user-1",
+    categoryId: "consumables",
+  });
+  const secondPage = await handleAction({
+    type: "page-category",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    page: 1,
+  });
+
+  assert.equal(firstPage.result.payload.type, "view");
+  assert.equal(secondPage.result.payload.type, "view");
+  if (firstPage.result.payload.type !== "view" || secondPage.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(firstPage.result.payload.view.screen, "category");
+  assert.equal(secondPage.result.payload.view.screen, "category");
+  if (
+    firstPage.result.payload.view.screen !== "category" ||
+    secondPage.result.payload.view.screen !== "category"
+  ) {
+    return;
+  }
+
+  assert.equal(firstPage.result.payload.view.currentPage, 0);
+  assert.equal(firstPage.result.payload.view.totalPages, 2);
+  assert.equal(firstPage.result.payload.view.categoryItems.length, 25);
+  assert.equal(secondPage.result.payload.view.currentPage, 1);
+  assert.equal(secondPage.result.payload.view.totalPages, 2);
+  assert.deepEqual(
+    secondPage.result.payload.view.categoryItems.map((item) => item.id),
+    ["consumable-26"],
+  );
+});
+
+test("category paging also splits before field overflow when item summaries are long", async () => {
+  const catalogItems: DiceShopItem[] = Array.from({ length: 12 }, (_, index) => ({
+    id: `upgrade-${index + 1}`,
+    name: `Upgrade ${index + 1} ${"X".repeat(65)}`,
+    description: `Permanent upgrade ${index + 1}.`,
+    pricePips: 100 + index,
+    consumable: false,
+    effect: {
+      type: "passive-extra-shield-on-umbrella",
+      extraCharges: 1,
+    },
+  }));
+  const { handleAction } = createTestShopUseCase({ catalogItems });
+
+  const result = await handleAction({
+    type: "open-category",
+    ownerId: "user-1",
+    categoryId: "permanent-upgrades",
+  });
+
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.screen, "category");
+  if (result.result.payload.view.screen !== "category") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.totalPages > 1, true);
+});
+
+test("item detail tracks the category page that contains the selected item", async () => {
+  const catalogItems: DiceShopItem[] = Array.from({ length: 26 }, (_, index) => ({
+    id: `consumable-${index + 1}`,
+    name: `Consumable ${index + 1}`,
+    description: `Consumable ${index + 1} description.`,
+    pricePips: index + 1,
+    consumable: true,
+    effect: {
+      type: "double-roll-uses",
+      uses: index + 1,
+    },
+  }));
+  const { handleAction } = createTestShopUseCase({ catalogItems });
+
+  const result = await handleAction({
+    type: "select-item",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    itemId: "consumable-26",
+  });
+
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.screen, "item-detail");
+  if (result.result.payload.view.screen !== "item-detail") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.categoryPage, 1);
+  assert.equal(result.result.payload.view.categoryTotalPages, 2);
 });
 
 test("confirming use item applies the item and returns to the shop lobby", async () => {

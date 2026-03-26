@@ -5,10 +5,20 @@ export const diceInventoryButtonPrefix = "dice-inventory:";
 
 export const encodeDiceInventoryAction = (action: DiceInventoryAction): string => {
   if (action.type === "refresh") {
-    return encodeActionId(diceInventoryButtonPrefix, "refresh", action.ownerId);
+    return encodeActionId(diceInventoryButtonPrefix, "refresh", action.ownerId, action.page);
   }
 
-  return encodeActionId(diceInventoryButtonPrefix, "use", action.ownerId, action.itemId);
+  if (action.type === "page") {
+    return encodeActionId(diceInventoryButtonPrefix, "page", action.ownerId, action.page);
+  }
+
+  return encodeActionId(
+    diceInventoryButtonPrefix,
+    "use",
+    action.ownerId,
+    action.itemId,
+    action.page,
+  );
 };
 
 export const parseDiceInventoryAction = (customId: string): DiceInventoryAction | null => {
@@ -17,17 +27,37 @@ export const parseDiceInventoryAction = (customId: string): DiceInventoryAction 
     return null;
   }
 
-  const [action, ownerId, itemId] = parsed;
+  const [action, ownerId, itemIdOrPage, pageRaw] = parsed;
   if (!ownerId) {
     return null;
   }
 
   if (action === "refresh") {
-    return { type: "refresh", ownerId };
+    const page = Number.parseInt(itemIdOrPage ?? "0", 10);
+    return {
+      type: "refresh",
+      ownerId,
+      page: Number.isInteger(page) ? page : 0,
+    };
   }
 
-  if (action === "use" && itemId) {
-    return { type: "use", ownerId, itemId };
+  if (action === "page") {
+    const page = Number.parseInt(itemIdOrPage ?? "", 10);
+    if (!Number.isInteger(page)) {
+      return null;
+    }
+
+    return { type: "page", ownerId, page };
+  }
+
+  const page = Number.parseInt(pageRaw ?? "0", 10);
+  if (action === "use" && itemIdOrPage) {
+    return {
+      type: "use",
+      ownerId,
+      itemId: itemIdOrPage,
+      page: Number.isInteger(page) ? page : 0,
+    };
   }
 
   return null;

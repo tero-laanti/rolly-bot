@@ -1,0 +1,130 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { DiceInventoryEntry } from "../../domain/shop";
+import { createDiceInventoryUseCase } from "./use-case";
+
+const createConsumableEntry = (
+  index: number,
+  description: string = `Item ${index} description.`,
+): DiceInventoryEntry => ({
+  item: {
+    id: `consumable-${index}`,
+    name: `Consumable ${index}`,
+    description,
+    pricePips: index,
+    consumable: true,
+    effect: {
+      type: "double-roll-uses",
+      uses: index,
+    },
+  },
+  quantity: 1,
+});
+
+const createPassiveEntry = (index: number, description: string): DiceInventoryEntry => ({
+  item: {
+    id: `upgrade-${index}`,
+    name: `Upgrade ${index}`,
+    description,
+    pricePips: 100 + index,
+    consumable: false,
+    effect: {
+      type: "passive-extra-shield-on-umbrella",
+      extraCharges: 1,
+    },
+  },
+  quantity: 1,
+});
+
+const createTestInventoryUseCase = (entries: DiceInventoryEntry[]) => {
+  return createDiceInventoryUseCase({
+    inventory: {
+      getOwnedInventoryEntries: () => entries,
+    },
+    useDiceItem: async () => ({
+      ok: false,
+      message: "Not used in this test.",
+    }),
+  });
+};
+
+const interactionOptions = {
+  reserveAutoRollSession: () => null,
+  triggerRandomGroupEvent: async () => ({
+    ok: false as const,
+    reason: "unavailable" as const,
+  }),
+};
+
+test("inventory paging splits after 20 consumable buttons and shows arrows only when needed", async () => {
+  const useCase = createTestInventoryUseCase(
+    Array.from({ length: 21 }, (_, index) => createConsumableEntry(index + 1)),
+  );
+
+  const firstPage = useCase.createDiceInventoryReply("user-1");
+  assert.equal(firstPage.payload.type, "view");
+  if (firstPage.payload.type !== "view") {
+    return;
+  }
+
+  assert.match(firstPage.payload.view.content, /Page 1\/2\./);
+  assert.equal(firstPage.payload.view.components.length, 5);
+  assert.deepEqual(
+    firstPage.payload.view.components[4]?.map((button) => button.label),
+    ["Refresh", "→"],
+  );
+
+  const secondPage = await useCase.handleDiceInventoryAction(
+    "user-1",
+    { type: "page", ownerId: "user-1", page: 1 },
+    interactionOptions,
+  );
+  assert.equal(secondPage.result.payload.type, "view");
+  if (secondPage.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.match(secondPage.result.payload.view.content, /Page 2\/2\./);
+  assert.equal(secondPage.result.payload.view.components.length, 2);
+  assert.deepEqual(
+    secondPage.result.payload.view.components[1]?.map((button) => button.label),
+    ["←", "Refresh"],
+  );
+});
+
+test("inventory paging also splits when entry text would exceed Discord's message limit", async () => {
+  const useCase = createTestInventoryUseCase([
+    createPassiveEntry(1, "A".repeat(1_700)),
+    createPassiveEntry(2, "B".repeat(1_700)),
+  ]);
+
+  const firstPage = useCase.createDiceInventoryReply("user-1");
+  assert.equal(firstPage.payload.type, "view");
+  if (firstPage.payload.type !== "view") {
+    return;
+  }
+
+  assert.match(firstPage.payload.view.content, /Upgrade 1/);
+  assert.doesNotMatch(firstPage.payload.view.content, /Upgrade 2/);
+  assert.deepEqual(
+    firstPage.payload.view.components[0]?.map((button) => button.label),
+    ["Refresh", "→"],
+  );
+
+  const secondPage = await useCase.handleDiceInventoryAction(
+    "user-1",
+    { type: "page", ownerId: "user-1", page: 1 },
+    interactionOptions,
+  );
+  assert.equal(secondPage.result.payload.type, "view");
+  if (secondPage.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.match(secondPage.result.payload.view.content, /Upgrade 2/);
+  assert.doesNotMatch(secondPage.result.payload.view.content, /Upgrade 1/);
+  assert.deepEqual(
+    secondPage.result.payload.view.components[0]?.map((button) => button.label),
+    ["←", "Refresh"],
+  );
+});

@@ -66,18 +66,22 @@ test("category renders one select menu with only that category's items", () => {
         categoryId: "consumables",
         categoryLabel: "Consumables",
         categorySummary: "Single-use items and timed boosts for your next moves.",
+        currentPage: 0,
+        totalPages: 1,
         categoryItems: [
           {
             id: "dice-revolver",
             name: "Dice Revolver",
             pricePips: 6,
             ownedQuantity: 0,
+            ownedSummary: "Owned 0",
           },
           {
             id: "cleanse-salt",
             name: "Cleanse Salt",
             pricePips: 15,
             ownedQuantity: 2,
+            ownedSummary: "Owned 2",
           },
         ],
       },
@@ -118,6 +122,8 @@ test("item-detail renders one buy button plus navigation controls", () => {
         categorySummaries,
         categoryId: "consumables",
         categoryLabel: "Consumables",
+        categoryPage: 0,
+        categoryTotalPages: 1,
         itemNavigation: {
           previousItemId: null,
           nextItemId: "cleanse-salt",
@@ -247,6 +253,8 @@ test("empty category omits the select menu and keeps navigation buttons", () => 
         categoryId: "consumables",
         categoryLabel: "Consumables",
         categorySummary: "Single-use items and timed boosts for your next moves.",
+        currentPage: 0,
+        totalPages: 1,
         categoryItems: [],
       },
     },
@@ -273,12 +281,15 @@ test("permanent upgrades render owned state as emoji instead of a count", () => 
         categoryId: "permanent-upgrades",
         categoryLabel: "Permanent Upgrades",
         categorySummary: "One-time passive upgrades that stay active once owned.",
+        currentPage: 0,
+        totalPages: 1,
         categoryItems: [
           {
             id: "umbrella-harness",
             name: "Umbrella Harness",
             pricePips: 25,
             ownedQuantity: 0,
+            ownedSummary: "Owned: ❌",
           },
         ],
       },
@@ -310,6 +321,8 @@ test("permanent upgrade item detail renders emoji owned state", () => {
         categorySummaries,
         categoryId: "permanent-upgrades",
         categoryLabel: "Permanent Upgrades",
+        categoryPage: 0,
+        categoryTotalPages: 1,
         itemNavigation: {
           previousItemId: null,
           nextItemId: null,
@@ -331,4 +344,39 @@ test("permanent upgrade item detail renders emoji owned state", () => {
   const embed = interaction.payload.embeds?.[0]?.toJSON();
   const ownedField = embed?.fields?.find((field) => field.name === "Owned");
   assert.equal(ownedField?.value, "❌");
+});
+
+test("category pagination shows arrows only when another page exists", () => {
+  const interaction = renderDiceShopResult({
+    kind: "update",
+    payload: {
+      type: "view",
+      view: {
+        screen: "category",
+        ownerId: "user-1",
+        balancePips: 40,
+        categorySummaries,
+        categoryId: "consumables",
+        categoryLabel: "Consumables",
+        categorySummary: "Single-use items and timed boosts for your next moves.",
+        currentPage: 0,
+        totalPages: 2,
+        categoryItems: [
+          {
+            id: "dice-revolver",
+            name: "Dice Revolver",
+            pricePips: 6,
+            ownedQuantity: 0,
+            ownedSummary: "Owned 0",
+          },
+        ],
+      },
+    },
+  }).interactionResult;
+
+  const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
+  assert.deepEqual(
+    rows[1]?.components.map((component) => ("label" in component ? component.label : undefined)),
+    ["→", "View Permanent Upgrades", "Shop Home", "Close"],
+  );
 });

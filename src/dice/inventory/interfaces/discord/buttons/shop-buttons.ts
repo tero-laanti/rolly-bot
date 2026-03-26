@@ -20,6 +20,14 @@ export const encodeDiceShopButtonAction = (
         action.ownerId,
         action.categoryId,
       );
+    case "page-category":
+      return encodeActionId(
+        diceShopButtonPrefix,
+        "page-category",
+        action.ownerId,
+        action.categoryId,
+        action.page,
+      );
     case "prompt-use-item":
       return encodeActionId(
         diceShopButtonPrefix,
@@ -72,7 +80,7 @@ export const parseDiceShopButtonAction = (
     return null;
   }
 
-  const [action, ownerId, categoryId, itemId, direction] = parsed;
+  const [action, ownerId, categoryId, itemIdOrPage, direction] = parsed;
   if (!ownerId) {
     return null;
   }
@@ -89,25 +97,34 @@ export const parseDiceShopButtonAction = (
     return { type: "open-category", ownerId, categoryId };
   }
 
-  if (action === "prompt-use-item" && isDiceShopCategoryId(categoryId) && itemId) {
-    return { type: "prompt-use-item", ownerId, categoryId, itemId };
+  if (action === "page-category" && isDiceShopCategoryId(categoryId)) {
+    const page = Number.parseInt(itemIdOrPage ?? "", 10);
+    if (!Number.isInteger(page)) {
+      return null;
+    }
+
+    return { type: "page-category", ownerId, categoryId, page };
   }
 
-  if (action === "confirm-use-item" && isDiceShopCategoryId(categoryId) && itemId) {
-    return { type: "confirm-use-item", ownerId, categoryId, itemId };
+  if (action === "prompt-use-item" && isDiceShopCategoryId(categoryId) && itemIdOrPage) {
+    return { type: "prompt-use-item", ownerId, categoryId, itemId: itemIdOrPage };
   }
 
-  if (action === "buy-selected-item" && isDiceShopCategoryId(categoryId) && itemId) {
-    return { type: "buy-selected-item", ownerId, categoryId, itemId };
+  if (action === "confirm-use-item" && isDiceShopCategoryId(categoryId) && itemIdOrPage) {
+    return { type: "confirm-use-item", ownerId, categoryId, itemId: itemIdOrPage };
+  }
+
+  if (action === "buy-selected-item" && isDiceShopCategoryId(categoryId) && itemIdOrPage) {
+    return { type: "buy-selected-item", ownerId, categoryId, itemId: itemIdOrPage };
   }
 
   if (
     action === "view-adjacent-item" &&
     isDiceShopCategoryId(categoryId) &&
-    itemId &&
+    itemIdOrPage &&
     isDiceShopItemNavigationDirection(direction)
   ) {
-    return { type: "view-adjacent-item", ownerId, categoryId, itemId, direction };
+    return { type: "view-adjacent-item", ownerId, categoryId, itemId: itemIdOrPage, direction };
   }
 
   return null;

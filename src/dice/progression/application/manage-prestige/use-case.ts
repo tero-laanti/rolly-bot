@@ -19,6 +19,7 @@ import {
 } from "../achievement-announcements";
 
 const prestigeButtonsPerRow = 5;
+const prestigeButtonsPerPage = 20;
 
 type PrestigeState = {
   activePrestige: number;
@@ -31,6 +32,11 @@ export type DicePrestigeAction =
   | {
       type: "choose";
       ownerId: string;
+    }
+  | {
+      type: "page";
+      ownerId: string;
+      page: number;
     }
   | {
       type: "back";
@@ -103,7 +109,22 @@ export const createDicePrestigeUseCase = ({
         kind: "update",
         payload: {
           type: "view",
-          view: buildSelectView(action.ownerId, state),
+          view: buildSelectView(
+            action.ownerId,
+            state,
+            getPrestigePageForSelection(state.activePrestige),
+          ),
+        },
+      };
+    }
+
+    if (action.type === "page") {
+      const state = getPrestigeState(progression, action.ownerId);
+      return {
+        kind: "update",
+        payload: {
+          type: "view",
+          view: buildSelectView(action.ownerId, state, action.page),
         },
       };
     }
@@ -264,7 +285,11 @@ const buildMainView = (
   };
 };
 
-const buildSelectView = (userId: string, state: PrestigeState): ActionView<DicePrestigeAction> => {
+const buildSelectView = (
+  userId: string,
+  state: PrestigeState,
+  requestedPage: number,
+): ActionView<DicePrestigeAction> => {
   const prestigeButtons: ActionButtonSpec<DicePrestigeAction>[] = Array.from(
     { length: state.highestPrestige + 1 },
     (_, index) => {
@@ -279,18 +304,37 @@ const buildSelectView = (userId: string, state: PrestigeState): ActionView<DiceP
     },
   );
 
-  const rows = chunkActionButtons(prestigeButtons, prestigeButtonsPerRow);
-
-  rows.push([
-    {
-      action: { type: "back", ownerId: userId },
-      label: "Back",
+  const totalPages = Math.max(1, Math.ceil(prestigeButtons.length / prestigeButtonsPerPage));
+  const currentPage = clampPage(requestedPage, totalPages);
+  const startIndex = currentPage * prestigeButtonsPerPage;
+  const rows = chunkActionButtons(
+    prestigeButtons.slice(startIndex, startIndex + prestigeButtonsPerPage),
+    prestigeButtonsPerRow,
+  );
+  const navigationRow: ActionButtonSpec<DicePrestigeAction>[] = [];
+  if (currentPage > 0) {
+    navigationRow.push({
+      action: { type: "page", ownerId: userId, page: currentPage - 1 },
+      label: "←",
       style: "secondary",
-    },
-  ]);
+    });
+  }
+  navigationRow.push({
+    action: { type: "back", ownerId: userId },
+    label: "Back",
+    style: "secondary",
+  });
+  if (currentPage + 1 < totalPages) {
+    navigationRow.push({
+      action: { type: "page", ownerId: userId, page: currentPage + 1 },
+      label: "→",
+      style: "secondary",
+    });
+  }
+  rows.push(navigationRow);
 
   return {
-    content: buildSelectContent(userId, state),
+    content: buildSelectContent(userId, state, currentPage, totalPages),
     components: rows,
   };
 };
@@ -315,10 +359,33 @@ const buildMainContent = (userId: string, state: PrestigeState): string => {
   ].join("\n");
 };
 
-const buildSelectContent = (userId: string, state: PrestigeState): string => {
-  return [
+const buildSelectContent = (
+  userId: string,
+  state: PrestigeState,
+  currentPage: number,
+  totalPages: number,
+): string => {
+  const lines = [
     `Choose active prestige for <@${userId}>.`,
     `Current: ${state.activePrestige} (d${getDiceSidesForPrestige(state.activePrestige)}), dice: ${state.activeDiceCount}.`,
     `Unlocked range: 0-${state.highestPrestige}.`,
-  ].join("\n");
+  ];
+
+  if (totalPages > 1) {
+    lines.push(`Page ${currentPage + 1}/${totalPages}.`);
+  }
+
+  return lines.join("\n");
+};
+
+const getPrestigePageForSelection = (prestige: number): number => {
+  return Math.max(0, Math.floor(prestige / prestigeButtonsPerPage));
+};
+
+const clampPage = (page: number, totalPages: number): number => {
+  if (!Number.isInteger(page)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(totalPages - 1, page));
 };

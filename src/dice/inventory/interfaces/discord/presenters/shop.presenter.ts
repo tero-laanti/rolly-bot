@@ -6,6 +6,7 @@ import {
   StringSelectMenuBuilder,
 } from "discord.js";
 import type { MessageActionRowComponentBuilder } from "discord.js";
+import { discordStringSelectOptionLimit } from "../../../../../shared/discord";
 import {
   createRenderedInteractionResult,
   type InteractionResult,
@@ -102,13 +103,7 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
           value:
             view.categoryItems.length > 0
               ? view.categoryItems
-                  .map(
-                    (item) =>
-                      `**${item.name}** • ${item.pricePips} pips • ${formatOwnedSummary(
-                        view.categoryId,
-                        item.ownedQuantity,
-                      )}`,
-                  )
+                  .map((item) => `**${item.name}** • ${item.pricePips} pips • ${item.ownedSummary}`)
                   .join("\n")
               : "No items available in this category.",
           inline: false,
@@ -209,10 +204,18 @@ const buildCategoryDescription = (
   view: Extract<DiceShopViewModel, { screen: "category" }>,
 ): string => {
   if (!view.statusMessage) {
-    return `${view.categorySummary}\nChoose an item from the dropdown below.`;
+    return [
+      view.categorySummary,
+      `Choose an item from the dropdown below.${formatPageIndicator(view.currentPage, view.totalPages)}`,
+    ].join("\n");
   }
 
-  return `${view.categorySummary}\nChoose an item from the dropdown below.\n\n${view.statusMessage}`;
+  return [
+    view.categorySummary,
+    `Choose an item from the dropdown below.${formatPageIndicator(view.currentPage, view.totalPages)}`,
+    "",
+    view.statusMessage,
+  ].join("\n");
 };
 
 const buildDiceShopComponents = (
@@ -246,6 +249,12 @@ const buildDiceShopComponents = (
     const alternateCategory = getAlternateCategorySummary(view);
 
     if (view.categoryItems.length > 0) {
+      if (view.categoryItems.length > discordStringSelectOptionLimit) {
+        throw new Error(
+          `Shop category page exceeds Discord's ${discordStringSelectOptionLimit}-option limit.`,
+        );
+      }
+
       rows.push(
         new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
           new StringSelectMenuBuilder()
@@ -263,38 +272,66 @@ const buildDiceShopComponents = (
               view.categoryItems.map((item) => ({
                 label: item.name,
                 value: item.id,
-                description: `${item.pricePips} pips • ${formatOwnedSummary(
-                  view.categoryId,
-                  item.ownedQuantity,
-                )}`,
+                description: `${item.pricePips} pips • ${item.ownedSummary}`,
               })),
             ),
         ),
       );
     }
 
-    rows.push(
-      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    const controls: MessageActionRowComponentBuilder[] = [];
+    if (view.currentPage > 0) {
+      controls.push(
         new ButtonBuilder()
           .setCustomId(
             encodeDiceShopButtonAction({
-              type: "open-category",
+              type: "page-category",
               ownerId: view.ownerId,
-              categoryId: alternateCategory.id,
+              categoryId: view.categoryId,
+              page: view.currentPage - 1,
             }),
           )
-          .setLabel(`View ${alternateCategory.label}`)
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(encodeDiceShopButtonAction({ type: "view-home", ownerId: view.ownerId }))
-          .setLabel("Shop Home")
+          .setLabel("←")
           .setStyle(ButtonStyle.Secondary),
+      );
+    }
+    if (view.currentPage + 1 < view.totalPages) {
+      controls.push(
         new ButtonBuilder()
-          .setCustomId(encodeDiceShopButtonAction({ type: "close", ownerId: view.ownerId }))
-          .setLabel("Close")
-          .setStyle(ButtonStyle.Danger),
-      ),
+          .setCustomId(
+            encodeDiceShopButtonAction({
+              type: "page-category",
+              ownerId: view.ownerId,
+              categoryId: view.categoryId,
+              page: view.currentPage + 1,
+            }),
+          )
+          .setLabel("→")
+          .setStyle(ButtonStyle.Secondary),
+      );
+    }
+    controls.push(
+      new ButtonBuilder()
+        .setCustomId(
+          encodeDiceShopButtonAction({
+            type: "open-category",
+            ownerId: view.ownerId,
+            categoryId: alternateCategory.id,
+          }),
+        )
+        .setLabel(`View ${alternateCategory.label}`)
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(encodeDiceShopButtonAction({ type: "view-home", ownerId: view.ownerId }))
+        .setLabel("Shop Home")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(encodeDiceShopButtonAction({ type: "close", ownerId: view.ownerId }))
+        .setLabel("Close")
+        .setStyle(ButtonStyle.Danger),
     );
+
+    rows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(...controls));
 
     return rows;
   }
@@ -345,9 +382,10 @@ const buildDiceShopComponents = (
         new ButtonBuilder()
           .setCustomId(
             encodeDiceShopButtonAction({
-              type: "open-category",
+              type: "page-category",
               ownerId: view.ownerId,
               categoryId: view.categoryId,
+              page: view.categoryPage,
             }),
           )
           .setLabel("Back to Categories")
@@ -408,12 +446,8 @@ const buildDiceShopComponents = (
   ];
 };
 
-const formatOwnedSummary = (categoryId: string, ownedQuantity: number): string => {
-  if (categoryId === "permanent-upgrades") {
-    return `Owned: ${ownedQuantity > 0 ? "✅" : "❌"}`;
-  }
-
-  return `Owned ${ownedQuantity}`;
+const formatPageIndicator = (currentPage: number, totalPages: number): string => {
+  return totalPages > 1 ? `\nPage ${currentPage + 1}/${totalPages}.` : "";
 };
 
 const formatOwnedValue = (categoryId: string, ownedQuantity: number): string => {

@@ -8,6 +8,10 @@ export const encodeDicePrestigeAction = (action: DicePrestigeAction): string => 
     return encodeActionId(dicePrestigeButtonPrefix, "choose", action.ownerId);
   }
 
+  if (action.type === "page") {
+    return encodeActionId(dicePrestigeButtonPrefix, "page", action.ownerId, action.page);
+  }
+
   if (action.type === "back") {
     return encodeActionId(dicePrestigeButtonPrefix, "back", action.ownerId);
   }
@@ -32,6 +36,15 @@ export const parseDicePrestigeAction = (customId: string): DicePrestigeAction | 
 
   if (action === "choose") {
     return { type: "choose", ownerId };
+  }
+
+  if (action === "page") {
+    const page = Number.parseInt(prestigeRaw ?? "", 10);
+    if (!Number.isInteger(page)) {
+      return null;
+    }
+
+    return { type: "page", ownerId, page };
   }
 
   if (action === "back") {

@@ -11,6 +11,10 @@ import {
 } from "../../../progression/application/achievement-announcements";
 import { getDiceItemAchievementIds } from "../achievement-rules";
 import { isPassivePermanentItem } from "../../domain/passive-items";
+import {
+  discordEmbedFieldValueCharacterLimit,
+  discordStringSelectOptionLimit,
+} from "../../../../shared/discord";
 import type {
   ReserveAutoRollSession,
   TriggerRandomGroupEvent,
@@ -51,6 +55,12 @@ export type DiceShopAction =
       type: "open-category";
       ownerId: string;
       categoryId: DiceShopCategoryId;
+    }
+  | {
+      type: "page-category";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+      page: number;
     }
   | {
       type: "select-item";
@@ -100,6 +110,7 @@ export type DiceShopCategoryItemSummary = {
   name: string;
   pricePips: number;
   ownedQuantity: number;
+  ownedSummary: string;
 };
 
 export type DiceShopItemDetail = {
@@ -144,12 +155,16 @@ export type DiceShopViewModel =
       categoryId: DiceShopCategoryId;
       categoryLabel: string;
       categorySummary: string;
+      currentPage: number;
+      totalPages: number;
       categoryItems: DiceShopCategoryItemSummary[];
     })
   | (DiceShopViewBase & {
       screen: "item-detail";
       categoryId: DiceShopCategoryId;
       categoryLabel: string;
+      categoryPage: number;
+      categoryTotalPages: number;
       selectedItem: DiceShopItemDetail;
       itemNavigation: DiceShopItemNavigation;
     })
@@ -328,6 +343,25 @@ export const createDiceShopUseCase = ({
           payload: {
             type: "view",
             view: buildCategoryViewModel(economy, inventory, shopCatalog, action.ownerId, category),
+          },
+        },
+      };
+    }
+
+    if (action.type === "page-category") {
+      return {
+        result: {
+          kind: "update",
+          payload: {
+            type: "view",
+            view: buildCategoryViewModel(
+              economy,
+              inventory,
+              shopCatalog,
+              action.ownerId,
+              category,
+              action.page,
+            ),
           },
         },
       };
@@ -595,9 +629,20 @@ const buildCategoryViewModel = (
   shopCatalog: DiceShopCatalog,
   userId: string,
   category: DiceShopCategoryDefinition,
+  requestedPage: number = 0,
   statusMessage?: string,
 ): DiceShopViewModel => {
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
+  const categoryItems = getCategoryItems(shopCatalog, category.id).map((item) => ({
+    id: item.id,
+    name: item.name,
+    pricePips: item.pricePips,
+    ownedQuantity: inventoryQuantities.get(item.id) ?? 0,
+    ownedSummary: buildOwnedSummary(category.id, inventoryQuantities.get(item.id) ?? 0),
+  }));
+  const pages = paginateCategoryItems(categoryItems);
+  const totalPages = Math.max(1, pages.length);
+  const currentPage = clampPage(requestedPage, totalPages);
 
   return {
     screen: "category",
@@ -607,12 +652,9 @@ const buildCategoryViewModel = (
     categoryId: category.id,
     categoryLabel: category.label,
     categorySummary: category.summary,
-    categoryItems: getCategoryItems(shopCatalog, category.id).map((item) => ({
-      id: item.id,
-      name: item.name,
-      pricePips: item.pricePips,
-      ownedQuantity: inventoryQuantities.get(item.id) ?? 0,
-    })),
+    currentPage,
+    totalPages,
+    categoryItems: pages[currentPage] ?? [],
     statusMessage,
   };
 };
@@ -632,11 +674,26 @@ const buildItemDetailViewModel = (
   }
 
   const balancePips = economy.getEconomySnapshot(userId).pips;
-  const ownedQuantity = inventory.getInventoryQuantities(userId).get(item.id) ?? 0;
+  const inventoryQuantities = inventory.getInventoryQuantities(userId);
+  const ownedQuantity = inventoryQuantities.get(item.id) ?? 0;
   const alreadyOwned = isPassivePermanentItem(item) && ownedQuantity > 0;
   const hasEnoughPips = balancePips >= item.pricePips;
   const buyable = !alreadyOwned && hasEnoughPips;
   const itemNavigation = buildItemNavigation(shopCatalog, category.id, item.id);
+  const categoryPages = paginateCategoryItems(
+    getCategoryItems(shopCatalog, category.id).map((categoryItem) => {
+      const categoryOwnedQuantity = inventoryQuantities.get(categoryItem.id) ?? 0;
+      return {
+        id: categoryItem.id,
+        name: categoryItem.name,
+        pricePips: categoryItem.pricePips,
+        ownedQuantity: categoryOwnedQuantity,
+        ownedSummary: buildOwnedSummary(category.id, categoryOwnedQuantity),
+      };
+    }),
+  );
+  const categoryTotalPages = Math.max(1, categoryPages.length);
+  const categoryPage = findCategoryPageIndex(categoryPages, item.id);
 
   return {
     screen: "item-detail",
@@ -645,6 +702,8 @@ const buildItemDetailViewModel = (
     categorySummaries: buildCategorySummaries(shopCatalog),
     categoryId: category.id,
     categoryLabel: category.label,
+    categoryPage,
+    categoryTotalPages,
     itemNavigation,
     selectedItem: {
       id: item.id,
@@ -719,6 +778,48 @@ const getCategoryItems = (shopCatalog: DiceShopCatalog, categoryId: DiceShopCate
     .filter((item) => getDiceShopCategoryId(item) === categoryId);
 };
 
+const paginateCategoryItems = (
+  items: DiceShopCategoryItemSummary[],
+): DiceShopCategoryItemSummary[][] => {
+  if (items.length < 1) {
+    return [[]];
+  }
+
+  const pages: DiceShopCategoryItemSummary[][] = [];
+  let currentPageItems: DiceShopCategoryItemSummary[] = [];
+  let currentFieldLength = 0;
+
+  for (const item of items) {
+    const itemLineLength = buildCategoryItemFieldLine(item).length;
+    const candidateLength =
+      currentPageItems.length < 1 ? itemLineLength : currentFieldLength + 1 + itemLineLength;
+    const exceedsBudget =
+      currentPageItems.length >= discordStringSelectOptionLimit ||
+      candidateLength > discordEmbedFieldValueCharacterLimit;
+
+    if (currentPageItems.length > 0 && exceedsBudget) {
+      pages.push(currentPageItems);
+      currentPageItems = [item];
+      currentFieldLength = itemLineLength;
+      continue;
+    }
+
+    currentPageItems.push(item);
+    currentFieldLength = candidateLength;
+  }
+
+  if (currentPageItems.length > 0) {
+    pages.push(currentPageItems);
+  }
+
+  return pages;
+};
+
+const findCategoryPageIndex = (pages: DiceShopCategoryItemSummary[][], itemId: string): number => {
+  const pageIndex = pages.findIndex((page) => page.some((item) => item.id === itemId));
+  return pageIndex >= 0 ? pageIndex : 0;
+};
+
 const getAdjacentCategoryItem = (
   shopCatalog: DiceShopCatalog,
   categoryId: DiceShopCategoryId,
@@ -776,4 +877,24 @@ const buildPurchaseChangeSummary = (item: DiceShopItem): string => {
   }
 
   return "The item was added to your inventory. Use /inventory when you want to activate it.";
+};
+
+const buildOwnedSummary = (categoryId: DiceShopCategoryId, ownedQuantity: number): string => {
+  if (categoryId === "permanent-upgrades") {
+    return `Owned: ${ownedQuantity > 0 ? "✅" : "❌"}`;
+  }
+
+  return `Owned ${ownedQuantity}`;
+};
+
+const buildCategoryItemFieldLine = (item: DiceShopCategoryItemSummary): string => {
+  return `**${item.name}** • ${item.pricePips} pips • ${item.ownedSummary}`;
+};
+
+const clampPage = (page: number, totalPages: number): number => {
+  if (!Number.isInteger(page)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(totalPages - 1, page));
 };
