@@ -102,7 +102,7 @@ const buildRaidDescriptionWithinLimit = ({
       formatParticipants(participantIds, participantMaxVisible),
     ];
 
-    if (contributionLines) {
+    if (contributionLines && contributionLines.length > 0) {
       lines.push(
         "",
         "**Damage leaders**",

@@ -13,7 +13,11 @@ import {
 import type { DiceInventoryEntry } from "../../../inventory/domain/shop";
 import type { AutoRollSessionReservation, DiceInventoryRepository } from "../ports";
 import { getItemOwnershipLabel } from "../../domain/passive-items";
-import { discordActionRowLimit, discordMessageCharacterLimit } from "../../../../shared/discord";
+import {
+  discordActionRowLimit,
+  discordMessageCharacterLimit,
+  truncateDiscordText,
+} from "../../../../shared/discord";
 
 export type DiceInventoryAction =
   | {
@@ -198,25 +202,24 @@ const buildInventoryContent = (
   currentPage: number = 0,
   totalPages: number = 1,
 ): string => {
-  const sections: string[] = [];
   const headerLines = [`Dice inventory for <@${userId}>:`];
 
-  if (statusLine) {
-    sections.push(statusLine);
-  }
-
   if (entries.length === 0) {
+    const sections: string[] = [];
+    if (statusLine) {
+      sections.push(statusLine);
+    }
     headerLines.push("Inventory is empty.", "Buy items with /shop.");
     sections.push(headerLines.join("\n"));
-    return sections.join("\n\n");
+    return truncateDiscordText(sections.join("\n\n"), discordMessageCharacterLimit);
   }
 
   headerLines.push("Use buttons below to consume items.");
   if (totalPages > 1) {
     headerLines.push(`Page ${currentPage + 1}/${totalPages}.`);
   }
-  sections.push(headerLines.join("\n"));
-  sections.push(
+  const bodySections = [
+    headerLines.join("\n"),
     ...entries.map((entry) =>
       [
         `**${entry.item.name}**`,
@@ -225,9 +228,23 @@ const buildInventoryContent = (
         getItemOwnershipLabel(entry.item),
       ].join("\n"),
     ),
-  );
+  ];
+  const bodyContent = bodySections.join("\n\n");
+  if (!statusLine) {
+    return bodyContent;
+  }
 
-  return sections.join("\n\n");
+  const fullContent = [statusLine, bodyContent].join("\n\n");
+  if (fullContent.length <= discordMessageCharacterLimit) {
+    return fullContent;
+  }
+
+  const availableStatusLength = discordMessageCharacterLimit - bodyContent.length - 2;
+  if (availableStatusLength <= 0) {
+    return bodyContent;
+  }
+
+  return [truncateDiscordText(statusLine, availableStatusLength), bodyContent].join("\n\n");
 };
 
 const buildInventoryComponents = (

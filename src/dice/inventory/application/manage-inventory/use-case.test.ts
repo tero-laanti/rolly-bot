@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiceInventoryEntry } from "../../domain/shop";
+import { discordMessageCharacterLimit } from "../../../../shared/discord";
 import { createDiceInventoryUseCase } from "./use-case";
 
 const createConsumableEntry = (
@@ -127,4 +128,34 @@ test("inventory paging also splits when entry text would exceed Discord's messag
     secondPage.result.payload.view.components[0]?.map((button) => button.label),
     ["←", "Refresh"],
   );
+});
+
+test("inventory view truncates long runtime status text before exceeding Discord's message limit", async () => {
+  const useCase = createDiceInventoryUseCase({
+    inventory: {
+      getOwnedInventoryEntries: () => [createPassiveEntry(1, "A".repeat(1_700))],
+    },
+    useDiceItem: async () => ({
+      ok: true as const,
+      item: createConsumableEntry(99).item,
+      remainingQuantity: 1,
+      statusMessage: `Status: ${"S".repeat(500)}`,
+      achievementAnnouncements: [],
+    }),
+  });
+
+  const result = await useCase.handleDiceInventoryAction(
+    "user-1",
+    { type: "use", ownerId: "user-1", itemId: "consumable-99", page: 0 },
+    interactionOptions,
+  );
+
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.ok(result.result.payload.view.content.length <= discordMessageCharacterLimit);
+  assert.match(result.result.payload.view.content, /^Status: S+/);
+  assert.match(result.result.payload.view.content, /\*\*Upgrade 1\*\*/);
 });

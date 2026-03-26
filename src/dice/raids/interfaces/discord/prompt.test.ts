@@ -60,3 +60,26 @@ test("resolved raid prompt trims long leaderboards without dropping the outcome 
   assert.match(description, /The boss was defeated in time\./);
   assert.match(description, /Reward applied to 10 eligible raiders/);
 });
+
+test("active raid prompt omits the damage leaders section when no damage has been logged yet", () => {
+  const prompt = buildRaidActivePrompt({
+    participantIds: ["user-1"],
+    eligibleParticipantCount: 1,
+    startedAtMs: 0,
+    endsAtMs: 60_000,
+    threadId: "thread-1",
+    bossName: "Bone Dragon",
+    bossLevel: 42,
+    currentHp: 5678,
+    maxHp: 5678,
+    rewardSummary: "20 pips",
+    totalDamage: 0,
+    totalAttacks: 0,
+    contributionLines: [],
+  });
+
+  const description = getEmbedDescription(prompt.embeds?.[0]);
+  assert.ok(description);
+  assert.doesNotMatch(description, /\*\*Damage leaders\*\*/);
+  assert.doesNotMatch(description, /No damage logged yet\./);
+});
