@@ -40,6 +40,14 @@ import type {
   RandomEventRarityTier,
   RandomEventVarietyPityConfig,
 } from "../dice/random-events/domain/variety";
+import {
+  assertDiscordTextLength,
+  discordButtonLabelCharacterLimit,
+  discordEmbedDescriptionCharacterLimit,
+  discordEmbedTitleCharacterLimit,
+  discordMessageCharacterLimit,
+  discordStringSelectOptionLabelCharacterLimit,
+} from "../shared/discord";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -74,7 +82,8 @@ const achievementRuleTypes = [
   "all-of",
   "manual",
 ] as const;
-const introPostContentMaxLength = 2_000;
+const introPostContentMaxLength = discordMessageCharacterLimit;
+const randomEventTemplateVariablePattern = /\$\{([a-zA-Z0-9_]+)\}/g;
 
 const isRecord = (value: unknown): value is UnknownRecord => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -168,6 +177,95 @@ const readStringArray = (value: unknown, label: string): string[] => {
   }
 
   return value.map((entry, index) => readNonEmptyString(entry, `${label}[${index}]`));
+};
+
+const getRandomEventRarityLabel = (rarity: RandomEventRarityTier): string => {
+  switch (rarity) {
+    case "common":
+      return "Common Event";
+    case "uncommon":
+      return "Uncommon Event";
+    case "rare":
+      return "Rare Event";
+    case "epic":
+      return "Epic Event";
+    case "legendary":
+      return "Legendary Event";
+  }
+};
+
+const getLongestString = (values: readonly string[]): string => {
+  return values.reduce((longest, value) => (value.length > longest.length ? value : longest), "");
+};
+
+const renderRandomEventTemplateWithLongestValues = (
+  template: string,
+  variables: Record<string, string[]>,
+): string => {
+  return template.replace(randomEventTemplateVariablePattern, (match, key: string) => {
+    return getLongestString(variables[key] ?? []) || match;
+  });
+};
+
+const collectScenarioRenderVariables = (
+  scenario: RandomEventScenario,
+): Record<string, string[]> => {
+  const collected: Record<string, string[]> = {
+    ...(scenario.textVariables ?? {}),
+  };
+  const referencedKeys = new Set<string>();
+
+  for (const template of [scenario.title, scenario.prompt, scenario.claimLabel]) {
+    for (const match of template.matchAll(randomEventTemplateVariablePattern)) {
+      const key = match[1];
+      if (key) {
+        referencedKeys.add(key);
+      }
+    }
+  }
+
+  for (const outcome of scenario.outcomes) {
+    for (const key of referencedKeys) {
+      const values = outcome.textVariables?.[key];
+      if (!values || values.length < 1) {
+        continue;
+      }
+
+      collected[key] = [...new Set([...(collected[key] ?? []), ...values])];
+    }
+  }
+
+  return collected;
+};
+
+const collectOutcomeRenderVariables = (
+  scenario: RandomEventScenario,
+  outcome: RandomEventOutcome,
+) => {
+  return {
+    ...(scenario.textVariables ?? {}),
+    ...(outcome.textVariables ?? {}),
+  };
+};
+
+const getInventoryOwnershipLabel = (item: DiceItemData): string => {
+  if (isPassiveDiceItemEffect(item.effect)) {
+    return "Permanent passive upgrade.";
+  }
+
+  return item.consumable ? "Consumable." : "Permanent collectible.";
+};
+
+const buildSingleItemInventoryPreview = (item: DiceItemData): string => {
+  return [
+    "Dice inventory for <@123456789012345678>:",
+    "Use buttons below to consume items.",
+    "",
+    `**${item.name}**`,
+    "Owned: 1.",
+    item.description,
+    getInventoryOwnershipLabel(item),
+  ].join("\n");
 };
 
 const readFiniteNumberAtLeast = (value: unknown, label: string, minValue: number): number => {
@@ -713,6 +811,104 @@ const isPassiveDiceItemEffect = (effect: DiceItemEffect): boolean => {
   );
 };
 
+const validateDiceItemDiscordText = (item: DiceItemData, label: string): void => {
+  assertDiscordTextLength(item.name, `${label}.name`, discordStringSelectOptionLabelCharacterLimit);
+
+  if (item.consumable) {
+    assertDiscordTextLength(
+      `Use ${item.name}`,
+      `${label}.name as used in inventory buttons`,
+      discordButtonLabelCharacterLimit,
+    );
+  }
+
+  assertDiscordTextLength(
+    item.description,
+    `${label}.description`,
+    discordEmbedDescriptionCharacterLimit,
+  );
+  assertDiscordTextLength(
+    buildSingleItemInventoryPreview(item),
+    `${label}.description as rendered in a single-item /inventory page`,
+    discordMessageCharacterLimit,
+  );
+};
+
+const validateRandomEventScenarioDiscordText = (
+  scenario: RandomEventScenario,
+  label: string,
+): void => {
+  const scenarioRenderVariables = collectScenarioRenderVariables(scenario);
+  const renderedTitle = renderRandomEventTemplateWithLongestValues(
+    scenario.title,
+    scenarioRenderVariables,
+  );
+  const renderedPrompt = renderRandomEventTemplateWithLongestValues(
+    scenario.prompt,
+    scenarioRenderVariables,
+  );
+  const renderedClaimLabel = renderRandomEventTemplateWithLongestValues(
+    scenario.claimLabel,
+    scenarioRenderVariables,
+  );
+
+  assertDiscordTextLength(
+    `${getRandomEventRarityLabel(scenario.rarity)} • ${renderedTitle}`,
+    `${label}.title as rendered in Discord`,
+    discordEmbedTitleCharacterLimit,
+  );
+  assertDiscordTextLength(
+    renderedPrompt,
+    `${label}.prompt as rendered in Discord`,
+    discordEmbedDescriptionCharacterLimit,
+  );
+  assertDiscordTextLength(
+    renderedClaimLabel,
+    `${label}.claimLabel as rendered in Discord`,
+    discordButtonLabelCharacterLimit,
+  );
+
+  scenario.outcomes.forEach((outcome, outcomeIndex) => {
+    const renderedOutcomeMessage = renderRandomEventTemplateWithLongestValues(
+      outcome.message,
+      collectOutcomeRenderVariables(scenario, outcome),
+    );
+
+    assertDiscordTextLength(
+      renderedOutcomeMessage,
+      `${label}.outcomes[${outcomeIndex}].message as rendered in Discord`,
+      discordEmbedDescriptionCharacterLimit,
+    );
+  });
+};
+
+const buildLongestRaidBossName = (raids: DiceRaidData): string => {
+  const prefix = getLongestString(raids.bossNames.prefixes);
+  const suffix = getLongestString(raids.bossNames.suffixes);
+  return `${prefix} ${suffix}`.trim();
+};
+
+const validateRaidDiscordText = (raids: DiceRaidData): void => {
+  const bossName = buildLongestRaidBossName(raids);
+  const maxBossLevel = raids.bossBalance.maxBossLevel;
+
+  assertDiscordTextLength(
+    `${bossName} - Lv.${maxBossLevel}`,
+    "raids.bossNames as rendered in the active raid title",
+    discordEmbedTitleCharacterLimit,
+  );
+  assertDiscordTextLength(
+    `Raid cleared - ${bossName} Lv.${maxBossLevel}`,
+    "raids.bossNames as rendered in the resolved raid title",
+    discordEmbedTitleCharacterLimit,
+  );
+  assertDiscordTextLength(
+    `Raid failed - ${bossName} Lv.${maxBossLevel}`,
+    "raids.bossNames as rendered in the failed raid title",
+    discordEmbedTitleCharacterLimit,
+  );
+};
+
 export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => {
   if (!Array.isArray(value)) {
     throw new Error("Achievements data must be an array.");
@@ -1021,7 +1217,7 @@ export const parseRandomEventBalance = (value: unknown): DiceRandomEventBalanceD
 
 export const parseDiceRaidsData = (value: unknown): DiceRaidData => {
   const record = assertRecord(value, "raids");
-  return {
+  const parsed = {
     reward: readRaidRewardConfig(record.reward, "raids.reward"),
     bossNames: readRaidBossNamesConfig(record.bossNames, "raids.bossNames"),
     bossBalance: readRaidBossBalanceConfig(record.bossBalance, "raids.bossBalance"),
@@ -1030,6 +1226,9 @@ export const parseDiceRaidsData = (value: unknown): DiceRaidData => {
       "raids.participantStrength",
     ),
   };
+
+  validateRaidDiscordText(parsed);
+  return parsed;
 };
 
 export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {
@@ -1203,6 +1402,9 @@ export const parseRandomEventScenarios = (value: unknown): RandomEventScenario[]
     readRandomEventScenario(entry, `randomEventsV1[${index}]`),
   );
   validateRandomEventScenarios(parsed);
+  parsed.forEach((scenario, index) =>
+    validateRandomEventScenarioDiscordText(scenario, `randomEventsV1[${index}]`),
+  );
   return parsed;
 };
 
@@ -1271,7 +1473,7 @@ export const parseDiceItems = (value: unknown): DiceItemData[] => {
 
   const parsed = value.map((entry, index) => {
     const record = assertRecord(entry, `itemsV1[${index}]`);
-    return {
+    const item = {
       id: readNonEmptyString(record.id, `itemsV1[${index}].id`),
       name: readNonEmptyString(record.name, `itemsV1[${index}].name`),
       description: readNonEmptyString(record.description, `itemsV1[${index}].description`),
@@ -1279,6 +1481,9 @@ export const parseDiceItems = (value: unknown): DiceItemData[] => {
       consumable: readBoolean(record.consumable, `itemsV1[${index}].consumable`),
       effect: readDiceItemEffect(record.effect, `itemsV1[${index}].effect`),
     };
+
+    validateDiceItemDiscordText(item, `itemsV1[${index}]`);
+    return item;
   });
 
   const ids = new Set<string>();

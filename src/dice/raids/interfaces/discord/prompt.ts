@@ -5,7 +5,14 @@ import {
   EmbedBuilder,
   type BaseMessageOptions,
 } from "discord.js";
-import { formatDiscordFullTime, formatDiscordRelativeTime } from "../../../../shared/discord";
+import {
+  assertDiscordTextLength,
+  discordEmbedDescriptionCharacterLimit,
+  discordEmbedTitleCharacterLimit,
+  formatDiscordFullTime,
+  formatDiscordRelativeTime,
+  truncateDiscordText,
+} from "../../../../shared/discord";
 import type { RaidOutcome } from "../../application/ports";
 import { buildRaidJoinButtonId } from "./button-ids";
 
@@ -16,13 +23,20 @@ const failureColor = 0x8b949e;
 const maxVisibleParticipants = 20;
 const hpBarWidth = 14;
 
-const formatParticipants = (participantIds: readonly string[]): string => {
+const formatOverflowLine = (hiddenCount: number, noun: string): string => {
+  return `...and ${hiddenCount} more ${noun}${hiddenCount === 1 ? "" : "s"}.`;
+};
+
+const formatParticipants = (
+  participantIds: readonly string[],
+  maxVisible: number = maxVisibleParticipants,
+): string => {
   if (participantIds.length < 1) {
     return "No raiders yet - be the first to join.";
   }
 
   const visibleParticipantMentions = participantIds
-    .slice(0, maxVisibleParticipants)
+    .slice(0, maxVisible)
     .map((participantId) => `<@${participantId}>`);
   const hiddenParticipantCount = Math.max(
     0,
@@ -44,12 +58,90 @@ const formatHpBar = (currentHp: number, maxHp: number): string => {
   return `[${"#".repeat(filledWidth)}${"-".repeat(emptyWidth)}]`;
 };
 
-const buildContributionBlock = (contributionLines: readonly string[]): string => {
+const buildContributionLines = (
+  contributionLines: readonly string[],
+  maxVisible: number,
+): string[] => {
   if (contributionLines.length < 1) {
-    return "No damage logged yet.";
+    return ["No damage logged yet."];
   }
 
-  return contributionLines.join("\n");
+  if (maxVisible <= 0) {
+    return [formatOverflowLine(contributionLines.length, "damage line")];
+  }
+
+  const visibleLines = contributionLines.slice(0, maxVisible);
+  const hiddenLineCount = contributionLines.length - visibleLines.length;
+  if (hiddenLineCount < 1) {
+    return visibleLines;
+  }
+
+  return [...visibleLines, formatOverflowLine(hiddenLineCount, "damage line")];
+};
+
+const buildRaidDescriptionWithinLimit = ({
+  linesBeforeParticipants,
+  participantIds,
+  contributionLines = null,
+}: {
+  linesBeforeParticipants: string[];
+  participantIds: readonly string[];
+  contributionLines?: readonly string[] | null;
+}): string => {
+  const buildDescription = ({
+    participantMaxVisible,
+    contributionMaxVisible,
+  }: {
+    participantMaxVisible: number;
+    contributionMaxVisible: number;
+  }): string => {
+    const lines = [
+      ...linesBeforeParticipants,
+      "",
+      `**Joined raiders (${participantIds.length})**`,
+      formatParticipants(participantIds, participantMaxVisible),
+    ];
+
+    if (contributionLines) {
+      lines.push(
+        "",
+        "**Damage leaders**",
+        ...buildContributionLines(contributionLines, contributionMaxVisible),
+      );
+    }
+
+    return lines.join("\n");
+  };
+
+  let participantMaxVisible =
+    participantIds.length > 0 ? Math.min(maxVisibleParticipants, participantIds.length) : 0;
+  let contributionMaxVisible = contributionLines?.length ?? 0;
+  let description = buildDescription({
+    participantMaxVisible,
+    contributionMaxVisible,
+  });
+
+  while (description.length > discordEmbedDescriptionCharacterLimit && contributionMaxVisible > 0) {
+    contributionMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      contributionMaxVisible,
+    });
+  }
+
+  while (description.length > discordEmbedDescriptionCharacterLimit && participantMaxVisible > 1) {
+    participantMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      contributionMaxVisible,
+    });
+  }
+
+  return truncateDiscordText(
+    description,
+    discordEmbedDescriptionCharacterLimit,
+    "\n... (truncated)",
+  );
 };
 
 const getOutcomePresentation = (
@@ -106,16 +198,18 @@ export const buildRaidAnnouncementPrompt = ({
     );
   }
 
-  descriptionLines.push(
-    "",
-    `**Joined raiders (${participantIds.length})**`,
-    formatParticipants(participantIds),
-  );
+  const title = disabled ? "Raid signup closed" : "Incoming raid";
+  assertDiscordTextLength(title, "raid prompt title", discordEmbedTitleCharacterLimit);
 
   const embed = new EmbedBuilder()
     .setColor(raidColor)
-    .setTitle(disabled ? "Raid signup closed" : "Incoming raid")
-    .setDescription(descriptionLines.join("\n"))
+    .setTitle(title)
+    .setDescription(
+      buildRaidDescriptionWithinLimit({
+        linesBeforeParticipants: descriptionLines,
+        participantIds,
+      }),
+    )
     .setFooter({
       text: disabled
         ? "Joined raiders are now locked for this raid."
@@ -165,27 +259,27 @@ export const buildRaidActivePrompt = ({
   totalAttacks: number;
   contributionLines: readonly string[];
 }): BaseMessageOptions => {
+  const title = `${bossName} - Lv.${bossLevel}`;
+  assertDiscordTextLength(title, "raid active prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(raidColor)
-    .setTitle(`${bossName} - Lv.${bossLevel}`)
+    .setTitle(title)
     .setDescription(
-      [
-        `Fight in <#${threadId}>.`,
-        `Raid opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
-        "Only joined raiders using /roll in this thread deal damage.",
-        "Land at least one hit in this thread to qualify for the clear reward.",
-        "",
-        `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
-        `Total damage: **${totalDamage}** across ${totalAttacks} hit${totalAttacks === 1 ? "" : "s"}.`,
-        `Reward-eligible raiders: **${eligibleParticipantCount}**.`,
-        `Reward on success: **${rewardSummary}**.`,
-        "",
-        `**Joined raiders (${participantIds.length})**`,
-        formatParticipants(participantIds),
-        "",
-        "**Damage leaders**",
-        buildContributionBlock(contributionLines),
-      ].join("\n"),
+      buildRaidDescriptionWithinLimit({
+        linesBeforeParticipants: [
+          `Fight in <#${threadId}>.`,
+          `Raid opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
+          "Only joined raiders using /roll in this thread deal damage.",
+          "Land at least one hit in this thread to qualify for the clear reward.",
+          "",
+          `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
+          `Total damage: **${totalDamage}** across ${totalAttacks} hit${totalAttacks === 1 ? "" : "s"}.`,
+          `Reward-eligible raiders: **${eligibleParticipantCount}**.`,
+          `Reward on success: **${rewardSummary}**.`,
+        ],
+        participantIds,
+        contributionLines,
+      }),
     )
     .setFooter({ text: "Use /roll inside the raid thread to attack." });
 
@@ -221,24 +315,22 @@ export const buildRaidResolvedPrompt = ({
     outcome === "success"
       ? `Reward applied to ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
       : "";
+  const title = `${presentation.title} - ${bossName} Lv.${bossLevel}`;
+  assertDiscordTextLength(title, "raid resolved prompt title", discordEmbedTitleCharacterLimit);
 
   const embed = new EmbedBuilder()
     .setColor(presentation.color)
-    .setTitle(`${presentation.title} - ${bossName} Lv.${bossLevel}`)
+    .setTitle(title)
     .setDescription(
-      [
-        `${presentation.summaryLine} The raid ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
-        `Boss HP pool: **${maxHp}**.`,
-        rewardLine,
-        "",
-        `**Joined raiders (${participantIds.length})**`,
-        formatParticipants(participantIds),
-        "",
-        "**Damage leaders**",
-        buildContributionBlock(contributionLines),
-      ]
-        .filter((line) => line.length > 0)
-        .join("\n"),
+      buildRaidDescriptionWithinLimit({
+        linesBeforeParticipants: [
+          `${presentation.summaryLine} The raid ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
+          `Boss HP pool: **${maxHp}**.`,
+          rewardLine,
+        ].filter((line) => line.length > 0),
+        participantIds,
+        contributionLines,
+      }),
     );
 
   return {
@@ -264,21 +356,21 @@ export const buildRaidResolveFailedPrompt = ({
       : outcome === "failure"
         ? "The raid timed out."
         : "The raid ended.";
+  const title = "Raid ended with cleanup needed";
+  assertDiscordTextLength(title, "raid cleanup prompt title", discordEmbedTitleCharacterLimit);
 
   const embed = new EmbedBuilder()
     .setColor(failureColor)
-    .setTitle("Raid ended with cleanup needed")
+    .setTitle(title)
     .setDescription(
-      [
-        `${outcomeText} Cleanup failed ${formatDiscordRelativeTime(resolvedAtMs)}.`,
-        bossName ? `Boss: **${bossName}**.` : "",
-        "A moderator may need to tidy the stale raid message manually.",
-        "",
-        `**Joined raiders (${participantIds.length})**`,
-        formatParticipants(participantIds),
-      ]
-        .filter((line) => line.length > 0)
-        .join("\n"),
+      buildRaidDescriptionWithinLimit({
+        linesBeforeParticipants: [
+          `${outcomeText} Cleanup failed ${formatDiscordRelativeTime(resolvedAtMs)}.`,
+          bossName ? `Boss: **${bossName}**.` : "",
+          "A moderator may need to tidy the stale raid message manually.",
+        ].filter((line) => line.length > 0),
+        participantIds,
+      }),
     );
 
   return {
@@ -294,19 +386,19 @@ export const buildRaidInterruptedPrompt = ({
   participantIds: readonly string[];
   bossName?: string | null;
 }): BaseMessageOptions => {
+  const title = "Raid interrupted";
+  assertDiscordTextLength(title, "raid interrupted prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(failureColor)
-    .setTitle("Raid interrupted")
+    .setTitle(title)
     .setDescription(
-      [
-        "This raid was closed while the bot restarted.",
-        bossName ? `Boss: **${bossName}**.` : "",
-        "",
-        `**Joined raiders (${participantIds.length})**`,
-        formatParticipants(participantIds),
-      ]
-        .filter((line) => line.length > 0)
-        .join("\n"),
+      buildRaidDescriptionWithinLimit({
+        linesBeforeParticipants: [
+          "This raid was closed while the bot restarted.",
+          bossName ? `Boss: **${bossName}**.` : "",
+        ].filter((line) => line.length > 0),
+        participantIds,
+      }),
     );
 
   return {
@@ -320,16 +412,16 @@ export const buildRaidStartFailedPrompt = ({
 }: {
   participantIds: readonly string[];
 }): BaseMessageOptions => {
+  const title = "Raid failed to start";
+  assertDiscordTextLength(title, "raid start failed prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(failureColor)
-    .setTitle("Raid failed to start")
+    .setTitle(title)
     .setDescription(
-      [
-        "Raid signup closed, but the boss thread could not be opened.",
-        "",
-        `**Joined raiders (${participantIds.length})**`,
-        formatParticipants(participantIds),
-      ].join("\n"),
+      buildRaidDescriptionWithinLimit({
+        linesBeforeParticipants: ["Raid signup closed, but the boss thread could not be opened."],
+        participantIds,
+      }),
     );
 
   return {
@@ -343,14 +435,20 @@ export const buildRaidCancelledPrompt = ({
 }: {
   scheduledStartAtMs: number;
 }): BaseMessageOptions => {
+  const title = "Raid cancelled";
+  assertDiscordTextLength(title, "raid cancelled prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(failureColor)
-    .setTitle("Raid cancelled")
+    .setTitle(title)
     .setDescription(
-      [
-        "Nobody joined before the boss arrived.",
-        `Scheduled start: ${formatDiscordFullTime(scheduledStartAtMs)}.`,
-      ].join("\n"),
+      truncateDiscordText(
+        [
+          "Nobody joined before the boss arrived.",
+          `Scheduled start: ${formatDiscordFullTime(scheduledStartAtMs)}.`,
+        ].join("\n"),
+        discordEmbedDescriptionCharacterLimit,
+        "\n... (truncated)",
+      ),
     );
 
   return {

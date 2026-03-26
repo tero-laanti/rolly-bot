@@ -25,6 +25,7 @@ Shared notes:
 - `consumable: false` is used for passive permanent upgrades that work automatically while owned.
 - Passive permanent upgrades are clamped to one owned copy.
 - Time-based units are explicit in field names such as `minutes`, `durationSeconds`, and `intervalSeconds`.
+- Startup validation rejects item names or descriptions that are too long to fit the live shop or single-item inventory surfaces.
 
 Effect types:
 

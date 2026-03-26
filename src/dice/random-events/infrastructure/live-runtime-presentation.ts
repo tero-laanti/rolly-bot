@@ -1,5 +1,9 @@
 import { EmbedBuilder } from "discord.js";
-import { formatDiscordRelativeTime } from "../../../shared/discord";
+import {
+  discordEmbedDescriptionCharacterLimit,
+  formatDiscordRelativeTime,
+  truncateDiscordText,
+} from "../../../shared/discord";
 import type { RandomEventScenario, RandomEventSelectionResult } from "../domain/content";
 import type {
   RandomEventRollChallengeDefinition,
@@ -37,7 +41,17 @@ const pickRandomTemplate = (templates: string[]): string | null => {
   return templates[index] ?? templates[0] ?? null;
 };
 
-const formatParticipantMentions = (participants: string[], maxVisible = 5): string => {
+const maxVisibleParticipantMentions = 5;
+const maxVisibleFailureLines = 3;
+
+const formatOverflowLine = (hiddenCount: number, noun: string): string => {
+  return `...and ${hiddenCount} more ${noun}${hiddenCount === 1 ? "" : "s"}.`;
+};
+
+const formatParticipantMentions = (
+  participants: string[],
+  maxVisible = maxVisibleParticipantMentions,
+): string => {
   const visibleParticipants = participants.slice(0, maxVisible).map((userId) => `<@${userId}>`);
   const hiddenCount = participants.length - visibleParticipants.length;
 
@@ -70,6 +84,30 @@ const formatSequenceStepLine = (
 ): string => {
   const status = stepResult.succeeded ? "✅" : "❌";
   return `${status} Step ${index + 1}: **${stepResult.label}** — rolled ${stepResult.rolledValue} on d${stepResult.dieSides} (needed ${formatComparator(stepResult.comparator, stepResult.target)}).`;
+};
+
+const formatVisibleLines = ({
+  lines,
+  maxVisible,
+  noun,
+  takeFromEnd = false,
+}: {
+  lines: string[];
+  maxVisible: number;
+  noun: string;
+  takeFromEnd?: boolean;
+}): string[] => {
+  if (maxVisible <= 0 || lines.length < 1) {
+    return [];
+  }
+
+  const visibleLines = takeFromEnd ? lines.slice(-maxVisible) : lines.slice(0, maxVisible);
+  const hiddenCount = lines.length - visibleLines.length;
+  if (hiddenCount < 1) {
+    return visibleLines;
+  }
+
+  return [...visibleLines, formatOverflowLine(hiddenCount, noun)];
 };
 
 export const getRandomEventRarityPresentation = (rarity: RandomEventRarityTier) => {
@@ -114,44 +152,85 @@ export const buildActiveClaimDescription = (
   failedAttemptLines: string[] = [],
   requiredReadyCount: number | null = null,
 ): string => {
-  const lines = [prompt];
+  const buildDescription = ({
+    participantMaxVisible,
+    failedAttemptMaxVisible,
+  }: {
+    participantMaxVisible: number;
+    failedAttemptMaxVisible: number;
+  }): string => {
+    const lines = [prompt];
 
-  if (typeof requiredReadyCount === "number") {
-    const remainingPlayers = Math.max(requiredReadyCount - participants.length, 0);
-    lines.push(
-      "",
-      `**Ready now:** ${participants.length}/${requiredReadyCount}. Still waiting for ${remainingPlayers} more player${remainingPlayers === 1 ? "" : "s"}.`,
-    );
-  }
-
-  if (participants.length > 0) {
-    const participantLabel = participants.length === 1 ? "Participant" : "Participants";
-    lines.push("", `**${participantLabel} so far:** ${formatParticipantMentions(participants)}`);
-  }
-
-  if (activityLine) {
-    lines.push("", activityLine);
-  }
-
-  if (failedAttemptLines.length > 0) {
-    const maxVisibleFailures = 3;
-    const visibleFailureLines = failedAttemptLines.slice(-maxVisibleFailures);
-    const hiddenFailureCount = failedAttemptLines.length - visibleFailureLines.length;
-    lines.push("", "**Recent failed attempts:**", ...visibleFailureLines);
-    if (hiddenFailureCount > 0) {
+    if (typeof requiredReadyCount === "number") {
+      const remainingPlayers = Math.max(requiredReadyCount - participants.length, 0);
       lines.push(
-        `...and ${hiddenFailureCount} more failed attempt${hiddenFailureCount === 1 ? "" : "s"}.`,
+        "",
+        `**Ready now:** ${participants.length}/${requiredReadyCount}. Still waiting for ${remainingPlayers} more player${remainingPlayers === 1 ? "" : "s"}.`,
       );
     }
 
-    lines.push("", "The event is still open.");
+    if (participants.length > 0) {
+      const participantLabel = participants.length === 1 ? "Participant" : "Participants";
+      lines.push(
+        "",
+        `**${participantLabel} so far:** ${formatParticipantMentions(participants, participantMaxVisible)}`,
+      );
+    }
+
+    if (activityLine) {
+      lines.push("", activityLine);
+    }
+
+    const visibleFailureLines = formatVisibleLines({
+      lines: failedAttemptLines,
+      maxVisible: failedAttemptMaxVisible,
+      noun: "failed attempt",
+      takeFromEnd: true,
+    });
+    if (visibleFailureLines.length > 0) {
+      lines.push("", "**Recent failed attempts:**", ...visibleFailureLines);
+      lines.push("", "The event is still open.");
+    }
+
+    if (typeof expiresAtMs === "number") {
+      lines.push("", `⏳ Ends ${formatDiscordRelativeTime(expiresAtMs)}.`);
+    }
+
+    return lines.join("\n");
+  };
+
+  let participantMaxVisible =
+    participants.length > 0 ? Math.min(maxVisibleParticipantMentions, participants.length) : 0;
+  let failedAttemptMaxVisible = Math.min(maxVisibleFailureLines, failedAttemptLines.length);
+  let description = buildDescription({
+    participantMaxVisible,
+    failedAttemptMaxVisible,
+  });
+
+  while (
+    description.length > discordEmbedDescriptionCharacterLimit &&
+    failedAttemptMaxVisible > 0
+  ) {
+    failedAttemptMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      failedAttemptMaxVisible,
+    });
   }
 
-  if (typeof expiresAtMs === "number") {
-    lines.push("", `⏳ Ends ${formatDiscordRelativeTime(expiresAtMs)}.`);
+  while (description.length > discordEmbedDescriptionCharacterLimit && participantMaxVisible > 1) {
+    participantMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      failedAttemptMaxVisible,
+    });
   }
 
-  return lines.join("\n");
+  return truncateDiscordText(
+    description,
+    discordEmbedDescriptionCharacterLimit,
+    "\n... (truncated)",
+  );
 };
 
 export const buildSequenceChallengeButtonLabel = (
@@ -175,29 +254,48 @@ export const buildSequenceChallengeDescription = ({
   progress: RandomEventRollChallengeProgress;
   expiresAtMs: number;
 }): string => {
-  const lines = [selection.renderedPrompt, "", `<@${userId}> is taking the challenge.`];
+  const buildDescription = (maxVisibleStepLines: number): string => {
+    const lines = [selection.renderedPrompt, "", `<@${userId}> is taking the challenge.`];
+    const revealedRollLines = formatVisibleLines({
+      lines: progress.stepResults.map((stepResult, index) =>
+        formatSequenceStepLine(stepResult, index),
+      ),
+      maxVisible: maxVisibleStepLines,
+      noun: "earlier revealed roll",
+      takeFromEnd: true,
+    });
 
-  if (progress.stepResults.length > 0) {
-    lines.push(
-      "",
-      "**Revealed rolls:**",
-      ...progress.stepResults.map((stepResult, index) => formatSequenceStepLine(stepResult, index)),
-    );
-  }
-
-  if (!progress.completed) {
-    const nextStep = challenge.steps[progress.nextStepIndex];
-    if (nextStep) {
-      lines.push(
-        "",
-        `**Next step ${progress.nextStepIndex + 1}/${challenge.steps.length}:** ${nextStep.label}`,
-        `Need ${formatComparator(nextStep.comparator, nextStep.target)}.`,
-        `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`,
-      );
+    if (revealedRollLines.length > 0) {
+      lines.push("", "**Revealed rolls:**", ...revealedRollLines);
     }
+
+    if (!progress.completed) {
+      const nextStep = challenge.steps[progress.nextStepIndex];
+      if (nextStep) {
+        lines.push(
+          "",
+          `**Next step ${progress.nextStepIndex + 1}/${challenge.steps.length}:** ${nextStep.label}`,
+          `Need ${formatComparator(nextStep.comparator, nextStep.target)}.`,
+          `⏳ Auto-resolves ${formatDiscordRelativeTime(expiresAtMs)} if no one continues.`,
+        );
+      }
+    }
+
+    return lines.join("\n");
+  };
+
+  let maxVisibleStepLines = progress.stepResults.length;
+  let description = buildDescription(maxVisibleStepLines);
+  while (description.length > discordEmbedDescriptionCharacterLimit && maxVisibleStepLines > 0) {
+    maxVisibleStepLines -= 1;
+    description = buildDescription(maxVisibleStepLines);
   }
 
-  return lines.join("\n");
+  return truncateDiscordText(
+    description,
+    discordEmbedDescriptionCharacterLimit,
+    "\n... (truncated)",
+  );
 };
 
 export const buildResolvedEventEmbed = (
@@ -205,9 +303,31 @@ export const buildResolvedEventEmbed = (
   lines: string[],
 ): EmbedBuilder => {
   const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
+  const buildDescription = (maxVisibleLines: number): string => {
+    return [
+      selection.renderedPrompt,
+      "",
+      "**Outcome:**",
+      ...formatVisibleLines({
+        lines,
+        maxVisible: maxVisibleLines,
+        noun: "result line",
+      }),
+    ].join("\n");
+  };
+
+  let maxVisibleLines = lines.length;
+  let description = buildDescription(maxVisibleLines);
+  while (description.length > discordEmbedDescriptionCharacterLimit && maxVisibleLines > 0) {
+    maxVisibleLines -= 1;
+    description = buildDescription(maxVisibleLines);
+  }
+
   return new EmbedBuilder()
     .setTitle(getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle))
-    .setDescription([selection.renderedPrompt, "", "**Outcome:**", ...lines].join("\n"))
+    .setDescription(
+      truncateDiscordText(description, discordEmbedDescriptionCharacterLimit, "\n... (truncated)"),
+    )
     .setColor(rarityPresentation.color)
     .setFooter({ text: `${rarityPresentation.label} • Resolved` });
 };
@@ -219,30 +339,80 @@ export const buildExpiredEventEmbed = (
 ): EmbedBuilder => {
   const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
   const requiredReadyCount = selection.scenario.requiredReadyCount;
-  const descriptionLines =
-    typeof requiredReadyCount === "number" && participants.length < requiredReadyCount
-      ? [
-          selection.renderedPrompt,
-          "",
-          `Only ${participants.length}/${requiredReadyCount} players were ready before time ran out.`,
-          ...(participants.length > 0
-            ? ["", `**Ready players:** ${formatParticipantMentions(participants)}`]
-            : []),
-        ]
-      : failedAttemptLines.length > 0
+  const buildDescription = ({
+    participantMaxVisible,
+    failedAttemptMaxVisible,
+  }: {
+    participantMaxVisible: number;
+    failedAttemptMaxVisible: number;
+  }): string => {
+    const descriptionLines =
+      typeof requiredReadyCount === "number" && participants.length < requiredReadyCount
         ? [
             selection.renderedPrompt,
             "",
-            "**Recent failed attempts:**",
-            ...failedAttemptLines.slice(-3),
-            "",
-            "The window closes before anyone pulls it off.",
+            `Only ${participants.length}/${requiredReadyCount} players were ready before time ran out.`,
+            ...(participants.length > 0
+              ? [
+                  "",
+                  `**Ready players:** ${formatParticipantMentions(
+                    participants,
+                    participantMaxVisible,
+                  )}`,
+                ]
+              : []),
           ]
-        : [selection.renderedPrompt, "", "No one claimed this event in time."];
+        : failedAttemptLines.length > 0
+          ? [
+              selection.renderedPrompt,
+              "",
+              "**Recent failed attempts:**",
+              ...formatVisibleLines({
+                lines: failedAttemptLines,
+                maxVisible: failedAttemptMaxVisible,
+                noun: "failed attempt",
+                takeFromEnd: true,
+              }),
+              "",
+              "The window closes before anyone pulls it off.",
+            ]
+          : [selection.renderedPrompt, "", "No one claimed this event in time."];
+
+    return descriptionLines.join("\n");
+  };
+
+  let participantMaxVisible =
+    participants.length > 0 ? Math.min(maxVisibleParticipantMentions, participants.length) : 0;
+  let failedAttemptMaxVisible = Math.min(maxVisibleFailureLines, failedAttemptLines.length);
+  let description = buildDescription({
+    participantMaxVisible,
+    failedAttemptMaxVisible,
+  });
+
+  while (
+    description.length > discordEmbedDescriptionCharacterLimit &&
+    failedAttemptMaxVisible > 0
+  ) {
+    failedAttemptMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      failedAttemptMaxVisible,
+    });
+  }
+
+  while (description.length > discordEmbedDescriptionCharacterLimit && participantMaxVisible > 1) {
+    participantMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      failedAttemptMaxVisible,
+    });
+  }
 
   return new EmbedBuilder()
     .setTitle(getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle))
-    .setDescription(descriptionLines.join("\n"))
+    .setDescription(
+      truncateDiscordText(description, discordEmbedDescriptionCharacterLimit, "\n... (truncated)"),
+    )
     .setColor(rarityPresentation.color)
     .setFooter({ text: `${rarityPresentation.label} • Expired` });
 };

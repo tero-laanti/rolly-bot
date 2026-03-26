@@ -72,6 +72,7 @@ Tiered reward alternative:
 - `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
 - `reward.rollPassBuff.minimumRolls` and `reward.rollPassBuff.maximumRolls` clamp the rewarded roll count.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
+- Startup validation rejects prefix/suffix combinations that would overflow the live raid embed titles once the boss name and level are composed.
 - `baseHp` is the level 1 boss HP before level scaling.
 - `hpIncreasePerBossLevelPercent` is the compound HP increase applied for each boss level above 1.
 - Boss HP is calculated from boss level first, then multiplied by the joined-raider strength total when the raid starts.

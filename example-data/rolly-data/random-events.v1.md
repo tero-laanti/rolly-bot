@@ -58,6 +58,7 @@ Text variables:
 - Keys used in `title`, `prompt`, or `claimLabel` are chosen once when the event opens and stay fixed through resolution.
 - Outcome messages reuse those same values for shared keys so the prompt and resolution stay consistent.
 - If an outcome needs its own variable value, use a key that appears only in the outcome message. Those outcome-only keys still override scenario values.
+- Startup validation checks the worst-case rendered `title`, `prompt`, `claimLabel`, and outcome `message` against the Discord limits used by the live event prompt.
 
 Outcome weighting:
 

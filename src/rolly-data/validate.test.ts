@@ -18,6 +18,7 @@ type RandomEventScenarioInput = {
   claimLabel: string;
   claimPolicy: string;
   claimWindowSeconds: number;
+  textVariables?: Record<string, string[]>;
   requiredReadyCount?: number;
   retryPolicy?: string;
   challengeOutcomeIds?: {
@@ -29,6 +30,7 @@ type RandomEventScenarioInput = {
     resolution: string;
     message: string;
     effects: unknown[];
+    textVariables?: Record<string, string[]>;
   }>;
 };
 
@@ -135,6 +137,39 @@ test("parseRandomEventScenarios rejects stray challengeOutcomeIds without a roll
   );
 });
 
+test("parseRandomEventScenarios rejects rendered claim labels that exceed Discord button limits", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimLabel = "${action}";
+  scenario.textVariables = {
+    action: ["A".repeat(81)],
+  };
+
+  assert.throws(
+    () => parseRandomEventScenarios([scenario]),
+    /claimLabel as rendered in Discord must be <= 80 characters/i,
+  );
+});
+
+test("parseRandomEventScenarios rejects rendered outcome messages that exceed Discord embed limits", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.outcomes = [
+    {
+      id: "success",
+      resolution: "resolve-success",
+      message: "${reward}",
+      effects: [],
+      textVariables: {
+        reward: ["R".repeat(4_097)],
+      },
+    },
+  ];
+
+  assert.throws(
+    () => parseRandomEventScenarios([scenario]),
+    /outcomes\[0\]\.message as rendered in Discord must be <= 4096 characters/i,
+  );
+});
+
 test("parseDiceBalance defaults firstDailyRollPipReward to zero when omitted", () => {
   const parsed = parseDiceBalance({
     prestigeSides: [6, 8, 12, 20],
@@ -190,6 +225,42 @@ test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
   assert.equal(raids.participantStrength.prestigeMultiplier, 1.5);
 });
 
+test("parseDiceRaidsData rejects boss names that overflow raid titles", () => {
+  assert.throws(
+    () =>
+      parseDiceRaidsData({
+        reward: {
+          pipsFormula: {
+            flatPips: 5,
+            flatPipsThroughBossLevel: 5,
+          },
+          rollPassBuff: {
+            multiplierPerBossLevel: 1,
+            minimumMultiplier: 2,
+            maximumMultiplier: 10,
+            rollsPerBossLevelDivisor: 5,
+            minimumRolls: 1,
+            maximumRolls: 3,
+          },
+        },
+        bossNames: {
+          prefixes: ["X".repeat(180)],
+          suffixes: ["Y".repeat(120)],
+        },
+        bossBalance: {
+          baseHp: 120,
+          hpIncreasePerBossLevelPercent: 3,
+          levelHalfLifeLevels: 10,
+          maxBossLevel: 50,
+        },
+        participantStrength: {
+          prestigeMultiplier: 1.5,
+        },
+      }),
+    /active raid title must be <= 256 characters/i,
+  );
+});
+
 test("parseDiceItems rejects passive effects on consumable items", () => {
   const item = createDiceItemInput();
   item.consumable = true;
@@ -197,6 +268,16 @@ test("parseDiceItems rejects passive effects on consumable items", () => {
   assert.throws(
     () => parseDiceItems([item]),
     /Passive item padded-bracers must set consumable to false/i,
+  );
+});
+
+test("parseDiceItems rejects descriptions that overflow a single-item inventory page", () => {
+  const item = createDiceItemInput();
+  item.description = "A".repeat(2_100);
+
+  assert.throws(
+    () => parseDiceItems([item]),
+    /single-item \/inventory page must be <= 2000 characters/i,
   );
 });
 

@@ -10,7 +10,11 @@ import {
 } from "../domain/content";
 import type { RandomEventRollChallengeProgress } from "../domain/roll-challenges";
 import type { DiceTemporaryEffect } from "../../progression/domain/temporary-effects";
-import { buildActiveClaimDescription, buildExpiredEventEmbed } from "./live-runtime-presentation";
+import {
+  buildActiveClaimDescription,
+  buildExpiredEventEmbed,
+  buildResolvedEventEmbed,
+} from "./live-runtime-presentation";
 import { createRandomEventsState, registerActiveRandomEvent } from "./state-store";
 import {
   resolveRandomEvent,
@@ -606,6 +610,33 @@ test("expired event history does not reuse open-state retry wording", () => {
   assert.match(description, /Recent failed attempts/);
   assert.doesNotMatch(description, /still open/);
   assert.match(description, /The window closes before anyone pulls it off\./);
+});
+
+test("active event prompt trims oversized failed-attempt text without losing the prompt", () => {
+  const description = buildActiveClaimDescription(
+    "Test prompt",
+    null,
+    null,
+    [],
+    ["A".repeat(2_200), "B".repeat(2_200), "C".repeat(2_200)],
+  );
+
+  assert.ok(description.length <= 4_096);
+  assert.match(description, /Test prompt/);
+});
+
+test("resolved event embed trims excess result lines while preserving the outcome header", () => {
+  const selection = renderRandomEventScenario(createChallengeScenario(), {
+    random: () => 0,
+  });
+  const description = buildResolvedEventEmbed(
+    selection,
+    Array.from({ length: 6 }, (_, index) => `Result ${index + 1}: ${"X".repeat(900)}`),
+  ).toJSON().description;
+
+  assert.ok(description);
+  assert.ok(description.length <= 4_096);
+  assert.match(description, /\*\*Outcome:\*\*/);
 });
 
 const resolveMultiUserScenarioDescription = async (

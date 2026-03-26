@@ -19,3 +19,4 @@ General rules:
 
 - Keep `id` values stable.
 - Treat the validators as the exact structural contract. These docs explain what the fields mean when you are editing data.
+- Authored text is also validated against the Discord payload limits used by the bot's live shop, raid, and random-event prompts. If startup rejects a data change, trim the authored strings instead of relying on Discord to accept them.
