@@ -35,6 +35,7 @@ import {
 import type { TriggerOpportunityResult } from "./foundation-scheduler";
 import {
   buildActiveClaimDescription,
+  buildActiveClaimButtonLabel,
   buildClaimActivityLine,
   buildSequenceChallengeButtonLabel,
   buildSequenceChallengeDescription,
@@ -179,6 +180,7 @@ export const createRandomEventsLiveRuntime = ({
         )
       : null;
     const windowSnapshot = windowManager.getWindow(eventId);
+    const participants = windowSnapshot?.participants ?? [];
     const rarityPresentation = getRandomEventRarityPresentation(context.selection.scenario.rarity);
 
     const prompt = buildRandomEventClaimPrompt({
@@ -187,12 +189,21 @@ export const createRandomEventsLiveRuntime = ({
         context.selection.renderedPrompt,
         activityLine,
         getActiveRandomEventCurrentPhaseExpiryMs(context),
-        windowSnapshot?.participants ?? [],
+        participants,
         context.failedAttemptLines,
         context.selection.scenario.requiredReadyCount ?? null,
       ),
       buttonCustomId: buildRandomEventClaimButtonId(eventId),
-      buttonLabel: context.selection.renderedClaimLabel,
+      buttonLabel: buildActiveClaimButtonLabel({
+        claimLabel: context.selection.renderedClaimLabel,
+        participantCount: participants.length,
+        requiredReadyCount: context.selection.scenario.requiredReadyCount ?? null,
+        hasKeepOpenFailures: context.failedAttemptLines.length > 0,
+        retryMode:
+          getRandomEventRetryPolicy(context.selection.scenario) === "allow-retry"
+            ? "same-user-can-retry"
+            : "next-user-must-try",
+      }),
       color: rarityPresentation.color,
       footerText: rarityPresentation.label,
     });

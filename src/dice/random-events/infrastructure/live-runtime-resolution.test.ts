@@ -11,6 +11,7 @@ import {
 import type { RandomEventRollChallengeProgress } from "../domain/roll-challenges";
 import type { DiceTemporaryEffect } from "../../progression/domain/temporary-effects";
 import {
+  buildActiveClaimButtonLabel,
   buildActiveClaimDescription,
   buildExpiredEventEmbed,
   buildResolvedEventEmbed,
@@ -173,6 +174,43 @@ test("keep-open attempt resolution logs a neutral failed-attempt history line", 
   assert.match(attempt.failedAttemptLine, /<@123> failed:/);
   assert.match(attempt.failedAttemptLine, /Rolled 2 \(d6\)/);
   assert.doesNotMatch(attempt.failedAttemptLine, /still open/);
+});
+
+test("active claim button label changes after keep-open failures", () => {
+  assert.equal(
+    buildActiveClaimButtonLabel({
+      claimLabel: "Push gate",
+      participantCount: 0,
+      requiredReadyCount: null,
+      hasKeepOpenFailures: true,
+      retryMode: "next-user-must-try",
+    }),
+    "Next try: Push gate",
+  );
+
+  assert.equal(
+    buildActiveClaimButtonLabel({
+      claimLabel: "Push gate",
+      participantCount: 0,
+      requiredReadyCount: null,
+      hasKeepOpenFailures: true,
+      retryMode: "same-user-can-retry",
+    }),
+    "Try again: Push gate",
+  );
+});
+
+test("active claim button label shows progress for partially filled multi-user events", () => {
+  assert.equal(
+    buildActiveClaimButtonLabel({
+      claimLabel: "Gather",
+      participantCount: 1,
+      requiredReadyCount: 3,
+      hasKeepOpenFailures: false,
+      retryMode: "next-user-must-try",
+    }),
+    "Gather (1/3)",
+  );
 });
 
 test("shield-blocked negative outcomes report no applied negative effects", () => {

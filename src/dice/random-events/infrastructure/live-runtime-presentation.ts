@@ -1,5 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import {
+  discordButtonLabelCharacterLimit,
   discordEmbedDescriptionCharacterLimit,
   formatDiscordRelativeTime,
   truncateDiscordText,
@@ -239,6 +240,34 @@ export const buildSequenceChallengeButtonLabel = (
 ): string => {
   const nextStepNumber = Math.min(progress.nextStepIndex + 1, totalSteps);
   return `Roll step ${nextStepNumber}/${totalSteps}`;
+};
+
+export const buildActiveClaimButtonLabel = ({
+  claimLabel,
+  participantCount,
+  requiredReadyCount,
+  hasKeepOpenFailures,
+  retryMode,
+}: {
+  claimLabel: string;
+  participantCount: number;
+  requiredReadyCount: number | null;
+  hasKeepOpenFailures: boolean;
+  retryMode: "same-user-can-retry" | "next-user-must-try";
+}): string => {
+  if (typeof requiredReadyCount === "number" && participantCount > 0) {
+    return truncateDiscordText(
+      `${claimLabel} (${participantCount}/${requiredReadyCount})`,
+      discordButtonLabelCharacterLimit,
+    );
+  }
+
+  if (hasKeepOpenFailures) {
+    const prefix = retryMode === "same-user-can-retry" ? "Try again: " : "Next try: ";
+    return truncateDiscordText(`${prefix}${claimLabel}`, discordButtonLabelCharacterLimit);
+  }
+
+  return claimLabel;
 };
 
 export const buildSequenceChallengeDescription = ({
