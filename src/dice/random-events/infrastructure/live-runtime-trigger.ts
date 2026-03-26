@@ -4,11 +4,17 @@ import { getRandomEventBalanceData } from "../../../rolly-data/load";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { secondMs } from "../../../shared/time";
 import type { RandomEventClaimPolicy } from "../domain/claim-policy";
-import { getRandomEventFlow, selectRandomEventScenario } from "../domain/content";
+import {
+  getRandomEventFlow,
+  selectRandomEventScenario,
+  type RandomEventSelectionResult,
+} from "../domain/content";
 import type { RandomEventVarietyState } from "../domain/variety";
 import {
+  buildRandomEventActionButtonId,
   buildRandomEventClaimButtonId,
   buildRandomEventClaimPrompt,
+  type RandomEventPromptButton,
   type RandomEventInteractionWindowLifecycleContext,
   type RandomEventInteractionWindowManager,
 } from "../interfaces/discord/interaction-window";
@@ -36,6 +42,26 @@ const copyVarietyState = (
   target.triggerCount = source.triggerCount;
   target.nonRareStreak = source.nonRareStreak;
   target.lastSeenTriggerByTemplateId = new Map(source.lastSeenTriggerByTemplateId);
+};
+
+export const buildInitialRandomEventPromptButtons = ({
+  eventId,
+  selection,
+}: {
+  eventId: string;
+  selection: RandomEventSelectionResult;
+}): RandomEventPromptButton[] | undefined => {
+  const flow = getRandomEventFlow(selection.scenario);
+  if (flow.type === "group-meter") {
+    return [
+      {
+        customId: buildRandomEventActionButtonId(eventId, "join"),
+        label: selection.renderedClaimLabel,
+      },
+    ];
+  }
+
+  return undefined;
 };
 
 export const triggerRandomEventOpportunity = async ({
@@ -103,6 +129,7 @@ export const triggerRandomEventOpportunity = async ({
     randomEventBalance.claimWindowDurationMultiplier;
   const estimatedExpiresAtMs = Date.now() + claimWindowDurationMs;
   const rarityPresentation = getRandomEventRarityPresentation(selection.scenario.rarity);
+  const flow = getRandomEventFlow(selection.scenario);
   const prompt = buildRandomEventClaimPrompt({
     title: getRandomEventEmbedTitle(selection.scenario, selection.renderedTitle),
     description: buildActiveClaimDescription(
@@ -115,6 +142,7 @@ export const triggerRandomEventOpportunity = async ({
     ),
     buttonCustomId: buildRandomEventClaimButtonId(eventId),
     buttonLabel: selection.renderedClaimLabel,
+    buttons: buildInitialRandomEventPromptButtons({ eventId, selection }),
     color: rarityPresentation.color,
     footerText: rarityPresentation.label,
   });
@@ -128,7 +156,6 @@ export const triggerRandomEventOpportunity = async ({
     return { created: false };
   }
 
-  const flow = getRandomEventFlow(selection.scenario);
   const openedWindow =
     flow.type === "single-resolution"
       ? windowManager.openWindow({

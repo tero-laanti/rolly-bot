@@ -22,6 +22,7 @@ type RandomEventScenarioInput = {
   requiredReadyCount?: number;
   retryPolicy?: string;
   flow?: unknown;
+  rollChallenge?: unknown;
   challengeOutcomeIds?: {
     success: string[];
     failure: string[];
@@ -266,6 +267,55 @@ test("parseRandomEventScenarios accepts stake-offer flows", () => {
 
   const parsed = parseRandomEventScenarios([scenario]);
   assert.equal(parsed[0]?.flow?.type, "stake-offer");
+});
+
+test("parseRandomEventScenarios rejects stake-offer flows with unsupported challenge state", () => {
+  const scenario = createRandomEventScenarioInput();
+  scenario.claimPolicy = "first-click";
+  scenario.retryPolicy = "once-per-user";
+  scenario.rollChallenge = {
+    id: "stake-offer-roll",
+    mode: "single-step",
+    steps: [
+      {
+        id: "stake-offer-step",
+        label: "Roll 4+ on d6",
+        source: { type: "static-die", sides: 6 },
+        target: 4,
+        comparator: "gte",
+      },
+    ],
+  };
+  scenario.flow = {
+    type: "stake-offer",
+    stakePips: 4,
+    acceptLabel: "Take bet",
+    declineLabel: "Walk away",
+    declineMessage: "The bookmaker shrugs and turns to the next mark.",
+  };
+  scenario.challengeOutcomeIds = {
+    success: ["bookmaker-win"],
+    failure: ["bookmaker-loss"],
+  };
+  scenario.outcomes = [
+    {
+      id: "bookmaker-win",
+      resolution: "resolve-success",
+      message: "Your side wins the imaginary bout.",
+      effects: [{ type: "currency", minAmount: 6, maxAmount: 7 }],
+    },
+    {
+      id: "bookmaker-loss",
+      resolution: "keep-open-failure",
+      message: "The imaginary underdog gets flattened instantly.",
+      effects: [{ type: "temporary-roll-penalty", divisor: 2, rolls: 3, stackMode: "refresh" }],
+    },
+  ];
+
+  assert.throws(
+    () => parseRandomEventScenarios([scenario]),
+    /stake-offer flows cannot use top-level rollChallenge, challengeOutcomeIds, or retryPolicy|stake-offer flows cannot define keep-open-failure outcomes/i,
+  );
 });
 
 test("parseRandomEventScenarios rejects rendered claim labels that exceed Discord button limits", () => {

@@ -635,6 +635,18 @@ const validateScenario = (scenario: RandomEventScenario): void => {
         `Scenario ${scenario.id} stake-offer flows must define both declineLabel and declineMessage.`,
       );
     }
+
+    if (scenario.rollChallenge || scenario.challengeOutcomeIds || scenario.retryPolicy) {
+      throw new Error(
+        `Scenario ${scenario.id} stake-offer flows cannot use top-level rollChallenge, challengeOutcomeIds, or retryPolicy.`,
+      );
+    }
+
+    if (hasKeepOpenFailure) {
+      throw new Error(
+        `Scenario ${scenario.id} stake-offer flows cannot define keep-open-failure outcomes.`,
+      );
+    }
   }
 
   if (hasRandomEventChallengeOutcomeBranching(scenario)) {

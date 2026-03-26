@@ -1533,6 +1533,10 @@ export const createRandomEventsLiveRuntime = ({
         return "not-owner";
       }
 
+      if (economy.getPips(userId) < flow.stakePips) {
+        return "insufficient-pips";
+      }
+
       context.flowState.ownerUserId = userId;
       resetPhaseExpiry(eventId);
       await refreshNonWindowPrompt(eventId);
