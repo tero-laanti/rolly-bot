@@ -107,6 +107,13 @@ export const triggerRandomEventOpportunity = async ({
   }
 
   const randomEventBalance = getRandomEventBalanceData();
+  if (randomEventBalance.claimWindowDurationMultiplier <= 0) {
+    logger.error(
+      "[random-events] randomEventBalance.claimWindowDurationMultiplier must be greater than 0.",
+    );
+    return { created: false };
+  }
+
   const candidateVarietyState = cloneVarietyState(contentState);
   const candidateScenarios =
     requiredClaimPolicy === undefined
@@ -127,6 +134,11 @@ export const triggerRandomEventOpportunity = async ({
     selection.scenario.claimWindowSeconds *
     secondMs *
     randomEventBalance.claimWindowDurationMultiplier;
+  if (!Number.isFinite(claimWindowDurationMs) || claimWindowDurationMs < 1) {
+    logger.error("[random-events] Computed claim window duration must be at least 1ms.");
+    return { created: false };
+  }
+
   const estimatedExpiresAtMs = Date.now() + claimWindowDurationMs;
   const rarityPresentation = getRandomEventRarityPresentation(selection.scenario.rarity);
   const flow = getRandomEventFlow(selection.scenario);

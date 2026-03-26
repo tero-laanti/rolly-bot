@@ -105,6 +105,7 @@ const createHarness = ({
         });
         return {
           blockedByShield: false,
+          applied: true,
           lockoutUntilMs: Date.parse(lockoutUntil),
         };
       },

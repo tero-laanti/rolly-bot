@@ -187,7 +187,7 @@ export const applyRandomEventEffectsToUser = (
       });
       if (result.blockedByShield) {
         effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
-      } else {
+      } else if (result.applied) {
         appliedNegativeEffects.push({
           type: "temporary-roll-penalty",
         });
@@ -202,7 +202,7 @@ export const applyRandomEventEffectsToUser = (
     });
     if (result.blockedByShield) {
       effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
-    } else {
+    } else if (result.applied) {
       appliedNegativeEffects.push({
         type: "temporary-lockout",
         expiresAtMs: result.lockoutUntilMs,
@@ -427,11 +427,10 @@ export const resolveRandomEvent = async ({
     await context.message.edit({
       content: "",
       embeds: [
-        buildExpiredEventEmbed(
-          context.selection,
-          context.failedAttemptLines,
+        buildExpiredEventEmbed(context.selection, {
+          failedAttemptLines: context.failedAttemptLines,
           participants,
-        ).toJSON(),
+        }).toJSON(),
       ],
       components: [],
     });
@@ -445,11 +444,10 @@ export const resolveRandomEvent = async ({
     await context.message.edit({
       content: "",
       embeds: [
-        buildExpiredEventEmbed(
-          context.selection,
-          context.failedAttemptLines,
+        buildExpiredEventEmbed(context.selection, {
+          failedAttemptLines: context.failedAttemptLines,
           participants,
-        ).toJSON(),
+        }).toJSON(),
       ],
       components: [],
     });

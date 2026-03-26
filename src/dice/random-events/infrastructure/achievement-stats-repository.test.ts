@@ -138,3 +138,35 @@ test("shield-blocked negative outcomes do not count as applied negative achievem
     ["random-event-first-failure"],
   );
 });
+
+test("no-op negative outcomes do not count toward Cursed Evening or lockouts", () => {
+  const db = new Database(":memory:");
+  initializeDatabaseSchema(db);
+
+  const selection = {
+    scenario: {
+      claimPolicy: "first-click",
+      rarity: "rare",
+    },
+  } as const as Parameters<typeof recordRandomEventAchievementStats>[1]["selection"];
+
+  const result = recordRandomEventAchievementStats(db, {
+    selection,
+    userId: "user-1",
+    attemptResolution: createAttemptResolution({
+      outcomeEffects: [
+        {
+          type: "temporary-lockout",
+          durationMinutes: 5,
+        },
+      ],
+      hadActiveNegativeEffectBeforeAttempt: true,
+    }),
+    hadKeepOpenFailureBeforeSuccess: false,
+    nowMs: 1_710_000_000_000,
+  });
+
+  assert.equal(result.stats.failureCount, 1);
+  assert.equal(result.stats.lockoutCount, 0);
+  assert.equal(result.cursedEvening, false);
+});

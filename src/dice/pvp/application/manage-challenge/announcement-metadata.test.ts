@@ -138,6 +138,7 @@ test("resolved duels return announcement metadata for both players", async () =>
           });
           return {
             blockedByShield: false,
+            applied: true,
             lockoutUntilMs,
           };
         },

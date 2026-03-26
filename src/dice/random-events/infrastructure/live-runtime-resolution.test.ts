@@ -13,6 +13,7 @@ import type { DiceTemporaryEffect } from "../../progression/domain/temporary-eff
 import {
   buildActiveClaimButtonLabel,
   buildActiveClaimDescription,
+  buildClaimActivityLine,
   buildExpiredEventEmbed,
   buildResolvedEventEmbed,
   buildSequenceChallengeDescription,
@@ -274,8 +275,12 @@ test("keep-open attempt resolution logs a neutral failed-attempt history line", 
         }) as DiceTemporaryEffect,
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     selection,
     userId: "123",
@@ -410,6 +415,13 @@ test("active claim button label shows progress for partially filled multi-user e
   );
 });
 
+test("claim activity fallback stays player-facing when no template exists", () => {
+  assert.equal(
+    buildClaimActivityLine(createChallengeScenario(), "123", "Start challenge", "did"),
+    "<@123> is ready to start challenge.",
+  );
+});
+
 test("shield-blocked negative outcomes report no applied negative effects", () => {
   const scenario: RandomEventScenario = {
     id: "blocked-negative-test",
@@ -445,8 +457,12 @@ test("shield-blocked negative outcomes report no applied negative effects", () =
       getActiveDiceTemporaryEffects: () => [],
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: true, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: true,
+        applied: false,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     selection,
     userId: "123",
@@ -455,6 +471,73 @@ test("shield-blocked negative outcomes report no applied negative effects", () =
   assert.deepEqual(attempt.appliedNegativeEffects, []);
   assert.equal(attempt.hadActiveNegativeEffectBeforeAttempt, false);
   assert.deepEqual(attempt.effectNotes, ["Bad Luck Umbrella blocked a negative event effect."]);
+});
+
+test("no-op negative outcomes do not report applied negative effects", () => {
+  const scenario: RandomEventScenario = {
+    id: "noop-negative-test",
+    rarity: "common",
+    title: "No-op Negative Test",
+    prompt: "A shadow hangs over the table.",
+    claimLabel: "Push on",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "penalty",
+        resolution: "resolve-failure",
+        message: "The shadow tries to sap your luck.",
+        effects: [
+          {
+            type: "temporary-roll-penalty",
+            divisor: 2,
+            rolls: 1,
+            stackMode: "no-stack",
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario);
+
+  const attempt = resolveRandomEventAttempt({
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [
+        {
+          id: "effect-1",
+          userId: "123",
+          effectCode: "roll-pass-divisor",
+          kind: "negative",
+          source: "test",
+          magnitude: 2,
+          remainingRolls: 1,
+          expiresAt: null,
+          consumeOnCommand: "dice",
+          stackGroup: "roll-pass-divisor",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        } satisfies DiceTemporaryEffect,
+      ],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: false }),
+    },
+    selection,
+    userId: "123",
+  });
+
+  assert.equal(attempt.hadActiveNegativeEffectBeforeAttempt, true);
+  assert.deepEqual(attempt.appliedNegativeEffects, []);
 });
 
 test("currency outcomes award pip amounts within the configured range", () => {
@@ -500,8 +583,12 @@ test("currency outcomes award pip amounts within the configured range", () => {
       getActiveDiceTemporaryEffects: () => [],
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     selection,
     userId: "123",
@@ -580,8 +667,12 @@ test("consumable item outcomes grant inventory rewards and report them", () => {
       getActiveDiceTemporaryEffects: () => [],
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     selection,
     userId: "123",
@@ -644,8 +735,12 @@ test("attempt resolution detects an already-active negative effect before applyi
       ],
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     selection,
     userId: "123",
@@ -837,14 +932,33 @@ test("expired event history does not reuse open-state retry wording", () => {
   const selection = renderRandomEventScenario(createChallengeScenario(), {
     random: () => 0,
   });
-  const description = buildExpiredEventEmbed(selection, [
-    "<@123> failed: Rolled 2 (d6). You slip on the first plank and back away.",
-  ]).toJSON().description;
+  const description = buildExpiredEventEmbed(selection, {
+    failedAttemptLines: [
+      "<@123> failed: Rolled 2 (d6). You slip on the first plank and back away.",
+    ],
+  }).toJSON().description;
 
   assert.ok(description);
   assert.match(description, /Recent failed attempts/);
   assert.doesNotMatch(description, /still open/);
   assert.match(description, /The window closes before anyone pulls it off\./);
+});
+
+test("expired event embeds keep the expired footer when showing prior progress", () => {
+  const selection = renderRandomEventScenario(createChallengeScenario(), {
+    random: () => 0,
+  });
+  const embed = buildExpiredEventEmbed(selection, {
+    historyLines: ["<@123>: Success: You make the crossing cleanly."],
+  }).toJSON();
+
+  assert.ok(embed.description);
+  assert.match(embed.description, /Progress before expiry/);
+  assert.match(
+    embed.description,
+    /The event expired before the remaining rewards could be claimed\./,
+  );
+  assert.equal(embed.footer?.text, "Rare Event • Expired");
 });
 
 test("active event prompt trims oversized failed-attempt text without losing the prompt", () => {
@@ -1054,8 +1168,12 @@ const resolveMultiUserScenarioDescription = async (
         },
       },
       hostileEffects: {
-        applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+        applyShieldableNegativeLockout: () => ({
+          blockedByShield: false,
+          applied: true,
+          lockoutUntilMs: null,
+        }),
+        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
       },
       eventId: "event-1",
       participants: ["111", "222"],
@@ -1179,8 +1297,12 @@ test("multi-user events reuse one currency amount for all participants in a shar
         },
       },
       hostileEffects: {
-        applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+        applyShieldableNegativeLockout: () => ({
+          blockedByShield: false,
+          applied: true,
+          lockoutUntilMs: null,
+        }),
+        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
       },
       eventId: "event-shared-currency",
       participants: ["111", "222"],
@@ -1296,8 +1418,12 @@ test("threshold multi-user events expire if the required ready count is not met"
       },
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     eventId: "event-2",
     participants: ["111", "222"],
@@ -1374,8 +1500,12 @@ test("resolved event lines place unlocked achievements on a new line", async () 
       },
     },
     hostileEffects: {
-      applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: null,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
     },
     eventId: "event-achievement-newline",
     participants: ["111"],
@@ -1488,8 +1618,12 @@ test("keep-open comeback progress only counts when the same user failed before s
         },
       },
       hostileEffects: {
-        applyShieldableNegativeLockout: () => ({ blockedByShield: false, lockoutUntilMs: null }),
-        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false }),
+        applyShieldableNegativeLockout: () => ({
+          blockedByShield: false,
+          applied: true,
+          lockoutUntilMs: null,
+        }),
+        applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
       },
       eventId,
       participants: [participant],

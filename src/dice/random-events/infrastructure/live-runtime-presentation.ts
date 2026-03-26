@@ -178,7 +178,7 @@ export const buildClaimActivityLine = (
     return `<@${userId}> is already ready to ${actionText}.`;
   }
 
-  return `<@${userId}> did ${actionText}.`;
+  return `<@${userId}> is ready to ${actionText}.`;
 };
 
 export const buildActiveClaimDescription = (
@@ -418,17 +418,26 @@ export const buildResolvedEventEmbed = (
 
 export const buildExpiredEventEmbed = (
   selection: RandomEventSelectionResult,
-  failedAttemptLines: string[] = [],
-  participants: string[] = [],
+  {
+    failedAttemptLines = [],
+    participants = [],
+    historyLines = [],
+  }: {
+    failedAttemptLines?: string[];
+    participants?: string[];
+    historyLines?: string[];
+  } = {},
 ): EmbedBuilder => {
   const rarityPresentation = randomEventRarityPresentation[selection.scenario.rarity];
   const requiredReadyCount = selection.scenario.requiredReadyCount;
   const buildDescription = ({
     participantMaxVisible,
     failedAttemptMaxVisible,
+    historyMaxVisible,
   }: {
     participantMaxVisible: number;
     failedAttemptMaxVisible: number;
+    historyMaxVisible: number;
   }): string => {
     const descriptionLines =
       typeof requiredReadyCount === "number" && participants.length < requiredReadyCount
@@ -446,21 +455,47 @@ export const buildExpiredEventEmbed = (
                 ]
               : []),
           ]
-        : failedAttemptLines.length > 0
+        : historyLines.length > 0
           ? [
               selection.renderedPrompt,
               "",
-              "**Recent failed attempts:**",
+              "**Progress before expiry:**",
               ...formatVisibleLines({
-                lines: failedAttemptLines,
-                maxVisible: failedAttemptMaxVisible,
-                noun: "failed attempt",
+                lines: historyLines,
+                maxVisible: historyMaxVisible,
+                noun: "progress line",
                 takeFromEnd: true,
               }),
+              ...(failedAttemptLines.length > 0
+                ? [
+                    "",
+                    "**Recent failed attempts:**",
+                    ...formatVisibleLines({
+                      lines: failedAttemptLines,
+                      maxVisible: failedAttemptMaxVisible,
+                      noun: "failed attempt",
+                      takeFromEnd: true,
+                    }),
+                  ]
+                : []),
               "",
-              "The window closes before anyone pulls it off.",
+              "The event expired before the remaining rewards could be claimed.",
             ]
-          : [selection.renderedPrompt, "", "No one claimed this event in time."];
+          : failedAttemptLines.length > 0
+            ? [
+                selection.renderedPrompt,
+                "",
+                "**Recent failed attempts:**",
+                ...formatVisibleLines({
+                  lines: failedAttemptLines,
+                  maxVisible: failedAttemptMaxVisible,
+                  noun: "failed attempt",
+                  takeFromEnd: true,
+                }),
+                "",
+                "The window closes before anyone pulls it off.",
+              ]
+            : [selection.renderedPrompt, "", "No one claimed this event in time."];
 
     return descriptionLines.join("\n");
   };
@@ -468,10 +503,21 @@ export const buildExpiredEventEmbed = (
   let participantMaxVisible =
     participants.length > 0 ? Math.min(maxVisibleParticipantMentions, participants.length) : 0;
   let failedAttemptMaxVisible = Math.min(maxVisibleFailureLines, failedAttemptLines.length);
+  let historyMaxVisible = historyLines.length;
   let description = buildDescription({
     participantMaxVisible,
     failedAttemptMaxVisible,
+    historyMaxVisible,
   });
+
+  while (description.length > discordEmbedDescriptionCharacterLimit && historyMaxVisible > 0) {
+    historyMaxVisible -= 1;
+    description = buildDescription({
+      participantMaxVisible,
+      failedAttemptMaxVisible,
+      historyMaxVisible,
+    });
+  }
 
   while (
     description.length > discordEmbedDescriptionCharacterLimit &&
@@ -481,6 +527,7 @@ export const buildExpiredEventEmbed = (
     description = buildDescription({
       participantMaxVisible,
       failedAttemptMaxVisible,
+      historyMaxVisible,
     });
   }
 
@@ -489,6 +536,7 @@ export const buildExpiredEventEmbed = (
     description = buildDescription({
       participantMaxVisible,
       failedAttemptMaxVisible,
+      historyMaxVisible,
     });
   }
 

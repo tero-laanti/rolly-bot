@@ -140,6 +140,15 @@ const readFiniteNumber = (value: unknown, label: string): number => {
   return value;
 };
 
+const readPositiveFiniteNumber = (value: unknown, label: string): number => {
+  const parsed = readFiniteNumber(value, label);
+  if (parsed <= 0) {
+    throw new Error(`${label} must be > 0.`);
+  }
+
+  return parsed;
+};
+
 const readInteger = (
   value: unknown,
   label: string,
@@ -1476,7 +1485,7 @@ export const parseDicePvpData = (value: unknown): DicePvpData => {
 export const parseRandomEventBalance = (value: unknown): DiceRandomEventBalanceData => {
   const record = assertRecord(value, "randomEventBalance");
   return {
-    claimWindowDurationMultiplier: readFiniteNumber(
+    claimWindowDurationMultiplier: readPositiveFiniteNumber(
       record.claimWindowDurationMultiplier,
       "randomEventBalance.claimWindowDurationMultiplier",
     ),

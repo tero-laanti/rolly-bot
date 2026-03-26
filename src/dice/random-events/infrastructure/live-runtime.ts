@@ -143,7 +143,10 @@ const getSequenceChallenge = (
   };
 };
 
-const formatEffectPreview = (effects: RandomEventEffect[]): string => {
+const formatEffectPreview = (
+  effects: RandomEventEffect[],
+  getConsumableItemName: (itemId: string) => string | null,
+): string => {
   const parts = effects.flatMap((effect) => {
     if (effect.type === "currency") {
       return effect.minAmount === effect.maxAmount
@@ -152,21 +155,25 @@ const formatEffectPreview = (effects: RandomEventEffect[]): string => {
     }
 
     if (effect.type === "consumable-item") {
-      return [`${effect.quantity}x ${effect.itemId}`];
+      return [`${effect.quantity}x ${getConsumableItemName(effect.itemId) ?? "consumable item"}`];
     }
 
     if (effect.type === "temporary-roll-multiplier") {
-      return [`x${effect.multiplier} for ${effect.rolls} rolls`];
+      return [
+        `roll boost x${effect.multiplier} for ${effect.rolls} roll${effect.rolls === 1 ? "" : "s"}`,
+      ];
     }
 
     if (effect.type === "temporary-roll-penalty") {
-      return [`/${effect.divisor} for ${effect.rolls} rolls`];
+      return [
+        `roll penalty /${effect.divisor} for ${effect.rolls} roll${effect.rolls === 1 ? "" : "s"}`,
+      ];
     }
 
-    return [`lockout ${effect.durationMinutes}m`];
+    return [`${effect.durationMinutes}-minute PvP lockout`];
   });
 
-  return parts.length > 0 ? parts.join(", ") : "no reward";
+  return parts.length > 0 ? parts.join(", ") : "nothing extra";
 };
 
 const formatChallengeProgressSummary = (
@@ -280,6 +287,13 @@ export const createRandomEventsLiveRuntime = ({
 
   const startClickCooldown = (userId: string): void => {
     clickCooldownByUserId.set(userId, Date.now());
+  };
+
+  const previewEffects = (effects: RandomEventEffect[]): string => {
+    return formatEffectPreview(
+      effects,
+      (itemId) => itemCatalog.getDiceShopItem(itemId)?.name ?? null,
+    );
   };
 
   const schedulePhaseExpiry = (eventId: string, durationMs: number): number | null => {
@@ -406,7 +420,16 @@ export const createRandomEventsLiveRuntime = ({
     await publishAchievementAnnouncementsForAttempts(context, achievementAttempts);
   };
 
-  const expireCustomEvent = async (eventId: string, lines: string[] = []): Promise<void> => {
+  const expireCustomEvent = async (
+    eventId: string,
+    {
+      failedAttemptLines = [],
+      historyLines = [],
+    }: {
+      failedAttemptLines?: string[];
+      historyLines?: string[];
+    } = {},
+  ): Promise<void> => {
     const context = activeEventsById.get(eventId);
     if (!context) {
       customFlowAchievementStateByEventId.delete(eventId);
@@ -419,13 +442,10 @@ export const createRandomEventsLiveRuntime = ({
     customFlowAchievementStateByEventId.delete(eventId);
     resolveActiveRandomEvent(state, eventId);
 
-    const embed =
-      lines.length > 0
-        ? buildResolvedEventEmbed(context.selection, [
-            ...lines,
-            "The event expired before the remaining rewards could be claimed.",
-          ])
-        : buildExpiredEventEmbed(context.selection, lines);
+    const embed = buildExpiredEventEmbed(context.selection, {
+      failedAttemptLines,
+      historyLines,
+    });
     await context.message
       .edit({
         embeds: [embed.toJSON()],
@@ -564,8 +584,8 @@ export const createRandomEventsLiveRuntime = ({
           stagePrompt: stage.prompt ?? stage.successMessage,
           statusLines: [
             ownerLine,
-            `Up next: ${formatEffectPreview(stage.successEffects)}.`,
-            `On failure: ${formatEffectPreview(stage.failureEffects ?? [])}.`,
+            `Up next: ${previewEffects(stage.successEffects)}.`,
+            `On failure: ${previewEffects(stage.failureEffects ?? [])}.`,
           ],
           resolvedLines: context.flowState.resolvedLines,
           failedAttemptLines: context.failedAttemptLines,
@@ -600,12 +620,12 @@ export const createRandomEventsLiveRuntime = ({
             stage?.prompt ?? "The run is complete. Cash out the pot before it goes cold.",
           statusLines: [
             ownerLine,
-            `Current pot: ${formatEffectPreview(context.flowState.potEffects)}.`,
+            `Current pot: ${previewEffects(context.flowState.potEffects)}.`,
             stage
-              ? `Next clear adds: ${formatEffectPreview(stage.successEffects)}.`
+              ? `Next clear adds: ${previewEffects(stage.successEffects)}.`
               : "Next clear adds: none.",
             stage
-              ? `On failure: ${formatEffectPreview(stage.failureEffects ?? [])}.`
+              ? `On failure: ${previewEffects(stage.failureEffects ?? [])}.`
               : "On failure: lose the pot.",
           ],
           resolvedLines: context.flowState.resolvedLines,
@@ -651,9 +671,9 @@ export const createRandomEventsLiveRuntime = ({
                     .join(", ")
                 : "none yet"
             }.`,
-            `Stage reward: ${formatEffectPreview(stage.successEffects)}.`,
+            `Stage reward: ${previewEffects(stage.successEffects)}.`,
             ...(stage.rollChallenge
-              ? [`On failed join: ${formatEffectPreview(stage.failureEffects ?? [])}.`]
+              ? [`On failed join: ${previewEffects(stage.failureEffects ?? [])}.`]
               : []),
             ...(contributors.length > 0
               ? [`Newest adds: ${contributors.map((userId) => `<@${userId}>`).join(", ")}.`]
@@ -688,7 +708,7 @@ export const createRandomEventsLiveRuntime = ({
           prompt: context.selection.renderedPrompt,
           stageLabel: "Offer",
           stagePrompt: ownerLine,
-          statusLines: [`Stake: ${flow.stakePips} pips.`, flow.declineMessage],
+          statusLines: [`Stake: ${flow.stakePips} pips.`, `Decline option: ${flow.declineLabel}.`],
           resolvedLines: [],
           failedAttemptLines: context.failedAttemptLines,
           expiresAtMs,
@@ -1377,7 +1397,9 @@ export const createRandomEventsLiveRuntime = ({
     if (flow.type === "solo-ladder" && context.flowState.type === "solo-ladder") {
       const stage = flow.stages[context.flowState.stageIndex];
       if (!context.flowState.ownerUserId || !stage) {
-        await expireCustomEvent(eventId, context.failedAttemptLines);
+        await expireCustomEvent(eventId, {
+          failedAttemptLines: context.failedAttemptLines,
+        });
         return;
       }
 
@@ -1458,7 +1480,9 @@ export const createRandomEventsLiveRuntime = ({
 
     if (flow.type === "solo-push-your-luck" && context.flowState.type === "solo-push-your-luck") {
       if (!context.flowState.ownerUserId) {
-        await expireCustomEvent(eventId, context.failedAttemptLines);
+        await expireCustomEvent(eventId, {
+          failedAttemptLines: context.failedAttemptLines,
+        });
         return;
       }
 
@@ -1485,7 +1509,9 @@ export const createRandomEventsLiveRuntime = ({
     }
 
     if (flow.type === "stake-offer") {
-      await expireCustomEvent(eventId, context.failedAttemptLines);
+      await expireCustomEvent(eventId, {
+        failedAttemptLines: context.failedAttemptLines,
+      });
     }
   };
 

@@ -489,6 +489,47 @@ test("stake offers release ownership after an insufficient-funds continue and st
   }
 });
 
+test("stake offer prompts use live status copy before anyone declines", async () => {
+  const scenario: RandomEventScenario = {
+    ...createBaseScenario(),
+    flow: {
+      type: "stake-offer",
+      stakePips: 5,
+      acceptLabel: "Take deal",
+      declineLabel: "Pass",
+      declineMessage: "The offer passes by.",
+    },
+    outcomes: [
+      {
+        id: "deal-win",
+        resolution: "resolve-success",
+        message: "The deal pays out.",
+        effects: [{ type: "currency", minAmount: 8, maxAmount: 8 }],
+      },
+    ],
+  };
+
+  await withPatchedRuntime(
+    {
+      scenario,
+      flowState: {
+        type: "stake-offer",
+        ownerUserId: null,
+      },
+    },
+    async ({ runtime, messageEdits }) => {
+      const result = await runtime.onTriggerOpportunity({ now: new Date(10_000) });
+      assert.equal(result?.created, true);
+
+      const description = (messageEdits[0] as { embeds: Array<{ description?: string }> })
+        ?.embeds[0]?.description;
+      assert.ok(description);
+      assert.match(description, /Decline option: Pass\./);
+      assert.doesNotMatch(description, /The offer passes by\./);
+    },
+  );
+});
+
 test("staged trigger results return the actual post-send expiry for scheduler state registration", async () => {
   const originalDateNow = Date.now;
   Date.now = () => 10_000;

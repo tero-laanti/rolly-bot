@@ -6,6 +6,7 @@ import {
   parseDiceItems,
   parseDiceRaidsData,
   parseIntroPostsV1Data,
+  parseRandomEventBalance,
   parseRandomEventScenarios,
   validateRandomEventConsumableRewards,
 } from "./validate";
@@ -103,6 +104,34 @@ test("parseDiceAchievements defaults hidden to false when omitted", () => {
   ]);
 
   assert.equal(parsed[0]?.hidden, false);
+});
+
+test("parseRandomEventBalance rejects non-positive claim window multipliers", () => {
+  assert.throws(
+    () =>
+      parseRandomEventBalance({
+        claimWindowDurationMultiplier: 0,
+        variety: {
+          antiRepeatCooldownTriggers: 0,
+          rarityChances: {
+            common: 1,
+            uncommon: 0,
+            rare: 0,
+            epic: 0,
+            legendary: 0,
+          },
+          pity: {
+            enabled: false,
+            startAfterNonRareTriggers: 0,
+            rareWeightStep: 0,
+            epicWeightStep: 0,
+            legendaryWeightStep: 0,
+            maxBonusMultiplier: 1,
+          },
+        },
+      }),
+    /claimWindowDurationMultiplier must be > 0/i,
+  );
 });
 
 test("parseRandomEventScenarios rejects invalid requiredReadyCount at load time", () => {
