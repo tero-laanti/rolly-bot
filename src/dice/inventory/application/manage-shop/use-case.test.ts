@@ -69,6 +69,22 @@ const starterCoil: DiceShopItem = {
   },
 };
 
+const capacitorBank: DiceShopItem = {
+  id: "capacitor-bank",
+  name: "Capacitor Bank",
+  description: "Passive upgrade: each copy raises personal Dice charge max by +10.",
+  pricePips: 300,
+  consumable: false,
+  repeatablePricing: {
+    priceIncreasePipsPerOwned: 300,
+  },
+  requiresItemId: "idle-dynamo",
+  effect: {
+    type: "passive-personal-charge-cap-bonus",
+    extraMaxMultiplier: 10,
+  },
+};
+
 const emptyItemAchievementStats = {
   shopPurchaseCount: 0,
   itemUseCount: 0,
@@ -473,10 +489,10 @@ test("permanent upgrades still reject repeat purchase", async () => {
   assert.equal(getRecordShopPurchaseCalls(), 0);
 });
 
-test("prerequisite-gated permanent upgrades stay locked until the required item is owned", async () => {
+test("buying a hidden prerequisite-gated upgrade is rejected as unavailable", async () => {
   const { handleAction } = createTestShopUseCase({
     initialPips: 1_000,
-    catalogItems: [idleDynamo, starterCoil],
+    catalogItems: [idleDynamo, starterCoil, capacitorBank],
   });
 
   const result = await handleAction({
@@ -486,25 +502,125 @@ test("prerequisite-gated permanent upgrades stay locked until the required item 
     itemId: starterCoil.id,
   });
 
-  assert.equal(result.result.payload.type, "view");
-  if (result.result.payload.type !== "view") {
+  assert.deepEqual(result.result, {
+    kind: "reply",
+    payload: {
+      type: "message",
+      content: "That shop item does not exist.",
+      ephemeral: true,
+    },
+  });
+});
+
+test("prerequisite-gated permanent upgrades stay hidden from the shop until unlocked", async () => {
+  const { useCase, handleAction } = createTestShopUseCase({
+    initialPips: 1_000,
+    catalogItems: [idleDynamo, starterCoil, capacitorBank],
+  });
+
+  const landing = useCase.createDiceShopReply("user-1");
+  const category = await handleAction({
+    type: "open-category",
+    ownerId: "user-1",
+    categoryId: "permanent-upgrades",
+  });
+
+  assert.equal(landing.payload.type, "view");
+  assert.equal(category.result.payload.type, "view");
+  if (landing.payload.type !== "view" || category.result.payload.type !== "view") {
     return;
   }
 
-  assert.equal(result.result.payload.view.screen, "item-detail");
-  if (result.result.payload.view.screen !== "item-detail") {
+  assert.deepEqual(landing.payload.view.categorySummaries, [
+    {
+      id: "consumables",
+      label: "Consumables",
+      summary: "Single-use items and timed boosts for your next moves.",
+      itemCount: 0,
+    },
+    {
+      id: "permanent-upgrades",
+      label: "Permanent Upgrades",
+      summary: "Passive upgrades and permanent systems that stay active once bought.",
+      itemCount: 1,
+    },
+  ]);
+  assert.equal(category.result.payload.view.screen, "category");
+  if (category.result.payload.view.screen !== "category") {
     return;
   }
 
-  assert.equal(
-    result.result.payload.view.statusMessage,
-    "Starter Coil requires Idle Dynamo before it can be bought.",
+  assert.deepEqual(
+    category.result.payload.view.categoryItems.map((item) => item.id),
+    [idleDynamo.id],
   );
-  assert.equal(result.result.payload.view.selectedItem.buyable, false);
-  assert.equal(
-    result.result.payload.view.selectedItem.buyDisabledReason,
-    "Starter Coil requires Idle Dynamo before it can be bought.",
+});
+
+test("prerequisite-gated permanent upgrades appear once the required item is owned", async () => {
+  const { handleAction } = createTestShopUseCase({
+    initialPips: 1_000,
+    initialInventory: new Map([[idleDynamo.id, 1]]),
+    catalogItems: [idleDynamo, starterCoil, capacitorBank],
+  });
+
+  const category = await handleAction({
+    type: "open-category",
+    ownerId: "user-1",
+    categoryId: "permanent-upgrades",
+  });
+  const detail = await handleAction({
+    type: "select-item",
+    ownerId: "user-1",
+    categoryId: "permanent-upgrades",
+    itemId: starterCoil.id,
+  });
+
+  assert.equal(category.result.payload.type, "view");
+  assert.equal(detail.result.payload.type, "view");
+  if (category.result.payload.type !== "view" || detail.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(category.result.payload.view.screen, "category");
+  assert.equal(detail.result.payload.view.screen, "item-detail");
+  if (
+    category.result.payload.view.screen !== "category" ||
+    detail.result.payload.view.screen !== "item-detail"
+  ) {
+    return;
+  }
+
+  assert.deepEqual(
+    category.result.payload.view.categoryItems.map((item) => item.id),
+    [idleDynamo.id, starterCoil.id, capacitorBank.id],
   );
+  assert.deepEqual(detail.result.payload.view.itemNavigation, {
+    previousItemId: idleDynamo.id,
+    nextItemId: capacitorBank.id,
+  });
+});
+
+test("direct selection of a hidden prerequisite-gated item is rejected", async () => {
+  const { handleAction } = createTestShopUseCase({
+    initialPips: 1_000,
+    catalogItems: [idleDynamo, starterCoil, capacitorBank],
+  });
+
+  const result = await handleAction({
+    type: "select-item",
+    ownerId: "user-1",
+    categoryId: "permanent-upgrades",
+    itemId: starterCoil.id,
+  });
+
+  assert.deepEqual(result.result, {
+    kind: "reply",
+    payload: {
+      type: "message",
+      content: "That shop item does not exist.",
+      ephemeral: true,
+    },
+  });
 });
 
 test("use item prompt opens a yes/no confirmation screen", async () => {

@@ -285,7 +285,7 @@ export const createDiceShopUseCase = ({
       kind: "reply",
       payload: {
         type: "view",
-        view: buildLandingViewModel(economy, shopCatalog, userId),
+        view: buildLandingViewModel(economy, inventory, shopCatalog, userId),
         ephemeral: false,
       },
     };
@@ -331,7 +331,7 @@ export const createDiceShopUseCase = ({
           kind: "update",
           payload: {
             type: "view",
-            view: buildLandingViewModel(economy, shopCatalog, action.ownerId),
+            view: buildLandingViewModel(economy, inventory, shopCatalog, action.ownerId),
           },
         },
       };
@@ -382,8 +382,11 @@ export const createDiceShopUseCase = ({
       };
     }
 
-    const item = shopCatalog.getDiceShopItem(action.itemId);
-    if (!item || getDiceShopCategoryId(item) !== category.id) {
+    const inventoryQuantities = inventory.getInventoryQuantities(action.ownerId);
+    const item = getVisibleCategoryItems(shopCatalog, category.id, inventoryQuantities).find(
+      (candidate) => candidate.id === action.itemId,
+    );
+    if (!item) {
       return {
         result: {
           kind: "reply",
@@ -417,6 +420,7 @@ export const createDiceShopUseCase = ({
             type: "view",
             view: buildUseItemConfirmationViewModel(
               economy,
+              inventory,
               shopCatalog,
               action.ownerId,
               category,
@@ -447,9 +451,13 @@ export const createDiceShopUseCase = ({
     }
 
     if (action.type === "view-adjacent-item") {
-      const adjacentItem = getAdjacentCategoryItem(
+      const visibleCategoryItems = getVisibleCategoryItems(
         shopCatalog,
         category.id,
+        inventoryQuantities,
+      );
+      const adjacentItem = getAdjacentCategoryItem(
+        visibleCategoryItems,
         action.itemId,
         action.direction,
       );
@@ -530,6 +538,7 @@ export const createDiceShopUseCase = ({
             type: "view",
             view: buildLandingViewModel(
               economy,
+              inventory,
               shopCatalog,
               action.ownerId,
               useResult.statusMessage,
@@ -635,7 +644,7 @@ export const createDiceShopUseCase = ({
         ].flatMap((announcement) => (announcement ? [announcement] : [])),
         payload: {
           type: "view",
-          view: buildPurchaseReceiptViewModel(shopCatalog, action.ownerId, purchase),
+          view: buildPurchaseReceiptViewModel(inventory, shopCatalog, action.ownerId, purchase),
         },
       },
     };
@@ -649,15 +658,18 @@ export const createDiceShopUseCase = ({
 
 const buildLandingViewModel = (
   economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   shopCatalog: DiceShopCatalog,
   userId: string,
   statusMessage?: string,
 ): DiceShopViewModel => {
+  const inventoryQuantities = inventory.getInventoryQuantities(userId);
+
   return {
     screen: "landing",
     ownerId: userId,
     balancePips: economy.getEconomySnapshot(userId).pips,
-    categorySummaries: buildCategorySummaries(shopCatalog),
+    categorySummaries: buildCategorySummaries(shopCatalog, inventoryQuantities),
     statusMessage,
   };
 };
@@ -672,13 +684,15 @@ const buildCategoryViewModel = (
   statusMessage?: string,
 ): DiceShopViewModel => {
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
-  const categoryItems = getCategoryItems(shopCatalog, category.id).map((item) => ({
-    id: item.id,
-    name: item.name,
-    pricePips: getDiceShopItemCurrentPricePips(item, inventoryQuantities.get(item.id) ?? 0),
-    ownedQuantity: inventoryQuantities.get(item.id) ?? 0,
-    ownedSummary: buildOwnedSummary(item, inventoryQuantities.get(item.id) ?? 0),
-  }));
+  const categoryItems = getVisibleCategoryItems(shopCatalog, category.id, inventoryQuantities).map(
+    (item) => ({
+      id: item.id,
+      name: item.name,
+      pricePips: getDiceShopItemCurrentPricePips(item, inventoryQuantities.get(item.id) ?? 0),
+      ownedQuantity: inventoryQuantities.get(item.id) ?? 0,
+      ownedSummary: buildOwnedSummary(item, inventoryQuantities.get(item.id) ?? 0),
+    }),
+  );
   const pages = paginateCategoryItems(categoryItems);
   const totalPages = Math.max(1, pages.length);
   const currentPage = clampPage(requestedPage, totalPages);
@@ -687,7 +701,7 @@ const buildCategoryViewModel = (
     screen: "category",
     ownerId: userId,
     balancePips: economy.getEconomySnapshot(userId).pips,
-    categorySummaries: buildCategorySummaries(shopCatalog),
+    categorySummaries: buildCategorySummaries(shopCatalog, inventoryQuantities),
     categoryId: category.id,
     categoryLabel: category.label,
     categorySummary: category.summary,
@@ -707,13 +721,17 @@ const buildItemDetailViewModel = (
   itemId: string,
   statusMessage?: string,
 ): DiceShopViewModel => {
-  const item = shopCatalog.getDiceShopItem(itemId);
-  if (!item || getDiceShopCategoryId(item) !== category.id) {
-    throw new Error(`Missing shop item detail for ${itemId} in category ${category.id}.`);
-  }
-
   const balancePips = economy.getEconomySnapshot(userId).pips;
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
+  const visibleCategoryItems = getVisibleCategoryItems(
+    shopCatalog,
+    category.id,
+    inventoryQuantities,
+  );
+  const item = visibleCategoryItems.find((candidate) => candidate.id === itemId);
+  if (!item) {
+    throw new Error(`Missing visible shop item detail for ${itemId} in category ${category.id}.`);
+  }
   const ownedQuantity = inventoryQuantities.get(item.id) ?? 0;
   const alreadyOwned =
     isPassivePermanentItem(item) && !isRepeatablePassivePermanentItem(item) && ownedQuantity > 0;
@@ -724,9 +742,9 @@ const buildItemDetailViewModel = (
     : null;
   const hasEnoughPips = balancePips >= currentPricePips;
   const buyable = !alreadyOwned && !missingRequirement && hasEnoughPips;
-  const itemNavigation = buildItemNavigation(shopCatalog, category.id, item.id);
+  const itemNavigation = buildItemNavigation(visibleCategoryItems, item.id);
   const categoryPages = paginateCategoryItems(
-    getCategoryItems(shopCatalog, category.id).map((categoryItem) => {
+    visibleCategoryItems.map((categoryItem) => {
       const categoryOwnedQuantity = inventoryQuantities.get(categoryItem.id) ?? 0;
       return {
         id: categoryItem.id,
@@ -744,7 +762,7 @@ const buildItemDetailViewModel = (
     screen: "item-detail",
     ownerId: userId,
     balancePips,
-    categorySummaries: buildCategorySummaries(shopCatalog),
+    categorySummaries: buildCategorySummaries(shopCatalog, inventoryQuantities),
     categoryId: category.id,
     categoryLabel: category.label,
     categoryPage,
@@ -775,15 +793,18 @@ const buildItemDetailViewModel = (
 };
 
 const buildPurchaseReceiptViewModel = (
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   shopCatalog: DiceShopCatalog,
   userId: string,
   purchase: Extract<ShopPurchaseAttempt, { ok: true }>,
 ): DiceShopViewModel => {
+  const inventoryQuantities = inventory.getInventoryQuantities(userId);
+
   return {
     screen: "purchase-receipt",
     ownerId: userId,
     balancePips: purchase.remainingPips,
-    categorySummaries: buildCategorySummaries(shopCatalog),
+    categorySummaries: buildCategorySummaries(shopCatalog, inventoryQuantities),
     receipt: {
       itemId: purchase.item.id,
       categoryId: getDiceShopCategoryId(purchase.item),
@@ -798,28 +819,34 @@ const buildPurchaseReceiptViewModel = (
 
 const buildUseItemConfirmationViewModel = (
   economy: Pick<DiceEconomyRepository, "getEconomySnapshot">,
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">,
   shopCatalog: DiceShopCatalog,
   userId: string,
   category: DiceShopCategoryDefinition,
   item: DiceShopItem,
 ): DiceShopViewModel => {
+  const inventoryQuantities = inventory.getInventoryQuantities(userId);
+
   return {
     screen: "use-item-confirmation",
     ownerId: userId,
     balancePips: economy.getEconomySnapshot(userId).pips,
-    categorySummaries: buildCategorySummaries(shopCatalog),
+    categorySummaries: buildCategorySummaries(shopCatalog, inventoryQuantities),
     categoryId: category.id,
     itemId: item.id,
     itemName: item.name,
   };
 };
 
-const buildCategorySummaries = (shopCatalog: DiceShopCatalog): DiceShopCategorySummary[] => {
+const buildCategorySummaries = (
+  shopCatalog: DiceShopCatalog,
+  inventoryQuantities: ReadonlyMap<string, number>,
+): DiceShopCategorySummary[] => {
   return diceShopCategories.map((category) => ({
     id: category.id,
     label: category.label,
     summary: category.summary,
-    itemCount: getCategoryItems(shopCatalog, category.id).length,
+    itemCount: getVisibleCategoryItems(shopCatalog, category.id, inventoryQuantities).length,
   }));
 };
 
@@ -827,6 +854,16 @@ const getCategoryItems = (shopCatalog: DiceShopCatalog, categoryId: DiceShopCate
   return shopCatalog
     .getDiceShopItems()
     .filter((item) => getDiceShopCategoryId(item) === categoryId);
+};
+
+const getVisibleCategoryItems = (
+  shopCatalog: DiceShopCatalog,
+  categoryId: DiceShopCategoryId,
+  inventoryQuantities: ReadonlyMap<string, number>,
+) => {
+  return getCategoryItems(shopCatalog, categoryId).filter(
+    (item) => !itemRequiresOwnership(item, inventoryQuantities),
+  );
 };
 
 const paginateCategoryItems = (
@@ -872,12 +909,10 @@ const findCategoryPageIndex = (pages: DiceShopCategoryItemSummary[][], itemId: s
 };
 
 const getAdjacentCategoryItem = (
-  shopCatalog: DiceShopCatalog,
-  categoryId: DiceShopCategoryId,
+  items: DiceShopItem[],
   itemId: string,
   direction: DiceShopItemNavigationDirection,
 ) => {
-  const items = getCategoryItems(shopCatalog, categoryId);
   const currentIndex = items.findIndex((item) => item.id === itemId);
   if (currentIndex < 0) {
     return null;
@@ -887,15 +922,10 @@ const getAdjacentCategoryItem = (
   return items[adjacentIndex] ?? items[currentIndex] ?? null;
 };
 
-const buildItemNavigation = (
-  shopCatalog: DiceShopCatalog,
-  categoryId: DiceShopCategoryId,
-  itemId: string,
-): DiceShopItemNavigation => {
-  const items = getCategoryItems(shopCatalog, categoryId);
+const buildItemNavigation = (items: DiceShopItem[], itemId: string): DiceShopItemNavigation => {
   const currentIndex = items.findIndex((item) => item.id === itemId);
   if (currentIndex < 0) {
-    throw new Error(`Missing shop item navigation for ${itemId} in category ${categoryId}.`);
+    throw new Error(`Missing shop item navigation for ${itemId}.`);
   }
 
   return {
