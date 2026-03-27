@@ -94,21 +94,36 @@ test("stats dashboard shows baseline economy progression and analytics data", ()
   });
 
   assert.equal(result.ephemeral, false);
-  assert.match(result.content, /\*\*Rolly Stats for <@user-1>\*\*/);
-  assert.match(result.content, /Economy: 7 Fame \| 13 Pips\./);
-  assert.match(
+  assert.equal(
     result.content,
-    /Progression: 3 dice on D10 \| active prestige 1 \| highest prestige 2\./,
+    [
+      "**Rolly Stats for <@user-1>**",
+      "",
+      "**Economy**",
+      "Fame: **7** | Pips: **13**",
+      "",
+      "**Progression**",
+      "Dice: **3 dice** on **D10**",
+      "Prestige: active **1** | best **2**",
+      "",
+      "**Roll Status**",
+      "Current /roll power: **×1**",
+      "Charge: none",
+      "Double rolls: none",
+      "Temporary effects: none",
+      "",
+      "**Bans**",
+      `Ban slots: **0/${expectedUnlockedSlots}** used`,
+      `Next unlock: **${expectedNextUnlockAt} Fame (+${expectedRemainingFame})**`,
+      "Current bans: none",
+      "",
+      "**Analytics**",
+      "Current dice: **7d** | **12** sets | **3** one-offs",
+      "Current prestige: **9d** | **48** dice rolled",
+      "Lifetime: **240** dice | **80** sets | **55** /roll calls",
+      "PvP: **4W / 2L / 1D**",
+    ].join("\n"),
   );
-  assert.match(
-    result.content,
-    new RegExp(
-      `Bans: 0/${expectedUnlockedSlots} used \\| next Fame unlock at ${expectedNextUnlockAt} \\(\\+${expectedRemainingFame}\\) \\| current bans none\\.`,
-    ),
-  );
-  assert.match(result.content, /Permanent bonuses: none\./);
-  assert.match(result.content, /Active roll status: none\./);
-  assert.match(result.content, /Current \/roll power: ×1\./);
 });
 
 test("stats dashboard shows permanent bonuses and personal charge configuration", () => {
@@ -146,13 +161,17 @@ test("stats dashboard shows permanent bonuses and personal charge configuration"
 
   assert.match(
     result.content,
+    new RegExp(`Ban slots: \\*\\*0/${expectedUnlockedSlots}\\*\\* used`),
+  );
+  assert.match(
+    result.content,
     new RegExp(
-      `Bans: 0/${expectedUnlockedSlots} used \\| next Fame unlock at ${expectedNextUnlockAt} \\(\\+${expectedRemainingFame}\\)`,
+      `Next unlock: \\*\\*${expectedNextUnlockAt} Fame \\(\\+${expectedRemainingFame}\\)\\*\\*`,
     ),
   );
   assert.match(
     result.content,
-    /Permanent bonuses: \+2 ban slots \| \+15% pip rewards \| personal charge every 12 minutes up to ×5\./,
+    /Permanent bonuses: \+2 ban slots \| \+15% pip rewards \| personal charge every 12m, up to ×5/,
   );
 });
 
@@ -224,14 +243,33 @@ test("stats dashboard shows active roll effects and charge state", () => {
     nowMs,
   });
 
-  assert.match(result.content, /Active roll status: .*global charge ×2/);
-  assert.match(result.content, /Active roll status: .*personal charge ×4/);
-  assert.match(result.content, /Active roll status: .*current charge ×5/);
-  assert.match(result.content, /Active roll status: .*PvP double ×2 for 20 minutes 0 seconds/);
-  assert.match(result.content, /Active roll status: .*item double 2 uses for 15 minutes 0 seconds/);
-  assert.match(result.content, /Active roll status: .*temporary buffs ×2/);
-  assert.match(result.content, /Active roll status: .*temporary penalties ÷2/);
-  assert.match(result.content, /Current \/roll power: ×5\./);
+  assert.match(result.content, /Current \/roll power: \*\*×5\*\*/);
+  assert.match(result.content, /Charge: global charge ×2 \| personal charge ×4 \| combined ×5/);
+  assert.match(
+    result.content,
+    /Double rolls: PvP double-roll ×2 \(20m\) \| item double-roll ×2 \(2 uses, 15m\)/,
+  );
+  assert.match(result.content, /Temporary effects: buffs ×2 \| penalties ÷2/);
+});
+
+test("stats dashboard keeps single-source charge labels concise", () => {
+  const nowMs = Date.parse("2026-03-27T10:00:00.000Z");
+  const globalChargeAtMs = nowMs - (getDiceChargeStartMs() + 2 * minuteMs);
+  const useCase = createUseCase({
+    progression: {
+      getLastDiceRollAt: () => globalChargeAtMs,
+      getLastPersonalDiceRollAt: () => null,
+    },
+  });
+
+  const result = useCase({
+    userId: "user-6",
+    userMention: "<@user-6>",
+    nowMs,
+  });
+
+  assert.match(result.content, /Charge: global charge ×2/);
+  assert.doesNotMatch(result.content, /combined ×2/);
 });
 
 test("stats dashboard reports the next fame-based ban unlock at exact thresholds", () => {
@@ -257,8 +295,12 @@ test("stats dashboard reports the next fame-based ban unlock at exact thresholds
 
   assert.match(
     result.content,
+    new RegExp(`Ban slots: \\*\\*0/${expectedUnlockedSlots}\\*\\* used`),
+  );
+  assert.match(
+    result.content,
     new RegExp(
-      `Bans: 0/${expectedUnlockedSlots} used \\| next Fame unlock at ${expectedNextUnlockAt} \\(\\+${expectedRemainingFame}\\)`,
+      `Next unlock: \\*\\*${expectedNextUnlockAt} Fame \\(\\+${expectedRemainingFame}\\)\\*\\*`,
     ),
   );
 });

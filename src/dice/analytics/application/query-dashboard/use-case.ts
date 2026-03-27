@@ -13,7 +13,8 @@ import {
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
 import { discordMessageCharacterLimit } from "../../../../shared/discord";
-import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
+import { truncateWithSuffix } from "../../../../shared/text";
+import { secondsPerDay, secondsPerHour, secondsPerMinute } from "../../../../shared/time";
 
 export type DiceStatsView = {
   content: string;
@@ -82,22 +83,36 @@ export const createQueryDiceStatsUseCase = ({
       getUnlockedBanSlotsFromFame(balance.fame, diceCount, dieSides) +
       permanentBonusSnapshot.extraBanSlots;
 
-    const lines = [
-      `**Rolly Stats for ${userMention}**`,
-      `Economy: ${balance.fame} Fame | ${balance.pips} Pips.`,
-      `Progression: ${formatDiceCount(diceCount)} on D${dieSides} | active prestige ${activePrestige} | highest prestige ${highestPrestige}.`,
-      `Bans: ${countUsedBans(bans)}/${unlockedBanSlots} used | ${formatNextBanUnlock(balance.fame)} | ${formatCompactBansSummary(bans)}.`,
-      `Permanent bonuses: ${formatPermanentBonuses(permanentBonusSnapshot)}.`,
-      `Active roll status: ${formatActiveRollStatus(modifierState, pvpDoubleRollUntil, nowMs)}.`,
-      `Current /roll power: ×${formatMultiplierFactor(modifierState.effectiveFactor)}.`,
-      `Time at current dice count: ${formatElapsed(analyticsView.diceCountStartedAt, nowMs)}.`,
-      `Current-dice analytics: ${analyticsView.rollSetsCurrentDiceCount} sets | ${analyticsView.nearDiceCountIncreaseRollSetsCurrentDiceCount} one-offs.`,
-      `Time on current prestige: ${formatElapsed(analyticsView.prestigeStartedAt, nowMs)}.`,
-      `Current-prestige analytics: ${analyticsView.diceRolledCurrentPrestige} dice rolled.`,
-      `Lifetime analytics: ${analyticsView.totalDiceRolled} dice rolled | ${analyticsView.totalDiceSetsRolled} sets | ${analyticsView.totalRollCommandsCalled} /roll calls.`,
-      `PvP stats: ${analyticsView.pvpWins}W / ${analyticsView.pvpLosses}L / ${analyticsView.pvpDraws}D.`,
+    const sections = [
+      formatStatsSection("Economy", [`Fame: **${balance.fame}** | Pips: **${balance.pips}**`]),
+      formatStatsSection("Progression", [
+        `Dice: **${formatDiceCount(diceCount)}** on **D${dieSides}**`,
+        `Prestige: active **${activePrestige}** | best **${highestPrestige}**`,
+      ]),
+      formatStatsSection("Roll Status", [
+        `Current /roll power: **×${formatMultiplierFactor(modifierState.effectiveFactor)}**`,
+        `Charge: ${formatChargeStatus(modifierState)}`,
+        `Double rolls: ${formatDoubleRollStatus(modifierState, pvpDoubleRollUntil, nowMs)}`,
+        `Temporary effects: ${formatTemporaryEffectsStatus(modifierState)}`,
+        ...formatPermanentBonusesLine(permanentBonusSnapshot),
+      ]),
+      formatStatsSection("Bans", [
+        `Ban slots: **${countUsedBans(bans)}/${unlockedBanSlots}** used`,
+        `Next unlock: **${formatNextBanUnlock(balance.fame)}**`,
+        `Current bans: ${formatCompactBansSummary(bans)}`,
+      ]),
+      formatStatsSection("Analytics", [
+        `Current dice: **${formatElapsed(analyticsView.diceCountStartedAt, nowMs)}** | **${analyticsView.rollSetsCurrentDiceCount}** sets | **${analyticsView.nearDiceCountIncreaseRollSetsCurrentDiceCount}** one-offs`,
+        `Current prestige: **${formatElapsed(analyticsView.prestigeStartedAt, nowMs)}** | **${analyticsView.diceRolledCurrentPrestige}** dice rolled`,
+        `Lifetime: **${analyticsView.totalDiceRolled}** dice | **${analyticsView.totalDiceSetsRolled}** sets | **${analyticsView.totalRollCommandsCalled}** /roll calls`,
+        `PvP: **${analyticsView.pvpWins}W / ${analyticsView.pvpLosses}L / ${analyticsView.pvpDraws}D**`,
+      ]),
     ];
-    const content = truncateWithSuffix(lines.join("\n"), discordMessageCharacterLimit, "\n...");
+    const content = truncateWithSuffix(
+      [formatStatsHeader(userMention), ...sections].join("\n\n"),
+      discordMessageCharacterLimit,
+      "\n...",
+    );
 
     return {
       content,
@@ -115,13 +130,21 @@ const countUsedBans = (bans: Map<number, Set<number>>): number => {
   return count;
 };
 
+const formatStatsHeader = (userMention: string): string => {
+  return `**Rolly Stats for ${userMention}**`;
+};
+
+const formatStatsSection = (title: string, lines: string[]): string => {
+  return [`**${title}**`, ...lines].join("\n");
+};
+
 const formatCompactBansSummary = (bans: Map<number, Set<number>>): string => {
   const entries = Array.from(bans.entries())
     .filter(([, values]) => values.size > 0)
     .sort((a, b) => a[0] - b[0]);
 
   if (entries.length < 1) {
-    return "current bans none";
+    return "none";
   }
 
   const parts = entries.map(([dieIndex, values]) => {
@@ -135,12 +158,12 @@ const formatCompactBansSummary = (bans: Map<number, Set<number>>): string => {
 const formatNextBanUnlock = (fame: number): string => {
   const banStep = getDiceBanStep();
   if (banStep <= 0) {
-    return "next Fame unlock unavailable";
+    return "unavailable";
   }
 
   const nextUnlockAt = (Math.floor(fame / banStep) + 1) * banStep;
   const remainingFame = Math.max(0, nextUnlockAt - fame);
-  return `next Fame unlock at ${nextUnlockAt} (+${remainingFame})`;
+  return `${nextUnlockAt} Fame (+${remainingFame})`;
 };
 
 const formatPermanentBonuses = (
@@ -158,48 +181,42 @@ const formatPermanentBonuses = (
 
   if (bonuses.personalCharge.unlocked) {
     parts.push(
-      `personal charge every ${formatMinutes(bonuses.personalCharge.minutesPerMultiplier)} up to ×${bonuses.personalCharge.maxMultiplier}`,
+      `personal charge every ${formatMinutes(bonuses.personalCharge.minutesPerMultiplier)}, up to ×${bonuses.personalCharge.maxMultiplier}`,
     );
   }
 
   return parts.length > 0 ? parts.join(" | ") : "none";
 };
 
-const formatActiveRollStatus = (
+const formatDoubleRollStatus = (
   modifierState: ReturnType<typeof createDiceRollModifierState>,
   pvpDoubleRollUntil: number | null,
   nowMs: number,
 ): string => {
   const parts: string[] = [];
 
-  if (modifierState.globalChargeMultiplier > 1) {
-    parts.push(`global charge ×${formatMultiplierFactor(modifierState.globalChargeMultiplier)}`);
-  }
-
-  if (modifierState.personalChargeMultiplier > 1) {
-    parts.push(
-      `personal charge ×${formatMultiplierFactor(modifierState.personalChargeMultiplier)}`,
-    );
-  }
-
-  if (modifierState.combinedChargeMultiplier > 1) {
-    parts.push(`current charge ×${formatMultiplierFactor(modifierState.combinedChargeMultiplier)}`);
-  }
-
   if (modifierState.hasActivePvpDoubleRoll) {
-    parts.push(`PvP double ×2 for ${formatRemainingDuration(pvpDoubleRollUntil, nowMs)}`);
+    parts.push(`PvP double-roll ×2 (${formatRemainingDuration(pvpDoubleRollUntil, nowMs)})`);
   }
 
   if (modifierState.hasActiveItemDoubleRoll) {
     parts.push(formatItemDoubleRollStatus(modifierState.itemDoubleRollStatus, nowMs));
   }
 
+  return parts.length > 0 ? parts.join(" | ") : "none";
+};
+
+const formatTemporaryEffectsStatus = (
+  modifierState: ReturnType<typeof createDiceRollModifierState>,
+): string => {
+  const parts: string[] = [];
+
   if (modifierState.temporaryEffectsRollSummary.multiplier > 1) {
-    parts.push(`temporary buffs ×${modifierState.temporaryEffectsRollSummary.multiplier}`);
+    parts.push(`buffs ×${modifierState.temporaryEffectsRollSummary.multiplier}`);
   }
 
   if (modifierState.temporaryEffectsRollSummary.divisor > 1) {
-    parts.push(`temporary penalties ÷${modifierState.temporaryEffectsRollSummary.divisor}`);
+    parts.push(`penalties ÷${modifierState.temporaryEffectsRollSummary.divisor}`);
   }
 
   return parts.length > 0 ? parts.join(" | ") : "none";
@@ -220,31 +237,60 @@ const formatItemDoubleRollStatus = (
   }
 
   if (status.expiresAtMs !== null && status.expiresAtMs > nowMs) {
-    details.push(`for ${formatRemainingDuration(status.expiresAtMs, nowMs)}`);
+    details.push(`${formatRemainingDuration(status.expiresAtMs, nowMs)}`);
   }
 
   if (details.length < 1) {
-    return "item double active";
+    return "item double-roll ×2";
   }
 
-  if (details.length === 1) {
-    return `item double ${details[0]}`;
+  return `item double-roll ×2 (${details.join(", ")})`;
+};
+
+const formatChargeStatus = (
+  modifierState: ReturnType<typeof createDiceRollModifierState>,
+): string => {
+  const parts: string[] = [];
+
+  if (modifierState.globalChargeMultiplier > 1) {
+    parts.push(`global charge ×${formatMultiplierFactor(modifierState.globalChargeMultiplier)}`);
   }
 
-  return `item double ${details[0]} ${details.slice(1).join(" ")}`;
+  if (modifierState.personalChargeMultiplier > 1) {
+    parts.push(
+      `personal charge ×${formatMultiplierFactor(modifierState.personalChargeMultiplier)}`,
+    );
+  }
+
+  if (
+    modifierState.globalChargeMultiplier > 1 &&
+    modifierState.personalChargeMultiplier > 1 &&
+    modifierState.combinedChargeMultiplier > 1
+  ) {
+    parts.push(`combined ×${formatMultiplierFactor(modifierState.combinedChargeMultiplier)}`);
+  }
+
+  return parts.length > 0 ? parts.join(" | ") : "none";
 };
 
 const formatRemainingDuration = (endMs: number | null, nowMs: number): string => {
   if (endMs === null || endMs <= nowMs) {
-    return "0 seconds";
+    return "0s";
   }
 
-  return formatDurationWords(endMs - nowMs);
+  return formatCompactDuration(endMs - nowMs);
+};
+
+const formatPermanentBonusesLine = (
+  bonuses: ReturnType<DicePermanentBonusesPort["getPermanentBonuses"]>,
+): string[] => {
+  const summary = formatPermanentBonuses(bonuses);
+  return summary === "none" ? [] : [`Permanent bonuses: ${summary}`];
 };
 
 const formatMinutes = (value: number): string => {
   const normalized = Math.max(1, Math.round(value));
-  return `${normalized} minute${normalized === 1 ? "" : "s"}`;
+  return `${normalized}m`;
 };
 
 const formatDiceCount = (value: number): string => {
@@ -254,8 +300,34 @@ const formatDiceCount = (value: number): string => {
 const formatElapsed = (startedAtIso: string, nowMs: number): string => {
   const startedAtMs = Date.parse(startedAtIso);
   if (Number.isNaN(startedAtMs)) {
-    return "Unknown";
+    return "unknown";
   }
 
-  return formatDurationWords(Math.max(0, nowMs - startedAtMs), { includeDays: true });
+  return formatCompactDuration(Math.max(0, nowMs - startedAtMs), { includeDays: true });
+};
+
+const formatCompactDuration = (
+  durationMs: number,
+  { includeDays = false }: { includeDays?: boolean } = {},
+): string => {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const days = Math.floor(totalSeconds / secondsPerDay);
+  const hours = Math.floor((totalSeconds % secondsPerDay) / secondsPerHour);
+  const minutes = Math.floor((totalSeconds % secondsPerHour) / secondsPerMinute);
+  const seconds = totalSeconds % 60;
+
+  if (includeDays && days > 0) {
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  }
+
+  const totalHours = includeDays ? hours : Math.floor(totalSeconds / secondsPerHour);
+  if (totalHours > 0) {
+    return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
+  }
+
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+
+  return `${seconds}s`;
 };
