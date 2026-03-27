@@ -15,11 +15,13 @@ type Harness = ReturnType<typeof createHarness>;
 const createHarness = ({
   inventoryQuantities = {},
   pips = {},
+  pipRewardBonusPercentByUser = {},
   randomValues = [0],
   awardedAchievements = {},
 }: {
   inventoryQuantities?: Record<string, Record<string, number>>;
   pips?: Record<string, number>;
+  pipRewardBonusPercentByUser?: Record<string, number>;
   randomValues?: number[];
   awardedAchievements?: Record<string, string[]>;
 } = {}) => {
@@ -94,6 +96,20 @@ const createHarness = ({
         const next = getBalance(userId) + amount;
         setBalance(userId, next);
         return next;
+      },
+      grantRewardPips: ({ userId, baseAmount }) => {
+        const awardedAmount =
+          Math.max(0, Math.floor(baseAmount)) +
+          Math.floor(
+            (Math.max(0, Math.floor(baseAmount)) * (pipRewardBonusPercentByUser[userId] ?? 0)) /
+              100,
+          );
+        const next = getBalance(userId) + awardedAmount;
+        setBalance(userId, next);
+        return {
+          awardedAmount,
+          pips: next,
+        };
       },
     },
     hostileEffects: {
@@ -525,6 +541,29 @@ test("decisive wager payouts credit the full pot to the winner", async () => {
     assert.match(result.payload.content, scenario.payoutText);
     assert.doesNotMatch(result.payload.content, /burned/);
   }
+});
+
+test("decisive wager payouts apply Pip Magnet bonuses only to the winner payout", async () => {
+  const harness = createHarness({
+    pips: { challenger: 100, opponent: 100 },
+    pipRewardBonusPercentByUser: { challenger: 20 },
+    randomValues: [0.9, 0],
+  });
+  const challenge = await createChallenge({
+    harness,
+    wagerPips: 10,
+  });
+
+  const result = await harness.useCase.handleDicePvpAction(
+    "opponent",
+    { type: "accept", challengeId: challenge.id },
+    null,
+  );
+
+  assert.equal(harness.balances.get("challenger"), 114);
+  assert.equal(harness.balances.get("opponent"), 90);
+  assert.equal(result.payload.type, "message");
+  assert.match(result.payload.content, /receives 24 pips/);
 });
 
 test("failed challenge publishing cancels the challenge and refunds the challenger", async () => {

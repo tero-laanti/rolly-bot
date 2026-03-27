@@ -17,6 +17,7 @@ import {
   canStartCasinoRound,
   getExpectedRound,
   getOutcomeFromPayout,
+  grantCasinoPayout,
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
@@ -108,9 +109,12 @@ const startBlackjackRound = ({
 
   const openingRound = createBlackjackRound(session.bet);
   const resolution = resolveBlackjackOpening(openingRound);
+  let awardedPayout = 0;
   if (resolution.kind === "resolved") {
     if (resolution.payout > 0) {
-      nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
+      const reward = grantCasinoPayout(economy, session.userId, resolution.payout, nextPips);
+      awardedPayout = reward.awardedPayout;
+      nextPips = reward.pips;
     }
 
     const openingOutcome = getOutcomeFromPayout(session.bet, resolution.payout);
@@ -144,7 +148,9 @@ const startBlackjackRound = ({
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
+            lastOutcome: `${resolution.summary}${
+              awardedPayout > 0 ? `\nPaid ${awardedPayout} pips.` : ""
+            }\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
               resolution.playerHand,
               false,
             )}.`,
@@ -199,10 +205,8 @@ const handleBlackjackAction = (
       );
     }
 
-    let nextPips = pips;
-    if (resolution.payout > 0) {
-      nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
-    }
+    const reward = grantCasinoPayout(economy, session.userId, resolution.payout, pips);
+    const nextPips = reward.pips;
 
     const playerTotal = getBlackjackHandTotals(resolution.playerHand).total;
     const outcome = getOutcomeFromPayout(round.bet, resolution.payout);
@@ -237,7 +241,9 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
+            lastOutcome: `${resolution.summary}${
+              reward.awardedPayout > 0 ? `\nPaid ${reward.awardedPayout} pips.` : ""
+            }\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
               resolution.playerHand,
               false,
             )}.`,
@@ -261,10 +267,8 @@ const handleBlackjackAction = (
       return invalidCasinoAction();
     }
 
-    let nextPips = pips;
-    if (resolution.payout > 0) {
-      nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
-    }
+    const reward = grantCasinoPayout(economy, session.userId, resolution.payout, pips);
+    const nextPips = reward.pips;
 
     const outcome = getOutcomeFromPayout(round.bet, resolution.payout);
     const achievementStats = analytics.recordRoundCompleted({
@@ -293,7 +297,9 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
+            lastOutcome: `${resolution.summary}${
+              reward.awardedPayout > 0 ? `\nPaid ${reward.awardedPayout} pips.` : ""
+            }\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
               resolution.playerHand,
               false,
             )}.`,

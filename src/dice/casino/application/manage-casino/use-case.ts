@@ -22,7 +22,7 @@ import { buildCasinoView } from "./view";
 
 type ManageCasinoDependencies = {
   analytics: DiceCasinoAnalyticsRepository;
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   sessions: DiceCasinoSessionRepository;
   unitOfWork: UnitOfWork;
@@ -236,7 +236,7 @@ const mutateCasinoSession = ({
 }: {
   action: DiceCasinoAction;
   analytics: DiceCasinoAnalyticsRepository;
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   nowMs: number;
   sessions: DiceCasinoSessionRepository;

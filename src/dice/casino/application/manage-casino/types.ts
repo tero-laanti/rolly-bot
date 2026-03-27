@@ -111,7 +111,7 @@ export type MutateSessionResult =
 
 export type DiceCasinoMutationContext = {
   analytics: DiceCasinoAnalyticsRepository;
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   session: DiceCasinoSession;
   pips: number;

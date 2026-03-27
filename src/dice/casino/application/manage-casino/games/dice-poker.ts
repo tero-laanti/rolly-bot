@@ -14,6 +14,7 @@ import {
   canStartCasinoRound,
   getExpectedRound,
   getOutcomeFromPayout,
+  grantCasinoPayout,
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
@@ -162,13 +163,8 @@ const handleDicePokerAction = (
     }
 
     const rerollResult = rerollDicePokerRound(round);
-    let nextPips = pips;
-    if (rerollResult.result.payout > 0) {
-      nextPips = economy.applyPipsDelta({
-        userId: session.userId,
-        amount: rerollResult.result.payout,
-      });
-    }
+    const reward = grantCasinoPayout(economy, session.userId, rerollResult.result.payout, pips);
+    const nextPips = reward.pips;
 
     const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
@@ -204,7 +200,7 @@ const handleDicePokerAction = (
             activeRound: null,
             lastOutcome: `Final hand: ${formatDice(rerollResult.finalRoll)}.\n${describePokerResult(
               rerollResult.result,
-            )}`,
+            )}${reward.awardedPayout > 0 ? `\nPaid ${reward.awardedPayout} pips.` : ""}`,
           },
         },
         nextPips,

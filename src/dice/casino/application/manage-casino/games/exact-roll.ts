@@ -17,6 +17,7 @@ import {
   canStartCasinoRound,
   capitalize,
   getOutcomeFromPayout,
+  grantCasinoPayout,
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
@@ -160,8 +161,11 @@ const handleExactRollAction = (
     let nextPips = economy.applyPipsDelta({ userId: session.userId, amount: -session.bet });
     const rolledFace = rollDie(getExactRollDieSides());
     const resolution = resolveExactRollFace(session.bet, action.face, rolledFace);
+    let awardedPayout = 0;
     if (resolution.payout > 0) {
-      nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
+      const reward = grantCasinoPayout(economy, session.userId, resolution.payout, nextPips);
+      awardedPayout = reward.awardedPayout;
+      nextPips = reward.pips;
     }
 
     analytics.recordRoundStarted({
@@ -198,7 +202,7 @@ const handleExactRollAction = (
             exactRollFace: action.face,
             exactRollMode: "exact-face",
             lastOutcome: resolution.won
-              ? `Hit. Picked ${formatDieFace(action.face)}, rolled ${formatDieFace(rolledFace)}. Paid ${resolution.payout} pips.`
+              ? `Hit. Picked ${formatDieFace(action.face)}, rolled ${formatDieFace(rolledFace)}. Paid ${awardedPayout} pips.`
               : `Missed. Picked ${formatDieFace(action.face)}, rolled ${formatDieFace(rolledFace)}.`,
           },
         },
@@ -221,8 +225,11 @@ const handleExactRollAction = (
     let nextPips = economy.applyPipsDelta({ userId: session.userId, amount: -session.bet });
     const rolledFace = rollDie(getExactRollDieSides());
     const resolution = resolveExactRollHighLow(session.bet, action.choice, rolledFace);
+    let awardedPayout = 0;
     if (resolution.payout > 0) {
-      nextPips = economy.applyPipsDelta({ userId: session.userId, amount: resolution.payout });
+      const reward = grantCasinoPayout(economy, session.userId, resolution.payout, nextPips);
+      awardedPayout = reward.awardedPayout;
+      nextPips = reward.pips;
     }
 
     analytics.recordRoundStarted({
@@ -261,7 +268,7 @@ const handleExactRollAction = (
             lastOutcome: resolution.won
               ? `Hit. Picked ${capitalize(action.choice)}, rolled ${formatDieFace(
                   rolledFace,
-                )}. Paid ${resolution.payout} pips.`
+                )}. Paid ${awardedPayout} pips.`
               : `Missed. Picked ${capitalize(action.choice)}, rolled ${formatDieFace(rolledFace)}.`,
           },
         },

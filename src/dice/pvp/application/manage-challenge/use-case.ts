@@ -66,7 +66,7 @@ type PublishChallenge = (view: ActionView<DicePvpAction>) => Promise<{ url: stri
 
 type ManageChallengeDependencies = {
   analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics" | "updateDicePvpStats">;
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips">;
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
   hostileEffects: Pick<DiceHostileEffectsService, "applyShieldableNegativeLockout">;
   inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">;
   progression: Pick<DiceProgressionRepository, "awardAchievements" | "getDicePrestige">;
@@ -569,12 +569,13 @@ const handleChallengeAccept = (
         : resolvedChallenge.challengerId;
     const payoutPips = getWagerWinnerPayoutPips(challenge.wagerPips);
 
-    if (payoutPips > 0) {
-      economy.applyPipsDelta({
-        userId: winnerId,
-        amount: payoutPips,
-      });
-    }
+    const awardedPayoutPips =
+      payoutPips > 0
+        ? economy.grantRewardPips({
+            userId: winnerId,
+            baseAmount: payoutPips,
+          }).awardedAmount
+        : 0;
 
     const punishmentMs = getDuelPunishmentMs(challenge.duelTier);
     const reducedPunishmentMs = applyPvpLoserLockoutReduction(
@@ -622,7 +623,7 @@ const handleChallengeAccept = (
       type: "win" as const,
       winnerId,
       loserId,
-      payoutPips,
+      payoutPips: awardedPayoutPips,
       winnerDoubleRollUntilMs,
       loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
       loserBlockedByShield: loserLockoutResult.blockedByShield,

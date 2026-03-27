@@ -1,5 +1,6 @@
 import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
 import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
+import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import {
   createDefaultDiceCasinoSessionState,
   createDiceCasinoSessionToken,
@@ -207,6 +208,32 @@ export const getOutcomeFromPayout = (bet: number, payout: number): "win" | "loss
   }
 
   return "win";
+};
+
+export const grantCasinoPayout = (
+  economy: Pick<DiceEconomyRepository, "grantRewardPips">,
+  userId: string,
+  payout: number,
+  currentPips: number,
+): {
+  awardedPayout: number;
+  pips: number;
+} => {
+  if (payout < 1) {
+    return {
+      awardedPayout: 0,
+      pips: currentPips,
+    };
+  }
+
+  const reward = economy.grantRewardPips({
+    userId,
+    baseAmount: payout,
+  });
+  return {
+    awardedPayout: reward.awardedAmount,
+    pips: reward.pips,
+  };
 };
 
 export const viewMutation = (

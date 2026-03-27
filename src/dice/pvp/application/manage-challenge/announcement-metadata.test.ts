@@ -128,6 +128,15 @@ test("resolved duels return announcement metadata for both players", async () =>
           balances.set(userId, next);
           return next;
         },
+        grantRewardPips: ({ userId, baseAmount }) => {
+          const awardedAmount = Math.max(0, Math.floor(baseAmount));
+          const next = (balances.get(userId) ?? 0) + awardedAmount;
+          balances.set(userId, next);
+          return {
+            awardedAmount,
+            pips: next,
+          };
+        },
       },
       hostileEffects: {
         applyShieldableNegativeLockout: ({ userId, durationMs, nowMs = Date.now() }) => {

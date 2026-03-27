@@ -15,6 +15,7 @@ import {
   canStartCasinoRound,
   getExpectedRound,
   getOutcomeFromPayout,
+  grantCasinoPayout,
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
@@ -188,7 +189,8 @@ const handlePushYourLuckAction = (
       );
     }
 
-    const nextPips = economy.applyPipsDelta({ userId: session.userId, amount: rollResult.payout });
+    const reward = grantCasinoPayout(economy, session.userId, rollResult.payout, pips);
+    const nextPips = reward.pips;
     const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "push-your-luck",
@@ -215,7 +217,7 @@ const handlePushYourLuckAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `Perfect run. Reached ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${rollResult.payout} pips.`,
+            lastOutcome: `Perfect run. Reached ${getPushYourLuckAutoCashoutAtUniqueFaces()} uniques and paid ${reward.awardedPayout} pips.`,
           },
         },
         nextPips,
@@ -232,7 +234,8 @@ const handlePushYourLuckAction = (
     }
 
     const payout = getPushYourLuckCashoutPayout(round.bet, round.uniqueValues.length);
-    const nextPips = economy.applyPipsDelta({ userId: session.userId, amount: payout });
+    const reward = grantCasinoPayout(economy, session.userId, payout, pips);
+    const nextPips = reward.pips;
     const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
       game: "push-your-luck",
@@ -259,7 +262,7 @@ const handlePushYourLuckAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `Cashed out at ${round.uniqueValues.length} uniques for ${payout} pips.`,
+            lastOutcome: `Cashed out at ${round.uniqueValues.length} uniques for ${reward.awardedPayout} pips.`,
           },
         },
         nextPips,
