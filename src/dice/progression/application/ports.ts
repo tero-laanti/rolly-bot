@@ -78,6 +78,8 @@ export type DiceProgressionRepository = {
   markFirstDiceBan: (userId: string) => boolean;
   getLastDiceRollAt: () => number | null;
   setLastDiceRollAt: (nowMs: number) => void;
+  getLastPersonalDiceRollAt: (userId: string) => number | null;
+  setLastPersonalDiceRollAt: (userId: string, nowMs: number) => void;
   purgeExpiredDiceTemporaryEffects: (nowMs?: number) => number;
   getActiveDiceTemporaryEffects: (
     input: GetActiveDiceTemporaryEffectsInput,

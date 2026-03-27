@@ -37,11 +37,25 @@ const createPassiveEntry = (index: number, description: string): DiceInventoryEn
   quantity: 1,
 });
 
+const zeroPermanentBonuses = {
+  getPermanentBonuses: () => ({
+    extraBanSlots: 0,
+    pipRewardBonusPercent: 0,
+    personalCharge: {
+      unlocked: false,
+      minutesPerMultiplier: 0,
+      speedMultiplier: 1,
+      maxMultiplier: 1,
+    },
+  }),
+};
+
 const createTestInventoryUseCase = (entries: DiceInventoryEntry[]) => {
   return createDiceInventoryUseCase({
     inventory: {
       getOwnedInventoryEntries: () => entries,
     },
+    permanentBonuses: zeroPermanentBonuses,
     useDiceItem: async () => ({
       ok: false,
       message: "Not used in this test.",
@@ -135,6 +149,7 @@ test("inventory view truncates long runtime status text before exceeding Discord
     inventory: {
       getOwnedInventoryEntries: () => [createPassiveEntry(1, "A".repeat(1_700))],
     },
+    permanentBonuses: zeroPermanentBonuses,
     useDiceItem: async () => ({
       ok: true as const,
       item: createConsumableEntry(99).item,

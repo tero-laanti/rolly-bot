@@ -12,6 +12,7 @@ import {
 } from "../../application/use-item/use-case";
 import { createSqliteInventoryRepository, createDiceShopCatalog } from "./inventory-repository";
 import { createSqliteDiceItemEffectsService } from "./item-effects-service";
+import { createSqlitePermanentBonusesPort } from "./permanent-bonuses-service";
 
 export const createSqliteUseDiceItemUseCase = (db: SqliteDatabase) => {
   const unitOfWork = createSqliteUnitOfWork(db);
@@ -33,10 +34,12 @@ export const createSqliteUseDiceItemUseCase = (db: SqliteDatabase) => {
 
 export const createSqliteDiceInventoryUseCase = (db: SqliteDatabase) => {
   const inventory = createSqliteInventoryRepository(db);
+  const permanentBonuses = createSqlitePermanentBonusesPort(db);
   const useDiceItem = createSqliteUseDiceItemUseCase(db);
 
   return createDiceInventoryUseCase({
     inventory,
+    permanentBonuses,
     useDiceItem,
   });
 };
@@ -44,6 +47,7 @@ export const createSqliteDiceInventoryUseCase = (db: SqliteDatabase) => {
 export const createSqliteDiceInventoryCommandServices = (db: SqliteDatabase) => {
   const unitOfWork = createSqliteUnitOfWork(db);
   const inventory = createSqliteInventoryRepository(db);
+  const permanentBonuses = createSqlitePermanentBonusesPort(db);
   const progression = createSqliteProgressionRepository(db);
   const useDiceItem = createSqliteUseDiceItemUseCase(db);
   const finalizeAutoRollItemUse = createFinalizeAutoRollItemUseUseCase({
@@ -55,6 +59,7 @@ export const createSqliteDiceInventoryCommandServices = (db: SqliteDatabase) => 
   return {
     inventoryUseCase: createDiceInventoryUseCase({
       inventory,
+      permanentBonuses,
       useDiceItem,
     }),
     finalizeAutoRollItemUse,

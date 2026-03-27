@@ -128,7 +128,7 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
         },
         {
           name: "Owned",
-          value: formatOwnedValue(view.categoryId, view.selectedItem.ownedQuantity),
+          value: view.selectedItem.ownedLabel,
           inline: true,
         },
         {
@@ -137,6 +137,14 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
           inline: true,
         },
       );
+
+    if (typeof view.selectedItem.nextPricePips === "number") {
+      embed.addFields({
+        name: "Next Price",
+        value: `${view.selectedItem.nextPricePips} pips`,
+        inline: true,
+      });
+    }
 
     if (view.statusMessage) {
       embed.addFields({
@@ -448,14 +456,6 @@ const buildDiceShopComponents = (
 
 const formatPageIndicator = (currentPage: number, totalPages: number): string => {
   return totalPages > 1 ? `\nPage ${currentPage + 1}/${totalPages}.` : "";
-};
-
-const formatOwnedValue = (categoryId: string, ownedQuantity: number): string => {
-  if (categoryId === "permanent-upgrades") {
-    return ownedQuantity > 0 ? "✅" : "❌";
-  }
-
-  return `${ownedQuantity}`;
 };
 
 const getAlternateCategorySummary = (view: Extract<DiceShopViewModel, { screen: "category" }>) => {

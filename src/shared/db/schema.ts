@@ -1,8 +1,8 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 2;
+const currentSchemaVersion = 3;
 
-const currentSchemaColumns = new Map<string, string[]>([
+const schemaVersion2Columns = new Map<string, string[]>([
   [
     "balances",
     ["user_id", "fame", "pips", "last_daily_pip_reward_at", "fame_updated_at", "updated_at"],
@@ -190,8 +190,15 @@ const currentSchemaColumns = new Map<string, string[]>([
   ["managed_intro_posts", ["slot_index", "channel_id", "message_id", "created_at", "updated_at"]],
 ]);
 
+const currentSchemaColumns = new Map<string, string[]>([
+  ...schemaVersion2Columns,
+  ["dice_personal_charge_state", ["user_id", "last_roll_at", "updated_at"]],
+]);
+
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   if (hasExistingUserTables(db)) {
+    assertSchemaArtifacts(db, schemaVersion2Columns);
+    createAdditiveSchemaArtifacts(db);
     assertCurrentSchemaArtifacts(db);
     db.pragma(`user_version = ${currentSchemaVersion}`);
     return;
@@ -300,6 +307,12 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
 
     CREATE TABLE IF NOT EXISTS dice_charge_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
+      last_roll_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_personal_charge_state (
+      user_id TEXT PRIMARY KEY,
       last_roll_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -437,12 +450,13 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
     );
   `);
 
+  createAdditiveSchemaArtifacts(db);
   assertCurrentSchemaArtifacts(db);
   db.pragma(`user_version = ${currentSchemaVersion}`);
 };
 
 const assertCurrentSchemaArtifacts = (db: SqliteDatabase): void => {
-  const issues = getCurrentSchemaIssues(db);
+  const issues = getSchemaIssues(db, currentSchemaColumns);
   if (issues.length < 1) {
     return;
   }
@@ -450,10 +464,19 @@ const assertCurrentSchemaArtifacts = (db: SqliteDatabase): void => {
   throw buildSchemaError("Database schema is incomplete or outdated for this build.", issues);
 };
 
-const getCurrentSchemaIssues = (db: SqliteDatabase): string[] => {
+const assertSchemaArtifacts = (db: SqliteDatabase, schemaColumns: Map<string, string[]>): void => {
+  const issues = getSchemaIssues(db, schemaColumns);
+  if (issues.length < 1) {
+    return;
+  }
+
+  throw buildSchemaError("Database schema is incomplete or outdated for this build.", issues);
+};
+
+const getSchemaIssues = (db: SqliteDatabase, schemaColumns: Map<string, string[]>): string[] => {
   const issues: string[] = [];
 
-  for (const [tableName, columnNames] of currentSchemaColumns) {
+  for (const [tableName, columnNames] of schemaColumns) {
     if (!hasTable(db, tableName)) {
       issues.push(`Missing current table ${tableName}.`);
       continue;
@@ -467,6 +490,16 @@ const getCurrentSchemaIssues = (db: SqliteDatabase): string[] => {
   }
 
   return issues;
+};
+
+const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dice_personal_charge_state (
+      user_id TEXT PRIMARY KEY,
+      last_roll_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
 };
 
 const buildSchemaError = (message: string, details: string[]): Error => {

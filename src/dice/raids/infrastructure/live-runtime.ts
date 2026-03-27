@@ -548,9 +548,9 @@ export const createRaidsLiveRuntime = ({
       const achievementAnnouncements: AchievementAnnouncement[] = [];
 
       for (const participantId of rewardEligibleUserIds) {
-        economy.applyPipsDelta({
+        economy.grantRewardPips({
           userId: participantId,
-          amount: boss.reward.pips,
+          baseAmount: boss.reward.pips,
         });
         progression.applyDiceTemporaryEffect({
           userId: participantId,

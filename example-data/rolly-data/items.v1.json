@@ -65,6 +65,32 @@
     }
   },
   {
+    "id": "idle-dynamo",
+    "name": "Idle Dynamo",
+    "description": "Passive upgrade: unlocks personal Dice charge at +1 every 2 idle minutes, up to x10.",
+    "pricePips": 50,
+    "consumable": false,
+    "effect": {
+      "type": "passive-personal-charge-unlock",
+      "minutesPerMultiplier": 2,
+      "maxMultiplier": 10
+    }
+  },
+  {
+    "id": "blacklist-ledger",
+    "name": "Blacklist Ledger",
+    "description": "Passive upgrade: each copy grants +1 extra ban slot.",
+    "pricePips": 150,
+    "consumable": false,
+    "repeatablePricing": {
+      "priceIncreasePipsPerOwned": 150
+    },
+    "effect": {
+      "type": "passive-extra-ban-slot",
+      "extraSlots": 1
+    }
+  },
+  {
     "id": "umbrella-harness",
     "name": "Umbrella Harness",
     "description": "Passive upgrade: Bad Luck Umbrella grants +1 extra shield charge when used.",
@@ -73,6 +99,50 @@
     "effect": {
       "type": "passive-extra-shield-on-umbrella",
       "extraCharges": 1
+    }
+  },
+  {
+    "id": "pip-magnet",
+    "name": "Pip Magnet",
+    "description": "Passive upgrade: each copy adds +10% pip rewards.",
+    "pricePips": 250,
+    "consumable": false,
+    "repeatablePricing": {
+      "priceIncreasePipsPerOwned": 250
+    },
+    "effect": {
+      "type": "passive-pip-reward-bonus",
+      "bonusPercent": 10
+    }
+  },
+  {
+    "id": "starter-coil",
+    "name": "Starter Coil",
+    "description": "Passive upgrade: each copy makes personal Dice charge build 25% faster.",
+    "pricePips": 300,
+    "consumable": false,
+    "repeatablePricing": {
+      "priceIncreasePipsPerOwned": 300
+    },
+    "requiresItemId": "idle-dynamo",
+    "effect": {
+      "type": "passive-personal-charge-speed-bonus",
+      "fasterPercent": 0.25
+    }
+  },
+  {
+    "id": "capacitor-bank",
+    "name": "Capacitor Bank",
+    "description": "Passive upgrade: each copy raises personal Dice charge max by +10.",
+    "pricePips": 300,
+    "consumable": false,
+    "repeatablePricing": {
+      "priceIncreasePipsPerOwned": 300
+    },
+    "requiresItemId": "idle-dynamo",
+    "effect": {
+      "type": "passive-personal-charge-cap-bonus",
+      "extraMaxMultiplier": 10
     }
   },
   {

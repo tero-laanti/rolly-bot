@@ -13,7 +13,7 @@ const categorySummaries = [
   {
     id: "permanent-upgrades" as const,
     label: "Permanent Upgrades",
-    summary: "One-time passive upgrades that stay active once owned.",
+    summary: "Passive upgrades and permanent systems that stay active once bought.",
     itemCount: 1,
   },
 ];
@@ -134,6 +134,7 @@ test("item-detail renders one buy button plus navigation controls", () => {
           description: "Your next 6 /roll uses roll twice.",
           pricePips: 6,
           ownedQuantity: 1,
+          ownedLabel: "Owned 1",
           typeLabel: "Consumable",
           buyable: true,
         },
@@ -280,7 +281,7 @@ test("permanent upgrades render owned state as emoji instead of a count", () => 
         categorySummaries,
         categoryId: "permanent-upgrades",
         categoryLabel: "Permanent Upgrades",
-        categorySummary: "One-time passive upgrades that stay active once owned.",
+        categorySummary: "Passive upgrades and permanent systems that stay active once bought.",
         currentPage: 0,
         totalPages: 1,
         categoryItems: [
@@ -333,6 +334,7 @@ test("permanent upgrade item detail renders emoji owned state", () => {
           description: "Adds one extra Bad Luck Umbrella charge.",
           pricePips: 25,
           ownedQuantity: 0,
+          ownedLabel: "Owned: ❌",
           typeLabel: "Permanent Upgrade",
           buyable: false,
           buyDisabledReason: "You need 25 pips. Current balance: 15 pips.",
@@ -343,7 +345,45 @@ test("permanent upgrade item detail renders emoji owned state", () => {
 
   const embed = interaction.payload.embeds?.[0]?.toJSON();
   const ownedField = embed?.fields?.find((field) => field.name === "Owned");
-  assert.equal(ownedField?.value, "❌");
+  assert.equal(ownedField?.value, "Owned: ❌");
+});
+
+test("repeatable upgrade item detail renders next price", () => {
+  const interaction = renderDiceShopResult({
+    kind: "update",
+    payload: {
+      type: "view",
+      view: {
+        screen: "item-detail",
+        ownerId: "user-1",
+        balancePips: 1_250,
+        categorySummaries,
+        categoryId: "permanent-upgrades",
+        categoryLabel: "Permanent Upgrades",
+        categoryPage: 0,
+        categoryTotalPages: 1,
+        itemNavigation: {
+          previousItemId: null,
+          nextItemId: null,
+        },
+        selectedItem: {
+          id: "pip-magnet",
+          name: "Pip Magnet",
+          description: "Passive upgrade: each copy adds +10% pip rewards.",
+          pricePips: 750,
+          nextPricePips: 1_000,
+          ownedQuantity: 2,
+          ownedLabel: "Owned 2",
+          typeLabel: "Permanent Upgrade",
+          buyable: true,
+        },
+      },
+    },
+  }).interactionResult;
+
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
+  const nextPriceField = embed?.fields?.find((field) => field.name === "Next Price");
+  assert.equal(nextPriceField?.value, "1000 pips");
 });
 
 test("category pagination shows arrows only when another page exists", () => {

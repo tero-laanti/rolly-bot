@@ -10,6 +10,7 @@ import type {
   DicePvpData,
   DiceItemData,
   DiceItemEffect,
+  DiceItemRepeatablePricing,
   IntroPostsV1Data,
   DiceBalanceVarietyConfig,
   DiceRandomEventBalanceData,
@@ -297,7 +298,9 @@ const collectOutcomeRenderVariables = (
 
 const getInventoryOwnershipLabel = (item: DiceItemData): string => {
   if (isPassiveDiceItemEffect(item.effect)) {
-    return "Permanent passive upgrade.";
+    return item.repeatablePricing
+      ? "Permanent passive upgrade. Stacks."
+      : "Permanent passive upgrade.";
   }
 
   return item.consumable ? "Consumable." : "Permanent collectible.";
@@ -1013,6 +1016,46 @@ const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
     };
   }
 
+  if (type === "passive-extra-ban-slot") {
+    return {
+      type,
+      extraSlots: readInteger(record.extraSlots, `${label}.extraSlots`, 1),
+    };
+  }
+
+  if (type === "passive-pip-reward-bonus") {
+    return {
+      type,
+      bonusPercent: readInteger(record.bonusPercent, `${label}.bonusPercent`, 1),
+    };
+  }
+
+  if (type === "passive-personal-charge-unlock") {
+    return {
+      type,
+      minutesPerMultiplier: readFiniteNumberAtLeast(
+        record.minutesPerMultiplier,
+        `${label}.minutesPerMultiplier`,
+        0.01,
+      ),
+      maxMultiplier: readInteger(record.maxMultiplier, `${label}.maxMultiplier`, 1),
+    };
+  }
+
+  if (type === "passive-personal-charge-speed-bonus") {
+    return {
+      type,
+      fasterPercent: readFiniteNumberAtLeast(record.fasterPercent, `${label}.fasterPercent`, 0),
+    };
+  }
+
+  if (type === "passive-personal-charge-cap-bonus") {
+    return {
+      type,
+      extraMaxMultiplier: readInteger(record.extraMaxMultiplier, `${label}.extraMaxMultiplier`, 1),
+    };
+  }
+
   throw new Error(`${label}.type is invalid.`);
 };
 
@@ -1020,8 +1063,27 @@ const isPassiveDiceItemEffect = (effect: DiceItemEffect): boolean => {
   return (
     effect.type === "passive-extra-shield-on-umbrella" ||
     effect.type === "passive-pvp-loser-lockout-reduction" ||
-    effect.type === "passive-cleanse-grants-negative-effect-shield"
+    effect.type === "passive-cleanse-grants-negative-effect-shield" ||
+    effect.type === "passive-extra-ban-slot" ||
+    effect.type === "passive-pip-reward-bonus" ||
+    effect.type === "passive-personal-charge-unlock" ||
+    effect.type === "passive-personal-charge-speed-bonus" ||
+    effect.type === "passive-personal-charge-cap-bonus"
   );
+};
+
+const readDiceItemRepeatablePricing = (
+  value: unknown,
+  label: string,
+): DiceItemRepeatablePricing => {
+  const record = assertRecord(value, label);
+  return {
+    priceIncreasePipsPerOwned: readInteger(
+      record.priceIncreasePipsPerOwned,
+      `${label}.priceIncreasePipsPerOwned`,
+      1,
+    ),
+  };
 };
 
 const validateDiceItemDiscordText = (item: DiceItemData, label: string): void => {
@@ -1780,6 +1842,17 @@ export const parseDiceItems = (value: unknown): DiceItemData[] => {
       description: readNonEmptyString(record.description, `itemsV1[${index}].description`),
       pricePips: readInteger(record.pricePips, `itemsV1[${index}].pricePips`, 0),
       consumable: readBoolean(record.consumable, `itemsV1[${index}].consumable`),
+      repeatablePricing:
+        record.repeatablePricing === undefined
+          ? undefined
+          : readDiceItemRepeatablePricing(
+              record.repeatablePricing,
+              `itemsV1[${index}].repeatablePricing`,
+            ),
+      requiresItemId:
+        record.requiresItemId === undefined
+          ? undefined
+          : readNonEmptyString(record.requiresItemId, `itemsV1[${index}].requiresItemId`),
       effect: readDiceItemEffect(record.effect, `itemsV1[${index}].effect`),
     };
 
@@ -1803,7 +1876,23 @@ export const parseDiceItems = (value: unknown): DiceItemData[] => {
       throw new Error(`Passive item ${item.id} must set consumable to false.`);
     }
 
+    if (item.repeatablePricing && !isPassiveDiceItemEffect(item.effect)) {
+      throw new Error(
+        `Only passive upgrades may declare repeatablePricing, but ${item.id} is not passive.`,
+      );
+    }
+
+    if (item.requiresItemId === item.id) {
+      throw new Error(`Item ${item.id} cannot require itself.`);
+    }
+
     ids.add(item.id);
+  }
+
+  for (const item of parsed) {
+    if (item.requiresItemId && !ids.has(item.requiresItemId)) {
+      throw new Error(`Item ${item.id} requires unknown item '${item.requiresItemId}'.`);
+    }
   }
 
   return parsed;

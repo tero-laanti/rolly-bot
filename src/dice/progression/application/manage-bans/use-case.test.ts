@@ -55,6 +55,19 @@ const loadUseCase = (dataDir: string) => {
   }
 };
 
+const zeroPermanentBonuses = {
+  getPermanentBonuses: () => ({
+    extraBanSlots: 0,
+    pipRewardBonusPercent: 0,
+    personalCharge: {
+      unlocked: false,
+      minutesPerMultiplier: 0,
+      speedMultiplier: 1,
+      maxMultiplier: 1,
+    },
+  }),
+};
+
 test("first ban returns announcement metadata without inline achievement text", () => {
   withCustomRollyData((dataDir) => {
     const { createDiceBansUseCase } = loadUseCase(dataDir);
@@ -63,6 +76,7 @@ test("first ban returns announcement metadata without inline achievement text", 
       economy: {
         getFame: () => 100,
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
         clearDiceBan: () => undefined,
         clearSingleDiceBan: () => undefined,
@@ -111,6 +125,7 @@ test("clear bans requires an explicit confirmation step", () => {
       economy: {
         getFame: () => 100,
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
         clearDiceBan: () => undefined,
         clearSingleDiceBan: () => undefined,
@@ -154,6 +169,7 @@ test("confirmed clear bans removes all bans and returns to the die selection vie
       economy: {
         getFame: () => 100,
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
         clearDiceBan: (userId, dieIndex) => {
           if (userId === "user-1") {

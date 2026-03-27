@@ -5,6 +5,7 @@ import { createSqliteEconomyRepository } from "../../../economy/infrastructure/s
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
 import { raidsDiceRollPort } from "../../../raids/infrastructure/admin-controller";
 import { createSqliteDiceItemEffectsService } from "../../../inventory/infrastructure/sqlite/item-effects-service";
+import { createSqlitePermanentBonusesPort } from "../../../inventory/infrastructure/sqlite/permanent-bonuses-service";
 import { createDiceBansUseCase } from "../../application/manage-bans/use-case";
 import { createDicePrestigeUseCase } from "../../application/manage-prestige/use-case";
 import { createQueryDiceAchievementsUseCase } from "../../application/query-achievements/use-case";
@@ -25,10 +26,12 @@ export const createSqliteDicePrestigeUseCase = (db: SqliteDatabase) => {
 
 export const createSqliteDiceBansUseCase = (db: SqliteDatabase) => {
   const economy = createSqliteEconomyRepository(db);
+  const permanentBonuses = createSqlitePermanentBonusesPort(db);
   const progression = createSqliteProgressionRepository(db);
 
   return createDiceBansUseCase({
     economy,
+    permanentBonuses,
     progression,
   });
 };
@@ -47,11 +50,13 @@ export const createSqliteRollDiceUseCase = (db: SqliteDatabase) => {
   const progression = createSqliteProgressionRepository(db);
   const pvp = createSqlitePvpRepository(db);
   const itemEffects = createSqliteDiceItemEffectsService(db);
+  const permanentBonuses = createSqlitePermanentBonusesPort(db);
 
   return createRunRollDiceUseCase({
     analytics,
     economy,
     itemEffects,
+    permanentBonuses,
     progression,
     pvp,
     raids: raidsDiceRollPort,

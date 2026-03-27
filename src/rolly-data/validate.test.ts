@@ -481,6 +481,103 @@ test("parseDiceItems rejects passive effects on consumable items", () => {
   );
 });
 
+test("parseDiceItems accepts repeatable passive pricing and prerequisites", () => {
+  const parsed = parseDiceItems([
+    {
+      id: "idle-dynamo",
+      name: "Idle Dynamo",
+      description:
+        "Passive upgrade: unlocks personal Dice charge at +1 every 2 idle minutes, up to x10.",
+      pricePips: 50,
+      consumable: false,
+      effect: {
+        type: "passive-personal-charge-unlock",
+        minutesPerMultiplier: 2,
+        maxMultiplier: 10,
+      },
+    },
+    {
+      id: "starter-coil",
+      name: "Starter Coil",
+      description: "Passive upgrade: each copy makes personal Dice charge build 25% faster.",
+      pricePips: 300,
+      consumable: false,
+      repeatablePricing: {
+        priceIncreasePipsPerOwned: 300,
+      },
+      requiresItemId: "idle-dynamo",
+      effect: {
+        type: "passive-personal-charge-speed-bonus",
+        fasterPercent: 0.25,
+      },
+    },
+  ]);
+
+  assert.deepEqual(parsed[1]?.repeatablePricing, {
+    priceIncreasePipsPerOwned: 300,
+  });
+  assert.equal(parsed[1]?.requiresItemId, "idle-dynamo");
+});
+
+test("parseDiceItems rejects repeatable pricing on non-passive items", () => {
+  assert.throws(
+    () =>
+      parseDiceItems([
+        {
+          id: "dice-revolver",
+          name: "Dice Revolver",
+          description: "Your next 6 /roll uses roll twice.",
+          pricePips: 6,
+          consumable: true,
+          repeatablePricing: {
+            priceIncreasePipsPerOwned: 6,
+          },
+          effect: {
+            type: "double-roll-uses",
+            uses: 6,
+          },
+        },
+      ]),
+    /Only passive upgrades may declare repeatablePricing, but dice-revolver is not passive/i,
+  );
+});
+
+test("parseDiceItems rejects self prerequisites", () => {
+  assert.throws(
+    () =>
+      parseDiceItems([
+        {
+          ...createDiceItemInput(),
+          requiresItemId: "padded-bracers",
+        },
+      ]),
+    /Item padded-bracers cannot require itself/i,
+  );
+});
+
+test("parseDiceItems rejects unknown prerequisites", () => {
+  assert.throws(
+    () =>
+      parseDiceItems([
+        {
+          ...createDiceItemInput(),
+          id: "starter-coil",
+          name: "Starter Coil",
+          description: "Passive upgrade: each copy makes personal Dice charge build 25% faster.",
+          repeatablePricing: {
+            priceIncreasePipsPerOwned: 300,
+          },
+          requiresItemId: "idle-dynamo",
+          effect: {
+            type: "passive-personal-charge-speed-bonus",
+            fasterPercent: 0.25,
+          },
+        },
+      ]),
+    /Item starter-coil requires unknown item 'idle-dynamo'/i,
+  );
+});
+
 test("parseDiceItems rejects descriptions that overflow a single-item inventory page", () => {
   const item = createDiceItemInput();
   item.description = "A".repeat(2_100);

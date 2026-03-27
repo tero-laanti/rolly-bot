@@ -4,6 +4,7 @@ import type {
   EconomyLeaderboardEntry,
   EconomyLeaderboardMetric,
   EconomySnapshot,
+  RewardPipGrantResult,
 } from "../domain/balance";
 
 export type {
@@ -12,6 +13,7 @@ export type {
   EconomyLeaderboardEntry,
   EconomyLeaderboardMetric,
   EconomySnapshot,
+  RewardPipGrantResult,
 } from "../domain/balance";
 
 export type DiceEconomyRepository = {
@@ -25,6 +27,7 @@ export type DiceEconomyRepository = {
   getLastDailyPipRewardAt: (userId: string) => string | null;
   applyFameDelta: (change: EconomyChange) => number;
   applyPipsDelta: (change: EconomyChange) => number;
+  grantRewardPips: (input: { userId: string; baseAmount: number }) => RewardPipGrantResult;
   grantDailyPipsIfEligible: (input: {
     userId: string;
     amount: number;

@@ -6,6 +6,7 @@ import {
 import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
+import type { DicePermanentBonusesPort } from "../../../inventory/application/ports";
 import type { DiceItemEffectsService } from "../../../inventory/application/item-effects-service";
 import {
   createAchievementAnnouncement,
@@ -26,7 +27,11 @@ import {
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
 import { rollDieWithBans } from "../../../progression/domain/bans";
-import { getDiceChargeMultiplier } from "../../../progression/domain/charge";
+import {
+  combineDiceChargeMultipliers,
+  getDiceChargeMultiplier,
+  getPersonalDiceChargeMultiplier,
+} from "../../../progression/domain/charge";
 import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { RaidDiceRollPort } from "../../../raids/application/ports";
@@ -83,6 +88,7 @@ type RunRollDiceDependencies = {
   >;
   economy: Pick<DiceEconomyRepository, "applyFameDelta" | "getFame" | "grantDailyPipsIfEligible">;
   itemEffects: Pick<DiceItemEffectsService, "consumeOneDoubleRollUse" | "getItemDoubleRollStatus">;
+  permanentBonuses: Pick<DicePermanentBonusesPort, "getPermanentBonuses">;
   progression: Pick<
     DiceProgressionRepository,
     | "awardAchievements"
@@ -94,9 +100,11 @@ type RunRollDiceDependencies = {
     | "getDicePrestige"
     | "getDiceSides"
     | "getLastDiceRollAt"
+    | "getLastPersonalDiceRollAt"
     | "getUserDiceAchievements"
     | "setDiceCount"
     | "setLastDiceRollAt"
+    | "setLastPersonalDiceRollAt"
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
   raids?: Pick<RaidDiceRollPort, "applyDiceRoll">;
@@ -115,6 +123,7 @@ export const createRunRollDiceUseCase = ({
   analytics,
   economy,
   itemEffects,
+  permanentBonuses,
   progression,
   pvp,
   raids,
@@ -160,8 +169,21 @@ export const createRunRollDiceUseCase = ({
     const baseDiceCount = Math.max(1, diceCount);
     const pvpDoubleRollUntil = pvp.getActiveDoubleRoll(userId, nowMs);
     const itemDoubleRollStatus = itemEffects.getItemDoubleRollStatus(userId, nowMs);
+    const permanentBonusSnapshot = permanentBonuses.getPermanentBonuses(userId);
     const lastDiceRollAt = progression.getLastDiceRollAt();
-    const chargeMultiplier = getDiceChargeMultiplier(lastDiceRollAt, nowMs);
+    const lastPersonalDiceRollAt = progression.getLastPersonalDiceRollAt(userId);
+    const globalChargeMultiplier = getDiceChargeMultiplier(lastDiceRollAt, nowMs);
+    const personalChargeMultiplier = permanentBonusSnapshot.personalCharge.unlocked
+      ? getPersonalDiceChargeMultiplier(
+          lastPersonalDiceRollAt,
+          permanentBonusSnapshot.personalCharge,
+          nowMs,
+        )
+      : 1;
+    const chargeMultiplier = combineDiceChargeMultipliers(
+      globalChargeMultiplier,
+      personalChargeMultiplier,
+    );
     const hasActivePvpDoubleRoll = Boolean(pvpDoubleRollUntil && pvpDoubleRollUntil > nowMs);
     const resolvedRollPassState = resolveRollPassState({
       prestige: highestPrestige,
@@ -177,7 +199,9 @@ export const createRunRollDiceUseCase = ({
     const { rollPassCount, didUseChargeRoll } = resolvedRollPassState;
     const dieSides = progression.getDiceSides(userId);
     const fameBefore = economy.getFame(userId);
-    const unlockedBansBefore = getUnlockedBanSlotsFromFame(fameBefore, diceCount, dieSides);
+    const unlockedBansBefore =
+      getUnlockedBanSlotsFromFame(fameBefore, diceCount, dieSides) +
+      permanentBonusSnapshot.extraBanSlots;
     const bans = progression.getDiceBans(userId);
 
     const rollPasses = Array.from({ length: rollPassCount }, () =>
@@ -215,7 +239,10 @@ export const createRunRollDiceUseCase = ({
         ...earnedAchievements,
         ...getManualProgressionAchievementIds(progressionAchievementStats),
       ]);
-      const achievementPipReward = getAchievementPipRewardTotal(newlyEarned);
+      const baseAchievementPipReward = getAchievementPipRewardTotal(newlyEarned);
+      const achievementPipReward =
+        baseAchievementPipReward +
+        Math.floor((baseAchievementPipReward * permanentBonusSnapshot.pipRewardBonusPercent) / 100);
       const diceCountAfter = diceCount + diceCountIncrease;
       if (hasDiceCountIncrease) {
         progression.setDiceCount({ userId, diceCount: diceCountAfter });
@@ -233,10 +260,11 @@ export const createRunRollDiceUseCase = ({
             })
           : {
               awarded: false,
+              awardedAmount: 0,
               pips: 0,
               lastDailyPipRewardAt: null,
             };
-      const dailyPipReward = dailyPipGrant.awarded ? firstDailyRollPipReward : 0;
+      const dailyPipReward = dailyPipGrant.awardedAmount;
       const pipReward = achievementPipReward + dailyPipReward;
 
       analytics.recordDiceRollAnalytics({
@@ -265,6 +293,7 @@ export const createRunRollDiceUseCase = ({
         itemEffects.consumeOneDoubleRollUse(userId, nowMs);
       }
       progression.setLastDiceRollAt(nowMs);
+      progression.setLastPersonalDiceRollAt(userId, nowMs);
 
       return {
         newlyEarned,
@@ -273,6 +302,7 @@ export const createRunRollDiceUseCase = ({
         diceCountAfter,
         fameAfter,
         dailyFirstRollAwarded: dailyPipGrant.awarded,
+        dailyFirstRollAwardedAmount: dailyPipGrant.awardedAmount,
       };
     });
 
@@ -283,15 +313,13 @@ export const createRunRollDiceUseCase = ({
       hasDiceCountIncrease,
     });
     const dailyFirstRollBanner =
-      source === "manual" && result.dailyFirstRollAwarded && firstDailyRollPipReward > 0
-        ? formatDailyFirstRollBanner(firstDailyRollPipReward)
+      source === "manual" && result.dailyFirstRollAwarded && result.dailyFirstRollAwardedAmount > 0
+        ? formatDailyFirstRollBanner(result.dailyFirstRollAwardedAmount)
         : "";
     const multiplierFooter = buildRollModifierFooter(resolvedRollPassState);
-    const unlockedBansAfter = getUnlockedBanSlotsFromFame(
-      result.fameAfter,
-      result.diceCountAfter,
-      dieSides,
-    );
+    const unlockedBansAfter =
+      getUnlockedBanSlotsFromFame(result.fameAfter, result.diceCountAfter, dieSides) +
+      permanentBonusSnapshot.extraBanSlots;
     const unlockedFooter = unlockedBansAfter > unlockedBansBefore ? "New ban slot unlocked." : "";
     const remainingItemDoubleRollUses =
       !didUseChargeRoll && itemDoubleRollStatus.remainingUses > 0

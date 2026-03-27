@@ -569,9 +569,9 @@ test("currency outcomes award pip amounts within the configured range", () => {
 
   const attempt = resolveRandomEventAttempt({
     economy: {
-      applyPipsDelta: ({ amount }) => {
-        awarded.push(amount);
-        return amount;
+      grantRewardPips: ({ baseAmount }) => {
+        awarded.push(baseAmount);
+        return { awardedAmount: baseAmount, pips: baseAmount };
       },
     },
     progression: {
@@ -634,7 +634,7 @@ test("consumable item outcomes grant inventory rewards and report them", () => {
 
   const attempt = resolveRandomEventAttempt({
     economy: {
-      applyPipsDelta: ({ amount }) => amount,
+      grantRewardPips: ({ baseAmount }) => ({ awardedAmount: baseAmount, pips: baseAmount }),
     },
     inventory: {
       grantInventoryItem: (input) => {
@@ -1284,9 +1284,9 @@ test("multi-user events reuse one currency amount for all participants in a shar
       activeEventsById,
       state,
       economy: {
-        applyPipsDelta: ({ amount }) => {
-          awarded.push(amount);
-          return amount;
+        grantRewardPips: ({ baseAmount }) => {
+          awarded.push(baseAmount);
+          return { awardedAmount: baseAmount, pips: baseAmount };
         },
       },
       progression: {

@@ -1,4 +1,5 @@
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
+import type { DicePermanentBonusesPort } from "../../../inventory/application/ports";
 import { getMaxBansPerDie, getUnlockedBanSlotsFromFame } from "../../../progression/domain/bans";
 import type { DiceProgressionRepository } from "../ports";
 import { awardManualDiceAchievements } from "../achievement-awards";
@@ -58,6 +59,7 @@ export type DiceBansResult = ActionResult<DiceBansAction> & {
 
 type ManageBansDependencies = {
   economy: Pick<DiceEconomyRepository, "getFame">;
+  permanentBonuses: Pick<DicePermanentBonusesPort, "getPermanentBonuses">;
   progression: Pick<
     DiceProgressionRepository,
     | "clearDiceBan"
@@ -71,13 +73,19 @@ type ManageBansDependencies = {
   >;
 };
 
-export const createDiceBansUseCase = ({ economy, progression }: ManageBansDependencies) => {
+export const createDiceBansUseCase = ({
+  economy,
+  permanentBonuses,
+  progression,
+}: ManageBansDependencies) => {
   const createDiceBansReply = (userId: string): DiceBansResult => {
     const diceCount = progression.getDiceCount(userId);
     const dieSides = progression.getDiceSides(userId);
     const fame = economy.getFame(userId);
     const bans = progression.getDiceBans(userId);
-    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceCount, dieSides);
+    const unlockedSlots =
+      getUnlockedBanSlotsFromFame(fame, diceCount, dieSides) +
+      permanentBonuses.getPermanentBonuses(userId).extraBanSlots;
     const usedCount = countUsedBans(bans);
 
     if (unlockedSlots < 1 && usedCount === 0) {
@@ -116,7 +124,9 @@ export const createDiceBansUseCase = ({ economy, progression }: ManageBansDepend
     const diceCount = progression.getDiceCount(action.ownerId);
     const dieSides = progression.getDiceSides(action.ownerId);
     const fame = economy.getFame(action.ownerId);
-    const unlockedSlots = getUnlockedBanSlotsFromFame(fame, diceCount, dieSides);
+    const unlockedSlots =
+      getUnlockedBanSlotsFromFame(fame, diceCount, dieSides) +
+      permanentBonuses.getPermanentBonuses(action.ownerId).extraBanSlots;
 
     if (action.type === "back") {
       const bans = progression.getDiceBans(action.ownerId);

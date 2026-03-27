@@ -103,7 +103,7 @@ export const applyRandomEventEffectsToUser = (
     random,
     resolvedCurrencyAmounts,
   }: {
-    economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
+    economy?: Pick<DiceEconomyRepository, "grantRewardPips">;
     inventory?: RandomEventResolutionInventory;
     itemCatalog?: RandomEventResolutionItemCatalog;
     progression: RandomEventResolutionProgression;
@@ -136,9 +136,10 @@ export const applyRandomEventEffectsToUser = (
         getRandomIntInclusive(effect.minAmount, effect.maxAmount, random);
       currencyEffectIndex += 1;
       if (amount > 0) {
-        economy?.applyPipsDelta({ userId, amount });
-        pipReward += amount;
-        effectNotes.push(`Gained ${amount} pip${amount === 1 ? "" : "s"}.`);
+        const reward = economy?.grantRewardPips({ userId, baseAmount: amount });
+        const awardedAmount = reward?.awardedAmount ?? amount;
+        pipReward += awardedAmount;
+        effectNotes.push(`Gained ${awardedAmount} pip${awardedAmount === 1 ? "" : "s"}.`);
       }
       continue;
     }
@@ -274,7 +275,7 @@ export const resolveRandomEventAttempt = ({
   sharedOutcomeSelection,
   random = Math.random,
 }: {
-  economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  economy?: Pick<DiceEconomyRepository, "grantRewardPips">;
   inventory?: RandomEventResolutionInventory;
   itemCatalog?: RandomEventResolutionItemCatalog;
   progression: RandomEventResolutionProgression;
@@ -394,7 +395,7 @@ export const resolveRandomEvent = async ({
 }: {
   activeEventsById: Map<string, ActiveRandomEventContext>;
   state: RandomEventsState;
-  economy?: Pick<DiceEconomyRepository, "applyPipsDelta">;
+  economy?: Pick<DiceEconomyRepository, "grantRewardPips">;
   inventory?: RandomEventResolutionInventory;
   itemCatalog?: RandomEventResolutionItemCatalog;
   progression: RandomEventResolutionProgression;

@@ -1,10 +1,12 @@
 import type { SqliteDatabase } from "../../../../shared/db";
+import { createSqlitePermanentBonusesPort } from "../../../inventory/infrastructure/sqlite/permanent-bonuses-service";
 import type { DiceEconomyRepository } from "../../application/ports";
 import type {
   DailyPipGrantResult,
   EconomyChange,
   EconomyLeaderboardEntry,
   EconomySnapshot,
+  RewardPipGrantResult,
 } from "../../domain/balance";
 
 const getEconomySnapshot = (db: SqliteDatabase, userId: string): EconomySnapshot => {
@@ -111,6 +113,47 @@ const getUtcDayKey = (value: string): string => {
   return value.slice(0, 10);
 };
 
+const getRewardAmountWithPermanentBonuses = (
+  db: SqliteDatabase,
+  userId: string,
+  baseAmount: number,
+): number => {
+  const permanentBonuses = createSqlitePermanentBonusesPort(db).getPermanentBonuses(userId);
+  const normalizedBaseAmount = Math.max(0, Math.floor(baseAmount));
+  if (normalizedBaseAmount < 1) {
+    return 0;
+  }
+
+  return (
+    normalizedBaseAmount +
+    Math.floor((normalizedBaseAmount * permanentBonuses.pipRewardBonusPercent) / 100)
+  );
+};
+
+const grantRewardPips = (
+  db: SqliteDatabase,
+  {
+    userId,
+    baseAmount,
+  }: {
+    userId: string;
+    baseAmount: number;
+  },
+): RewardPipGrantResult => {
+  const awardedAmount = getRewardAmountWithPermanentBonuses(db, userId, baseAmount);
+  if (awardedAmount < 1) {
+    return {
+      awardedAmount: 0,
+      pips: getPips(db, userId),
+    };
+  }
+
+  return {
+    awardedAmount,
+    pips: applyPipsDelta(db, { userId, amount: awardedAmount }),
+  };
+};
+
 const grantDailyPipsIfEligible = (
   db: SqliteDatabase,
   {
@@ -125,6 +168,7 @@ const grantDailyPipsIfEligible = (
 ): DailyPipGrantResult => {
   const claimedAt = new Date(nowMs).toISOString();
   const todayKey = getUtcDayKey(claimedAt);
+  const awardedAmount = getRewardAmountWithPermanentBonuses(db, userId, amount);
   const select = db.prepare(
     "SELECT pips, last_daily_pip_reward_at FROM balances WHERE user_id = ?",
   );
@@ -151,6 +195,7 @@ const grantDailyPipsIfEligible = (
     if (lastClaimedAt && getUtcDayKey(lastClaimedAt) === todayKey) {
       return {
         awarded: false,
+        awardedAmount: 0,
         pips: existing?.pips ?? 0,
         lastDailyPipRewardAt: lastClaimedAt,
       };
@@ -158,7 +203,7 @@ const grantDailyPipsIfEligible = (
 
     insert.run({
       userId,
-      amount,
+      amount: awardedAmount,
       claimedAt,
       updatedAt: claimedAt,
     });
@@ -171,7 +216,8 @@ const grantDailyPipsIfEligible = (
 
     return {
       awarded: true,
-      pips: updated?.pips ?? amount,
+      awardedAmount,
+      pips: updated?.pips ?? awardedAmount,
       lastDailyPipRewardAt: updated?.last_daily_pip_reward_at ?? claimedAt,
     };
   })();
@@ -186,6 +232,7 @@ export const createSqliteEconomyRepository = (db: SqliteDatabase): DiceEconomyRe
     getLastDailyPipRewardAt: (userId) => getLastDailyPipRewardAt(db, userId),
     applyFameDelta: (change) => applyFameDelta(db, change),
     applyPipsDelta: (change) => applyPipsDelta(db, change),
+    grantRewardPips: (input) => grantRewardPips(db, input),
     grantDailyPipsIfEligible: (input) => grantDailyPipsIfEligible(db, input),
   };
 };

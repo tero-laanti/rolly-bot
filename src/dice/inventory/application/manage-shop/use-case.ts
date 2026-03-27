@@ -10,7 +10,12 @@ import {
   type AchievementAnnouncement,
 } from "../../../progression/application/achievement-announcements";
 import { getDiceItemAchievementIds } from "../achievement-rules";
-import { isPassivePermanentItem } from "../../domain/passive-items";
+import {
+  getDiceShopItemCurrentPricePips,
+  isPassivePermanentItem,
+  isRepeatablePassivePermanentItem,
+  itemRequiresOwnership,
+} from "../../domain/passive-items";
 import {
   discordEmbedFieldValueCharacterLimit,
   discordStringSelectOptionLimit,
@@ -42,7 +47,7 @@ const diceShopCategories: DiceShopCategoryDefinition[] = [
     id: "permanent-upgrades",
     label: "Permanent Upgrades",
     singularLabel: "Permanent Upgrade",
-    summary: "One-time passive upgrades that stay active once owned.",
+    summary: "Passive upgrades and permanent systems that stay active once bought.",
   },
 ];
 
@@ -118,7 +123,9 @@ export type DiceShopItemDetail = {
   name: string;
   description: string;
   pricePips: number;
+  nextPricePips?: number;
   ownedQuantity: number;
+  ownedLabel: string;
   typeLabel: string;
   buyable: boolean;
   buyDisabledReason?: string;
@@ -231,12 +238,20 @@ type ShopPurchaseAttempt =
       reason: "insufficient-pips";
       item: DiceShopItem;
       currentPips: number;
+      requiredPips: number;
+    }
+  | {
+      ok: false;
+      reason: "requires-item";
+      item: DiceShopItem;
+      requiredItemName: string;
     }
   | {
       ok: true;
       item: DiceShopItem;
       quantity: number;
       remainingPips: number;
+      pricePaid: number;
       newlyEarned: ReturnType<DiceProgressionRepository["awardAchievements"]>;
     };
 
@@ -525,8 +540,23 @@ export const createDiceShopUseCase = ({
     }
 
     const purchase = unitOfWork.runInTransaction<ShopPurchaseAttempt>(() => {
-      const ownedQuantity = inventory.getInventoryQuantities(action.ownerId).get(item.id) ?? 0;
-      if (isPassivePermanentItem(item) && ownedQuantity > 0) {
+      const ownedQuantities = inventory.getInventoryQuantities(action.ownerId);
+      const ownedQuantity = ownedQuantities.get(item.id) ?? 0;
+      if (itemRequiresOwnership(item, ownedQuantities)) {
+        return {
+          ok: false,
+          reason: "requires-item",
+          item,
+          requiredItemName:
+            shopCatalog.getDiceShopItem(item.requiresItemId ?? "")?.name ?? "Required item",
+        };
+      }
+
+      if (
+        isPassivePermanentItem(item) &&
+        !isRepeatablePassivePermanentItem(item) &&
+        ownedQuantity > 0
+      ) {
         return {
           ok: false,
           reason: "already-owned",
@@ -534,17 +564,19 @@ export const createDiceShopUseCase = ({
         };
       }
 
+      const currentPricePips = getDiceShopItemCurrentPricePips(item, ownedQuantity);
       const currentPips = economy.getPips(action.ownerId);
-      if (currentPips < item.pricePips) {
+      if (currentPips < currentPricePips) {
         return {
           ok: false,
           reason: "insufficient-pips",
           item,
           currentPips,
+          requiredPips: currentPricePips,
         };
       }
 
-      economy.applyPipsDelta({ userId: action.ownerId, amount: -item.pricePips });
+      economy.applyPipsDelta({ userId: action.ownerId, amount: -currentPricePips });
       const quantity = inventory.grantInventoryItem({
         userId: action.ownerId,
         itemId: item.id,
@@ -562,6 +594,7 @@ export const createDiceShopUseCase = ({
         item,
         quantity,
         remainingPips: economy.getPips(action.ownerId),
+        pricePaid: currentPricePips,
         newlyEarned,
       };
     });
@@ -581,7 +614,13 @@ export const createDiceShopUseCase = ({
               item.id,
               purchase.reason === "already-owned"
                 ? buildAlreadyOwnedMessage(purchase.item)
-                : buildInsufficientPipsMessage(purchase.item, purchase.currentPips),
+                : purchase.reason === "requires-item"
+                  ? buildMissingRequirementMessage(purchase.item, purchase.requiredItemName)
+                  : buildInsufficientPipsMessage(
+                      purchase.item,
+                      purchase.currentPips,
+                      purchase.requiredPips,
+                    ),
             ),
           },
         },
@@ -636,9 +675,9 @@ const buildCategoryViewModel = (
   const categoryItems = getCategoryItems(shopCatalog, category.id).map((item) => ({
     id: item.id,
     name: item.name,
-    pricePips: item.pricePips,
+    pricePips: getDiceShopItemCurrentPricePips(item, inventoryQuantities.get(item.id) ?? 0),
     ownedQuantity: inventoryQuantities.get(item.id) ?? 0,
-    ownedSummary: buildOwnedSummary(category.id, inventoryQuantities.get(item.id) ?? 0),
+    ownedSummary: buildOwnedSummary(item, inventoryQuantities.get(item.id) ?? 0),
   }));
   const pages = paginateCategoryItems(categoryItems);
   const totalPages = Math.max(1, pages.length);
@@ -676,9 +715,15 @@ const buildItemDetailViewModel = (
   const balancePips = economy.getEconomySnapshot(userId).pips;
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
   const ownedQuantity = inventoryQuantities.get(item.id) ?? 0;
-  const alreadyOwned = isPassivePermanentItem(item) && ownedQuantity > 0;
-  const hasEnoughPips = balancePips >= item.pricePips;
-  const buyable = !alreadyOwned && hasEnoughPips;
+  const alreadyOwned =
+    isPassivePermanentItem(item) && !isRepeatablePassivePermanentItem(item) && ownedQuantity > 0;
+  const currentPricePips = getDiceShopItemCurrentPricePips(item, ownedQuantity);
+  const missingRequirement = itemRequiresOwnership(item, inventoryQuantities);
+  const requiredItemName = item.requiresItemId
+    ? (shopCatalog.getDiceShopItem(item.requiresItemId)?.name ?? "Required item")
+    : null;
+  const hasEnoughPips = balancePips >= currentPricePips;
+  const buyable = !alreadyOwned && !missingRequirement && hasEnoughPips;
   const itemNavigation = buildItemNavigation(shopCatalog, category.id, item.id);
   const categoryPages = paginateCategoryItems(
     getCategoryItems(shopCatalog, category.id).map((categoryItem) => {
@@ -686,9 +731,9 @@ const buildItemDetailViewModel = (
       return {
         id: categoryItem.id,
         name: categoryItem.name,
-        pricePips: categoryItem.pricePips,
+        pricePips: getDiceShopItemCurrentPricePips(categoryItem, categoryOwnedQuantity),
         ownedQuantity: categoryOwnedQuantity,
-        ownedSummary: buildOwnedSummary(category.id, categoryOwnedQuantity),
+        ownedSummary: buildOwnedSummary(categoryItem, categoryOwnedQuantity),
       };
     }),
   );
@@ -709,15 +754,21 @@ const buildItemDetailViewModel = (
       id: item.id,
       name: item.name,
       description: item.description,
-      pricePips: item.pricePips,
+      pricePips: currentPricePips,
+      nextPricePips: item.repeatablePricing
+        ? getDiceShopItemCurrentPricePips(item, ownedQuantity + 1)
+        : undefined,
       ownedQuantity,
+      ownedLabel: buildOwnedSummary(item, ownedQuantity),
       typeLabel: category.singularLabel,
       buyable,
-      buyDisabledReason: alreadyOwned
-        ? "Already owned. Permanent upgrades can only be bought once."
-        : hasEnoughPips
-          ? undefined
-          : `You need ${item.pricePips} pips. Current balance: ${balancePips} pips.`,
+      buyDisabledReason: missingRequirement
+        ? buildMissingRequirementMessage(item, requiredItemName ?? "Required item")
+        : alreadyOwned
+          ? "Already owned. Permanent upgrades can only be bought once."
+          : hasEnoughPips
+            ? undefined
+            : `You need ${currentPricePips} pips. Current balance: ${balancePips} pips.`,
     },
     statusMessage,
   };
@@ -739,7 +790,7 @@ const buildPurchaseReceiptViewModel = (
       itemName: purchase.item.name,
       ownedQuantity: purchase.quantity,
       remainingPips: purchase.remainingPips,
-      changeSummary: buildPurchaseChangeSummary(purchase.item),
+      changeSummary: buildPurchaseChangeSummary(purchase.item, purchase.quantity),
       canUseItemNow: purchase.item.consumable,
     },
   };
@@ -867,11 +918,43 @@ const buildAlreadyOwnedMessage = (item: DiceShopItem): string => {
   return `${item.name} is already owned. Permanent upgrades can only be bought once.`;
 };
 
-const buildInsufficientPipsMessage = (item: DiceShopItem, currentPips: number): string => {
-  return `You need ${item.pricePips} pips to buy ${item.name}. Current balance: ${currentPips} pips.`;
+const buildMissingRequirementMessage = (item: DiceShopItem, requiredItemName: string): string => {
+  return `${item.name} requires ${requiredItemName} before it can be bought.`;
 };
 
-const buildPurchaseChangeSummary = (item: DiceShopItem): string => {
+const buildInsufficientPipsMessage = (
+  item: DiceShopItem,
+  currentPips: number,
+  requiredPips: number,
+): string => {
+  return `You need ${requiredPips} pips to buy ${item.name}. Current balance: ${currentPips} pips.`;
+};
+
+const buildPurchaseChangeSummary = (item: DiceShopItem, ownedQuantity: number): string => {
+  if (item.effect.type === "passive-extra-ban-slot") {
+    const totalExtraSlots = item.effect.extraSlots * ownedQuantity;
+    return `Permanent bonus active: +${totalExtraSlots} extra ban slot${totalExtraSlots === 1 ? "" : "s"}.`;
+  }
+
+  if (item.effect.type === "passive-pip-reward-bonus") {
+    const totalBonusPercent = item.effect.bonusPercent * ownedQuantity;
+    return `Permanent bonus active: +${totalBonusPercent}% pip rewards.`;
+  }
+
+  if (item.effect.type === "passive-personal-charge-unlock") {
+    return "Your personal Dice charge is now active.";
+  }
+
+  if (item.effect.type === "passive-personal-charge-speed-bonus") {
+    const totalFasterPercent = Math.round(item.effect.fasterPercent * 100 * ownedQuantity);
+    return `Permanent bonus active: personal Dice charge builds ${totalFasterPercent}% faster.`;
+  }
+
+  if (item.effect.type === "passive-personal-charge-cap-bonus") {
+    const totalExtraCap = item.effect.extraMaxMultiplier * ownedQuantity;
+    return `Permanent bonus active: personal Dice charge max +${totalExtraCap}.`;
+  }
+
   if (isPassivePermanentItem(item)) {
     return "This permanent upgrade is now active.";
   }
@@ -879,8 +962,12 @@ const buildPurchaseChangeSummary = (item: DiceShopItem): string => {
   return "The item was added to your inventory. Use /inventory when you want to activate it.";
 };
 
-const buildOwnedSummary = (categoryId: DiceShopCategoryId, ownedQuantity: number): string => {
-  if (categoryId === "permanent-upgrades") {
+const buildOwnedSummary = (item: DiceShopItem, ownedQuantity: number): string => {
+  if (isPassivePermanentItem(item)) {
+    if (isRepeatablePassivePermanentItem(item)) {
+      return `Owned ${ownedQuantity}`;
+    }
+
     return `Owned: ${ownedQuantity > 0 ? "✅" : "❌"}`;
   }
 

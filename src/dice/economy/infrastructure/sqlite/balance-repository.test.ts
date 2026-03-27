@@ -27,16 +27,19 @@ test("grantDailyPipsIfEligible awards once per UTC day", () => {
 
   assert.deepEqual(first, {
     awarded: true,
+    awardedAmount: 5,
     pips: 5,
     lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
   });
   assert.deepEqual(second, {
     awarded: false,
+    awardedAmount: 0,
     pips: 5,
     lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
   });
   assert.deepEqual(third, {
     awarded: true,
+    awardedAmount: 5,
     pips: 10,
     lastDailyPipRewardAt: "2026-03-21T00:00:00.000Z",
   });

@@ -22,6 +22,19 @@ export type DiceItemAchievementStats = {
   usedCleanseItem: boolean;
 };
 
+export type DicePersonalChargeBonus = {
+  unlocked: boolean;
+  minutesPerMultiplier: number;
+  speedMultiplier: number;
+  maxMultiplier: number;
+};
+
+export type DicePermanentBonuses = {
+  extraBanSlots: number;
+  pipRewardBonusPercent: number;
+  personalCharge: DicePersonalChargeBonus;
+};
+
 export type DiceInventoryRepository = {
   getInventoryQuantities: (userId: string) => Map<DiceShopItemId, number>;
   getInventoryQuantity: (userId: string, itemId: DiceShopItemId) => number;
@@ -31,6 +44,10 @@ export type DiceInventoryRepository = {
   getItemAchievementStats: (userId: string) => DiceItemAchievementStats;
   recordShopPurchase: (userId: string) => DiceItemAchievementStats;
   recordItemUse: (input: { userId: string; itemId: string }) => DiceItemAchievementStats;
+};
+
+export type DicePermanentBonusesPort = {
+  getPermanentBonuses: (userId: string) => DicePermanentBonuses;
 };
 
 export type DiceShopCatalog = {

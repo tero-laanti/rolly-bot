@@ -1,6 +1,9 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import type { DiceInventoryRepository, DiceShopCatalog } from "../../application/ports";
-import { isPassivePermanentItem } from "../../domain/passive-items";
+import {
+  isPassivePermanentItem,
+  isRepeatablePassivePermanentItem,
+} from "../../domain/passive-items";
 import {
   getDiceShopItem,
   getDiceShopItems,
@@ -109,7 +112,7 @@ const grantInventoryItem = (
   },
 ): number => {
   const item = getDiceShopItem(itemId);
-  if (item && isPassivePermanentItem(item)) {
+  if (item && isPassivePermanentItem(item) && !isRepeatablePassivePermanentItem(item)) {
     db.prepare(
       `
       INSERT INTO inventory_items (user_id, item_id, quantity, first_acquired_at, updated_at)

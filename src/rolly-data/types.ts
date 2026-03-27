@@ -243,7 +243,32 @@ export type DiceItemEffect =
   | {
       type: "passive-cleanse-grants-negative-effect-shield";
       charges: number;
+    }
+  | {
+      type: "passive-extra-ban-slot";
+      extraSlots: number;
+    }
+  | {
+      type: "passive-pip-reward-bonus";
+      bonusPercent: number;
+    }
+  | {
+      type: "passive-personal-charge-unlock";
+      minutesPerMultiplier: number;
+      maxMultiplier: number;
+    }
+  | {
+      type: "passive-personal-charge-speed-bonus";
+      fasterPercent: number;
+    }
+  | {
+      type: "passive-personal-charge-cap-bonus";
+      extraMaxMultiplier: number;
     };
+
+export type DiceItemRepeatablePricing = {
+  priceIncreasePipsPerOwned: number;
+};
 
 export type DiceItemData = {
   id: string;
@@ -251,6 +276,8 @@ export type DiceItemData = {
   description: string;
   pricePips: number;
   consumable: boolean;
+  repeatablePricing?: DiceItemRepeatablePricing;
+  requiresItemId?: string;
   effect: DiceItemEffect;
 };
 

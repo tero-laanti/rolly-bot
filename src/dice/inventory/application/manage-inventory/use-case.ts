@@ -11,7 +11,12 @@ import {
   type TriggerRandomGroupEvent,
 } from "../use-item/use-case";
 import type { DiceInventoryEntry } from "../../../inventory/domain/shop";
-import type { AutoRollSessionReservation, DiceInventoryRepository } from "../ports";
+import type {
+  AutoRollSessionReservation,
+  DiceInventoryRepository,
+  DicePermanentBonuses,
+  DicePermanentBonusesPort,
+} from "../ports";
 import { getItemOwnershipLabel } from "../../domain/passive-items";
 import {
   discordActionRowLimit,
@@ -52,6 +57,7 @@ export type DiceInventoryActionOutcome = {
 
 type ManageInventoryDependencies = {
   inventory: Pick<DiceInventoryRepository, "getOwnedInventoryEntries">;
+  permanentBonuses: Pick<DicePermanentBonusesPort, "getPermanentBonuses">;
   useDiceItem: (input: {
     userId: string;
     itemId: string;
@@ -62,6 +68,7 @@ type ManageInventoryDependencies = {
 
 export const createDiceInventoryUseCase = ({
   inventory,
+  permanentBonuses,
   useDiceItem,
 }: ManageInventoryDependencies) => {
   const createDiceInventoryReply = (userId: string): DiceInventoryResult => {
@@ -69,7 +76,7 @@ export const createDiceInventoryUseCase = ({
       kind: "reply",
       payload: {
         type: "view",
-        view: buildInventoryView(inventory, userId),
+        view: buildInventoryView(inventory, permanentBonuses, userId),
         ephemeral: false,
       },
     };
@@ -102,7 +109,13 @@ export const createDiceInventoryUseCase = ({
           kind: "update",
           payload: {
             type: "view",
-            view: buildInventoryView(inventory, action.ownerId, undefined, action.page),
+            view: buildInventoryView(
+              inventory,
+              permanentBonuses,
+              action.ownerId,
+              undefined,
+              action.page,
+            ),
           },
         },
       };
@@ -114,7 +127,13 @@ export const createDiceInventoryUseCase = ({
           kind: "update",
           payload: {
             type: "view",
-            view: buildInventoryView(inventory, action.ownerId, undefined, action.page),
+            view: buildInventoryView(
+              inventory,
+              permanentBonuses,
+              action.ownerId,
+              undefined,
+              action.page,
+            ),
           },
         },
       };
@@ -162,7 +181,13 @@ export const createDiceInventoryUseCase = ({
         kind: "update",
         payload: {
           type: "view",
-          view: buildInventoryView(inventory, action.ownerId, useResult.statusMessage, action.page),
+          view: buildInventoryView(
+            inventory,
+            permanentBonuses,
+            action.ownerId,
+            useResult.statusMessage,
+            action.page,
+          ),
         },
       },
       achievementAnnouncements: useResult.achievementAnnouncements,
@@ -177,20 +202,31 @@ export const createDiceInventoryUseCase = ({
 
 const buildInventoryView = (
   inventory: Pick<DiceInventoryRepository, "getOwnedInventoryEntries">,
+  permanentBonuses: Pick<DicePermanentBonusesPort, "getPermanentBonuses">,
   userId: string,
   statusLine?: string,
   requestedPage: number = 0,
 ): ActionView<DiceInventoryAction> => {
   const entries = inventory.getOwnedInventoryEntries(userId);
-  const pages = paginateInventoryEntries(entries, userId, statusLine, false);
+  const bonusLines = buildPermanentBonusLines(permanentBonuses.getPermanentBonuses(userId));
+  const pages = paginateInventoryEntries(entries, userId, statusLine, bonusLines, false);
   const normalizedPages =
-    pages.length > 1 ? paginateInventoryEntries(entries, userId, statusLine, true) : pages;
+    pages.length > 1
+      ? paginateInventoryEntries(entries, userId, statusLine, bonusLines, true)
+      : pages;
   const totalPages = Math.max(1, normalizedPages.length);
   const currentPage = clampPage(requestedPage, totalPages);
   const pageEntries = normalizedPages[currentPage] ?? [];
 
   return {
-    content: buildInventoryContent(userId, pageEntries, statusLine, currentPage, totalPages),
+    content: buildInventoryContent(
+      userId,
+      pageEntries,
+      statusLine,
+      bonusLines,
+      currentPage,
+      totalPages,
+    ),
     components: buildInventoryComponents(userId, pageEntries, currentPage, totalPages),
   };
 };
@@ -199,6 +235,7 @@ const buildInventoryContent = (
   userId: string,
   entries: DiceInventoryEntry[],
   statusLine?: string,
+  bonusLines: string[] = [],
   currentPage: number = 0,
   totalPages: number = 1,
 ): string => {
@@ -215,6 +252,9 @@ const buildInventoryContent = (
   }
 
   headerLines.push("Use buttons below to consume items.");
+  if (bonusLines.length > 0) {
+    headerLines.push("", ...bonusLines);
+  }
   if (totalPages > 1) {
     headerLines.push(`Page ${currentPage + 1}/${totalPages}.`);
   }
@@ -301,6 +341,7 @@ const paginateInventoryEntries = (
   entries: DiceInventoryEntry[],
   userId: string,
   statusLine: string | undefined,
+  bonusLines: string[],
   includePageIndicator: boolean,
 ): DiceInventoryEntry[][] => {
   if (entries.length < 1) {
@@ -318,6 +359,7 @@ const paginateInventoryEntries = (
       userId,
       candidateEntries,
       statusLine,
+      bonusLines,
       0,
       includePageIndicator ? 99 : 1,
     );
@@ -341,6 +383,42 @@ const paginateInventoryEntries = (
   }
 
   return pages;
+};
+
+const buildPermanentBonusLines = (bonuses: DicePermanentBonuses): string[] => {
+  const lines = ["Permanent bonuses:"];
+  const details: string[] = [];
+
+  if (bonuses.extraBanSlots > 0) {
+    details.push(`Extra ban slots: +${bonuses.extraBanSlots}.`);
+  }
+
+  if (bonuses.pipRewardBonusPercent > 0) {
+    details.push(`Pip rewards: +${bonuses.pipRewardBonusPercent}%.`);
+  }
+
+  if (bonuses.personalCharge.unlocked) {
+    details.push(
+      `Personal Dice charge: +1 every ${formatCompactNumber(bonuses.personalCharge.minutesPerMultiplier)} min, up to x${bonuses.personalCharge.maxMultiplier}.`,
+    );
+  }
+
+  if (details.length < 1) {
+    details.push("None yet.");
+  }
+
+  return [...lines, ...details];
+};
+
+const formatCompactNumber = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+
+  return value
+    .toFixed(2)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*[1-9])0+$/, "$1");
 };
 
 const clampPage = (page: number, totalPages: number): number => {

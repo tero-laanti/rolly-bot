@@ -6,6 +6,43 @@ import { createRunRollDiceUseCase } from "./use-case";
 
 const firstDailyRollPipReward = getFirstDailyRollPipReward();
 
+const zeroPermanentBonuses = {
+  getPermanentBonuses: () => ({
+    extraBanSlots: 0,
+    pipRewardBonusPercent: 0,
+    personalCharge: {
+      unlocked: false,
+      minutesPerMultiplier: 0,
+      speedMultiplier: 1,
+      maxMultiplier: 1,
+    },
+  }),
+};
+
+const createProgressionStub = () => ({
+  awardAchievements: (_userId: string, achievementIds: string[]) => achievementIds,
+  consumeDiceTemporaryEffectsForRoll: () => 0,
+  recordDiceProgressionAchievementStats: () => ({
+    rollCommandsTotal: 1,
+    nearDiceCountIncreaseRollsTotal: 0,
+    highestChargeMultiplier: 1,
+    highestRollPassCount: 1,
+    diceCountIncreasesTotal: 0,
+    firstBanAt: null,
+  }),
+  getActiveDiceTemporaryEffects: () => [],
+  getDiceBans: () => new Map<number, Set<number>>(),
+  getDiceCount: () => 1,
+  getDicePrestige: () => 0,
+  getDiceSides: () => 6,
+  getLastDiceRollAt: () => null,
+  getLastPersonalDiceRollAt: () => null,
+  getUserDiceAchievements: () => [],
+  setDiceCount: () => {},
+  setLastDiceRollAt: () => {},
+  setLastPersonalDiceRollAt: () => {},
+});
+
 test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
   const originalRandom = Math.random;
   Math.random = () => 0;
@@ -21,6 +58,7 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
         getFame: () => 0,
         grantDailyPipsIfEligible: () => ({
           awarded: false,
+          awardedAmount: 0,
           pips: 0,
           lastDailyPipRewardAt: null,
         }),
@@ -33,7 +71,9 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
           expiresAtMs: null,
         }),
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
+        ...createProgressionStub(),
         awardAchievements: (_userId, achievementIds) => achievementIds,
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
@@ -92,6 +132,7 @@ test("first roll of the UTC day awards daily pips", () => {
       getFame: () => 0,
       grantDailyPipsIfEligible: () => ({
         awarded: true,
+        awardedAmount: firstDailyRollPipReward,
         pips: firstDailyRollPipReward,
         lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
       }),
@@ -104,7 +145,9 @@ test("first roll of the UTC day awards daily pips", () => {
         expiresAtMs: null,
       }),
     },
+    permanentBonuses: zeroPermanentBonuses,
     progression: {
+      ...createProgressionStub(),
       awardAchievements: () => [],
       consumeDiceTemporaryEffectsForRoll: () => 0,
       recordDiceProgressionAchievementStats: () => ({
@@ -158,6 +201,7 @@ test("blocked rolls do not consume or grant the daily pip reward", () => {
         dailyGrantCalled = true;
         return {
           awarded: true,
+          awardedAmount: firstDailyRollPipReward,
           pips: firstDailyRollPipReward,
           lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
         };
@@ -171,7 +215,9 @@ test("blocked rolls do not consume or grant the daily pip reward", () => {
         expiresAtMs: null,
       }),
     },
+    permanentBonuses: zeroPermanentBonuses,
     progression: {
+      ...createProgressionStub(),
       awardAchievements: () => [],
       consumeDiceTemporaryEffectsForRoll: () => 0,
       recordDiceProgressionAchievementStats: () => ({
@@ -225,6 +271,7 @@ test("auto rolls do not grant the daily pip reward", () => {
         dailyGrantCalled = true;
         return {
           awarded: true,
+          awardedAmount: 5,
           pips: 5,
           lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
         };
@@ -238,7 +285,9 @@ test("auto rolls do not grant the daily pip reward", () => {
         expiresAtMs: null,
       }),
     },
+    permanentBonuses: zeroPermanentBonuses,
     progression: {
+      ...createProgressionStub(),
       awardAchievements: () => [],
       consumeDiceTemporaryEffectsForRoll: () => 0,
       recordDiceProgressionAchievementStats: () => ({
@@ -297,6 +346,7 @@ test("reward text includes both fame and pip rewards when both are earned", () =
         getFame: () => 0,
         grantDailyPipsIfEligible: () => ({
           awarded: true,
+          awardedAmount: firstDailyRollPipReward,
           pips: firstDailyRollPipReward,
           lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
         }),
@@ -309,7 +359,9 @@ test("reward text includes both fame and pip rewards when both are earned", () =
           expiresAtMs: null,
         }),
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
+        ...createProgressionStub(),
         awardAchievements: (_userId, achievementIds) => achievementIds,
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
@@ -377,6 +429,7 @@ test("raid damage uses the highest roll set total instead of summing all roll se
         getFame: () => 0,
         grantDailyPipsIfEligible: () => ({
           awarded: false,
+          awardedAmount: 0,
           pips: 0,
           lastDailyPipRewardAt: null,
         }),
@@ -389,7 +442,9 @@ test("raid damage uses the highest roll set total instead of summing all roll se
           expiresAtMs: null,
         }),
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
+        ...createProgressionStub(),
         awardAchievements: () => [],
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
@@ -463,6 +518,7 @@ test("manual rolls increment total /roll call analytics", () => {
         getFame: () => 0,
         grantDailyPipsIfEligible: () => ({
           awarded: false,
+          awardedAmount: 0,
           pips: 0,
           lastDailyPipRewardAt: null,
         }),
@@ -475,7 +531,9 @@ test("manual rolls increment total /roll call analytics", () => {
           expiresAtMs: null,
         }),
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
+        ...createProgressionStub(),
         awardAchievements: () => [],
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({
@@ -536,6 +594,7 @@ test("auto rolls do not increment total /roll call analytics", () => {
         getFame: () => 0,
         grantDailyPipsIfEligible: () => ({
           awarded: false,
+          awardedAmount: 0,
           pips: 0,
           lastDailyPipRewardAt: null,
         }),
@@ -548,7 +607,9 @@ test("auto rolls do not increment total /roll call analytics", () => {
           expiresAtMs: null,
         }),
       },
+      permanentBonuses: zeroPermanentBonuses,
       progression: {
+        ...createProgressionStub(),
         awardAchievements: () => [],
         consumeDiceTemporaryEffectsForRoll: () => 0,
         recordDiceProgressionAchievementStats: () => ({

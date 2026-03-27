@@ -92,10 +92,11 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasTable(db, "dice_analytics"), true);
   assert.equal(hasTable(db, "dice_analytics_by_prestige"), true);
   assert.equal(hasTable(db, "dice_progression_achievement_stats"), true);
+  assert.equal(hasTable(db, "dice_personal_charge_state"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_dice_sets_rolled"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_roll_commands_called"), true);
   assert.equal(hasColumn(db, "dice_analytics_by_prestige", "prestige_started_at"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 2);
+  assert.equal(db.pragma("user_version", { simple: true }), 3);
 });
 
 test("initializeDatabaseSchema rejects unsupported legacy progression schema without mutating the database", () => {

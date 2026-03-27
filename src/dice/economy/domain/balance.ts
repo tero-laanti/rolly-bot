@@ -16,6 +16,12 @@ export type EconomyLeaderboardEntry = EconomySnapshot & {
 
 export type DailyPipGrantResult = {
   awarded: boolean;
+  awardedAmount: number;
   pips: number;
   lastDailyPipRewardAt: string | null;
+};
+
+export type RewardPipGrantResult = {
+  awardedAmount: number;
+  pips: number;
 };
