@@ -144,14 +144,42 @@ This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full 
 bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --claim  # Claim work
+bd create --type=epic --title "..."         # Create a parent epic
+bd create --type=task --parent <epic-id> --title "..."  # Create a task under an epic
+bd create --type=task --parent <task-id> --title "..."  # Create a child task under a large task
+bd children <id>      # View child tasks for an epic or task
+bd epic status <id>   # Check epic completion status
 bd close <id>         # Complete work
 ```
 
 ### Rules
 
 - Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Structure work with hierarchy by default: use `epic` for larger initiatives, `task` for concrete deliverables, and child tasks/sub-tasks when a task is still too large to complete cleanly in one issue
+- For non-trivial work, create the hierarchy before writing code: epic first, then child tasks, then deeper child tasks only when the direct task is still too large
+- Use `--parent <id>` to attach a task to its epic or parent task, `bd children <id>` to inspect the tree, and `bd epic status <id>` to review epic progress
+- Keep leaf issues actionable and independently completable; avoid extra nesting unless it improves execution or handoff clarity
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+
+### Hierarchy Pattern
+
+```bash
+# 1. Create the parent epic for a larger feature or refactor
+bd create --type=epic --title "Improve random event admin flow"
+
+# 2. Create the main implementation tasks under the epic
+bd create --type=task --parent <epic-id> --title "Refactor admin use case"
+bd create --type=task --parent <epic-id> --title "Update Discord presenters"
+
+# 3. If one task is still too large, split it into child tasks
+bd create --type=task --parent <task-id> --title "Add repository port"
+bd create --type=task --parent <task-id> --title "Wire SQLite adapter"
+
+# 4. Inspect progress
+bd children <epic-or-task-id>
+bd epic status <epic-id>
+```
 
 ## Session Completion
 
