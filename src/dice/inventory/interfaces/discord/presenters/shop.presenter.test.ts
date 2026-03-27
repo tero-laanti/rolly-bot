@@ -348,44 +348,6 @@ test("permanent upgrade item detail renders emoji owned state", () => {
   assert.equal(ownedField?.value, "Owned: ❌");
 });
 
-test("repeatable upgrade item detail renders next price", () => {
-  const interaction = renderDiceShopResult({
-    kind: "update",
-    payload: {
-      type: "view",
-      view: {
-        screen: "item-detail",
-        ownerId: "user-1",
-        balancePips: 1_250,
-        categorySummaries,
-        categoryId: "permanent-upgrades",
-        categoryLabel: "Permanent Upgrades",
-        categoryPage: 0,
-        categoryTotalPages: 1,
-        itemNavigation: {
-          previousItemId: null,
-          nextItemId: null,
-        },
-        selectedItem: {
-          id: "pip-magnet",
-          name: "Pip Magnet",
-          description: "Passive upgrade: each copy adds +10% pip rewards.",
-          pricePips: 750,
-          nextPricePips: 1_000,
-          ownedQuantity: 2,
-          ownedLabel: "Owned 2",
-          typeLabel: "Permanent Upgrade",
-          buyable: true,
-        },
-      },
-    },
-  }).interactionResult;
-
-  const embed = interaction.payload.embeds?.[0]?.toJSON();
-  const nextPriceField = embed?.fields?.find((field) => field.name === "Next Price");
-  assert.equal(nextPriceField?.value, "1000 pips");
-});
-
 test("category pagination shows arrows only when another page exists", () => {
   const interaction = renderDiceShopResult({
     kind: "update",

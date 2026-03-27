@@ -138,14 +138,6 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
         },
       );
 
-    if (typeof view.selectedItem.nextPricePips === "number") {
-      embed.addFields({
-        name: "Next Price",
-        value: `${view.selectedItem.nextPricePips} pips`,
-        inline: true,
-      });
-    }
-
     if (view.statusMessage) {
       embed.addFields({
         name: "Status",

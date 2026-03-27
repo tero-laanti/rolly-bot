@@ -69,21 +69,6 @@ const starterCoil: DiceShopItem = {
   },
 };
 
-const pipMagnet: DiceShopItem = {
-  id: "pip-magnet",
-  name: "Pip Magnet",
-  description: "Passive upgrade: each copy adds +10% pip rewards.",
-  pricePips: 250,
-  consumable: false,
-  repeatablePricing: {
-    priceIncreasePipsPerOwned: 250,
-  },
-  effect: {
-    type: "passive-pip-reward-bonus",
-    bonusPercent: 10,
-  },
-};
-
 const emptyItemAchievementStats = {
   shopPurchaseCount: 0,
   itemUseCount: 0,
@@ -486,72 +471,6 @@ test("permanent upgrades still reject repeat purchase", async () => {
   assert.equal(getApplyPipsDeltaCalls(), 0);
   assert.equal(getGrantInventoryItemCalls(), 0);
   assert.equal(getRecordShopPurchaseCalls(), 0);
-});
-
-test("repeatable permanent upgrades use escalating prices and show the next price", async () => {
-  const { handleAction, getPips } = createTestShopUseCase({
-    initialPips: 2_000,
-    initialInventory: new Map([[pipMagnet.id, 2]]),
-    catalogItems: [pipMagnet],
-  });
-
-  const detail = await handleAction({
-    type: "select-item",
-    ownerId: "user-1",
-    categoryId: "permanent-upgrades",
-    itemId: pipMagnet.id,
-  });
-
-  assert.equal(detail.result.payload.type, "view");
-  if (detail.result.payload.type !== "view") {
-    return;
-  }
-
-  assert.equal(detail.result.payload.view.screen, "item-detail");
-  if (detail.result.payload.view.screen !== "item-detail") {
-    return;
-  }
-
-  assert.deepEqual(detail.result.payload.view.selectedItem, {
-    id: pipMagnet.id,
-    name: "Pip Magnet",
-    description: "Passive upgrade: each copy adds +10% pip rewards.",
-    pricePips: 750,
-    nextPricePips: 1_000,
-    ownedQuantity: 2,
-    ownedLabel: "Owned 2",
-    typeLabel: "Permanent Upgrade",
-    buyable: true,
-    buyDisabledReason: undefined,
-  });
-
-  const purchase = await handleAction({
-    type: "buy-selected-item",
-    ownerId: "user-1",
-    categoryId: "permanent-upgrades",
-    itemId: pipMagnet.id,
-  });
-
-  assert.equal(purchase.result.payload.type, "view");
-  if (purchase.result.payload.type !== "view") {
-    return;
-  }
-
-  assert.equal(purchase.result.payload.view.screen, "purchase-receipt");
-  if (purchase.result.payload.view.screen !== "purchase-receipt") {
-    return;
-  }
-
-  assert.deepEqual(purchase.result.payload.view.receipt, {
-    itemId: pipMagnet.id,
-    categoryId: "permanent-upgrades",
-    itemName: "Pip Magnet",
-    ownedQuantity: 3,
-    remainingPips: 1_250,
-    changeSummary: "Permanent bonus active: +30% pip rewards.",
-    canUseItemNow: false,
-  });
-  assert.equal(getPips(), 1_250);
 });
 
 test("prerequisite-gated permanent upgrades stay locked until the required item is owned", async () => {
