@@ -567,15 +567,7 @@ const handleChallengeAccept = (
       winnerId === resolvedChallenge.challengerId
         ? resolvedChallenge.opponentId
         : resolvedChallenge.challengerId;
-    const payoutPips = getWagerWinnerPayoutPips(challenge.wagerPips);
-
-    const awardedPayoutPips =
-      payoutPips > 0
-        ? economy.grantRewardPips({
-            userId: winnerId,
-            baseAmount: payoutPips,
-          }).awardedAmount
-        : 0;
+    const awardedPayoutPips = grantDuelWinnerPayout(economy, winnerId, challenge.wagerPips);
 
     const punishmentMs = getDuelPunishmentMs(challenge.duelTier);
     const reducedPunishmentMs = applyPvpLoserLockoutReduction(
@@ -1150,6 +1142,28 @@ const getWagerWinnerPayoutPips = (wagerPips: number): number => {
   }
 
   return wagerPips * 2;
+};
+
+const grantDuelWinnerPayout = (
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "grantRewardPips">,
+  winnerId: string,
+  wagerPips: number,
+): number => {
+  if (wagerPips < 1) {
+    return 0;
+  }
+
+  const refundedStake = Math.max(0, Math.floor(wagerPips));
+  economy.applyPipsDelta({
+    userId: winnerId,
+    amount: refundedStake,
+  });
+
+  const reward = economy.grantRewardPips({
+    userId: winnerId,
+    baseAmount: refundedStake,
+  });
+  return refundedStake + reward.awardedAmount;
 };
 
 const extendEffect = (currentUntil: string | null, durationMs: number, nowMs: number): number => {

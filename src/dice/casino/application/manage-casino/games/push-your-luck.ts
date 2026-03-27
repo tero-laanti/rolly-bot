@@ -189,7 +189,7 @@ const handlePushYourLuckAction = (
       );
     }
 
-    const reward = grantCasinoPayout(economy, session.userId, rollResult.payout, pips);
+    const reward = grantCasinoPayout(economy, session.userId, rollResult.payout, round.bet, pips);
     const nextPips = reward.pips;
     const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,
@@ -234,7 +234,7 @@ const handlePushYourLuckAction = (
     }
 
     const payout = getPushYourLuckCashoutPayout(round.bet, round.uniqueValues.length);
-    const reward = grantCasinoPayout(economy, session.userId, payout, pips);
+    const reward = grantCasinoPayout(economy, session.userId, payout, round.bet, pips);
     const nextPips = reward.pips;
     const achievementStats = analytics.recordRoundCompleted({
       userId: session.userId,

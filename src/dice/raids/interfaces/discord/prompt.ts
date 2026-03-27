@@ -280,7 +280,7 @@ export const buildRaidActivePrompt = ({
           `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
           `Total damage: **${totalDamage}** across ${totalAttacks} hit${totalAttacks === 1 ? "" : "s"}.`,
           `Reward-eligible raiders: **${eligibleParticipantCount}**.`,
-          `Reward on success: **${rewardSummary}**.`,
+          `Base reward on success: **${rewardSummary}**.`,
         ],
         participantIds,
         contributionLines,

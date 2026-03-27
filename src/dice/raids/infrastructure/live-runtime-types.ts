@@ -33,6 +33,7 @@ export type ActiveRaidRecord = {
   participantIds: Set<string>;
   joinedUserIds: Set<string>;
   rewardEligibleUserIds: Set<string>;
+  resolvedRewardSummary: string | null;
   achievementAnnouncements: AchievementAnnouncement[];
   activeThreadId: string | null;
   boss: ActiveRaidBossRecord | null;

@@ -57,7 +57,7 @@ test("active raid prompt trims long contribution sections without dropping the c
   assert.ok(description);
   assert.ok(description.length <= 4_096);
   assert.match(description, /HP: \*\*1234\/5678\*\*/);
-  assert.match(description, /Reward on success:/);
+  assert.match(description, /Base reward on success:/);
 });
 
 test("resolved raid prompt trims long leaderboards without dropping the outcome summary", () => {

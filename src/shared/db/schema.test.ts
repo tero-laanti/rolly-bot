@@ -83,6 +83,12 @@ const createCurrentSchemaV1 = (db: Database.Database): void => {
   `);
 };
 
+const createCurrentSchemaV2 = (db: Database.Database): void => {
+  initializeDatabaseSchema(db);
+  db.exec("DROP TABLE dice_personal_charge_state");
+  db.pragma("user_version = 2");
+};
+
 test("initializeDatabaseSchema creates the current schema on an empty database", () => {
   const db = new Database(":memory:");
 
@@ -143,4 +149,24 @@ test("initializeDatabaseSchema rejects an incomplete current schema without muta
   );
   assert.equal(hasTable(db, "dice_analytics_by_prestige"), false);
   assert.equal(db.pragma("user_version", { simple: true }), 0);
+});
+
+test("initializeDatabaseSchema adds the personal charge table on the supported v2 schema", () => {
+  const db = new Database(":memory:");
+  createCurrentSchemaV2(db);
+  db.prepare(
+    `
+    INSERT INTO balances (user_id, fame, pips, updated_at)
+    VALUES (?, ?, ?, ?)
+  `,
+  ).run("user-1", 7, 11, "2026-03-27T12:00:00.000Z");
+
+  initializeDatabaseSchema(db);
+
+  assert.equal(hasTable(db, "dice_personal_charge_state"), true);
+  assert.equal(db.pragma("user_version", { simple: true }), 3);
+  assert.deepEqual(db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get("user-1"), {
+    fame: 7,
+    pips: 11,
+  });
 });

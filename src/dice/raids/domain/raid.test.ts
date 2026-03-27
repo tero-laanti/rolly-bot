@@ -5,6 +5,7 @@ import {
   calculateRaidBossMaxHpForStrength,
   calculateRaidParticipantStrength,
   createRaidBoss,
+  describeAppliedRaidReward,
   getDefaultRaidReward,
 } from "./raid";
 
@@ -64,4 +65,17 @@ test("raid boss level roll is low-heavy and capped at level 50", () => {
   assert.equal(levelFiftyBoss.level, 50);
   assert.equal(levelFiftyBoss.maxHp, 511);
   assert.equal(scaledBoss.maxHp, 570);
+});
+
+test("applied raid reward summaries reflect permanent pip bonus outcomes", () => {
+  const reward = getDefaultRaidReward(12);
+
+  assert.equal(
+    describeAppliedRaidReward(reward, [12, 12]),
+    "12 pips and x12 roll buff for the next 2 /rolls per eligible raider",
+  );
+  assert.equal(
+    describeAppliedRaidReward(reward, [12, 14]),
+    "12-14 pips, based on permanent bonuses and x12 roll buff for the next 2 /rolls per eligible raider",
+  );
 });

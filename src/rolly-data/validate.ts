@@ -1072,6 +1072,15 @@ const isPassiveDiceItemEffect = (effect: DiceItemEffect): boolean => {
   );
 };
 
+const isRepeatablePassiveDiceItemEffect = (effect: DiceItemEffect): boolean => {
+  return (
+    effect.type === "passive-extra-ban-slot" ||
+    effect.type === "passive-pip-reward-bonus" ||
+    effect.type === "passive-personal-charge-speed-bonus" ||
+    effect.type === "passive-personal-charge-cap-bonus"
+  );
+};
+
 const readDiceItemRepeatablePricing = (
   value: unknown,
   label: string,
@@ -1879,6 +1888,12 @@ export const parseDiceItems = (value: unknown): DiceItemData[] => {
     if (item.repeatablePricing && !isPassiveDiceItemEffect(item.effect)) {
       throw new Error(
         `Only passive upgrades may declare repeatablePricing, but ${item.id} is not passive.`,
+      );
+    }
+
+    if (item.repeatablePricing && !isRepeatablePassiveDiceItemEffect(item.effect)) {
+      throw new Error(
+        `Only stacking passive upgrades may declare repeatablePricing, but ${item.id} does not stack.`,
       );
     }
 

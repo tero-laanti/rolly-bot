@@ -4,6 +4,20 @@ import Database from "better-sqlite3";
 import { initializeDatabaseSchema } from "../../../../shared/db/schema";
 import { createSqliteEconomyRepository } from "./balance-repository";
 
+const grantOwnedItem = (
+  db: Database.Database,
+  userId: string,
+  itemId: string,
+  quantity: number = 1,
+): void => {
+  db.prepare(
+    `
+    INSERT INTO inventory_items (user_id, item_id, quantity, first_acquired_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  ).run(userId, itemId, quantity, "2026-03-27T12:00:00.000Z", "2026-03-27T12:00:00.000Z");
+};
+
 test("grantDailyPipsIfEligible awards once per UTC day", () => {
   const db = new Database(":memory:");
   initializeDatabaseSchema(db);
@@ -42,6 +56,34 @@ test("grantDailyPipsIfEligible awards once per UTC day", () => {
     awardedAmount: 5,
     pips: 10,
     lastDailyPipRewardAt: "2026-03-21T00:00:00.000Z",
+  });
+});
+
+test("reward-aware pip grants include Pip Magnet bonuses", () => {
+  const db = new Database(":memory:");
+  initializeDatabaseSchema(db);
+  const economy = createSqliteEconomyRepository(db);
+  grantOwnedItem(db, "user-1", "pip-magnet", 2);
+
+  const directReward = economy.grantRewardPips({
+    userId: "user-1",
+    baseAmount: 10,
+  });
+  const dailyReward = economy.grantDailyPipsIfEligible({
+    userId: "user-1",
+    amount: 5,
+    nowMs: Date.parse("2026-03-20T09:00:00.000Z"),
+  });
+
+  assert.deepEqual(directReward, {
+    awardedAmount: 12,
+    pips: 12,
+  });
+  assert.deepEqual(dailyReward, {
+    awarded: true,
+    awardedAmount: 6,
+    pips: 18,
+    lastDailyPipRewardAt: "2026-03-20T09:00:00.000Z",
   });
 });
 

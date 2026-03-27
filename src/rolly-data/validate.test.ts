@@ -542,6 +542,30 @@ test("parseDiceItems rejects repeatable pricing on non-passive items", () => {
   );
 });
 
+test("parseDiceItems rejects repeatable pricing on passive effects that do not stack", () => {
+  assert.throws(
+    () =>
+      parseDiceItems([
+        {
+          id: "padded-bracers",
+          name: "Padded Bracers",
+          description: "Passive upgrade: reduce PvP loser lockout by 15%.",
+          pricePips: 900,
+          consumable: false,
+          repeatablePricing: {
+            priceIncreasePipsPerOwned: 900,
+          },
+          effect: {
+            type: "passive-pvp-loser-lockout-reduction",
+            reductionPercent: 0.15,
+            minimumMinutes: 15,
+          },
+        },
+      ]),
+    /Only stacking passive upgrades may declare repeatablePricing, but padded-bracers does not stack/i,
+  );
+});
+
 test("parseDiceItems rejects self prerequisites", () => {
   assert.throws(
     () =>

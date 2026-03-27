@@ -163,7 +163,13 @@ const handleDicePokerAction = (
     }
 
     const rerollResult = rerollDicePokerRound(round);
-    const reward = grantCasinoPayout(economy, session.userId, rerollResult.result.payout, pips);
+    const reward = grantCasinoPayout(
+      economy,
+      session.userId,
+      rerollResult.result.payout,
+      round.bet,
+      pips,
+    );
     const nextPips = reward.pips;
 
     const achievementStats = analytics.recordRoundCompleted({
@@ -200,7 +206,11 @@ const handleDicePokerAction = (
             activeRound: null,
             lastOutcome: `Final hand: ${formatDice(rerollResult.finalRoll)}.\n${describePokerResult(
               rerollResult.result,
-            )}${reward.awardedPayout > 0 ? `\nPaid ${reward.awardedPayout} pips.` : ""}`,
+            )}${
+              reward.awardedPayout > 0 && reward.awardedPayout !== rerollResult.result.payout
+                ? `\nPaid ${reward.awardedPayout} pips after permanent bonuses.`
+                : ""
+            }`,
           },
         },
         nextPips,

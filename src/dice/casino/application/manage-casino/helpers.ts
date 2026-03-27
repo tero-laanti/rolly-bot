@@ -1,6 +1,6 @@
-import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
-import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
+import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
+import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
 import {
   createDefaultDiceCasinoSessionState,
   createDiceCasinoSessionToken,
@@ -211,27 +211,47 @@ export const getOutcomeFromPayout = (bet: number, payout: number): "win" | "loss
 };
 
 export const grantCasinoPayout = (
-  economy: Pick<DiceEconomyRepository, "grantRewardPips">,
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "grantRewardPips">,
   userId: string,
   payout: number,
+  refundedBet: number,
   currentPips: number,
 ): {
   awardedPayout: number;
   pips: number;
 } => {
-  if (payout < 1) {
+  const normalizedPayout = Math.max(0, Math.floor(payout));
+  const normalizedRefund = Math.max(0, Math.min(normalizedPayout, Math.floor(refundedBet)));
+
+  if (normalizedPayout < 1) {
     return {
       awardedPayout: 0,
       pips: currentPips,
     };
   }
 
+  let nextPips = currentPips;
+  if (normalizedRefund > 0) {
+    nextPips = economy.applyPipsDelta({
+      userId,
+      amount: normalizedRefund,
+    });
+  }
+
+  const rewardBaseAmount = normalizedPayout - normalizedRefund;
+  if (rewardBaseAmount < 1) {
+    return {
+      awardedPayout: normalizedRefund,
+      pips: nextPips,
+    };
+  }
+
   const reward = economy.grantRewardPips({
     userId,
-    baseAmount: payout,
+    baseAmount: rewardBaseAmount,
   });
   return {
-    awardedPayout: reward.awardedAmount,
+    awardedPayout: normalizedRefund + reward.awardedAmount,
     pips: reward.pips,
   };
 };

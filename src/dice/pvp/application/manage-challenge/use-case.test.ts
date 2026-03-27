@@ -560,10 +560,10 @@ test("decisive wager payouts apply Pip Magnet bonuses only to the winner payout"
     null,
   );
 
-  assert.equal(harness.balances.get("challenger"), 114);
+  assert.equal(harness.balances.get("challenger"), 112);
   assert.equal(harness.balances.get("opponent"), 90);
   assert.equal(result.payload.type, "message");
-  assert.match(result.payload.content, /receives 24 pips/);
+  assert.match(result.payload.content, /receives 22 pips/);
 });
 
 test("failed challenge publishing cancels the challenge and refunds the challenger", async () => {

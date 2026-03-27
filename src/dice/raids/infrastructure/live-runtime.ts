@@ -25,6 +25,7 @@ import { getDiceRaidAchievementIds } from "../application/achievement-rules";
 import {
   calculateRaidParticipantStrength,
   createRaidBoss,
+  describeAppliedRaidReward,
   describeRaidReward,
 } from "../domain/raid";
 import { parseRaidJoinButtonId, parseRaidLeaveButtonId } from "../interfaces/discord/button-ids";
@@ -98,7 +99,8 @@ const buildRaidBossSnapshot = (context: ActiveRaidContext): RaidBossSnapshot | n
     level: context.raid.boss.level,
     currentHp: context.raid.boss.currentHp,
     maxHp: context.raid.boss.maxHp,
-    rewardSummary: describeRaidReward(context.raid.boss.reward),
+    rewardSummary:
+      context.raid.resolvedRewardSummary ?? describeRaidReward(context.raid.boss.reward),
   };
 };
 
@@ -225,7 +227,7 @@ export const createRaidsLiveRuntime = ({
             bossName: boss.name,
             bossLevel: boss.level,
             maxHp: boss.maxHp,
-            rewardSummary: describeRaidReward(boss.reward),
+            rewardSummary: context.raid.resolvedRewardSummary ?? describeRaidReward(boss.reward),
             contributionLines: buildContributionLines(context),
           });
         }
@@ -281,7 +283,7 @@ export const createRaidsLiveRuntime = ({
             bossName: boss.name,
             bossLevel: boss.level,
             maxHp: boss.maxHp,
-            rewardSummary: describeRaidReward(boss.reward),
+            rewardSummary: context.raid.resolvedRewardSummary ?? describeRaidReward(boss.reward),
             contributionLines: buildContributionLines(context),
           });
         }
@@ -456,6 +458,7 @@ export const createRaidsLiveRuntime = ({
     context.raid.closedAtMs = null;
     context.raid.activeThreadId = null;
     context.raid.rewardEligibleUserIds.clear();
+    context.raid.resolvedRewardSummary = null;
     context.raid.boss = null;
   };
 
@@ -480,6 +483,7 @@ export const createRaidsLiveRuntime = ({
     context.raid.closedAtMs = null;
     context.raid.activeThreadId = activeThreadId;
     context.raid.rewardEligibleUserIds.clear();
+    context.raid.resolvedRewardSummary = null;
     context.raid.boss = boss;
     liveRaidIdsByThreadId.set(activeThreadId, context.raid.raidId);
   };
@@ -546,12 +550,14 @@ export const createRaidsLiveRuntime = ({
 
     unitOfWork.runInTransaction(() => {
       const achievementAnnouncements: AchievementAnnouncement[] = [];
+      const awardedPipAmounts: number[] = [];
 
       for (const participantId of rewardEligibleUserIds) {
-        economy.grantRewardPips({
+        const reward = economy.grantRewardPips({
           userId: participantId,
           baseAmount: boss.reward.pips,
         });
+        awardedPipAmounts.push(reward.awardedAmount);
         progression.applyDiceTemporaryEffect({
           userId: participantId,
           effectCode: "roll-pass-multiplier",
@@ -606,6 +612,10 @@ export const createRaidsLiveRuntime = ({
         }
       }
 
+      context.raid.resolvedRewardSummary = describeAppliedRaidReward(
+        boss.reward,
+        awardedPipAmounts,
+      );
       context.raid.achievementAnnouncements =
         mergeAchievementAnnouncements(achievementAnnouncements);
     });
@@ -965,6 +975,7 @@ export const createRaidsLiveRuntime = ({
         participantIds: new Set<string>(),
         joinedUserIds: new Set<string>(),
         rewardEligibleUserIds: new Set<string>(),
+        resolvedRewardSummary: null,
         achievementAnnouncements: [],
         activeThreadId: null,
         boss: null,
@@ -1162,9 +1173,9 @@ export const createRaidsLiveRuntime = ({
           announcement ? [announcement] : [],
         ),
       );
-      const rewardSummary = describeRaidReward(boss.reward);
-      const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
       resolveRaid(context, "success", nowMs);
+      const rewardSummary = context.raid.resolvedRewardSummary ?? describeRaidReward(boss.reward);
+      const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
       return {
         kind: "applied",
         defeated: true,

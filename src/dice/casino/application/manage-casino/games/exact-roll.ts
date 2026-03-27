@@ -163,7 +163,13 @@ const handleExactRollAction = (
     const resolution = resolveExactRollFace(session.bet, action.face, rolledFace);
     let awardedPayout = 0;
     if (resolution.payout > 0) {
-      const reward = grantCasinoPayout(economy, session.userId, resolution.payout, nextPips);
+      const reward = grantCasinoPayout(
+        economy,
+        session.userId,
+        resolution.payout,
+        session.bet,
+        nextPips,
+      );
       awardedPayout = reward.awardedPayout;
       nextPips = reward.pips;
     }
@@ -227,7 +233,13 @@ const handleExactRollAction = (
     const resolution = resolveExactRollHighLow(session.bet, action.choice, rolledFace);
     let awardedPayout = 0;
     if (resolution.payout > 0) {
-      const reward = grantCasinoPayout(economy, session.userId, resolution.payout, nextPips);
+      const reward = grantCasinoPayout(
+        economy,
+        session.userId,
+        resolution.payout,
+        session.bet,
+        nextPips,
+      );
       awardedPayout = reward.awardedPayout;
       nextPips = reward.pips;
     }

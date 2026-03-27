@@ -19,3 +19,24 @@ test("achievement pip rewards are granted only on first unlock", () => {
   assert.deepEqual(second, []);
   assert.equal(economy.getPips("user-1"), 23);
 });
+
+test("achievement pip rewards respect Pip Magnet bonuses", () => {
+  const db = new Database(":memory:");
+  initializeDatabaseSchema(db);
+  db.prepare(
+    `
+    INSERT INTO inventory_items (user_id, item_id, quantity, first_acquired_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  ).run("user-1", "pip-magnet", 2, "2026-03-27T12:00:00.000Z", "2026-03-27T12:00:00.000Z");
+  const progression = createSqliteProgressionAchievementsRepository(db);
+  const economy = createSqliteEconomyRepository(db);
+
+  const newlyEarned = progression.awardAchievements("user-1", [
+    "example-pair",
+    "example-manual-prestige",
+  ]);
+
+  assert.deepEqual(newlyEarned, ["example-pair", "example-manual-prestige"]);
+  assert.equal(economy.getPips("user-1"), 27);
+});
