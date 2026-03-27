@@ -6,8 +6,14 @@ import {
 import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
-import type { DicePermanentBonusesPort } from "../../../inventory/application/ports";
-import type { DiceItemEffectsService } from "../../../inventory/application/item-effects-service";
+import type {
+  DicePermanentBonusesPort,
+  DicePersonalChargeBonus,
+} from "../../../inventory/application/ports";
+import type {
+  DiceItemDoubleRollStatus,
+  DiceItemEffectsService,
+} from "../../../inventory/application/item-effects-service";
 import {
   createAchievementAnnouncement,
   mergeAchievementAnnouncements,
@@ -18,20 +24,12 @@ import {
   getDiceAchievementsForRoll,
 } from "../../../progression/domain/achievements-store";
 import {
-  getBaseRollPassCount,
   getFirstDailyRollPipReward,
   getDiceCountIncreaseReward,
-  getDiceMaxRollPassCount,
   getDicePrestigeBaseDiceCount,
-  getDoubleBuffRollPassCount,
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
 import { rollDieWithBans } from "../../../progression/domain/bans";
-import {
-  combineDiceChargeMultipliers,
-  getDiceChargeMultiplier,
-  getPersonalDiceChargeMultiplier,
-} from "../../../progression/domain/charge";
 import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { RaidDiceRollPort } from "../../../raids/application/ports";
@@ -40,6 +38,11 @@ import {
   formatMatchingRollSummary,
   formatRewardText,
 } from "./reply-content";
+import {
+  buildDiceRollModifierFooter,
+  createDiceRollModifierState,
+  formatMultiplierFactor,
+} from "../roll-status";
 
 export type DiceAutoRollClassification =
   | {
@@ -55,22 +58,6 @@ export type DiceRollResult = {
   ephemeral: boolean;
   autoRollClassification: DiceAutoRollClassification;
   achievementAnnouncements?: AchievementAnnouncement[];
-};
-
-type RollPassEffectSummary = {
-  multiplier: number;
-  divisor: number;
-  effectiveFactor: number;
-  hasApplicableEffects: boolean;
-};
-
-type ResolvedRollPassState = {
-  rollPassCount: number;
-  didUseChargeRoll: boolean;
-  effectiveFactor: number;
-  hasActivePvpDoubleRoll: boolean;
-  hasActiveItemDoubleRoll: boolean;
-  temporaryEffectsRollSummary: RollPassEffectSummary;
 };
 
 type RunRollDiceUseCaseInput = {
@@ -172,24 +159,13 @@ export const createRunRollDiceUseCase = ({
     const permanentBonusSnapshot = permanentBonuses.getPermanentBonuses(userId);
     const lastDiceRollAt = progression.getLastDiceRollAt();
     const lastPersonalDiceRollAt = progression.getLastPersonalDiceRollAt(userId);
-    const globalChargeMultiplier = getDiceChargeMultiplier(lastDiceRollAt, nowMs);
-    const personalChargeMultiplier = permanentBonusSnapshot.personalCharge.unlocked
-      ? getPersonalDiceChargeMultiplier(
-          lastPersonalDiceRollAt,
-          permanentBonusSnapshot.personalCharge,
-          nowMs,
-        )
-      : 1;
-    const chargeMultiplier = combineDiceChargeMultipliers(
-      globalChargeMultiplier,
-      personalChargeMultiplier,
-    );
-    const hasActivePvpDoubleRoll = Boolean(pvpDoubleRollUntil && pvpDoubleRollUntil > nowMs);
     const resolvedRollPassState = resolveRollPassState({
       prestige: highestPrestige,
-      chargeMultiplier,
-      hasActivePvpDoubleRoll,
-      hasActiveItemDoubleRoll: itemDoubleRollStatus.isActive,
+      lastDiceRollAt,
+      lastPersonalDiceRollAt,
+      personalChargeBonus: permanentBonusSnapshot.personalCharge,
+      pvpDoubleRollUntil,
+      itemDoubleRollStatus,
       temporaryEffects: progression.getActiveDiceTemporaryEffects({
         userId,
         nowMs,
@@ -231,7 +207,7 @@ export const createRunRollDiceUseCase = ({
       const progressionAchievementStats = progression.recordDiceProgressionAchievementStats({
         userId,
         nearDiceCountIncreaseRollCount,
-        chargeMultiplier,
+        chargeMultiplier: resolvedRollPassState.combinedChargeMultiplier,
         rollPassCount,
         diceCountIncreasesGained: diceCountIncrease,
       });
@@ -316,7 +292,7 @@ export const createRunRollDiceUseCase = ({
       source === "manual" && result.dailyFirstRollAwarded && result.dailyFirstRollAwardedAmount > 0
         ? formatDailyFirstRollBanner(result.dailyFirstRollAwardedAmount)
         : "";
-    const multiplierFooter = buildRollModifierFooter(resolvedRollPassState);
+    const multiplierFooter = buildDiceRollModifierFooter(resolvedRollPassState);
     const unlockedBansAfter =
       getUnlockedBanSlotsFromFame(result.fameAfter, result.diceCountAfter, dieSides) +
       permanentBonusSnapshot.extraBanSlots;
@@ -448,137 +424,32 @@ const getManualProgressionAchievementIds = (stats: DiceProgressionAchievementSta
   return achievementIds;
 };
 
-const summarizeRollPassEffects = (
-  effects: ReturnType<DiceProgressionRepository["getActiveDiceTemporaryEffects"]>,
-): RollPassEffectSummary => {
-  let multiplier = 1;
-  let divisor = 1;
-  let hasApplicableEffects = false;
-
-  for (const effect of effects) {
-    if (effect.effectCode === "roll-pass-multiplier" && effect.kind === "positive") {
-      multiplier *= Math.max(1, effect.magnitude);
-      hasApplicableEffects = true;
-      continue;
-    }
-
-    if (effect.effectCode === "roll-pass-divisor" && effect.kind === "negative") {
-      divisor *= Math.max(1, effect.magnitude);
-      hasApplicableEffects = true;
-    }
-  }
-
-  const normalizedMultiplier = Math.max(1, Math.floor(multiplier));
-  const normalizedDivisor = Math.max(1, Math.floor(divisor));
-
-  return {
-    multiplier: normalizedMultiplier,
-    divisor: normalizedDivisor,
-    effectiveFactor: normalizedMultiplier / normalizedDivisor,
-    hasApplicableEffects,
-  };
-};
-
 const resolveRollPassState = ({
   prestige,
-  chargeMultiplier,
-  hasActivePvpDoubleRoll,
-  hasActiveItemDoubleRoll,
+  lastDiceRollAt,
+  lastPersonalDiceRollAt,
+  personalChargeBonus,
+  pvpDoubleRollUntil,
+  itemDoubleRollStatus,
   temporaryEffects,
 }: {
   prestige: number;
-  chargeMultiplier: number;
-  hasActivePvpDoubleRoll: boolean;
-  hasActiveItemDoubleRoll: boolean;
+  lastDiceRollAt: number | null;
+  lastPersonalDiceRollAt: number | null;
+  personalChargeBonus: DicePersonalChargeBonus;
+  pvpDoubleRollUntil: number | null;
+  itemDoubleRollStatus: DiceItemDoubleRollStatus;
   temporaryEffects: ReturnType<DiceProgressionRepository["getActiveDiceTemporaryEffects"]>;
-}): ResolvedRollPassState => {
-  const baseRollPassCount = getBaseRollPassCount(prestige);
-  const hasActiveDoubleRoll = hasActivePvpDoubleRoll || hasActiveItemDoubleRoll;
-  const doubleBuffRollPassCount = hasActiveDoubleRoll
-    ? getDoubleBuffRollPassCount(prestige)
-    : baseRollPassCount;
-  const temporaryEffectsRollSummary = summarizeRollPassEffects(temporaryEffects);
-  const nonChargeRollPassCount = Math.max(
-    1,
-    Math.floor(doubleBuffRollPassCount * temporaryEffectsRollSummary.effectiveFactor),
-  );
-  const didUseChargeRoll = chargeMultiplier > 1;
-  const winningRollPassCount = didUseChargeRoll
-    ? baseRollPassCount * chargeMultiplier
-    : nonChargeRollPassCount;
-  const rollPassCount = Math.max(1, Math.min(getDiceMaxRollPassCount(), winningRollPassCount));
-
-  return {
-    rollPassCount,
-    didUseChargeRoll,
-    effectiveFactor: rollPassCount / baseRollPassCount,
-    hasActivePvpDoubleRoll,
-    hasActiveItemDoubleRoll,
-    temporaryEffectsRollSummary,
-  };
-};
-
-const buildRollModifierFooter = ({
-  hasActivePvpDoubleRoll,
-  hasActiveItemDoubleRoll,
-  temporaryEffectsRollSummary,
-  didUseChargeRoll,
-  effectiveFactor,
-}: ResolvedRollPassState): string => {
-  const modifierParts: string[] = [];
-
-  if (hasActivePvpDoubleRoll || hasActiveItemDoubleRoll) {
-    const doubleRollSources: string[] = [];
-    if (hasActivePvpDoubleRoll) {
-      doubleRollSources.push("PvP");
-    }
-    if (hasActiveItemDoubleRoll) {
-      doubleRollSources.push("item");
-    }
-
-    modifierParts.push(
-      doubleRollSources.length === 1
-        ? `${doubleRollSources[0]} double ×2`
-        : `double-roll buff ×2 (${doubleRollSources.join(" + ")})`,
-    );
-  }
-
-  if (temporaryEffectsRollSummary.multiplier > 1) {
-    modifierParts.push(
-      `temporary ${temporaryEffectsRollSummary.multiplier === 2 ? "buff" : "buffs"} ×${temporaryEffectsRollSummary.multiplier}`,
-    );
-  }
-
-  if (temporaryEffectsRollSummary.divisor > 1) {
-    modifierParts.push(
-      `temporary ${temporaryEffectsRollSummary.divisor === 2 ? "penalty" : "penalties"} ÷${temporaryEffectsRollSummary.divisor}`,
-    );
-  }
-
-  if (modifierParts.length < 1) {
-    return "";
-  }
-
-  if (didUseChargeRoll) {
-    return `Other active roll modifiers: ${modifierParts.join(" · ")}.`;
-  }
-
-  return `Roll modifiers: ${modifierParts.join(" · ")} → effective ×${formatMultiplierFactor(effectiveFactor)}.`;
-};
-
-const formatMultiplierFactor = (value: number): string => {
-  if (!Number.isFinite(value) || value <= 0) {
-    return "1";
-  }
-
-  if (Number.isInteger(value)) {
-    return value.toString();
-  }
-
-  return value
-    .toFixed(2)
-    .replace(/\.0+$/, "")
-    .replace(/(\.\d*[1-9])0+$/, "$1");
+}): ReturnType<typeof createDiceRollModifierState> => {
+  return createDiceRollModifierState({
+    prestige,
+    lastGlobalRollAtMs: lastDiceRollAt,
+    lastPersonalRollAtMs: lastPersonalDiceRollAt,
+    personalChargeBonus,
+    pvpDoubleRollUntilMs: pvpDoubleRollUntil,
+    itemDoubleRollStatus,
+    temporaryEffects,
+  });
 };
 
 const buildAutoRollClassification = ({

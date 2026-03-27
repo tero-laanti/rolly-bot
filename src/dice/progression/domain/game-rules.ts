@@ -5,7 +5,7 @@ const getDicePrestigeSides = (): number[] => {
   return getDiceBalanceData().prestigeSides;
 };
 
-const getBanStep = (): number => {
+export const getDiceBanStep = (): number => {
   return getDiceBalanceData().banStep;
 };
 
@@ -84,7 +84,7 @@ export const getUnlockedBanSlotsFromFame = (
 ): number => {
   void _diceCount;
   void _dieSides;
-  return Math.max(0, Math.floor(fame / getBanStep()));
+  return Math.max(0, Math.floor(fame / getDiceBanStep()));
 };
 
 export const normalizeDicePvpTier = (duelTier: number): number => {

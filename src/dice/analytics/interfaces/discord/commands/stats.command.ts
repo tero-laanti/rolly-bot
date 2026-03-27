@@ -1,15 +1,15 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 import { getDatabase } from "../../../../../shared/db";
-import { createSqliteQueryDiceAnalyticsUseCase } from "../../../infrastructure/sqlite/services";
+import { createSqliteQueryDiceStatsUseCase } from "../../../infrastructure/sqlite/services";
 
 export const data = new SlashCommandBuilder()
-  .setName("analytics")
-  .setDescription("Show your dice progression analytics.");
+  .setName("stats")
+  .setDescription("Show your current dice stats.");
 
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
-  const queryDiceAnalytics = createSqliteQueryDiceAnalyticsUseCase(getDatabase());
-  const result = queryDiceAnalytics({
+  const queryDiceStats = createSqliteQueryDiceStatsUseCase(getDatabase());
+  const result = queryDiceStats({
     userId: interaction.user.id,
     userMention: interaction.user.toString(),
     nowMs: Date.now(),

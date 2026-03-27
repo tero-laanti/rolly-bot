@@ -5,7 +5,7 @@ Repo-specific guidance for working on Rolly.
 ## Product Scope
 
 - Rolly is a Discord dice game with progression, random events, casino games, raids, and owner-only admin/update tools.
-- User-facing commands are `/roll`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, `/analytics`, `/admin`, and `/self-update`.
+- User-facing commands are `/roll`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, `/stats`, `/admin`, and `/self-update`.
 - Random events are part of the core product, not side infrastructure.
 - Fame and pips are part of the live game model. They are stored in the `balances` table and are used by gameplay systems.
 - Use `Rolly` for human-facing product copy and `rolly-bot` for package, repo, and filesystem identifiers when appropriate.

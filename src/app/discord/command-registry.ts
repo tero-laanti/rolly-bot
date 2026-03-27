@@ -5,7 +5,7 @@ import * as rCommand from "../../dice/progression/interfaces/discord/commands/r.
 import * as rollCommand from "../../dice/progression/interfaces/discord/commands/roll.command";
 import * as prestigeCommand from "../../dice/progression/interfaces/discord/commands/prestige.command";
 import * as adminCommand from "../../dice/admin/interfaces/discord/commands/admin.command";
-import * as analyticsCommand from "../../dice/analytics/interfaces/discord/commands/analytics.command";
+import * as statsCommand from "../../dice/analytics/interfaces/discord/commands/stats.command";
 import * as casinoCommand from "../../dice/casino/interfaces/discord/commands/casino.command";
 import * as balanceCommand from "../../dice/economy/interfaces/discord/commands/balance.command";
 import * as leaderboardsCommand from "../../dice/economy/interfaces/discord/commands/leaderboards.command";
@@ -42,7 +42,7 @@ const discordCommandModules: DiscordCommandModule[] = [
   shopCommand,
   inventoryCommand,
   pvpCommand,
-  analyticsCommand,
+  statsCommand,
   adminCommand,
   selfUpdateCommand,
 ];
