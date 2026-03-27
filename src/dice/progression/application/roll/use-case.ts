@@ -171,6 +171,7 @@ export const createRunRollDiceUseCase = ({
         nowMs,
         commandName: "dice",
       }),
+      nowMs,
     });
     const { rollPassCount, didUseChargeRoll } = resolvedRollPassState;
     const dieSides = progression.getDiceSides(userId);
@@ -432,6 +433,7 @@ const resolveRollPassState = ({
   pvpDoubleRollUntil,
   itemDoubleRollStatus,
   temporaryEffects,
+  nowMs,
 }: {
   prestige: number;
   lastDiceRollAt: number | null;
@@ -440,6 +442,7 @@ const resolveRollPassState = ({
   pvpDoubleRollUntil: number | null;
   itemDoubleRollStatus: DiceItemDoubleRollStatus;
   temporaryEffects: ReturnType<DiceProgressionRepository["getActiveDiceTemporaryEffects"]>;
+  nowMs: number;
 }): ReturnType<typeof createDiceRollModifierState> => {
   return createDiceRollModifierState({
     prestige,
@@ -449,6 +452,7 @@ const resolveRollPassState = ({
     pvpDoubleRollUntilMs: pvpDoubleRollUntil,
     itemDoubleRollStatus,
     temporaryEffects,
+    nowMs,
   });
 };
 
