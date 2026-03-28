@@ -98,10 +98,10 @@ test("contracts reply shows active accepted runs and summary state", () => {
   assert.equal(result.ephemeral, false);
   assert.match(result.content, /\*\*Daily Contracts\*\*/);
   assert.match(result.content, /Serious Roller/);
-  assert.match(
-    result.content,
-    /Difficulty: serious \| Progress: 4\/10 \| Reward: 20 Pips \| Status: In progress/,
-  );
+  assert.match(result.content, /Difficulty: serious/);
+  assert.match(result.content, /Progress: 4\/10/);
+  assert.match(result.content, /Reward: 20 Pips/);
+  assert.match(result.content, /Status: In progress/);
   assert.match(result.content, /Rerolls: Simple: ready \| Serious: ready \| Brutal: ready/);
   assert.match(result.content, /Refill: Available for brutal difficulty\./);
 });

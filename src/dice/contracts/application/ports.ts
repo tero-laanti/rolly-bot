@@ -1,4 +1,5 @@
 import type { UnitOfWork } from "../../../shared-kernel/application/unit-of-work";
+import type { ContractCompletionAnnouncement } from "./completion-announcements";
 import type {
   ContractAcceptedVia,
   ContractCadenceState,
@@ -128,6 +129,7 @@ export type ContractsProgressEvent = {
 
 export type ContractsProgressResult = {
   updates: ContractProgressUpdate[];
+  contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
 
 export interface ContractsProgressRecorder {

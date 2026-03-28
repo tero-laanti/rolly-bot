@@ -190,7 +190,11 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "exact-face-win" } : undefined,
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -218,6 +222,7 @@ const handleExactRollAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 
@@ -261,7 +266,11 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "high-low-win" } : undefined,
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -291,6 +300,7 @@ const handleExactRollAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 

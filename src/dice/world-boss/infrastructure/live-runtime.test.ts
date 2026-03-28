@@ -185,7 +185,9 @@ test("World Boss join publishes achievement announcements even if the signup pro
     const modulePaths = [
       "../../../shared/config",
       "../../../app/discord/achievement-announcements",
+      "../../../app/discord/contract-completion-announcements",
       "../../../shared/db",
+      "../../contracts/infrastructure/sqlite/services",
       "../../progression/application/achievement-awards",
       "./live-runtime",
     ] as const;
@@ -196,6 +198,16 @@ test("World Boss join publishes achievement announcements even if the signup pro
 
     const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
     const originalGetDatabase = sharedDb.getDatabase;
+    const contractsServices = moduleRequire(
+      "../../contracts/infrastructure/sqlite/services",
+    ) as typeof import("../../contracts/infrastructure/sqlite/services");
+    const originalCreateSqliteContractsGameplayProgressPort =
+      contractsServices.createSqliteContractsGameplayProgressPort;
+    const contractAnnouncements = moduleRequire(
+      "../../../app/discord/contract-completion-announcements",
+    ) as typeof import("../../../app/discord/contract-completion-announcements");
+    const originalPublishContractCompletionAnnouncements =
+      contractAnnouncements.publishContractCompletionAnnouncements;
     const achievementAwards = moduleRequire(
       "../../progression/application/achievement-awards",
     ) as typeof import("../../progression/application/achievement-awards");
@@ -204,6 +216,39 @@ test("World Boss join publishes achievement announcements even if the signup pro
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort = () => ({
+        recordRoll: () => null,
+        recordPvpWin: () => null,
+        recordCasinoGameCompletion: () => null,
+        recordWorldBossJoin: ({ userId }) => ({
+          updates: [],
+          contractCompletionAnnouncements: [
+            {
+              userId,
+              cadence: "weekly",
+              contractTitle: "World Boss Detail",
+              rewardPips: 45,
+            },
+          ],
+        }),
+      });
+      const publishedContractAnnouncements: Array<{
+        userId: string;
+        cadence: "daily" | "weekly";
+        contractTitle: string;
+        rewardPips: number;
+      }> = [];
+      (
+        contractAnnouncements as {
+          publishContractCompletionAnnouncements: typeof contractAnnouncements.publishContractCompletionAnnouncements;
+        }
+      ).publishContractCompletionAnnouncements = async ({ announcements }) => {
+        publishedContractAnnouncements.push(...announcements);
+      };
       (
         achievementAwards as {
           awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
@@ -328,11 +373,30 @@ test("World Boss join publishes achievement announcements even if the signup pro
           },
         },
       ]);
+      assert.deepEqual(publishedContractAnnouncements, [
+        {
+          userId: "user-1",
+          cadence: "weekly",
+          contractTitle: "World Boss Detail",
+          rewardPips: 45,
+        },
+      ]);
     } finally {
       if (runtime) {
         await runtime.stop();
       }
 
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort =
+        originalCreateSqliteContractsGameplayProgressPort;
+      (
+        contractAnnouncements as {
+          publishContractCompletionAnnouncements: typeof contractAnnouncements.publishContractCompletionAnnouncements;
+        }
+      ).publishContractCompletionAnnouncements = originalPublishContractCompletionAnnouncements;
       (
         sharedDb as {
           getDatabase: typeof sharedDb.getDatabase;
@@ -616,6 +680,7 @@ test("players can leave during signup and rejoining the same World Boss does not
     const modulePaths = [
       "../../../shared/config",
       "../../../app/discord/achievement-announcements",
+      "../../../app/discord/contract-completion-announcements",
       "../../../shared/db",
       "../../contracts/infrastructure/sqlite/services",
       "../../progression/application/achievement-awards",
@@ -633,6 +698,11 @@ test("players can leave during signup and rejoining the same World Boss does not
     ) as typeof import("../../contracts/infrastructure/sqlite/services");
     const originalCreateSqliteContractsGameplayProgressPort =
       contractsServices.createSqliteContractsGameplayProgressPort;
+    const contractAnnouncements = moduleRequire(
+      "../../../app/discord/contract-completion-announcements",
+    ) as typeof import("../../../app/discord/contract-completion-announcements");
+    const originalPublishContractCompletionAnnouncements =
+      contractAnnouncements.publishContractCompletionAnnouncements;
     const achievementAwards = moduleRequire(
       "../../progression/application/achievement-awards",
     ) as typeof import("../../progression/application/achievement-awards");
@@ -657,9 +727,32 @@ test("players can leave during signup and rejoining the same World Boss does not
         recordCasinoGameCompletion: () => null,
         recordWorldBossJoin: ({ userId }) => {
           recordedWorldBossJoins.push(userId);
-          return null;
+          return {
+            updates: [],
+            contractCompletionAnnouncements: [
+              {
+                userId,
+                cadence: "weekly",
+                contractTitle: "World Boss Detail",
+                rewardPips: 45,
+              },
+            ],
+          };
         },
       });
+      const publishedContractAnnouncements: Array<{
+        userId: string;
+        cadence: "daily" | "weekly";
+        contractTitle: string;
+        rewardPips: number;
+      }> = [];
+      (
+        contractAnnouncements as {
+          publishContractCompletionAnnouncements: typeof contractAnnouncements.publishContractCompletionAnnouncements;
+        }
+      ).publishContractCompletionAnnouncements = async ({ announcements }) => {
+        publishedContractAnnouncements.push(...announcements);
+      };
 
       const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
@@ -777,6 +870,12 @@ test("players can leave during signup and rejoining the same World Boss does not
           .length,
         1,
       );
+      assert.equal(
+        publishedContractAnnouncements.filter(
+          (announcement) => announcement.contractTitle === "World Boss Detail",
+        ).length,
+        1,
+      );
       assert.deepEqual(recordedWorldBossJoins, ["user-1"]);
       assert.ok(announcementEdits.length >= 3);
     } finally {
@@ -790,6 +889,11 @@ test("players can leave during signup and rejoining the same World Boss does not
         }
       ).createSqliteContractsGameplayProgressPort =
         originalCreateSqliteContractsGameplayProgressPort;
+      (
+        contractAnnouncements as {
+          publishContractCompletionAnnouncements: typeof contractAnnouncements.publishContractCompletionAnnouncements;
+        }
+      ).publishContractCompletionAnnouncements = originalPublishContractCompletionAnnouncements;
       (
         sharedDb as {
           getDatabase: typeof sharedDb.getDatabase;

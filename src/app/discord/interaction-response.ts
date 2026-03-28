@@ -9,6 +9,8 @@ import type {
   StringSelectMenuInteraction,
 } from "discord.js";
 import { publishAchievementAnnouncements } from "./achievement-announcements";
+import { publishContractCompletionAnnouncements } from "./contract-completion-announcements";
+import type { ContractCompletionAnnouncement } from "../../dice/contracts/application/completion-announcements";
 import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
 
 type InteractionMessagePayload = {
@@ -37,15 +39,18 @@ export type InteractionResult =
 export type RenderedInteractionResult = {
   interactionResult: InteractionResult;
   achievementAnnouncements?: AchievementAnnouncement[];
+  contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
 
 export const createRenderedInteractionResult = (
   interactionResult: InteractionResult,
   achievementAnnouncements: readonly AchievementAnnouncement[] = [],
+  contractCompletionAnnouncements: readonly ContractCompletionAnnouncement[] = [],
 ): RenderedInteractionResult => {
   return {
     interactionResult,
     achievementAnnouncements: [...achievementAnnouncements],
+    contractCompletionAnnouncements: [...contractCompletionAnnouncements],
   };
 };
 
@@ -69,6 +74,10 @@ export const applyRenderedChatInputResult = async (
     client: interaction.client,
     announcements: result.achievementAnnouncements ?? [],
   });
+  await publishContractCompletionAnnouncements({
+    client: interaction.client,
+    announcements: result.contractCompletionAnnouncements ?? [],
+  });
 };
 
 export const applyButtonResult = async (
@@ -87,6 +96,10 @@ export const applyRenderedButtonResult = async (
     client: interaction.client,
     announcements: result.achievementAnnouncements ?? [],
   });
+  await publishContractCompletionAnnouncements({
+    client: interaction.client,
+    announcements: result.contractCompletionAnnouncements ?? [],
+  });
 };
 
 export const applyStringSelectMenuResult = async (
@@ -104,6 +117,10 @@ export const applyRenderedStringSelectMenuResult = async (
   await publishAchievementAnnouncements({
     client: interaction.client,
     announcements: result.achievementAnnouncements ?? [],
+  });
+  await publishContractCompletionAnnouncements({
+    client: interaction.client,
+    announcements: result.contractCompletionAnnouncements ?? [],
   });
 };
 

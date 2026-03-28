@@ -181,3 +181,37 @@ test("services wire Contract Master acceptance, gameplay progress, and summary r
     }
   });
 });
+
+test("contract master chooser groups each difficulty on its own row with player-facing objectives", () => {
+  withEnv({ ROLLY_DATA_DIR: exampleRollyDataDir }, () => {
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+      const now = new Date("2026-03-28T11:00:00.000Z");
+      const service = services.createSqliteContractMasterService(db);
+
+      const view = service.createChooserView({
+        userId: "player-1",
+        cadence: "weekly",
+        now,
+      });
+
+      assert.match(view.content, /Objective: Roll 80 time\(s\)/);
+      assert.doesNotMatch(view.content, /Objective: roll_count 80 time\(s\)/);
+      assert.deepEqual(
+        view.components.map((row) => row.map((button) => button.label)),
+        [
+          ["Daily Contracts", "Weekly Contracts"],
+          ["Reroll Simple", "Accept Simple"],
+          ["Reroll Serious", "Accept Serious"],
+          ["Reroll Brutal", "Accept Brutal"],
+        ],
+      );
+    } finally {
+      clearContractsModuleGraph();
+    }
+  });
+});

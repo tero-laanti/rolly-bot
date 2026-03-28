@@ -186,6 +186,7 @@ export const createDiceCasinoUseCase = ({
         mutation.content,
         mutation.ephemeral,
         mutation.achievementAnnouncements ?? [],
+        mutation.contractCompletionAnnouncements ?? [],
       );
     }
 
@@ -215,6 +216,7 @@ export const createDiceCasinoUseCase = ({
     return {
       kind: "update",
       achievementAnnouncements: mutation.achievementAnnouncements ?? [],
+      contractCompletionAnnouncements: mutation.contractCompletionAnnouncements ?? [],
       payload: {
         type: "view",
         view: buildCasinoView(mutation.session, mutation.pips),

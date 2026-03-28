@@ -312,6 +312,72 @@ test("manual rolls record roll_count contract progress", () => {
   assert.equal(recordedEvents[0]?.occurredAt.getTime(), nowMs);
 });
 
+test("manual rolls surface contract completion announcements", () => {
+  const userId = "contracts-roll-announce-user";
+  const nowMs = 1_710_000_100_000;
+  const useCase = createRunRollDiceUseCase({
+    analytics: {
+      recordDiceRollAnalytics: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
+    },
+    contracts: {
+      recordRoll: () => ({
+        updates: [],
+        contractCompletionAnnouncements: [
+          {
+            userId,
+            cadence: "daily",
+            contractTitle: "Roll Routine",
+            rewardPips: 12,
+          },
+        ],
+      }),
+    },
+    economy: {
+      applyFameDelta: ({ amount }) => amount,
+      getFame: () => 0,
+      grantDailyPipsIfEligible: () => ({
+        awarded: false,
+        awardedAmount: 0,
+        pips: 0,
+        lastDailyPipRewardAt: null,
+      }),
+    },
+    itemEffects: {
+      consumeOneDoubleRollUse: () => false,
+      getItemDoubleRollStatus: () => ({
+        isActive: false,
+        remainingUses: 0,
+        expiresAtMs: null,
+      }),
+    },
+    permanentBonuses: zeroPermanentBonuses,
+    progression: createProgressionStub(),
+    pvp: {
+      getActiveDiceLockout: () => null,
+      getActiveDoubleRoll: () => null,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = useCase({
+    userId,
+    userMention: `<@${userId}>`,
+    nowMs,
+  });
+
+  assert.deepEqual(result.contractCompletionAnnouncements, [
+    {
+      userId,
+      cadence: "daily",
+      contractTitle: "Roll Routine",
+      rewardPips: 12,
+    },
+  ]);
+});
+
 test("manual rolls still succeed when contract progress recording fails", () => {
   const nowMs = 1_710_000_000_000;
   const useCase = createRunRollDiceUseCase({

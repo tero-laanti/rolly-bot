@@ -188,7 +188,11 @@ const handleDicePokerAction = (
               handKind: rerollResult.result.kind,
             },
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -219,6 +223,7 @@ const handleDicePokerAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 
@@ -236,7 +241,11 @@ const handleDicePokerAction = (
       payout: 0,
       outcome: "loss",
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -261,6 +270,7 @@ const handleDicePokerAction = (
       ),
       pips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 

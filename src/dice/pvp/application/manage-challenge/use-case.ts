@@ -8,6 +8,7 @@ import { formatDiscordRelativeTime } from "../../../../shared/discord";
 import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import type { ContractCompletionAnnouncement } from "../../../contracts/application/completion-announcements";
 import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository } from "../../../inventory/application/ports";
@@ -61,6 +62,7 @@ export type DicePvpAction =
 
 export type DicePvpResult = ActionResult<DicePvpAction> & {
   achievementAnnouncements?: AchievementAnnouncement[];
+  contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
 
 type PublishChallenge = (view: ActionView<DicePvpAction>) => Promise<{ url: string }>;
@@ -94,18 +96,19 @@ const recordPvpWinContractProgressSafely = (
   contracts: Pick<ContractsGameplayProgressPort, "recordPvpWin"> | undefined,
   userId: string,
   nowMs: number,
-): void => {
+): ReturnType<ContractsGameplayProgressPort["recordPvpWin"]> => {
   if (!contracts) {
-    return;
+    return null;
   }
 
   try {
-    contracts.recordPvpWin({
+    return contracts.recordPvpWin({
       userId,
       occurredAt: new Date(nowMs),
     });
   } catch (error) {
     console.warn("[contracts] Failed to record PvP win progress.", error);
+    return null;
   }
 };
 
@@ -681,7 +684,7 @@ const handleChallengeAccept = (
     );
   }
 
-  recordPvpWinContractProgressSafely(contracts, outcome.winnerId, nowMs);
+  const contractProgress = recordPvpWinContractProgressSafely(contracts, outcome.winnerId, nowMs);
 
   return updateMessage(
     buildWinResultContent(
@@ -704,6 +707,7 @@ const handleChallengeAccept = (
         createAchievementAnnouncement(outcome.loserId, outcome.loserNewlyEarned),
       ].flatMap((announcement) => (announcement ? [announcement] : [])),
     ),
+    contractProgress?.contractCompletionAnnouncements ?? [],
   );
 };
 
@@ -1061,10 +1065,12 @@ const updateMessage = (
   content: string,
   clearComponents: boolean,
   achievementAnnouncements: AchievementAnnouncement[] = [],
+  contractCompletionAnnouncements: ContractCompletionAnnouncement[] = [],
 ): DicePvpResult => {
   return {
     kind: "update",
     achievementAnnouncements,
+    contractCompletionAnnouncements,
     payload: {
       type: "message",
       content,

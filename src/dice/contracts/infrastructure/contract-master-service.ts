@@ -12,6 +12,7 @@ import {
   type ActionButtonSpec,
   type ActionView,
 } from "../../../shared-kernel/application/action-view";
+import { formatContractObjectiveText } from "../../../rolly-data/contracts/objective-text";
 import { createManageContractMasterUseCase } from "../application/manage-contract-master/use-case";
 import type {
   ContractCadenceView,
@@ -148,7 +149,10 @@ const renderActiveRunLines = (view: ContractCadenceView): string[] => {
   return [
     `**${truncateDiscordText(view.activeRun.contractTitle, 72)}**`,
     truncateDiscordText(view.activeRun.contractDescription, descriptionMaxLength),
-    `Difficulty: ${view.activeRun.difficulty} | Progress: ${progressLabel} | Reward: ${view.activeRun.rewardPips} Pips | Status: ${statusLabel}`,
+    `Difficulty: ${view.activeRun.difficulty}`,
+    `Progress: ${progressLabel}`,
+    `Reward: ${view.activeRun.rewardPips} Pips`,
+    `Status: ${statusLabel}`,
   ];
 };
 
@@ -161,18 +165,19 @@ const renderCadenceSummaryContent = ({
   view: ContractCadenceView;
   notice?: string;
 }): string => {
-  const parts = [
+  const sections = [
     notice ? `**${notice}**` : null,
-    `**${view.label} Contracts**`,
-    formatResetLine(view.resetAt),
-    ...renderActiveRunLines(view),
-    `Completed this window: ${view.completionCount}/2`,
-    `Rerolls: ${formatRerollStatus(view)}`,
-    `Refill: ${formatRefillStatus(view)}`,
+    [`**${view.label} Contracts**`, formatResetLine(view.resetAt)].join("\n"),
+    renderActiveRunLines(view).join("\n"),
+    [
+      `Completed this window: ${view.completionCount}/2`,
+      `Rerolls: ${formatRerollStatus(view)}`,
+      `Refill: ${formatRefillStatus(view)}`,
+    ].join("\n"),
     `Use **${panel.askForContractButtonLabel}** below to open the chooser when a slot is available.`,
   ].filter((part): part is string => Boolean(part));
 
-  return limitDiscordMessage(parts.join("\n"));
+  return limitDiscordMessage(sections.join("\n\n"));
 };
 
 const renderOfferSection = (offer: ContractCadenceView["offers"][number]): string => {
@@ -192,9 +197,7 @@ const renderOfferSection = (offer: ContractCadenceView["offers"][number]): strin
 
   lines.push(`**${truncateDiscordText(offer.offer.title, 72)}**`);
   lines.push(truncateDiscordText(offer.offer.description, descriptionMaxLength));
-  lines.push(
-    `Objective: ${offer.offer.objective.type} ${offer.offer.objective.requiredCount} time(s)`,
-  );
+  lines.push(`Objective: ${formatContractObjectiveText(offer.offer.objective)}`);
   lines.push(
     `Reroll: ${
       offer.source === "initial" ? (offer.rerollAvailable ? "ready" : "used") : "not available"
@@ -325,37 +328,37 @@ const buildChooserView = ({
   view: ContractCadenceView;
   notice?: string;
 }): ActionView<ContractMasterButtonAction> => {
-  const buttons: ActionButtonSpec<ContractMasterButtonAction>[] = [
-    ...buildCadenceNavigationButtons(panel, view.cadence),
-  ];
-
-  for (const offer of view.offers) {
-    buttons.push({
-      action: {
-        kind: "accept-offer",
-        cadence: view.cadence,
-        difficulty: offer.difficulty,
-      },
-      label: `Accept ${offer.label}`,
-      style: "success",
-      disabled: !offer.offer || !offer.selectable,
-    });
-    buttons.push({
-      action: {
-        kind: "reroll-offer",
-        cadence: view.cadence,
-        difficulty: offer.difficulty,
-      },
-      label: `Reroll ${offer.label}`,
-      style: "secondary",
-      disabled:
-        !offer.offer || !offer.selectable || offer.source !== "initial" || !offer.rerollAvailable,
-    });
-  }
-
   return {
     content: renderChooserContent({ view, notice }),
-    components: chunkActionButtons(buttons),
+    components: [
+      buildCadenceNavigationButtons(panel, view.cadence),
+      ...view.offers.map((offer): ActionButtonSpec<ContractMasterButtonAction>[] => [
+        {
+          action: {
+            kind: "reroll-offer",
+            cadence: view.cadence,
+            difficulty: offer.difficulty,
+          },
+          label: `Reroll ${offer.label}`,
+          style: "secondary",
+          disabled:
+            !offer.offer ||
+            !offer.selectable ||
+            offer.source !== "initial" ||
+            !offer.rerollAvailable,
+        },
+        {
+          action: {
+            kind: "accept-offer",
+            cadence: view.cadence,
+            difficulty: offer.difficulty,
+          },
+          label: `Accept ${offer.label}`,
+          style: "success",
+          disabled: !offer.offer || !offer.selectable,
+        },
+      ]),
+    ],
   };
 };
 

@@ -55,7 +55,10 @@ const renderActiveRun = (view: ContractCadenceView): string[] => {
   return [
     `**${truncateDiscordText(view.activeRun.contractTitle, 72)}**`,
     truncateDiscordText(view.activeRun.contractDescription, descriptionMaxLength),
-    `Difficulty: ${view.activeRun.difficulty} | Progress: ${progressLabel} | Reward: ${view.activeRun.rewardPips} Pips | Status: ${statusLabel}`,
+    `Difficulty: ${view.activeRun.difficulty}`,
+    `Progress: ${progressLabel}`,
+    `Reward: ${view.activeRun.rewardPips} Pips`,
+    `Status: ${statusLabel}`,
   ];
 };
 
@@ -67,14 +70,18 @@ const renderCadenceSection = (view: ContractCadenceView): string => {
     : 0;
 
   return [
-    `**${view.label} Contracts**`,
-    `Resets ${formatDiscordRelativeTime(view.resetAt.getTime())} (${formatDiscordFullTime(view.resetAt.getTime())})`,
-    ...renderActiveRun(view),
-    `Completed this window: ${view.completionCount}/2`,
-    `Rerolls: ${formatRerollStatus(view)}`,
-    `Refill: ${formatRefillStatus(view)}`,
-    `Pips granted from current accepted run: ${totalEarnedPips}`,
-  ].join("\n");
+    [
+      `**${view.label} Contracts**`,
+      `Resets ${formatDiscordRelativeTime(view.resetAt.getTime())} (${formatDiscordFullTime(view.resetAt.getTime())})`,
+    ].join("\n"),
+    renderActiveRun(view).join("\n"),
+    [
+      `Completed this window: ${view.completionCount}/2`,
+      `Rerolls: ${formatRerollStatus(view)}`,
+      `Refill: ${formatRefillStatus(view)}`,
+      `Pips granted from current accepted run: ${totalEarnedPips}`,
+    ].join("\n"),
+  ].join("\n\n");
 };
 
 const createUnavailableContractsReply = (): DiceContractsView => ({

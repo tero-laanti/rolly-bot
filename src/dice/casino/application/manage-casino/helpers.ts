@@ -1,4 +1,5 @@
 import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
+import type { ContractCompletionAnnouncement } from "../../../contracts/application/completion-announcements";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
@@ -261,18 +262,21 @@ export const recordCompletedCasinoGame = (
   contracts: Pick<ContractsGameplayProgressPort, "recordCasinoGameCompletion"> | undefined,
   userId: string,
   nowMs: number,
-): void => {
+): ContractCompletionAnnouncement[] => {
   if (!contracts) {
-    return;
+    return [];
   }
 
   try {
-    contracts.recordCasinoGameCompletion({
-      userId,
-      occurredAt: new Date(nowMs),
-    });
+    return (
+      contracts.recordCasinoGameCompletion({
+        userId,
+        occurredAt: new Date(nowMs),
+      })?.contractCompletionAnnouncements ?? []
+    );
   } catch (error) {
     console.warn("[contracts] Failed to record casino progress.", error);
+    return [];
   }
 };
 
@@ -280,12 +284,14 @@ export const viewMutation = (
   session: DiceCasinoSession,
   pips: number,
   achievementAnnouncements: AchievementAnnouncement[] = [],
+  contractCompletionAnnouncements: ContractCompletionAnnouncement[] = [],
 ): MutateSessionResult => {
   return {
     kind: "view",
     session,
     pips,
     achievementAnnouncements,
+    contractCompletionAnnouncements,
   };
 };
 
@@ -293,12 +299,14 @@ export const replyMutation = (
   content: string,
   ephemeral: boolean,
   achievementAnnouncements: AchievementAnnouncement[] = [],
+  contractCompletionAnnouncements: ContractCompletionAnnouncement[] = [],
 ): MutateSessionResult => {
   return {
     kind: "reply",
     content,
     ephemeral,
     achievementAnnouncements,
+    contractCompletionAnnouncements,
   };
 };
 
@@ -317,10 +325,12 @@ export const replyMessage = (
   content: string,
   ephemeral: boolean,
   achievementAnnouncements: AchievementAnnouncement[] = [],
+  contractCompletionAnnouncements: ContractCompletionAnnouncement[] = [],
 ): DiceCasinoResult => {
   return {
     kind: "reply",
     achievementAnnouncements,
+    contractCompletionAnnouncements,
     payload: {
       type: "message",
       content,

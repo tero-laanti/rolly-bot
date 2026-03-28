@@ -112,6 +112,20 @@ test("progress updates active accepted runs per cadence and grants pips once", (
 
   assert(first);
   assert.equal(first.updates.length, 2);
+  assert.deepEqual(first.contractCompletionAnnouncements, [
+    {
+      userId: "user-1",
+      cadence: "daily",
+      contractTitle: "daily serious roll",
+      rewardPips: 20,
+    },
+    {
+      userId: "user-1",
+      cadence: "weekly",
+      contractTitle: "weekly brutal roll",
+      rewardPips: 70,
+    },
+  ]);
   assert.equal(getGrantedPips(), 90);
   assert.equal(states.get("user-1|daily|2026-03-28")?.completionCount, 1);
   assert.equal(states.get("user-1|daily|2026-03-28")?.refillAvailableDifficulty, "serious");

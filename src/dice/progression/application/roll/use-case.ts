@@ -5,6 +5,7 @@ import {
 } from "../../../../shared/discord";
 import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import type { ContractCompletionAnnouncement } from "../../../contracts/application/completion-announcements";
 import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type {
@@ -59,6 +60,7 @@ export type DiceRollResult = {
   ephemeral: boolean;
   autoRollClassification: DiceAutoRollClassification;
   achievementAnnouncements?: AchievementAnnouncement[];
+  contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
 
 type RunRollDiceUseCaseInput = {
@@ -112,18 +114,19 @@ const recordRollContractProgressSafely = (
   contracts: Pick<ContractsGameplayProgressPort, "recordRoll"> | undefined,
   userId: string,
   nowMs: number,
-): void => {
+): ReturnType<ContractsGameplayProgressPort["recordRoll"]> => {
   if (!contracts) {
-    return;
+    return null;
   }
 
   try {
-    contracts.recordRoll({
+    return contracts.recordRoll({
       userId,
       occurredAt: new Date(nowMs),
     });
   } catch (error) {
     console.warn("[contracts] Failed to record roll progress.", error);
+    return null;
   }
 };
 
@@ -305,9 +308,8 @@ export const createRunRollDiceUseCase = ({
       };
     });
 
-    if (source === "manual") {
-      recordRollContractProgressSafely(contracts, userId, nowMs);
-    }
+    const contractProgress =
+      source === "manual" ? recordRollContractProgressSafely(contracts, userId, nowMs) : null;
 
     const chargeFactorText = formatMultiplierFactor(resolvedRollPassState.effectiveFactor);
     const rewardText = formatRewardText({
@@ -402,6 +404,7 @@ export const createRunRollDiceUseCase = ({
         prestigeFooter,
       }),
       achievementAnnouncements,
+      contractCompletionAnnouncements: contractProgress?.contractCompletionAnnouncements ?? [],
     };
   };
 };

@@ -7,6 +7,8 @@ import type {
   ContractsUnitOfWork,
   ContractsUserCadenceStateRepository,
 } from "../ports";
+import { createContractCompletionAnnouncement } from "../completion-announcements";
+import type { ContractCompletionAnnouncement } from "../completion-announcements";
 import {
   applyCompletionToCadenceState,
   createEmptyContractCadenceState,
@@ -46,6 +48,7 @@ export const createRecordContractsProgressUseCase = (
 
   const recordProgress: ContractsProgressRecorder["recordProgress"] = (event) => {
     const updates: ContractProgressUpdate[] = [];
+    const contractCompletionAnnouncements: ContractCompletionAnnouncement[] = [];
 
     unitOfWork.runInTransaction(() => {
       for (const cadence of contractCadences) {
@@ -79,6 +82,16 @@ export const createRecordContractsProgressUseCase = (
           userCadenceStateRepository.saveState(
             applyCompletionToCadenceState(state, update.run, event.occurredAt),
           );
+
+          const announcement = createContractCompletionAnnouncement({
+            userId: event.userId,
+            cadence: update.run.cadence,
+            contractTitle: update.run.contractTitle,
+            rewardPips: update.run.rewardPips,
+          });
+          if (announcement) {
+            contractCompletionAnnouncements.push(announcement);
+          }
         }
 
         updates.push(update);
@@ -89,7 +102,10 @@ export const createRecordContractsProgressUseCase = (
       return null;
     }
 
-    return { updates };
+    return {
+      updates,
+      contractCompletionAnnouncements,
+    };
   };
 
   return { recordProgress };

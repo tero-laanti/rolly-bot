@@ -30,7 +30,15 @@ const createHarness = ({
   randomValues?: number[];
   awardedAchievements?: Record<string, string[]>;
   recordedPvpWins?: string[];
-  recordPvpWin?: ({ userId }: { userId: string; occurredAt: Date }) => null;
+  recordPvpWin?: ({ userId, occurredAt }: { userId: string; occurredAt: Date }) => {
+    updates: [];
+    contractCompletionAnnouncements?: Array<{
+      userId: string;
+      cadence: "daily" | "weekly";
+      contractTitle: string;
+      rewardPips: number;
+    }>;
+  } | null;
 } = {}) => {
   const balances = new Map<string, number>(Object.entries(pips));
   const challenges = new Map<string, DicePvpChallenge>();
@@ -689,4 +697,41 @@ test("decisive PvP wins record contract progress for the winner only", async () 
   );
 
   assert.deepEqual(recordedPvpWins, ["challenger"]);
+});
+
+test("decisive PvP wins surface contract completion announcements", async () => {
+  const harness = createHarness({
+    pips: { challenger: 20, opponent: 20 },
+    randomValues: [0.9, 0],
+    recordPvpWin: ({ userId }) => ({
+      updates: [],
+      contractCompletionAnnouncements: [
+        {
+          userId,
+          cadence: "weekly",
+          contractTitle: "Duel Duty",
+          rewardPips: 45,
+        },
+      ],
+    }),
+  });
+  const challenge = await createChallenge({
+    harness,
+    wagerPips: 0,
+  });
+
+  const result = await harness.useCase.handleDicePvpAction(
+    "opponent",
+    { type: "accept", challengeId: challenge.id },
+    null,
+  );
+
+  assert.deepEqual(result.contractCompletionAnnouncements, [
+    {
+      userId: "challenger",
+      cadence: "weekly",
+      contractTitle: "Duel Duty",
+      rewardPips: 45,
+    },
+  ]);
 });

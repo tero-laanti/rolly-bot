@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "discord.js";
 import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
+import { publishContractCompletionAnnouncements } from "../../../app/discord/contract-completion-announcements";
 import type { WorldBossConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
@@ -133,18 +134,19 @@ const recordWorldBossJoinContractProgressSafely = ({
   contracts: Pick<ContractsGameplayProgressPort, "recordWorldBossJoin"> | undefined;
   logger: WorldBossLiveRuntimeLogger;
   userId: string;
-}): void => {
+}): ReturnType<ContractsGameplayProgressPort["recordWorldBossJoin"]> => {
   if (!contracts) {
-    return;
+    return null;
   }
 
   try {
-    contracts.recordWorldBossJoin({
+    return contracts.recordWorldBossJoin({
       userId,
       occurredAt: new Date(),
     });
   } catch (error) {
     logger.warn("[contracts] Failed to record World Boss join progress.", error);
+    return null;
   }
 };
 
@@ -1126,13 +1128,13 @@ export const createWorldBossLiveRuntime = ({
     context.worldBoss.participantIds.add(interaction.user.id);
     const isFirstWorldBossJoin = !context.worldBoss.joinedUserIds.has(interaction.user.id);
     context.worldBoss.joinedUserIds.add(interaction.user.id);
-    if (isFirstWorldBossJoin) {
-      recordWorldBossJoinContractProgressSafely({
-        contracts,
-        logger,
-        userId: interaction.user.id,
-      });
-    }
+    const contractProgress = isFirstWorldBossJoin
+      ? recordWorldBossJoinContractProgressSafely({
+          contracts,
+          logger,
+          userId: interaction.user.id,
+        })
+      : null;
     const achievementAnnouncements = isFirstWorldBossJoin
       ? [
           createAchievementAnnouncement(
@@ -1154,6 +1156,11 @@ export const createWorldBossLiveRuntime = ({
     await publishAchievementAnnouncements({
       client,
       announcements: achievementAnnouncements,
+      logger,
+    });
+    await publishContractCompletionAnnouncements({
+      client,
+      announcements: contractProgress?.contractCompletionAnnouncements ?? [],
       logger,
     });
   };

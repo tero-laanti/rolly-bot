@@ -140,7 +140,11 @@ const startBlackjackRound = ({
           ? { type: "blackjack-push" }
           : undefined,
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -172,6 +176,7 @@ const startBlackjackRound = ({
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 
@@ -236,7 +241,11 @@ const handleBlackjackAction = (
             ? { type: "blackjack-hit-to-21-win" }
             : undefined,
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -268,6 +277,7 @@ const handleBlackjackAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 
@@ -295,7 +305,11 @@ const handleBlackjackAction = (
       outcome,
       achievementEvent: outcome === "push" ? { type: "blackjack-push" } : undefined,
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -327,6 +341,7 @@ const handleBlackjackAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 

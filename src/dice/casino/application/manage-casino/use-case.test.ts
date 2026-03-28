@@ -105,6 +105,94 @@ test("completed casino rounds record contract progress", () => {
   assert.equal(recordedEvents[0]?.occurredAt.getTime(), nowMs);
 });
 
+test("completed casino rounds surface contract completion announcements", () => {
+  const nowMs = Date.UTC(2026, 2, 27, 12, 0, 0);
+  let balance = 50;
+  let activeSession: DiceCasinoSession | null = {
+    userId: "casino-user",
+    bet: 10,
+    state: {
+      ...createDefaultDiceCasinoSessionState("session-1"),
+      currentScreen: "setup",
+      selectedGame: "exact-roll",
+      exactRollMode: "exact-face",
+      exactRollFace: 2,
+    },
+    expiresAt: new Date(nowMs + 60_000).toISOString(),
+    updatedAt: new Date(nowMs).toISOString(),
+  };
+
+  const useCase = createDiceCasinoUseCase({
+    analytics: {
+      getAchievementStats: () => emptyAchievementStats,
+      recordRoundStarted: () => {},
+      recordRoundCompleted: () => emptyAchievementStats,
+    },
+    contracts: {
+      recordCasinoGameCompletion: () => ({
+        updates: [],
+        contractCompletionAnnouncements: [
+          {
+            userId: "casino-user",
+            cadence: "daily",
+            contractTitle: "High Stakes",
+            rewardPips: 8,
+          },
+        ],
+      }),
+    },
+    economy: {
+      getPips: () => balance,
+      applyPipsDelta: ({ amount }) => {
+        balance += amount;
+        return balance;
+      },
+      grantRewardPips: ({ baseAmount }) => {
+        balance += baseAmount;
+        return {
+          awardedAmount: baseAmount,
+          pips: balance,
+        };
+      },
+    },
+    progression: {
+      awardAchievements: () => [],
+    },
+    sessions: {
+      getActiveSession: () => activeSession,
+      saveSession: (session) => {
+        activeSession = session;
+      },
+      expireSession: () => {
+        activeSession = null;
+      },
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = useCase.handleDiceCasinoAction(
+    "casino-user",
+    {
+      type: "exact-face",
+      ownerId: "casino-user",
+      face: 2,
+      sessionToken: "session-1",
+    },
+    nowMs,
+  );
+
+  assert.deepEqual(result.contractCompletionAnnouncements, [
+    {
+      userId: "casino-user",
+      cadence: "daily",
+      contractTitle: "High Stakes",
+      rewardPips: 8,
+    },
+  ]);
+});
+
 test("completed casino rounds still succeed when contract progress recording fails", () => {
   const nowMs = Date.UTC(2026, 2, 27, 12, 0, 0);
   let balance = 50;

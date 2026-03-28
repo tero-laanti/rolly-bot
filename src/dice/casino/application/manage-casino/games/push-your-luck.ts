@@ -163,7 +163,11 @@ const handlePushYourLuckAction = (
         payout: 0,
         outcome: "loss",
       });
-      recordCompletedCasinoGame(contracts, session.userId, nowMs);
+      const contractCompletionAnnouncements = recordCompletedCasinoGame(
+        contracts,
+        session.userId,
+        nowMs,
+      );
       const newlyEarned = awardManualDiceAchievements(
         progression,
         session.userId,
@@ -188,6 +192,7 @@ const handlePushYourLuckAction = (
         ),
         pips,
         achievementAnnouncements,
+        contractCompletionAnnouncements,
       );
     }
 
@@ -202,7 +207,11 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, rollResult.payout),
       achievementEvent: { type: "push-perfect-run" },
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -227,6 +236,7 @@ const handlePushYourLuckAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 
@@ -248,7 +258,11 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, payout),
       achievementEvent: { type: "push-cashout" },
     });
-    recordCompletedCasinoGame(contracts, session.userId, nowMs);
+    const contractCompletionAnnouncements = recordCompletedCasinoGame(
+      contracts,
+      session.userId,
+      nowMs,
+    );
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -273,6 +287,7 @@ const handlePushYourLuckAction = (
       ),
       nextPips,
       achievementAnnouncements,
+      contractCompletionAnnouncements,
     );
   }
 

@@ -14,5 +14,6 @@ export const renderDiceRollResult = (result: DiceRollResult): RenderedInteractio
       },
     },
     result.achievementAnnouncements ?? [],
+    result.contractCompletionAnnouncements ?? [],
   );
 };

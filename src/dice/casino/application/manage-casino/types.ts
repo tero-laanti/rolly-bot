@@ -1,4 +1,5 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import type { ContractCompletionAnnouncement } from "../../../contracts/application/completion-announcements";
 import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
@@ -85,6 +86,7 @@ export type DiceCasinoAction =
 
 export type DiceCasinoResult = ActionResult<DiceCasinoAction> & {
   achievementAnnouncements?: AchievementAnnouncement[];
+  contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
 
 export type DiceCasinoActionRow = ActionView<DiceCasinoAction>["components"][number];
@@ -96,12 +98,14 @@ export type MutateSessionResult =
       session: DiceCasinoSession;
       pips: number;
       achievementAnnouncements?: AchievementAnnouncement[];
+      contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
     }
   | {
       kind: "reply";
       content: string;
       ephemeral: boolean;
       achievementAnnouncements?: AchievementAnnouncement[];
+      contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
     }
   | {
       kind: "expired";

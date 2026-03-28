@@ -57,6 +57,14 @@ test("auto-roll sessions publish achievement announcements from roll results", a
               achievementIds: ["achievement-auto-roll-test"],
             },
           ],
+          contractCompletionAnnouncements: [
+            {
+              userId: "user-1",
+              cadence: "daily",
+              contractTitle: "Roll Routine",
+              rewardPips: 12,
+            },
+          ],
         });
       };
 
@@ -123,6 +131,13 @@ test("auto-roll sessions publish achievement announcements from roll results", a
       assert.deepEqual(sentPayloads, [
         {
           content: "<@user-1> Achievement unlocked: achievement-auto-roll-test.",
+          allowedMentions: {
+            parse: [],
+            users: ["user-1"],
+          },
+        },
+        {
+          content: "<@user-1> completed a Daily contract: Roll Routine (+12 Pips).",
           allowedMentions: {
             parse: [],
             users: ["user-1"],

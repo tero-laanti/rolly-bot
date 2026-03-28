@@ -1,3 +1,4 @@
+import type { ContractCompletionAnnouncement } from "../../dice/contracts/application/completion-announcements";
 import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
 import {
   createRenderedInteractionResult,
@@ -9,6 +10,7 @@ import type { ActionResult, ActionView } from "../../shared-kernel/application/a
 
 type ActionResultWithAchievements<TAction> = ActionResult<TAction> & {
   achievementAnnouncements?: AchievementAnnouncement[];
+  contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
 
 export const renderActionView = <TAction>(
@@ -60,5 +62,9 @@ export const renderActionResult = <TAction>(
     };
   }
 
-  return createRenderedInteractionResult(interactionResult, result.achievementAnnouncements ?? []);
+  return createRenderedInteractionResult(
+    interactionResult,
+    result.achievementAnnouncements ?? [],
+    result.contractCompletionAnnouncements ?? [],
+  );
 };
