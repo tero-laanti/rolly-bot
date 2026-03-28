@@ -44,7 +44,7 @@ test("active raid prompt trims long contribution sections without dropping the c
     bossLevel: 42,
     currentHp: 1234,
     maxHp: 5678,
-    rewardSummary: "20 pips and x8 roll buff for the next 5 /rolls per eligible raider",
+    rewardSummary: "20 pips and x8 roll buff for the next 5 /rolls per eligible player",
     totalDamage: 4_444,
     totalAttacks: 120,
     contributionLines: Array.from(
@@ -69,7 +69,7 @@ test("resolved raid prompt trims long leaderboards without dropping the outcome 
     bossName: "Bone Dragon",
     bossLevel: 42,
     maxHp: 5678,
-    rewardSummary: "20 pips and x8 roll buff for the next 5 /rolls per eligible raider",
+    rewardSummary: "20 pips and x8 roll buff for the next 5 /rolls per eligible player",
     contributionLines: Array.from(
       { length: 80 },
       (_, index) => `${index + 1}. <@user-${index + 1}> dealt ${"Y".repeat(80)}`,
@@ -80,7 +80,7 @@ test("resolved raid prompt trims long leaderboards without dropping the outcome 
   assert.ok(description);
   assert.ok(description.length <= 4_096);
   assert.match(description, /The boss was defeated in time\./);
-  assert.match(description, /Reward applied to 10 eligible raiders/);
+  assert.match(description, /Reward applied to 10 eligible players/);
 });
 
 test("active raid prompt omits the damage leaders section when no damage has been logged yet", () => {
@@ -113,5 +113,5 @@ test("raid announcement prompt renders join and leave signup buttons", () => {
     scheduledStartAtMs: 60_000,
   });
 
-  assert.deepEqual(getButtonLabels(prompt), ["Join raid", "Leave raid"]);
+  assert.deepEqual(getButtonLabels(prompt), ["Join World Boss", "Leave World Boss"]);
 });

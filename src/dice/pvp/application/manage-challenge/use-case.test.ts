@@ -18,12 +18,19 @@ const createHarness = ({
   pipRewardBonusPercentByUser = {},
   randomValues = [0],
   awardedAchievements = {},
+  recordedPvpWins = [],
+  recordPvpWin = ({ userId }: { userId: string }) => {
+    recordedPvpWins.push(userId);
+    return null;
+  },
 }: {
   inventoryQuantities?: Record<string, Record<string, number>>;
   pips?: Record<string, number>;
   pipRewardBonusPercentByUser?: Record<string, number>;
   randomValues?: number[];
   awardedAchievements?: Record<string, string[]>;
+  recordedPvpWins?: string[];
+  recordPvpWin?: ({ userId }: { userId: string; occurredAt: Date }) => null;
 } = {}) => {
   const balances = new Map<string, number>(Object.entries(pips));
   const challenges = new Map<string, DicePvpChallenge>();
@@ -246,6 +253,9 @@ const createHarness = ({
         });
       },
     },
+    contracts: {
+      recordPvpWin,
+    },
     random: () => randomQueue.shift() ?? 0,
     unitOfWork: {
       runInTransaction: (work) => work(),
@@ -309,6 +319,38 @@ test("creating a wagered challenge escrows the challenger stake", async () => {
   assert.equal(challenge.wagerPips, 7);
   assert.equal(harness.balances.get("challenger"), 13);
   assert.equal(challenge.status, "pending");
+});
+
+test("accepting a PvP win still succeeds when contract progress recording fails", async () => {
+  const harness = createHarness({
+    pips: { challenger: 20, opponent: 20 },
+    randomValues: [0.9, 0],
+    recordPvpWin: () => {
+      throw new Error("contracts unavailable");
+    },
+  });
+
+  const challenge = await createChallenge({
+    harness,
+    wagerPips: 5,
+  });
+
+  const result = await harness.useCase.handleDicePvpAction(
+    "opponent",
+    {
+      type: "accept",
+      challengeId: challenge.id,
+    },
+    async () => ({ url: "https://example.test/challenge" }),
+    Date.UTC(2026, 2, 27, 12, 0, 0),
+  );
+
+  assert.equal(result.kind, "update");
+  assert.equal(result.payload.type, "message");
+  if (result.payload.type !== "message") {
+    throw new Error("Expected a message payload.");
+  }
+  assert.match(result.payload.content, /winner/i);
 });
 
 test("declining a wagered challenge refunds the challenger", async () => {
@@ -626,4 +668,25 @@ test("padded bracers reduce PvP loser lockout duration", async () => {
       new Map([["padded-bracers", 1]]),
     ),
   );
+});
+
+test("decisive PvP wins record contract progress for the winner only", async () => {
+  const recordedPvpWins: string[] = [];
+  const harness = createHarness({
+    pips: { challenger: 20, opponent: 20 },
+    randomValues: [0.9, 0],
+    recordedPvpWins,
+  });
+  const challenge = await createChallenge({
+    harness,
+    wagerPips: 0,
+  });
+
+  await harness.useCase.handleDicePvpAction(
+    "opponent",
+    { type: "accept", challengeId: challenge.id },
+    null,
+  );
+
+  assert.deepEqual(recordedPvpWins, ["challenger"]);
 });

@@ -258,6 +258,163 @@ test("blocked rolls do not consume or grant the daily pip reward", () => {
   assert.match(result.content, /you can play again/i);
 });
 
+test("manual rolls record roll_count contract progress", () => {
+  const recordedEvents: Array<{ userId: string; occurredAt: Date }> = [];
+  const nowMs = 1_710_000_000_000;
+  const useCase = createRunRollDiceUseCase({
+    analytics: {
+      recordDiceRollAnalytics: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
+    },
+    contracts: {
+      recordRoll: (event) => {
+        recordedEvents.push(event);
+        return null;
+      },
+    },
+    economy: {
+      applyFameDelta: ({ amount }) => amount,
+      getFame: () => 0,
+      grantDailyPipsIfEligible: () => ({
+        awarded: false,
+        awardedAmount: 0,
+        pips: 0,
+        lastDailyPipRewardAt: null,
+      }),
+    },
+    itemEffects: {
+      consumeOneDoubleRollUse: () => false,
+      getItemDoubleRollStatus: () => ({
+        isActive: false,
+        remainingUses: 0,
+        expiresAtMs: null,
+      }),
+    },
+    permanentBonuses: zeroPermanentBonuses,
+    progression: createProgressionStub(),
+    pvp: {
+      getActiveDiceLockout: () => null,
+      getActiveDoubleRoll: () => null,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  useCase({
+    userId: "contracts-roll-user",
+    userMention: "<@contracts-roll-user>",
+    nowMs,
+  });
+
+  assert.equal(recordedEvents.length, 1);
+  assert.equal(recordedEvents[0]?.userId, "contracts-roll-user");
+  assert.equal(recordedEvents[0]?.occurredAt.getTime(), nowMs);
+});
+
+test("manual rolls still succeed when contract progress recording fails", () => {
+  const nowMs = 1_710_000_000_000;
+  const useCase = createRunRollDiceUseCase({
+    analytics: {
+      recordDiceRollAnalytics: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
+    },
+    contracts: {
+      recordRoll: () => {
+        throw new Error("contracts unavailable");
+      },
+    },
+    economy: {
+      applyFameDelta: ({ amount }) => amount,
+      getFame: () => 0,
+      grantDailyPipsIfEligible: () => ({
+        awarded: false,
+        awardedAmount: 0,
+        pips: 0,
+        lastDailyPipRewardAt: null,
+      }),
+    },
+    itemEffects: {
+      consumeOneDoubleRollUse: () => false,
+      getItemDoubleRollStatus: () => ({
+        isActive: false,
+        remainingUses: 0,
+        expiresAtMs: null,
+      }),
+    },
+    permanentBonuses: zeroPermanentBonuses,
+    progression: createProgressionStub(),
+    pvp: {
+      getActiveDiceLockout: () => null,
+      getActiveDoubleRoll: () => null,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = useCase({
+    userId: "resilient-roll-user",
+    userMention: "<@resilient-roll-user>",
+    nowMs,
+  });
+
+  assert.equal(result.ephemeral, false);
+  assert.match(result.content, /rolled/i);
+});
+
+test("auto rolls do not record roll_count contract progress", () => {
+  const recordedEvents: Array<{ userId: string; occurredAt: Date }> = [];
+  const useCase = createRunRollDiceUseCase({
+    analytics: {
+      recordDiceRollAnalytics: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
+    },
+    contracts: {
+      recordRoll: (event) => {
+        recordedEvents.push(event);
+        return null;
+      },
+    },
+    economy: {
+      applyFameDelta: ({ amount }) => amount,
+      getFame: () => 0,
+      grantDailyPipsIfEligible: () => ({
+        awarded: false,
+        awardedAmount: 0,
+        pips: 0,
+        lastDailyPipRewardAt: null,
+      }),
+    },
+    itemEffects: {
+      consumeOneDoubleRollUse: () => false,
+      getItemDoubleRollStatus: () => ({
+        isActive: false,
+        remainingUses: 0,
+        expiresAtMs: null,
+      }),
+    },
+    permanentBonuses: zeroPermanentBonuses,
+    progression: createProgressionStub(),
+    pvp: {
+      getActiveDiceLockout: () => null,
+      getActiveDoubleRoll: () => null,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  useCase({
+    userId: "contracts-auto-roll-user",
+    userMention: "<@contracts-auto-roll-user>",
+    source: "auto",
+    nowMs: 1_710_000_000_001,
+  });
+
+  assert.equal(recordedEvents.length, 0);
+});
+
 test("auto rolls do not grant the daily pip reward", () => {
   let dailyGrantCalled = false;
   const useCase = createRunRollDiceUseCase({

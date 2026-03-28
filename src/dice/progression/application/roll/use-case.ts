@@ -5,6 +5,7 @@ import {
 } from "../../../../shared/discord";
 import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type {
   DicePermanentBonusesPort,
@@ -95,6 +96,7 @@ type RunRollDiceDependencies = {
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
   raids?: Pick<RaidDiceRollPort, "applyDiceRoll">;
+  contracts?: Pick<ContractsGameplayProgressPort, "recordRoll">;
   unitOfWork: UnitOfWork;
 };
 
@@ -106,6 +108,25 @@ const formatDailyFirstRollBanner = (pipReward: number): string => {
   return `**Daily first roll bonus!** +${pipReward} ${pipLabel}.`;
 };
 
+const recordRollContractProgressSafely = (
+  contracts: Pick<ContractsGameplayProgressPort, "recordRoll"> | undefined,
+  userId: string,
+  nowMs: number,
+): void => {
+  if (!contracts) {
+    return;
+  }
+
+  try {
+    contracts.recordRoll({
+      userId,
+      occurredAt: new Date(nowMs),
+    });
+  } catch (error) {
+    console.warn("[contracts] Failed to record roll progress.", error);
+  }
+};
+
 export const createRunRollDiceUseCase = ({
   analytics,
   economy,
@@ -114,6 +135,7 @@ export const createRunRollDiceUseCase = ({
   progression,
   pvp,
   raids,
+  contracts,
   unitOfWork,
 }: RunRollDiceDependencies) => {
   return ({
@@ -282,6 +304,10 @@ export const createRunRollDiceUseCase = ({
         dailyFirstRollAwardedAmount: dailyPipGrant.awardedAmount,
       };
     });
+
+    if (source === "manual") {
+      recordRollContractProgressSafely(contracts, userId, nowMs);
+    }
 
     const chargeFactorText = formatMultiplierFactor(resolvedRollPassState.effectiveFactor);
     const rewardText = formatRewardText({

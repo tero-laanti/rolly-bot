@@ -19,6 +19,7 @@ import {
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
+  recordCompletedCasinoGame,
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
@@ -123,7 +124,7 @@ const startPushYourLuckRound = ({
 };
 
 const handlePushYourLuckAction = (
-  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
+  { analytics, contracts, economy, nowMs, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "push-roll") {
@@ -162,6 +163,7 @@ const handlePushYourLuckAction = (
         payout: 0,
         outcome: "loss",
       });
+      recordCompletedCasinoGame(contracts, session.userId, nowMs);
       const newlyEarned = awardManualDiceAchievements(
         progression,
         session.userId,
@@ -200,6 +202,7 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, rollResult.payout),
       achievementEvent: { type: "push-perfect-run" },
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -245,6 +248,7 @@ const handlePushYourLuckAction = (
       outcome: getOutcomeFromPayout(round.bet, payout),
       achievementEvent: { type: "push-cashout" },
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,

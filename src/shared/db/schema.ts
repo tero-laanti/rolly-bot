@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 3;
+const currentSchemaVersion = 4;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -193,6 +193,27 @@ const schemaVersion2Columns = new Map<string, string[]>([
 const currentSchemaColumns = new Map<string, string[]>([
   ...schemaVersion2Columns,
   ["dice_personal_charge_state", ["user_id", "last_roll_at", "updated_at"]],
+  [
+    "dice_contract_rotations",
+    ["cadence", "period_key", "contract_ids_json", "reset_at", "activated_at", "updated_at"],
+  ],
+  [
+    "dice_contract_progress",
+    [
+      "user_id",
+      "contract_id",
+      "cadence",
+      "period_key",
+      "objective_type",
+      "required_count",
+      "current_count",
+      "completed_at",
+      "rewarded_at",
+      "reward_pips",
+      "reward_fame",
+      "updated_at",
+    ],
+  ],
 ]);
 
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
@@ -498,6 +519,32 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       user_id TEXT PRIMARY KEY,
       last_roll_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_contract_rotations (
+      cadence TEXT NOT NULL,
+      period_key TEXT NOT NULL,
+      contract_ids_json TEXT NOT NULL,
+      reset_at TEXT NOT NULL,
+      activated_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (cadence, period_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_contract_progress (
+      user_id TEXT NOT NULL,
+      contract_id TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      period_key TEXT NOT NULL,
+      objective_type TEXT NOT NULL,
+      required_count INTEGER NOT NULL,
+      current_count INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT,
+      rewarded_at TEXT,
+      reward_pips INTEGER NOT NULL DEFAULT 0,
+      reward_fame INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, contract_id, cadence, period_key)
     );
   `);
 };

@@ -21,6 +21,7 @@ import {
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
+  recordCompletedCasinoGame,
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
@@ -90,7 +91,9 @@ const buildBlackjackComponentRows = ({
 
 const startBlackjackRound = ({
   analytics,
+  contracts,
   economy,
+  nowMs,
   progression,
   pips,
   session,
@@ -137,6 +140,7 @@ const startBlackjackRound = ({
           ? { type: "blackjack-push" }
           : undefined,
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -186,7 +190,7 @@ const startBlackjackRound = ({
 };
 
 const handleBlackjackAction = (
-  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
+  { analytics, contracts, economy, nowMs, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "blackjack-hit") {
@@ -232,6 +236,7 @@ const handleBlackjackAction = (
             ? { type: "blackjack-hit-to-21-win" }
             : undefined,
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -290,6 +295,7 @@ const handleBlackjackAction = (
       outcome,
       achievementEvent: outcome === "push" ? { type: "blackjack-push" } : undefined,
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,

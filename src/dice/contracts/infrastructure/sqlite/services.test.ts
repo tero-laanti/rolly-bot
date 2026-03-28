@@ -1,0 +1,138 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createRequire } from "node:module";
+import test from "node:test";
+import Database from "better-sqlite3";
+import { initializeDatabaseSchema } from "../../../../shared/db/schema";
+
+const moduleRequire = createRequire(__filename);
+const exampleRollyDataDir = path.resolve(__dirname, "../../../../../example-data/rolly-data");
+
+const clearModules = (modulePaths: readonly string[]): void => {
+  for (const modulePath of modulePaths) {
+    const resolved = moduleRequire.resolve(modulePath);
+    delete require.cache[resolved];
+  }
+};
+
+const clearContractsModuleGraph = (): void => {
+  clearModules([
+    "../../../../rolly-data/load",
+    "../../../../rolly-data/paths",
+    "../rolly-data/contracts-catalog",
+    "./services",
+  ]);
+};
+
+const withEnv = (overrides: Record<string, string | undefined>, run: () => void): void => {
+  const previous = { ...process.env };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    run();
+  } finally {
+    process.env = previous;
+  }
+};
+
+const createRollyDataCopyWithoutContracts = (targetDir: string): void => {
+  fs.cpSync(exampleRollyDataDir, targetDir, { recursive: true });
+  fs.rmSync(path.join(targetDir, "contracts.v1.json"), { force: true });
+};
+
+test("createSqliteContractsGameplayProgressPort disables contracts for missing local contracts.v1.json", () => {
+  const originalCwd = process.cwd();
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-local-"));
+  const projectDir = path.join(tempRoot, "project");
+  const localRollyDataDir = path.join(projectDir, "rolly-data");
+
+  fs.mkdirSync(projectDir, { recursive: true });
+  createRollyDataCopyWithoutContracts(localRollyDataDir);
+
+  withEnv({ ROLLY_DATA_DIR: undefined }, () => {
+    process.chdir(projectDir);
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+
+      assert.equal(services.createSqliteContractsGameplayProgressPort(db), undefined);
+    } finally {
+      process.chdir(originalCwd);
+      clearContractsModuleGraph();
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("strict contracts resolver still fails loudly when local contracts.v1.json is missing", () => {
+  const originalCwd = process.cwd();
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-strict-"));
+  const projectDir = path.join(tempRoot, "project");
+  const localRollyDataDir = path.join(projectDir, "rolly-data");
+
+  fs.mkdirSync(projectDir, { recursive: true });
+  createRollyDataCopyWithoutContracts(localRollyDataDir);
+
+  withEnv({ ROLLY_DATA_DIR: undefined }, () => {
+    process.chdir(projectDir);
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+      const resolver = services.createSqliteContractsRotationResolver(db);
+
+      assert.throws(
+        () => resolver.resolveActiveRotation(new Date("2026-03-28T11:00:00.000Z")),
+        /Contracts data is unavailable/i,
+      );
+    } finally {
+      process.chdir(originalCwd);
+      clearContractsModuleGraph();
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("gameplay progress port still throws when contracts.v1.json exists but is invalid", () => {
+  const originalCwd = process.cwd();
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-invalid-"));
+  const projectDir = path.join(tempRoot, "project");
+  const localRollyDataDir = path.join(projectDir, "rolly-data");
+
+  fs.mkdirSync(projectDir, { recursive: true });
+  fs.cpSync(exampleRollyDataDir, localRollyDataDir, { recursive: true });
+  fs.writeFileSync(path.join(localRollyDataDir, "contracts.v1.json"), "{}\n");
+
+  withEnv({ ROLLY_DATA_DIR: undefined }, () => {
+    process.chdir(projectDir);
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+
+      assert.throws(
+        () => services.createSqliteContractsGameplayProgressPort(db),
+        /contractsV1\.(daily|weekly)|at least/i,
+      );
+    } finally {
+      process.chdir(originalCwd);
+      clearContractsModuleGraph();
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+});

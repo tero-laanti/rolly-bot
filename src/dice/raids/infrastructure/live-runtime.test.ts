@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import Database from "better-sqlite3";
 import { initializeDatabaseSchema } from "../../../shared/db/schema";
+import { truncateDiscordText } from "../../../shared/discord";
 
 const moduleRequire = createRequire(__filename);
 
@@ -32,6 +33,152 @@ const withEnv = async (
     process.env = previous;
   }
 };
+
+test("active World Boss thread names are truncated to Discord limits", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "../domain/raid",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const raidDomain = moduleRequire("../domain/raid") as typeof import("../domain/raid");
+    const originalCreateRaidBoss = raidDomain.createRaidBoss;
+    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const longBossName = "Ancient Guardian ".repeat(10).trim();
+      (
+        raidDomain as {
+          createRaidBoss: typeof raidDomain.createRaidBoss;
+        }
+      ).createRaidBoss = () => ({
+        name: longBossName,
+        level: 99,
+        maxHp: 9999,
+        reward: {
+          pips: 20,
+          rollPassMultiplier: 8,
+          rollPassRolls: 5,
+        },
+      });
+
+      const startedThreadNames: string[] = [];
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => payload,
+        startThread: async (options: { name: string; autoArchiveDuration: number }) => {
+          startedThreadNames.push(options.name);
+          return {
+            id: "raid-thread-1",
+          };
+        },
+      };
+      const announcementMessage = {
+        id: "raid-message-1",
+        channelId: "raid-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "raid-channel") {
+              return raidChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createRaidsLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      const raidRuntime = createRaidsLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "raid-channel",
+          joinLeadMs: 50,
+          activeDurationMs: 60_000,
+          targetRaidsPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+      runtime = raidRuntime;
+
+      const triggerResult = await raidRuntime.triggerRaidNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live raid to be created.");
+      }
+
+      await raidRuntime.handleButtonInteraction({
+        customId: `raid-join:${triggerResult.raidId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      for (let attempt = 0; attempt < 10 && startedThreadNames.length < 1; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      assert.equal(startedThreadNames.length, 1);
+      assert.equal(startedThreadNames[0], truncateDiscordText(`${longBossName} World Boss`, 100));
+      assert.ok(startedThreadNames[0].length <= 100);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      (
+        raidDomain as {
+          createRaidBoss: typeof raidDomain.createRaidBoss;
+        }
+      ).createRaidBoss = originalCreateRaidBoss;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
 
 test("raid join publishes achievement announcements even if the signup prompt edit fails", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
@@ -202,12 +349,275 @@ test("raid join publishes achievement announcements even if the signup prompt ed
   });
 });
 
+test("World Boss join still succeeds when contract progress recording fails", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "../../contracts/infrastructure/sqlite/services",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const contractsServices = moduleRequire(
+      "../../contracts/infrastructure/sqlite/services",
+    ) as typeof import("../../contracts/infrastructure/sqlite/services");
+    const originalCreateSqliteContractsGameplayProgressPort =
+      contractsServices.createSqliteContractsGameplayProgressPort;
+    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort = () => ({
+        recordRoll: () => null,
+        recordPvpWin: () => null,
+        recordCasinoGameCompletion: () => null,
+        recordWorldBossJoin: () => {
+          throw new Error("contracts unavailable");
+        },
+      });
+
+      const warnings: unknown[][] = [];
+      const announcementMessage = {
+        id: "raid-message-1",
+        channelId: "raid-channel",
+        channel: {
+          send: async () => announcementMessage,
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "raid-channel") {
+              return raidChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createRaidsLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      runtime = createRaidsLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "raid-channel",
+          joinLeadMs: 60_000,
+          activeDurationMs: 60_000,
+          targetRaidsPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: (...args: unknown[]) => {
+            warnings.push(args);
+          },
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerRaidNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live raid to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `raid-join:${triggerResult.raidId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      const snapshot = runtime.getLiveRaidsSnapshot();
+      assert.equal(snapshot.length, 1);
+      assert.equal(snapshot[0]?.participantCount, 1);
+      assert.equal(warnings.length, 1);
+      assert.match(String(warnings[0]?.[0]), /Failed to record World Boss join progress/);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort =
+        originalCreateSqliteContractsGameplayProgressPort;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
+test("World Boss join still succeeds when contracts are disabled at runtime wiring", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "../../contracts/infrastructure/sqlite/services",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const contractsServices = moduleRequire(
+      "../../contracts/infrastructure/sqlite/services",
+    ) as typeof import("../../contracts/infrastructure/sqlite/services");
+    const originalCreateSqliteContractsGameplayProgressPort =
+      contractsServices.createSqliteContractsGameplayProgressPort;
+    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort = () => undefined;
+
+      const warnings: unknown[][] = [];
+      const announcementMessage = {
+        id: "raid-message-1",
+        channelId: "raid-channel",
+        channel: {
+          send: async () => announcementMessage,
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "raid-channel") {
+              return raidChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createRaidsLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      runtime = createRaidsLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "raid-channel",
+          joinLeadMs: 60_000,
+          activeDurationMs: 60_000,
+          targetRaidsPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: (...args: unknown[]) => {
+            warnings.push(args);
+          },
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerRaidNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live raid to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `raid-join:${triggerResult.raidId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      const snapshot = runtime.getLiveRaidsSnapshot();
+      assert.equal(snapshot.length, 1);
+      assert.equal(snapshot[0]?.participantCount, 1);
+      assert.equal(warnings.length, 0);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort =
+        originalCreateSqliteContractsGameplayProgressPort;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
 test("raiders can leave during signup and rejoining the same raid does not republish join achievements", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
       "../../../app/discord/achievement-announcements",
       "../../../shared/db",
+      "../../contracts/infrastructure/sqlite/services",
       "../../progression/application/achievement-awards",
       "./live-runtime",
     ] as const;
@@ -218,6 +628,11 @@ test("raiders can leave during signup and rejoining the same raid does not repub
 
     const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
     const originalGetDatabase = sharedDb.getDatabase;
+    const contractsServices = moduleRequire(
+      "../../contracts/infrastructure/sqlite/services",
+    ) as typeof import("../../contracts/infrastructure/sqlite/services");
+    const originalCreateSqliteContractsGameplayProgressPort =
+      contractsServices.createSqliteContractsGameplayProgressPort;
     const achievementAwards = moduleRequire(
       "../../progression/application/achievement-awards",
     ) as typeof import("../../progression/application/achievement-awards");
@@ -231,6 +646,20 @@ test("raiders can leave during signup and rejoining the same raid does not repub
           awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
         }
       ).awardManualDiceAchievements = () => ["raid-join-test"];
+      const recordedWorldBossJoins: string[] = [];
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort = () => ({
+        recordRoll: () => null,
+        recordPvpWin: () => null,
+        recordCasinoGameCompletion: () => null,
+        recordWorldBossJoin: ({ userId }) => {
+          recordedWorldBossJoins.push(userId);
+          return null;
+        },
+      });
 
       const { createRaidsLiveRuntime } = moduleRequire(
         "./live-runtime",
@@ -347,12 +776,19 @@ test("raiders can leave during signup and rejoining the same raid does not repub
         publishedPayloads.filter((payload) => payload.content.includes("raid-join-test")).length,
         1,
       );
+      assert.deepEqual(recordedWorldBossJoins, ["user-1"]);
       assert.ok(announcementEdits.length >= 3);
     } finally {
       if (runtime) {
         await runtime.stop();
       }
 
+      (
+        contractsServices as {
+          createSqliteContractsGameplayProgressPort: typeof contractsServices.createSqliteContractsGameplayProgressPort;
+        }
+      ).createSqliteContractsGameplayProgressPort =
+        originalCreateSqliteContractsGameplayProgressPort;
       (
         sharedDb as {
           getDatabase: typeof sharedDb.getDatabase;

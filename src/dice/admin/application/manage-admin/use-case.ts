@@ -161,12 +161,12 @@ const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAd
         },
         {
           action: { type: "raid-status", ownerId, targetUserId },
-          label: "Raid status",
+          label: "World Boss status",
           style: "primary",
         },
         {
           action: { type: "raid-trigger", ownerId, targetUserId },
-          label: "Raid trigger",
+          label: "World Boss trigger",
           style: "primary",
         },
       ],
@@ -336,28 +336,28 @@ const buildRaidStatusView = (
   const status = raidsAdmin.getAdminStatus();
   if (!status) {
     return {
-      content: "**Dice admin · raid status**\nRaid runtime is currently unavailable.",
+      content: "**Dice admin · world boss status**\nWorld Boss runtime is currently unavailable.",
       components: buildBackComponents(ownerId, targetUserId),
     };
   }
 
   const lines = [
-    "**Dice admin · raid status**",
+    "**Dice admin · world boss status**",
     `- Enabled: ${status.enabled ? "yes" : "no"}`,
     `- Channel: ${status.channelId ? `<#${status.channelId}>` : "not configured"}`,
     `- Join lead: ${Math.round(status.joinLeadMs / 60_000)} min`,
     `- Active duration: ${Math.round(status.activeDurationMs / 60_000)} min`,
-    `- Random raids per day: ${status.targetRaidsPerDay}`,
+    `- Random World Bosses per day: ${status.targetRaidsPerDay}`,
     `- Min gap: ${Math.round(status.minGapMs / 60_000)} min`,
     `- Retry delay: ${Math.round(status.retryDelayMs / 1_000)} sec`,
     `- Quiet hours: ${status.quietHours.start}-${status.quietHours.end} (${status.quietHours.timezone})`,
-    `- Live raid count: ${status.snapshot.liveRaidCount}`,
+    `- Live World Boss count: ${status.snapshot.liveRaidCount}`,
     `- Last trigger: ${formatTimestamp(status.snapshot.lastTriggeredAt)}`,
     `- Next scheduler check: ${formatTimestamp(status.snapshot.nextCheckAt)}`,
   ];
 
   if (status.liveRaids.length > 0) {
-    lines.push("", "**Live raids**");
+    lines.push("", "**Live World Bosses**");
     for (const raid of status.liveRaids) {
       const messageId = raid.activeThreadId ?? raid.activeMessageId ?? raid.announcementMessageId;
       const bossText = raid.boss
@@ -385,10 +385,10 @@ const buildRaidTriggerView = async (
   if (!result.ok) {
     const content =
       result.reason === "disabled"
-        ? "**Dice admin · raid trigger**\nRaids are disabled in config."
+        ? "**Dice admin · world boss trigger**\nWorld Boss is disabled in config."
         : result.reason === "active-raid-exists"
-          ? "**Dice admin · raid trigger**\nA raid is already active. Use Raid status first."
-          : "**Dice admin · raid trigger**\nRaid runtime is currently unavailable.";
+          ? "**Dice admin · world boss trigger**\nA World Boss is already active. Use World Boss status first."
+          : "**Dice admin · world boss trigger**\nWorld Boss runtime is currently unavailable.";
 
     return {
       content,
@@ -399,16 +399,16 @@ const buildRaidTriggerView = async (
   if (!result.result?.created) {
     return {
       content:
-        "**Dice admin · raid trigger**\nNo raid was created. Check raid config or channel permissions.",
+        "**Dice admin · world boss trigger**\nNo World Boss was created. Check World Boss config or channel permissions.",
       components: buildBackComponents(ownerId, targetUserId),
     };
   }
 
   return {
     content: [
-      "**Dice admin · raid trigger**",
-      "Raid announced.",
-      `- Raid id: ${result.result.raidId ?? "unknown"}`,
+      "**Dice admin · world boss trigger**",
+      "World Boss announced.",
+      `- World Boss id: ${result.result.raidId ?? "unknown"}`,
       `- Scheduled start: ${formatTimestamp(result.result.scheduledStartAt ?? null)}`,
     ].join("\n"),
     components: buildBackComponents(ownerId, targetUserId),

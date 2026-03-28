@@ -1,6 +1,7 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteAnalyticsRepository } from "../../../analytics/infrastructure/sqlite/analytics-repository";
+import { createSqliteContractsGameplayProgressPort } from "../../../contracts/infrastructure/sqlite/services";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import { createSqliteInventoryRepository } from "../../../inventory/infrastructure/sqlite/inventory-repository";
 import { createSqliteProgressionRepository } from "../../../progression/infrastructure/sqlite/progression-repository";
@@ -16,6 +17,7 @@ export const createSqliteDicePvpUseCase = (db: SqliteDatabase) => {
   const progression = createSqliteProgressionRepository(db);
   const pvp = createSqlitePvpRepository(db);
   const hostileEffects = createSqliteDiceHostileEffectsService(db);
+  const contracts = createSqliteContractsGameplayProgressPort(db);
 
   return createDicePvpUseCase({
     analytics,
@@ -24,6 +26,7 @@ export const createSqliteDicePvpUseCase = (db: SqliteDatabase) => {
     inventory,
     progression,
     pvp,
+    contracts,
     unitOfWork,
   });
 };

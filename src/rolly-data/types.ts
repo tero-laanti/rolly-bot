@@ -142,6 +142,35 @@ export type DiceRaidParticipantStrengthData = {
   prestigeMultiplier: number;
 };
 
+export type DiceContractObjectiveType =
+  | "roll_count"
+  | "pvp_win_count"
+  | "casino_game_count"
+  | "world_boss_join_count";
+
+export type DiceContractObjectiveData = {
+  type: DiceContractObjectiveType;
+  requiredCount: number;
+};
+
+export type DiceContractRewardData = {
+  pips?: number;
+  fame?: number;
+};
+
+export type DiceContractData = {
+  id: string;
+  title: string;
+  description: string;
+  objective: DiceContractObjectiveData;
+  reward: DiceContractRewardData;
+};
+
+export type DiceContractsV1Data = {
+  daily: DiceContractData[];
+  weekly: DiceContractData[];
+};
+
 export type DiceBalanceData = {
   prestigeSides: number[];
   lowerPrestigeBaseDiceCount: number;
@@ -300,6 +329,7 @@ export type LoadedRollyData = {
   source: RollyDataSource;
   achievements: DiceAchievementData[];
   casinoV1: DiceCasinoData;
+  contractsV1: DiceContractsV1Data | null;
   diceBalance: DiceBalanceData;
   introPostsV1: IntroPostsV1Data;
   pvp: DicePvpData;

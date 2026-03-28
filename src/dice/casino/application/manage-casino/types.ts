@@ -1,4 +1,5 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
+import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import type { DiceCasinoAnalyticsRepository } from "../ports";
@@ -111,7 +112,9 @@ export type MutateSessionResult =
 
 export type DiceCasinoMutationContext = {
   analytics: DiceCasinoAnalyticsRepository;
+  contracts?: Pick<ContractsGameplayProgressPort, "recordCasinoGameCompletion">;
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
+  nowMs: number;
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   session: DiceCasinoSession;
   pips: number;

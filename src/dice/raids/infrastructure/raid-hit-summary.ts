@@ -25,10 +25,10 @@ export const buildRaidHitSummary = (input: BuildRaidHitSummaryInput): string => 
     lines.push(`Best Roll: **${formatBestRollPreview(input.bestRollSet)}**`);
   }
 
-  lines.push(`You dealt **${input.damage} raid damage.**`);
+  lines.push(`You dealt **${input.damage} World Boss damage.**`);
 
   const resolutionLine = input.defeated
-    ? `**${input.bossName}** was defeated. ${input.eligibleParticipantCount} eligible raider${input.eligibleParticipantCount === 1 ? "" : "s"} earned ${input.rewardSummary}.`
+    ? `**${input.bossName}** was defeated. ${input.eligibleParticipantCount} eligible player${input.eligibleParticipantCount === 1 ? "" : "s"} earned ${input.rewardSummary}.`
     : `**${input.bossName}** has ${input.currentHp}/${input.maxHp} HP remaining.`;
 
   lines.push(resolutionLine);

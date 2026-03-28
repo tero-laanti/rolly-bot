@@ -7,6 +7,11 @@ import type {
   DiceCasinoPushYourLuckPayoutData,
   DiceAchievementRule,
   DiceBalanceData,
+  DiceContractData,
+  DiceContractObjectiveData,
+  DiceContractObjectiveType,
+  DiceContractRewardData,
+  DiceContractsV1Data,
   DicePvpData,
   DiceItemData,
   DiceItemEffect,
@@ -93,6 +98,14 @@ const achievementRuleTypes = [
   "all-of",
   "manual",
 ] as const;
+const contractObjectiveTypes = [
+  "roll_count",
+  "pvp_win_count",
+  "casino_game_count",
+  "world_boss_join_count",
+] as const;
+const minimumDailyContracts = 3;
+const minimumWeeklyContracts = 2;
 const introPostContentMaxLength = discordMessageCharacterLimit;
 const randomEventTemplateVariablePattern = /\$\{([a-zA-Z0-9_]+)\}/g;
 
@@ -1258,6 +1271,94 @@ const validateRaidDiscordText = (raids: DiceRaidData): void => {
   );
 };
 
+const readContractObjectiveType = (value: unknown, label: string): DiceContractObjectiveType => {
+  const parsed = readNonEmptyString(value, label);
+  if (!contractObjectiveTypes.includes(parsed as DiceContractObjectiveType)) {
+    throw new Error(`${label} must be one of ${contractObjectiveTypes.join(", ")}.`);
+  }
+
+  return parsed as DiceContractObjectiveType;
+};
+
+const readContractObjective = (value: unknown, label: string): DiceContractObjectiveData => {
+  const record = assertRecord(value, label);
+  return {
+    type: readContractObjectiveType(record.type, `${label}.type`),
+    requiredCount: readInteger(record.requiredCount, `${label}.requiredCount`, 1),
+  };
+};
+
+const readContractReward = (value: unknown, label: string): DiceContractRewardData => {
+  const record = assertRecord(value, label);
+  const pips = readOptionalInteger(record.pips, `${label}.pips`, 1);
+  const fame = readOptionalInteger(record.fame, `${label}.fame`, 1);
+
+  if (pips === undefined && fame === undefined) {
+    throw new Error(`${label} must include pips and/or fame.`);
+  }
+
+  return {
+    pips,
+    fame,
+  };
+};
+
+const readContract = (value: unknown, label: string): DiceContractData => {
+  const record = assertRecord(value, label);
+  return {
+    id: readNonEmptyString(record.id, `${label}.id`),
+    title: readNonEmptyString(record.title, `${label}.title`),
+    description: readNonEmptyString(record.description, `${label}.description`),
+    objective: readContractObjective(record.objective, `${label}.objective`),
+    reward: readContractReward(record.reward, `${label}.reward`),
+  };
+};
+
+const formatContractRewardText = (reward: DiceContractRewardData): string => {
+  const parts: string[] = [];
+  if (reward.pips !== undefined) {
+    parts.push(`${reward.pips} pips`);
+  }
+  if (reward.fame !== undefined) {
+    parts.push(`${reward.fame} fame`);
+  }
+
+  return parts.join(" + ");
+};
+
+const buildSingleContractPreview = (contract: DiceContractData, cadence: "daily" | "weekly") => {
+  const cadenceLabel = cadence === "daily" ? "Daily Contract" : "Weekly Contract";
+  return [
+    `**${cadenceLabel}**`,
+    `${contract.title}`,
+    contract.description,
+    `Objective: ${contract.objective.type} x${contract.objective.requiredCount}`,
+    `Reward: ${formatContractRewardText(contract.reward)}`,
+  ].join("\n");
+};
+
+const validateContractDiscordText = (
+  contract: DiceContractData,
+  label: string,
+  cadence: "daily" | "weekly",
+): void => {
+  assertDiscordTextLength(
+    contract.title,
+    `${label}.title as rendered in Discord`,
+    discordEmbedTitleCharacterLimit,
+  );
+  assertDiscordTextLength(
+    contract.description,
+    `${label}.description as rendered in Discord`,
+    discordEmbedDescriptionCharacterLimit,
+  );
+  assertDiscordTextLength(
+    buildSingleContractPreview(contract, cadence),
+    `${label} as rendered in /contracts`,
+    discordMessageCharacterLimit,
+  );
+};
+
 export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => {
   if (!Array.isArray(value)) {
     throw new Error("Achievements data must be an array.");
@@ -1578,6 +1679,52 @@ export const parseDiceRaidsData = (value: unknown): DiceRaidData => {
 
   validateRaidDiscordText(parsed);
   return parsed;
+};
+
+export const parseDiceContractsV1Data = (value: unknown): DiceContractsV1Data => {
+  const record = assertRecord(value, "contractsV1");
+  if (!Array.isArray(record.daily)) {
+    throw new Error("contractsV1.daily must be an array.");
+  }
+  if (!Array.isArray(record.weekly)) {
+    throw new Error("contractsV1.weekly must be an array.");
+  }
+
+  const daily = record.daily.map((entry, index) =>
+    readContract(entry, `contractsV1.daily[${index}]`),
+  );
+  const weekly = record.weekly.map((entry, index) =>
+    readContract(entry, `contractsV1.weekly[${index}]`),
+  );
+
+  if (daily.length < minimumDailyContracts) {
+    throw new Error(`contractsV1.daily must include at least ${minimumDailyContracts} contracts.`);
+  }
+  if (weekly.length < minimumWeeklyContracts) {
+    throw new Error(
+      `contractsV1.weekly must include at least ${minimumWeeklyContracts} contracts.`,
+    );
+  }
+
+  const ids = new Set<string>();
+  for (const contract of [...daily, ...weekly]) {
+    if (ids.has(contract.id)) {
+      throw new Error(`Duplicate contract id: ${contract.id}`);
+    }
+    ids.add(contract.id);
+  }
+
+  daily.forEach((contract, index) =>
+    validateContractDiscordText(contract, `contractsV1.daily[${index}]`, "daily"),
+  );
+  weekly.forEach((contract, index) =>
+    validateContractDiscordText(contract, `contractsV1.weekly[${index}]`, "weekly"),
+  );
+
+  return {
+    daily,
+    weekly,
+  };
 };
 
 export const parseDiceCasinoData = (value: unknown): DiceCasinoData => {

@@ -21,6 +21,7 @@ import {
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
+  recordCompletedCasinoGame,
   replyMutation,
   viewMutation,
 } from "../helpers";
@@ -128,7 +129,7 @@ const startExactRollRound = (): MutateSessionResult => {
 };
 
 const handleExactRollAction = (
-  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
+  { analytics, contracts, economy, nowMs, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "exact-mode") {
@@ -189,6 +190,7 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "exact-face-win" } : undefined,
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -259,6 +261,7 @@ const handleExactRollAction = (
       outcome: getOutcomeFromPayout(session.bet, resolution.payout),
       achievementEvent: resolution.won ? { type: "high-low-win" } : undefined,
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,

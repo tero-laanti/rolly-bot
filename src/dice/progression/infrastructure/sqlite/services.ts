@@ -1,6 +1,7 @@
 import type { SqliteDatabase } from "../../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteAnalyticsRepository } from "../../../analytics/infrastructure/sqlite/analytics-repository";
+import { createSqliteContractsGameplayProgressPort } from "../../../contracts/infrastructure/sqlite/services";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
 import { raidsDiceRollPort } from "../../../raids/infrastructure/admin-controller";
@@ -51,6 +52,7 @@ export const createSqliteRollDiceUseCase = (db: SqliteDatabase) => {
   const pvp = createSqlitePvpRepository(db);
   const itemEffects = createSqliteDiceItemEffectsService(db);
   const permanentBonuses = createSqlitePermanentBonusesPort(db);
+  const contracts = createSqliteContractsGameplayProgressPort(db);
 
   return createRunRollDiceUseCase({
     analytics,
@@ -60,6 +62,7 @@ export const createSqliteRollDiceUseCase = (db: SqliteDatabase) => {
     progression,
     pvp,
     raids: raidsDiceRollPort,
+    contracts,
     unitOfWork,
   });
 };

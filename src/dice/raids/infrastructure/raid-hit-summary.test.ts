@@ -12,7 +12,7 @@ test("raid hit summary includes the best set for multi-set raid rolls", () => {
       currentHp: 71,
       maxHp: 100,
     }),
-    "Best Roll: **4 • 2 • 5 • 6 • 4 • 8**\nYou dealt **29 raid damage.**\n**Bone Dragon** has 71/100 HP remaining.",
+    "Best Roll: **4 • 2 • 5 • 6 • 4 • 8**\nYou dealt **29 World Boss damage.**\n**Bone Dragon** has 71/100 HP remaining.",
   );
 });
 
@@ -23,10 +23,10 @@ test("raid hit summary omits the best set when there was only one roll set", () 
       bossName: "Bone Dragon",
       bestRollSet: null,
       defeated: true,
-      rewardSummary: "5 Pips and 2 roll passes per eligible raider",
+      rewardSummary: "5 Pips and 2 roll passes per eligible player",
       eligibleParticipantCount: 2,
     }),
-    "You dealt **29 raid damage.**\n**Bone Dragon** was defeated. 2 eligible raiders earned 5 Pips and 2 roll passes per eligible raider.",
+    "You dealt **29 World Boss damage.**\n**Bone Dragon** was defeated. 2 eligible players earned 5 Pips and 2 roll passes per eligible player.",
   );
 });
 
@@ -40,6 +40,6 @@ test("raid hit summary caps the best set preview for long multi-set raid rolls",
       currentHp: 71,
       maxHp: 100,
     }),
-    "Best Roll: **1 • 2 • 3 • 4 • 5 • 6 • 7 • 8 • 9 • 10 • 11 • 12 • ... (+8 more)**\nYou dealt **29 raid damage.**\n**Bone Dragon** has 71/100 HP remaining.",
+    "Best Roll: **1 • 2 • 3 • 4 • 5 • 6 • 7 • 8 • 9 • 10 • 11 • 12 • ... (+8 more)**\nYou dealt **29 World Boss damage.**\n**Bone Dragon** has 71/100 HP remaining.",
   );
 });

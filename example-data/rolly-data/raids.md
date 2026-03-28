@@ -1,6 +1,7 @@
 # `raids.json`
 
-This file controls raid rewards, boss naming, and raid boss-balance tuning.
+This file controls World Boss rewards, boss naming, and World Boss balance tuning.
+Player-facing copy uses `World Boss`, while internal identifiers remain `raids` and `raids.json`.
 
 `reward` supports two pip payout shapes:
 
@@ -72,11 +73,11 @@ Tiered reward alternative:
 - `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
 - `reward.rollPassBuff.minimumRolls` and `reward.rollPassBuff.maximumRolls` clamp the rewarded roll count.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
-- Startup validation rejects prefix/suffix combinations that would overflow the live raid embed titles once the boss name and level are composed.
+- Startup validation rejects prefix/suffix combinations that would overflow the live World Boss embed titles once the boss name and level are composed.
 - `baseHp` is the level 1 boss HP before level scaling.
 - `hpIncreasePerBossLevelPercent` is the compound HP increase applied for each boss level above 1.
-- Boss HP is calculated from boss level first, then multiplied by the joined-raider strength total when the raid starts.
-- `participantStrength.prestigeMultiplier` scales each joined raider by `multiplier ^ prestige`, using the player's active prestige when the raid starts.
+- Boss HP is calculated from boss level first, then multiplied by the joined-player strength total when the World Boss starts.
+- `participantStrength.prestigeMultiplier` scales each joined player by `multiplier ^ prestige`, using the player's active prestige when the World Boss starts.
 - With the default `1.5`, prestige strengths are `1`, `1.5`, `2.25`, `3.375`, and so on.
 - With the default values, level 50 lands at roughly `4.26x` the HP of level 1.
 - `levelHalfLifeLevels` controls the low-heavy level roll. With the default `10`, a level 50 boss is half as likely as a level 40 boss, which is half as likely as a level 30 boss.

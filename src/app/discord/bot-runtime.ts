@@ -361,6 +361,11 @@ const initializeRollyData = (): void => {
   }
 
   console.log(`[rolly-data] Loaded game data from ${sourceDescription}.`);
+  if (loaded.contractsV1 === null) {
+    console.warn(
+      "[contracts] contracts.v1.json is missing from local rolly-data. Contracts are disabled.",
+    );
+  }
 };
 
 export const startDiscordBot = async (): Promise<void> => {

@@ -8,6 +8,7 @@ import { formatDiscordRelativeTime } from "../../../../shared/discord";
 import { minuteMs } from "../../../../shared/time";
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceInventoryRepository } from "../../../inventory/application/ports";
 import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
@@ -84,8 +85,28 @@ type ManageChallengeDependencies = {
     | "setDicePvpChallengeStatusFromPending"
     | "setDicePvpEffects"
   >;
+  contracts?: Pick<ContractsGameplayProgressPort, "recordPvpWin">;
   random?: () => number;
   unitOfWork: UnitOfWork;
+};
+
+const recordPvpWinContractProgressSafely = (
+  contracts: Pick<ContractsGameplayProgressPort, "recordPvpWin"> | undefined,
+  userId: string,
+  nowMs: number,
+): void => {
+  if (!contracts) {
+    return;
+  }
+
+  try {
+    contracts.recordPvpWin({
+      userId,
+      occurredAt: new Date(nowMs),
+    });
+  } catch (error) {
+    console.warn("[contracts] Failed to record PvP win progress.", error);
+  }
 };
 
 export const createDicePvpUseCase = ({
@@ -95,6 +116,7 @@ export const createDicePvpUseCase = ({
   inventory,
   progression,
   pvp,
+  contracts,
   random = Math.random,
   unitOfWork,
 }: ManageChallengeDependencies) => {
@@ -186,6 +208,7 @@ export const createDicePvpUseCase = ({
           inventory,
           progression,
           pvp,
+          contracts,
           unitOfWork,
           random,
         },
@@ -362,6 +385,7 @@ const handleChallengeAccept = (
     pvp,
     random = Math.random,
     unitOfWork,
+    contracts,
   }: ManageChallengeDependencies,
   actorId: string,
   challengeId: string,
@@ -656,6 +680,8 @@ const handleChallengeAccept = (
       ),
     );
   }
+
+  recordPvpWinContractProgressSafely(contracts, outcome.winnerId, nowMs);
 
   return updateMessage(
     buildWinResultContent(

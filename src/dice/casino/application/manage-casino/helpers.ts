@@ -1,3 +1,4 @@
+import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { AchievementAnnouncement } from "../../../progression/application/achievement-announcements";
 import type { DiceCasinoActiveRound, DiceCasinoSession } from "../../domain/casino-session";
@@ -254,6 +255,25 @@ export const grantCasinoPayout = (
     awardedPayout: normalizedRefund + reward.awardedAmount,
     pips: reward.pips,
   };
+};
+
+export const recordCompletedCasinoGame = (
+  contracts: Pick<ContractsGameplayProgressPort, "recordCasinoGameCompletion"> | undefined,
+  userId: string,
+  nowMs: number,
+): void => {
+  if (!contracts) {
+    return;
+  }
+
+  try {
+    contracts.recordCasinoGameCompletion({
+      userId,
+      occurredAt: new Date(nowMs),
+    });
+  } catch (error) {
+    console.warn("[contracts] Failed to record casino progress.", error);
+  }
 };
 
 export const viewMutation = (

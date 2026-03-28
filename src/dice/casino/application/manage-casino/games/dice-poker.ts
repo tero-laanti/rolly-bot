@@ -18,6 +18,7 @@ import {
   insufficientPipsReply,
   invalidCasinoAction,
   normalizeSessionBet,
+  recordCompletedCasinoGame,
   viewMutation,
 } from "../helpers";
 import { awardManualDiceAchievements } from "../../../../progression/application/achievement-awards";
@@ -127,7 +128,7 @@ const startDicePokerRound = ({
 };
 
 const handleDicePokerAction = (
-  { analytics, economy, progression, pips, session }: DiceCasinoMutationContext,
+  { analytics, contracts, economy, nowMs, progression, pips, session }: DiceCasinoMutationContext,
   action: DiceCasinoAction,
 ): MutateSessionResult | null => {
   if (action.type === "poker-toggle-hold") {
@@ -187,6 +188,7 @@ const handleDicePokerAction = (
               handKind: rerollResult.result.kind,
             },
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,
@@ -234,6 +236,7 @@ const handleDicePokerAction = (
       payout: 0,
       outcome: "loss",
     });
+    recordCompletedCasinoGame(contracts, session.userId, nowMs);
     const newlyEarned = awardManualDiceAchievements(
       progression,
       session.userId,

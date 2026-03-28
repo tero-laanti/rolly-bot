@@ -5,7 +5,7 @@ Rolly is a Discord dice game bot built around a persistent loop: roll, grow your
 ## Why Rolly
 
 - `/roll` is the core loop: matching rolls drive progression, achievements, Fame, Pips, bans, and temporary effects.
-- The surrounding systems keep the server busy: PvP, casino games, raids, random events, inventory, and progression systems all feed back into the next roll, including random-event payouts that can grant consumable items.
+- The surrounding systems keep the server busy: PvP, casino games, World Boss fights, random events, inventory, and progression systems all feed back into the next roll, including random-event payouts that can grant consumable items.
 
 ## In Action
 
@@ -23,7 +23,7 @@ Random events arrive as live interaction prompts inside the server:
 
 ## Command Surface
 
-- Player commands: `/roll`, `/balance`, `/leaderboards`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, and `/stats`
+- Player commands: `/roll`, `/balance`, `/leaderboards`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, `/contracts`, and `/stats`
 - Owner/admin commands: `/admin` and `/self-update`
 
 ## Quick Start
@@ -47,7 +47,8 @@ npm run dev
 
 If you have a private `rolly-data` checkout, place it in `./rolly-data` or point `ROLLY_DATA_DIR` at it. Otherwise Rolly falls back to the public examples in [example-data/rolly-data/](example-data/rolly-data/). See [docs/development.md](docs/development.md) for more information.
 
-Private `rolly-data` is validated against the Discord transport limits used by the live bot surfaces at startup, so authored text that would overflow shop, random-event, or raid payloads is rejected before the bot comes online.
+Private `rolly-data` is validated against the Discord transport limits used by the live bot surfaces at startup, so authored text that would overflow shop, random-event, or World Boss payloads is rejected before the bot comes online.
+Contracts authored in `contracts.v1.json` are also validated against the `/contracts` surface, and the command shows the shared daily/weekly rotations with auto-claimed reward progress.
 
 ## Further Reading
 

@@ -32,7 +32,7 @@ const formatParticipants = (
   maxVisible: number = maxVisibleParticipants,
 ): string => {
   if (participantIds.length < 1) {
-    return "No raiders yet - be the first to join.";
+    return "No challengers yet - be the first to join.";
   }
 
   const visibleParticipantMentions = participantIds
@@ -98,7 +98,7 @@ const buildRaidDescriptionWithinLimit = ({
     const lines = [
       ...linesBeforeParticipants,
       "",
-      `**Joined raiders (${participantIds.length})**`,
+      `**Joined players (${participantIds.length})**`,
       formatParticipants(participantIds, participantMaxVisible),
     ];
 
@@ -154,15 +154,15 @@ const getOutcomePresentation = (
   if (outcome === "success") {
     return {
       color: successColor,
-      title: "Raid cleared",
+      title: "World Boss defeated",
       summaryLine: "The boss was defeated in time.",
     };
   }
 
   return {
     color: failureColor,
-    title: "Raid failed",
-    summaryLine: "The boss escaped when the raid timer expired.",
+    title: "World Boss escaped",
+    summaryLine: "The boss escaped when the world boss timer expired.",
   };
 };
 
@@ -183,8 +183,8 @@ export const buildRaidAnnouncementPrompt = ({
 }): BaseMessageOptions => {
   const descriptionLines = [
     disabled
-      ? `Raid signup closed ${formatDiscordRelativeTime(scheduledStartAtMs)}.`
-      : `The raid begins ${formatDiscordRelativeTime(scheduledStartAtMs)}.`,
+      ? `World Boss signup closed ${formatDiscordRelativeTime(scheduledStartAtMs)}.`
+      : `The World Boss fight begins ${formatDiscordRelativeTime(scheduledStartAtMs)}.`,
     `Start time: ${formatDiscordFullTime(scheduledStartAtMs)}.`,
   ];
 
@@ -193,12 +193,12 @@ export const buildRaidAnnouncementPrompt = ({
   } else {
     descriptionLines.push(
       disabled
-        ? "This raid is no longer accepting new raiders."
-        : "Join now to lock yourself in before the boss arrives.",
+        ? "This World Boss is no longer accepting new players."
+        : "Join now before the World Boss arrives.",
     );
   }
 
-  const title = disabled ? "Raid signup closed" : "Incoming raid";
+  const title = disabled ? "World Boss signup closed" : "Incoming World Boss";
   assertDiscordTextLength(title, "raid prompt title", discordEmbedTitleCharacterLimit);
 
   const embed = new EmbedBuilder()
@@ -212,19 +212,19 @@ export const buildRaidAnnouncementPrompt = ({
     )
     .setFooter({
       text: disabled
-        ? "Joined raiders are now locked for this raid."
-        : "Joined players will be carried into the active raid state.",
+        ? "Joined players are now locked for this World Boss."
+        : "Joined players will be carried into the active World Boss fight.",
     });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(buildRaidJoinButtonId(raidId))
-      .setLabel("Join raid")
+      .setLabel("Join World Boss")
       .setStyle(ButtonStyle.Success)
       .setDisabled(disabled),
     new ButtonBuilder()
       .setCustomId(buildRaidLeaveButtonId(raidId))
-      .setLabel("Leave raid")
+      .setLabel("Leave World Boss")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled),
   );
@@ -273,20 +273,20 @@ export const buildRaidActivePrompt = ({
       buildRaidDescriptionWithinLimit({
         linesBeforeParticipants: [
           `Fight in <#${threadId}>.`,
-          `Raid opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
-          "Only joined raiders using /roll in this thread deal damage.",
+          `World Boss opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
+          "Only joined players using /roll in this thread deal damage.",
           "Land at least one hit in this thread to qualify for the clear reward.",
           "",
           `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
           `Total damage: **${totalDamage}** across ${totalAttacks} hit${totalAttacks === 1 ? "" : "s"}.`,
-          `Reward-eligible raiders: **${eligibleParticipantCount}**.`,
+          `Reward-eligible players: **${eligibleParticipantCount}**.`,
           `Base reward on success: **${rewardSummary}**.`,
         ],
         participantIds,
         contributionLines,
       }),
     )
-    .setFooter({ text: "Use /roll inside the raid thread to attack." });
+    .setFooter({ text: "Use /roll inside the World Boss thread to attack." });
 
   return {
     embeds: [embed],
@@ -318,7 +318,7 @@ export const buildRaidResolvedPrompt = ({
   const presentation = getOutcomePresentation(outcome);
   const rewardLine =
     outcome === "success"
-      ? `Reward applied to ${eligibleParticipantCount} eligible raider${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
+      ? `Reward applied to ${eligibleParticipantCount} eligible player${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
       : "";
   const title = `${presentation.title} - ${bossName} Lv.${bossLevel}`;
   assertDiscordTextLength(title, "raid resolved prompt title", discordEmbedTitleCharacterLimit);
@@ -329,7 +329,7 @@ export const buildRaidResolvedPrompt = ({
     .setDescription(
       buildRaidDescriptionWithinLimit({
         linesBeforeParticipants: [
-          `${presentation.summaryLine} The raid ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
+          `${presentation.summaryLine} The World Boss ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
           `Boss HP pool: **${maxHp}**.`,
           rewardLine,
         ].filter((line) => line.length > 0),
@@ -357,11 +357,11 @@ export const buildRaidResolveFailedPrompt = ({
 }): BaseMessageOptions => {
   const outcomeText =
     outcome === "success"
-      ? "The raid boss was defeated."
+      ? "The World Boss was defeated."
       : outcome === "failure"
-        ? "The raid timed out."
-        : "The raid ended.";
-  const title = "Raid ended with cleanup needed";
+        ? "The World Boss timer expired."
+        : "The World Boss ended.";
+  const title = "World Boss ended with cleanup needed";
   assertDiscordTextLength(title, "raid cleanup prompt title", discordEmbedTitleCharacterLimit);
 
   const embed = new EmbedBuilder()
@@ -372,7 +372,7 @@ export const buildRaidResolveFailedPrompt = ({
         linesBeforeParticipants: [
           `${outcomeText} Cleanup failed ${formatDiscordRelativeTime(resolvedAtMs)}.`,
           bossName ? `Boss: **${bossName}**.` : "",
-          "A moderator may need to tidy the stale raid message manually.",
+          "A moderator may need to tidy the stale World Boss message manually.",
         ].filter((line) => line.length > 0),
         participantIds,
       }),
@@ -391,7 +391,7 @@ export const buildRaidInterruptedPrompt = ({
   participantIds: readonly string[];
   bossName?: string | null;
 }): BaseMessageOptions => {
-  const title = "Raid interrupted";
+  const title = "World Boss interrupted";
   assertDiscordTextLength(title, "raid interrupted prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(failureColor)
@@ -399,7 +399,7 @@ export const buildRaidInterruptedPrompt = ({
     .setDescription(
       buildRaidDescriptionWithinLimit({
         linesBeforeParticipants: [
-          "This raid was closed while the bot restarted.",
+          "This World Boss was closed while the bot restarted.",
           bossName ? `Boss: **${bossName}**.` : "",
         ].filter((line) => line.length > 0),
         participantIds,
@@ -417,14 +417,16 @@ export const buildRaidStartFailedPrompt = ({
 }: {
   participantIds: readonly string[];
 }): BaseMessageOptions => {
-  const title = "Raid failed to start";
+  const title = "World Boss failed to start";
   assertDiscordTextLength(title, "raid start failed prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(failureColor)
     .setTitle(title)
     .setDescription(
       buildRaidDescriptionWithinLimit({
-        linesBeforeParticipants: ["Raid signup closed, but the boss thread could not be opened."],
+        linesBeforeParticipants: [
+          "World Boss signup closed, but the boss thread could not be opened.",
+        ],
         participantIds,
       }),
     );
@@ -440,7 +442,7 @@ export const buildRaidCancelledPrompt = ({
 }: {
   scheduledStartAtMs: number;
 }): BaseMessageOptions => {
-  const title = "Raid cancelled";
+  const title = "World Boss cancelled";
   assertDiscordTextLength(title, "raid cancelled prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
     .setColor(failureColor)

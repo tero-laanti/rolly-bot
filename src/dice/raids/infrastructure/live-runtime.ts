@@ -4,6 +4,8 @@ import { publishAchievementAnnouncements } from "../../../app/discord/achievemen
 import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
+import type { ContractsGameplayProgressPort } from "../../contracts/application/ports";
+import { createSqliteContractsGameplayProgressPort } from "../../contracts/infrastructure/sqlite/services";
 import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
 import { awardManualDiceAchievements } from "../../progression/application/achievement-awards";
 import {
@@ -38,6 +40,7 @@ import {
   buildRaidResolvedPrompt,
   buildRaidStartFailedPrompt,
 } from "../interfaces/discord/prompt";
+import { truncateDiscordText } from "../../../shared/discord";
 import type {
   ActiveRaidContext,
   ActiveRaidRecord,
@@ -71,9 +74,10 @@ export type RaidsLiveRuntime = {
   stop: () => Promise<void>;
 };
 
-const raidTitle = "Dice raid";
+const raidTitle = "World Boss";
 const raidProgressRenderThrottleMs = 1_500;
 const maxContributionLines = 5;
+const threadNameCharacterLimit = 100;
 
 const blockingStatuses = new Set<RaidStatus>(["joining", "starting", "active"]);
 
@@ -115,6 +119,29 @@ const buildContributionLines = (context: ActiveRaidContext): string[] => {
     .map(([userId, damage]) => `<@${userId}> - ${damage} dmg`);
 };
 
+const recordWorldBossJoinContractProgressSafely = ({
+  contracts,
+  logger,
+  userId,
+}: {
+  contracts: Pick<ContractsGameplayProgressPort, "recordWorldBossJoin"> | undefined;
+  logger: RaidsLiveRuntimeLogger;
+  userId: string;
+}): void => {
+  if (!contracts) {
+    return;
+  }
+
+  try {
+    contracts.recordWorldBossJoin({
+      userId,
+      occurredAt: new Date(),
+    });
+  } catch (error) {
+    logger.warn("[contracts] Failed to record World Boss join progress.", error);
+  }
+};
+
 export const createRaidsLiveRuntime = ({
   client,
   config,
@@ -123,6 +150,7 @@ export const createRaidsLiveRuntime = ({
   const liveRaidsById = new Map<string, ActiveRaidContext>();
   const liveRaidIdsByThreadId = new Map<string, string>();
   const db = getDatabase();
+  const contracts = createSqliteContractsGameplayProgressPort(db);
   const economy = createSqliteEconomyRepository(db);
   const progression = createSqliteProgressionRepository(db);
   const unitOfWork = createSqliteUnitOfWork(db);
@@ -765,7 +793,7 @@ export const createRaidsLiveRuntime = ({
 
     const activeMessage = await activeChannel
       .send({
-        content: "Opening raid thread...",
+        content: "Opening World Boss thread...",
       })
       .catch((error: unknown) => {
         logger.error("[raids] Failed to send active raid prompt.", error);
@@ -783,9 +811,14 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
+    const threadName = truncateDiscordText(
+      `${bossDefinition.name} World Boss`,
+      threadNameCharacterLimit,
+    );
+
     const activeThread = await activeMessage
       .startThread({
-        name: `${bossDefinition.name} raid`,
+        name: threadName,
         autoArchiveDuration: 60,
       })
       .catch((error: unknown) => {
@@ -1038,7 +1071,7 @@ export const createRaidsLiveRuntime = ({
       Date.now() >= context.raid.scheduledStartAtMs
     ) {
       await interaction.reply({
-        content: "Too late - this raid is already closed.",
+        content: "Too late - this World Boss is already closed.",
         ephemeral: true,
       });
       return;
@@ -1047,7 +1080,7 @@ export const createRaidsLiveRuntime = ({
     if (buttonAction.type === "leave") {
       if (!context.raid.participantIds.has(interaction.user.id)) {
         await interaction.reply({
-          content: "You're not signed up for this raid.",
+          content: "You're not signed up for this World Boss.",
           ephemeral: true,
         });
         return;
@@ -1065,7 +1098,7 @@ export const createRaidsLiveRuntime = ({
 
     if (context.raid.participantIds.has(interaction.user.id)) {
       await interaction.reply({
-        content: "You're already signed up for this raid.",
+        content: "You're already signed up for this World Boss.",
         ephemeral: true,
       });
       return;
@@ -1074,6 +1107,13 @@ export const createRaidsLiveRuntime = ({
     context.raid.participantIds.add(interaction.user.id);
     const isFirstJoinForRaid = !context.raid.joinedUserIds.has(interaction.user.id);
     context.raid.joinedUserIds.add(interaction.user.id);
+    if (isFirstJoinForRaid) {
+      recordWorldBossJoinContractProgressSafely({
+        contracts,
+        logger,
+        userId: interaction.user.id,
+      });
+    }
     const achievementAnnouncements = isFirstJoinForRaid
       ? [
           createAchievementAnnouncement(
@@ -1125,7 +1165,7 @@ export const createRaidsLiveRuntime = ({
       return {
         kind: "ignored",
         reason: "inactive",
-        summary: "Too late - this raid is no longer active.",
+        summary: "Too late - this World Boss is no longer active.",
       };
     }
 
@@ -1134,7 +1174,7 @@ export const createRaidsLiveRuntime = ({
       return {
         kind: "ignored",
         reason: "inactive",
-        summary: "Too late - the raid timer already ended.",
+        summary: "Too late - the World Boss timer already ended.",
       };
     }
 
@@ -1142,7 +1182,7 @@ export const createRaidsLiveRuntime = ({
       return {
         kind: "ignored",
         reason: "not-joined",
-        summary: `${userMention}, this roll did not hit the boss because you did not join before the raid started.`,
+        summary: `${userMention}, this roll did not hit the boss because you did not join before the World Boss started.`,
       };
     }
 

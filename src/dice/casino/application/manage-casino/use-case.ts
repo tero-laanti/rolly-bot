@@ -1,4 +1,5 @@
 import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
+import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DiceCasinoAnalyticsRepository, DiceCasinoSessionRepository } from "../ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
@@ -22,6 +23,7 @@ import { buildCasinoView } from "./view";
 
 type ManageCasinoDependencies = {
   analytics: DiceCasinoAnalyticsRepository;
+  contracts?: Pick<ContractsGameplayProgressPort, "recordCasinoGameCompletion">;
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   sessions: DiceCasinoSessionRepository;
@@ -35,6 +37,7 @@ type DiceCasinoReplyPlan = {
 
 export const createDiceCasinoUseCase = ({
   analytics,
+  contracts,
   economy,
   progression,
   sessions,
@@ -175,7 +178,7 @@ export const createDiceCasinoUseCase = ({
     }
 
     const mutation = unitOfWork.runInTransaction(() =>
-      mutateCasinoSession({ action, analytics, economy, progression, nowMs, sessions }),
+      mutateCasinoSession({ action, analytics, contracts, economy, progression, nowMs, sessions }),
     );
 
     if (mutation.kind === "reply") {
@@ -229,6 +232,7 @@ export const createDiceCasinoUseCase = ({
 const mutateCasinoSession = ({
   action,
   analytics,
+  contracts,
   economy,
   progression,
   nowMs,
@@ -236,6 +240,7 @@ const mutateCasinoSession = ({
 }: {
   action: DiceCasinoAction;
   analytics: DiceCasinoAnalyticsRepository;
+  contracts?: Pick<ContractsGameplayProgressPort, "recordCasinoGameCompletion">;
   economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "getPips" | "grantRewardPips">;
   progression: Pick<DiceProgressionRepository, "awardAchievements">;
   nowMs: number;
@@ -414,7 +419,9 @@ const mutateCasinoSession = ({
       sessions,
       getDiceCasinoGameModule(nextSession.state.selectedGame).startRound({
         analytics,
+        contracts,
         economy,
+        nowMs,
         progression,
         session: {
           ...nextSession,
@@ -437,7 +444,9 @@ const mutateCasinoSession = ({
       sessions,
       getDiceCasinoGameModule(nextSession.state.selectedGame).startRound({
         analytics,
+        contracts,
         economy,
+        nowMs,
         progression,
         session: {
           ...nextSession,
@@ -454,7 +463,9 @@ const mutateCasinoSession = ({
   const gameMutation = handleDiceCasinoGameAction(
     {
       analytics,
+      contracts,
       economy,
+      nowMs,
       progression,
       session: nextSession,
       pips: nextPips,

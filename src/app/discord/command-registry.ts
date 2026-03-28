@@ -7,6 +7,7 @@ import * as prestigeCommand from "../../dice/progression/interfaces/discord/comm
 import * as adminCommand from "../../dice/admin/interfaces/discord/commands/admin.command";
 import * as statsCommand from "../../dice/analytics/interfaces/discord/commands/stats.command";
 import * as casinoCommand from "../../dice/casino/interfaces/discord/commands/casino.command";
+import * as contractsCommand from "../../dice/contracts/interfaces/discord/commands/contracts.command";
 import * as balanceCommand from "../../dice/economy/interfaces/discord/commands/balance.command";
 import * as leaderboardsCommand from "../../dice/economy/interfaces/discord/commands/leaderboards.command";
 import * as inventoryCommand from "../../dice/inventory/interfaces/discord/commands/inventory.command";
@@ -37,6 +38,7 @@ const discordCommandModules: DiscordCommandModule[] = [
   bansCommand,
   achievementsCommand,
   casinoCommand,
+  contractsCommand,
   balanceCommand,
   leaderboardsCommand,
   shopCommand,

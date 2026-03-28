@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   parseDiceAchievements,
   parseDiceBalance,
+  parseDiceContractsV1Data,
   parseDiceItems,
   parseDiceRaidsData,
   parseIntroPostsV1Data,
@@ -81,6 +82,103 @@ const createDiceItemInput = () => ({
     reductionPercent: 0.25,
     minimumMinutes: 5,
   },
+});
+
+type ContractsV1Input = {
+  daily: Array<{
+    id: string;
+    title: string;
+    description: string;
+    objective: {
+      type: string;
+      requiredCount: number;
+    };
+    reward: {
+      pips?: number;
+      fame?: number;
+    };
+  }>;
+  weekly: Array<{
+    id: string;
+    title: string;
+    description: string;
+    objective: {
+      type: string;
+      requiredCount: number;
+    };
+    reward: {
+      pips?: number;
+      fame?: number;
+    };
+  }>;
+};
+
+const createContractsV1Input = (): ContractsV1Input => ({
+  daily: [
+    {
+      id: "daily-roll-streak",
+      title: "Daily Roller",
+      description: "Use /roll 10 times.",
+      objective: {
+        type: "roll_count",
+        requiredCount: 10,
+      },
+      reward: {
+        pips: 15,
+      },
+    },
+    {
+      id: "daily-pvp-win",
+      title: "First Blood",
+      description: "Win 1 PvP challenge.",
+      objective: {
+        type: "pvp_win_count",
+        requiredCount: 1,
+      },
+      reward: {
+        fame: 5,
+      },
+    },
+    {
+      id: "daily-casino-run",
+      title: "Lucky Table",
+      description: "Finish 3 casino games.",
+      objective: {
+        type: "casino_game_count",
+        requiredCount: 3,
+      },
+      reward: {
+        pips: 8,
+        fame: 2,
+      },
+    },
+  ],
+  weekly: [
+    {
+      id: "weekly-world-boss",
+      title: "Boss Attendance",
+      description: "Join 2 World Boss encounters.",
+      objective: {
+        type: "world_boss_join_count",
+        requiredCount: 2,
+      },
+      reward: {
+        fame: 20,
+      },
+    },
+    {
+      id: "weekly-roll-volume",
+      title: "Dice Marathon",
+      description: "Use /roll 60 times.",
+      objective: {
+        type: "roll_count",
+        requiredCount: 60,
+      },
+      reward: {
+        pips: 50,
+      },
+    },
+  ],
 });
 
 test("parseDiceBalance preserves firstDailyRollPipReward when provided", () => {
@@ -468,6 +566,62 @@ test("parseDiceRaidsData rejects boss names that overflow raid titles", () => {
         },
       }),
     /active raid title must be <= 256 characters/i,
+  );
+});
+
+test("parseDiceContractsV1Data accepts supported objective and reward shapes", () => {
+  const parsed = parseDiceContractsV1Data(createContractsV1Input());
+
+  assert.equal(parsed.daily.length, 3);
+  assert.equal(parsed.weekly.length, 2);
+  assert.equal(parsed.daily[0]?.objective.type, "roll_count");
+  assert.equal(parsed.weekly[0]?.objective.type, "world_boss_join_count");
+});
+
+test("parseDiceContractsV1Data rejects unsupported objective types", () => {
+  const input = createContractsV1Input();
+  input.daily[0].objective.type = "item_use_count";
+
+  assert.throws(
+    () => parseDiceContractsV1Data(input),
+    /contractsV1\.daily\[0\]\.objective\.type must be one of/i,
+  );
+});
+
+test("parseDiceContractsV1Data rejects rewards without pips or fame", () => {
+  const input = createContractsV1Input();
+  input.daily[0].reward = {};
+
+  assert.throws(
+    () => parseDiceContractsV1Data(input),
+    /contractsV1\.daily\[0\]\.reward must include pips and\/or fame/i,
+  );
+});
+
+test("parseDiceContractsV1Data rejects duplicate ids across daily and weekly contracts", () => {
+  const input = createContractsV1Input();
+  input.weekly[0].id = input.daily[0].id;
+
+  assert.throws(() => parseDiceContractsV1Data(input), /Duplicate contract id/i);
+});
+
+test("parseDiceContractsV1Data rejects insufficient daily contract catalog size", () => {
+  const input = createContractsV1Input();
+  input.daily = input.daily.slice(0, 2);
+
+  assert.throws(
+    () => parseDiceContractsV1Data(input),
+    /contractsV1\.daily must include at least 3 contracts/i,
+  );
+});
+
+test("parseDiceContractsV1Data rejects contract previews that exceed Discord message limits", () => {
+  const input = createContractsV1Input();
+  input.daily[0].description = "A".repeat(2_100);
+
+  assert.throws(
+    () => parseDiceContractsV1Data(input),
+    /contractsV1\.daily\[0\] as rendered in \/contracts must be <= 2000 characters/i,
   );
 });
 

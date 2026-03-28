@@ -39,9 +39,10 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 
 ### Gameplay data
 
-- `ROLLY_DATA_DIR`: Optional. Absolute or repo-relative path to a private `rolly-data` checkout. If omitted, Rolly tries `./rolly-data` and then [example-data/rolly-data/](../example-data/rolly-data/). The data directory is expected to include `achievements.json`, `casino.v1.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
+- `ROLLY_DATA_DIR`: Optional. Absolute or repo-relative path to a private `rolly-data` checkout. If omitted, Rolly tries `./rolly-data` and then [example-data/rolly-data/](../example-data/rolly-data/). The data directory is expected to include `achievements.json`, `casino.v1.json`, `contracts.v1.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - `random-events.v1.json` can reference consumable rewards from `items.v1.json`; startup validation rejects missing or non-consumable item ids.
-- Startup validation also rejects authored gameplay text that would overflow the Discord surfaces used by shop, random events, or raids. Runtime-only overflow from live raid/event state is trimmed when the message is rendered.
+- Startup validation also rejects authored gameplay text that would overflow the Discord surfaces used by shop, random events, or World Boss fights. Runtime-only overflow from live World Boss/event state is trimmed when the message is rendered.
+- `contracts.v1.json` powers the shared `/contracts` rotation. If it is missing from local `./rolly-data`, gameplay contracts hooks are disabled and `/contracts` shows an unavailable message instead of crashing the rest of the bot.
 
 ### Intro posts
 
@@ -63,18 +64,19 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 - `RANDOM_EVENTS_QUIET_HOURS_END`: Optional. Quiet-hours end in `HH:MM` 24-hour format. Default: `08:00`.
 - `RANDOM_EVENTS_QUIET_HOURS_TIMEZONE`: Optional. IANA timezone for quiet hours. Default: `Europe/Helsinki`.
 
-### Raids
+### World Boss (`RAIDS_*`)
 
-- `RAIDS_CHANNEL_ID`: Optional. Channel ID for raid announcements and active raid posts. Raids stay inactive until this is set.
-- `RAIDS_JOIN_LEAD_MINUTES`: Optional. Lead time between announcement and raid start. Units: minutes. Default: `30`.
-- `RAIDS_ACTIVE_DURATION_MINUTES`: Optional. Active raid duration after the boss arrives. Units: minutes. Default: `12`.
-- `RAIDS_TARGET_PER_DAY`: Optional. Target number of randomly scheduled raids per day. Set `0` to disable random scheduling while keeping owner-triggered raids available. Default: `0`.
-- `RAIDS_MIN_GAP_MINUTES`: Optional. Minimum gap between raid announcements. Units: minutes. Default: `180`.
-- `RAIDS_RETRY_DELAY_SECONDS`: Optional. Retry delay after a skipped or failed random raid trigger. Units: seconds. Default: `600`.
+- Player-facing copy uses `World Boss`, while internal identifiers remain `raids` (`RAIDS_*`, `raids.json`, and runtime IDs).
+- `RAIDS_CHANNEL_ID`: Optional. Channel ID for World Boss announcements and active World Boss posts. The World Boss runtime stays inactive until this is set.
+- `RAIDS_JOIN_LEAD_MINUTES`: Optional. Lead time between announcement and World Boss start. Units: minutes. Default: `30`.
+- `RAIDS_ACTIVE_DURATION_MINUTES`: Optional. Active World Boss duration after the boss arrives. Units: minutes. Default: `12`.
+- `RAIDS_TARGET_PER_DAY`: Optional. Target number of randomly scheduled World Boss fights per day. Set `0` to disable random scheduling while keeping owner-triggered World Boss runs available. Default: `0`.
+- `RAIDS_MIN_GAP_MINUTES`: Optional. Minimum gap between World Boss announcements. Units: minutes. Default: `180`.
+- `RAIDS_RETRY_DELAY_SECONDS`: Optional. Retry delay after a skipped or failed random World Boss trigger. Units: seconds. Default: `600`.
 - `RAIDS_JITTER_RATIO`: Optional. Scheduler jitter ratio. Default: `0.35`.
-- `RAIDS_QUIET_HOURS_START`: Optional. Quiet-hours start in `HH:MM` 24-hour format for random raids. Default: `23:00`.
-- `RAIDS_QUIET_HOURS_END`: Optional. Quiet-hours end in `HH:MM` 24-hour format for random raids. Default: `08:00`.
-- `RAIDS_QUIET_HOURS_TIMEZONE`: Optional. IANA timezone for raid quiet hours. Default: `Europe/Helsinki`.
+- `RAIDS_QUIET_HOURS_START`: Optional. Quiet-hours start in `HH:MM` 24-hour format for random World Boss scheduling. Default: `23:00`.
+- `RAIDS_QUIET_HOURS_END`: Optional. Quiet-hours end in `HH:MM` 24-hour format for random World Boss scheduling. Default: `08:00`.
+- `RAIDS_QUIET_HOURS_TIMEZONE`: Optional. IANA timezone for World Boss quiet hours. Default: `Europe/Helsinki`.
 
 ## Start the Bot
 
@@ -94,14 +96,15 @@ When command names, descriptions, or options change, run `npm run deploy:command
 
 - Runtime state is stored in `./data/rolly-bot.sqlite`.
 - Gameplay data loads in this order: `ROLLY_DATA_DIR`, `./rolly-data`, then [example-data/rolly-data/](../example-data/rolly-data/).
-- The expected data files are `achievements.json`, `casino.v1.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
-- Raid boss balance is defined in `raids.json` using a weighted random boss-level roll, per-level HP scaling, and a configurable prestige multiplier for joined-raider strength locked at raid start. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
+- The expected data files are `achievements.json`, `casino.v1.json`, `contracts.v1.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `random-events-balance.json`, and `random-events.v1.json`.
+- World Boss balance is defined in `raids.json` using a weighted random boss-level roll, per-level HP scaling, and a configurable prestige multiplier for joined-player strength locked at fight start. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
+- Contracts are defined in `contracts.v1.json`. `/contracts` renders the global daily/weekly rotation, per-user progress, auto-claimed reward status, and reset timing from that data. The public contract lives in [example-data/rolly-data/contracts.v1.md](../example-data/rolly-data/contracts.v1.md).
 - Public contract docs live in [example-data/rolly-data/README.md](../example-data/rolly-data/README.md) and [example-data/rolly-data/AUTHORING.md](../example-data/rolly-data/AUTHORING.md).
-- Shop, raid, and random-event payloads now fail fast on authored text that exceeds the Discord limits used by their live prompts.
+- Shop, World Boss, and random-event payloads now fail fast on authored text that exceeds the Discord limits used by their live prompts.
 - Managed intro posts are inactive until `INTRO_POST_CHANNEL_ID` is set.
 - Achievement posts are inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.
 - Random events are inactive until `RANDOM_EVENTS_CHANNEL_ID` is set.
-- Raids are inactive until `RAIDS_CHANNEL_ID` is set.
+- World Boss runtime is inactive until `RAIDS_CHANNEL_ID` is set.
 - `dist/` is generated output. Do not edit it directly.
 
 If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` refreshes that repo before rebuilding and redeploying commands.
@@ -125,10 +128,11 @@ Notes:
 - `npm run hooks:install` installs the repo-managed git hook if you want checks before pushes.
 - For code changes, the default verification bar is `npm run build`, `npm run typecheck`, and `npm run format:check`.
 - Run `npm run lint` when you touch broader TypeScript structure or config.
-- Behavior-heavy features such as progression, PvP, random events, raids, admin panels, and self-update benefit from manual Discord validation.
+- Behavior-heavy features such as progression, PvP, random events, World Boss fights, admin panels, and self-update benefit from manual Discord validation.
 
 ## Documentation Checklist
 
 - If you add or change an environment variable, update [README.md](../README.md), [.env.example](../.env.example), and this guide in the same change.
 - If you change the `rolly-data` contract or loader behavior, update [src/rolly-data/](../src/rolly-data/), [example-data/rolly-data/](../example-data/rolly-data/), [README.md](../README.md), this guide, and [.env.example](../.env.example) together.
 - If command names, descriptions, or options change, remind maintainers to run `npm run deploy:commands`.
+- `/contracts` is part of the slash-command surface. After adding or changing it, run `npm run deploy:commands`.
