@@ -199,8 +199,8 @@ test("contract master chooser groups each difficulty on its own row with player-
         now,
       });
 
-      assert.match(view.content, /Objective: Roll 80 time\(s\)/);
-      assert.doesNotMatch(view.content, /Objective: roll_count 80 time\(s\)/);
+      assert.doesNotMatch(view.content, /Objective:/);
+      assert.match(view.content, /Use \/roll 80 times\./);
       assert.deepEqual(
         view.components.map((row) => row.map((button) => button.label)),
         [

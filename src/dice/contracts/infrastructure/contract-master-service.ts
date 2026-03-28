@@ -12,7 +12,6 @@ import {
   type ActionButtonSpec,
   type ActionView,
 } from "../../../shared-kernel/application/action-view";
-import { formatContractObjectiveText } from "../../../rolly-data/contracts/objective-text";
 import { createManageContractMasterUseCase } from "../application/manage-contract-master/use-case";
 import type {
   ContractCadenceView,
@@ -197,7 +196,6 @@ const renderOfferSection = (offer: ContractCadenceView["offers"][number]): strin
 
   lines.push(`**${truncateDiscordText(offer.offer.title, 72)}**`);
   lines.push(truncateDiscordText(offer.offer.description, descriptionMaxLength));
-  lines.push(`Objective: ${formatContractObjectiveText(offer.offer.objective)}`);
   lines.push(
     `Reroll: ${
       offer.source === "initial" ? (offer.rerollAvailable ? "ready" : "used") : "not available"

@@ -64,7 +64,6 @@ import {
   discordMessageCharacterLimit,
   discordStringSelectOptionLabelCharacterLimit,
 } from "../shared/discord";
-import { formatContractObjectiveText } from "./contracts/objective-text";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1330,7 +1329,6 @@ const buildContractPreview = (contract: DiceContractData, cadenceLabel: string):
     `**${cadenceLabel} Contract**`,
     contract.title,
     contract.description,
-    `Objective: ${formatContractObjectiveText(contract.objective)}`,
     `Reward: ${contract.reward.pips} pips`,
   ].join("\n");
 };
