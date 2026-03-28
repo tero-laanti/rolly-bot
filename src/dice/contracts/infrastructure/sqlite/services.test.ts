@@ -163,9 +163,9 @@ test("contracts services fall back to contracts.v2.json when contracts.v1.json i
 
       assert.notEqual(services.createSqliteContractsGameplayProgressPort(db), undefined);
       assert.doesNotThrow(() =>
-        services.createSqliteContractsRotationResolver(db).resolveActiveRotation(
-          new Date("2026-03-28T11:00:00.000Z"),
-        ),
+        services
+          .createSqliteContractsRotationResolver(db)
+          .resolveActiveRotation(new Date("2026-03-28T11:00:00.000Z")),
       );
     } finally {
       process.chdir(originalCwd);
