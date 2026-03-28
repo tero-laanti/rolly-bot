@@ -31,6 +31,7 @@ import type { RandomEventScenario } from "../dice/random-events/domain/content";
 const achievementsFileName = "achievements.json";
 const casinoV1FileName = "casino.v1.json";
 const contractsV1FileName = "contracts.v1.json";
+const contractsV2FileName = "contracts.v2.json";
 const diceBalanceFileName = "dice-balance.json";
 const introPostsV1FileName = "intro-posts.v1.json";
 const itemsV1FileName = "items.v1.json";
@@ -86,14 +87,16 @@ const readOptionalJsonFile = (source: RollyDataSource, fileName: string): unknow
 };
 
 const loadContractsV1 = (source: RollyDataSource): DiceContractsV1Data | null => {
-  const rawContracts = readOptionalJsonFile(source, contractsV1FileName);
+  const rawContracts =
+    readOptionalJsonFile(source, contractsV1FileName) ??
+    readOptionalJsonFile(source, contractsV2FileName);
   if (rawContracts === null) {
     if (source.kind === "local") {
       return null;
     }
 
     throw new Error(
-      `Required rolly-data file is missing: ${getRollyDataFilePath(source, contractsV1FileName)}`,
+      `Required rolly-data file is missing: ${getRollyDataFilePath(source, contractsV1FileName)} or ${getRollyDataFilePath(source, contractsV2FileName)}`,
     );
   }
 
@@ -158,7 +161,7 @@ export const getDiceContractsV1Data = (): DiceContractsV1Data => {
   const loaded = getRollyData();
   if (loaded.contractsV1 === null) {
     throw new Error(
-      `Contracts data is unavailable from ${describeRollyDataSource(loaded.source)}. Add contracts.v1.json to enable contracts.`,
+      `Contracts data is unavailable from ${describeRollyDataSource(loaded.source)}. Add contracts.v1.json or contracts.v2.json to enable contracts.`,
     );
   }
 
