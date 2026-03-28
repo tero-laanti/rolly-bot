@@ -11,6 +11,7 @@ import {
   registerStringSelectMenuHandler,
 } from "./string-select-menu-router";
 import {
+  contractMasterConfig,
   introPostsConfig,
   randomEventsFoundationConfig,
   worldBossConfig,
@@ -39,6 +40,7 @@ import {
 } from "../../dice/world-boss/interfaces/discord/button-ids";
 import { createWorldBossState } from "../../dice/world-boss/infrastructure/state-store";
 import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastructure/challenge-expiration-runtime";
+import { syncContractMasterPanelOnStartup } from "../../dice/contracts/infrastructure/contract-master-panel-sync";
 import { syncIntroPostsOnStartup } from "../../system/intro-posts/infrastructure/startup-sync";
 
 const token = requireEnv("DISCORD_TOKEN");
@@ -269,6 +271,14 @@ client.once(Events.ClientReady, (readyClient) => {
     logger: console,
   }).catch((error) => {
     console.error("[intro-posts] Startup sync failed:", error);
+  });
+  void syncContractMasterPanelOnStartup({
+    client,
+    config: contractMasterConfig,
+    db: getDatabase(),
+    logger: console,
+  }).catch((error) => {
+    console.error("[contract-master] Startup sync failed:", error);
   });
   startRandomEventsFoundation();
   startWorldBossFoundation();

@@ -20,6 +20,14 @@ const hasColumn = (db: Database.Database, tableName: string, columnName: string)
   return columns.some((column) => column.name === columnName);
 };
 
+const hasIndex = (db: Database.Database, indexName: string): boolean => {
+  const row = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?")
+    .get(indexName) as { name: string } | undefined;
+
+  return Boolean(row);
+};
+
 const createLegacyProgressionSchema = (db: Database.Database): void => {
   db.exec(`
     CREATE TABLE dice_levels_by_prestige (
@@ -100,6 +108,73 @@ const createCurrentSchemaV4 = (db: Database.Database): void => {
   db.pragma("user_version = 4");
 };
 
+const createCurrentSchemaV5 = (db: Database.Database): void => {
+  initializeDatabaseSchema(db);
+  db.exec(`
+    DROP INDEX IF EXISTS idx_dice_contract_master_initial_offers_contract_id;
+    DROP INDEX IF EXISTS idx_dice_contract_master_runs_contract_id;
+
+    ALTER TABLE dice_contract_master_runs RENAME TO dice_contract_master_runs_v6;
+
+    CREATE TABLE dice_contract_master_runs (
+      user_id TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      reset_window TEXT NOT NULL,
+      sequence_number INTEGER NOT NULL,
+      contract_id TEXT NOT NULL,
+      difficulty TEXT NOT NULL,
+      objective_type TEXT NOT NULL,
+      required_count INTEGER NOT NULL,
+      current_count INTEGER NOT NULL DEFAULT 0,
+      accepted_via TEXT NOT NULL,
+      accepted_at TEXT NOT NULL,
+      completed_at TEXT,
+      reward_pips INTEGER NOT NULL DEFAULT 0,
+      reward_granted_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, cadence, reset_window, sequence_number)
+    );
+
+    INSERT INTO dice_contract_master_runs (
+      user_id,
+      cadence,
+      reset_window,
+      sequence_number,
+      contract_id,
+      difficulty,
+      objective_type,
+      required_count,
+      current_count,
+      accepted_via,
+      accepted_at,
+      completed_at,
+      reward_pips,
+      reward_granted_at,
+      updated_at
+    )
+    SELECT
+      user_id,
+      cadence,
+      reset_window,
+      sequence_number,
+      contract_id,
+      difficulty,
+      objective_type,
+      required_count,
+      current_count,
+      accepted_via,
+      accepted_at,
+      completed_at,
+      reward_pips,
+      reward_granted_at,
+      updated_at
+    FROM dice_contract_master_runs_v6;
+
+    DROP TABLE dice_contract_master_runs_v6;
+  `);
+  db.pragma("user_version = 5");
+};
+
 test("initializeDatabaseSchema creates the current schema on an empty database", () => {
   const db = new Database(":memory:");
 
@@ -114,10 +189,14 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasTable(db, "dice_contract_master_user_cadence_state"), true);
   assert.equal(hasTable(db, "dice_contract_master_runs"), true);
   assert.equal(hasTable(db, "dice_contract_master_reroll_usage"), true);
+  assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
+  assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_description"), true);
+  assert.equal(hasIndex(db, "idx_dice_contract_master_initial_offers_contract_id"), true);
+  assert.equal(hasIndex(db, "idx_dice_contract_master_runs_contract_id"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_dice_sets_rolled"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_roll_commands_called"), true);
   assert.equal(hasColumn(db, "dice_analytics_by_prestige", "prestige_started_at"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 5);
+  assert.equal(db.pragma("user_version", { simple: true }), 6);
 });
 
 test("initializeDatabaseSchema rejects unsupported legacy progression schema without mutating the database", () => {
@@ -180,7 +259,8 @@ test("initializeDatabaseSchema adds the personal charge table on the supported v
 
   assert.equal(hasTable(db, "dice_personal_charge_state"), true);
   assert.equal(hasTable(db, "dice_contract_master_runs"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 5);
+  assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
+  assert.equal(db.pragma("user_version", { simple: true }), 6);
   assert.deepEqual(db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get("user-1"), {
     fame: 7,
     pips: 11,
@@ -250,7 +330,71 @@ test("initializeDatabaseSchema resets legacy contracts rows and adds contract ma
     db.prepare("SELECT COUNT(*) AS count FROM dice_contract_progress").get() as { count: number },
     { count: 0 },
   );
-  assert.equal(db.pragma("user_version", { simple: true }), 5);
+  assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
+  assert.equal(db.pragma("user_version", { simple: true }), 6);
+});
+
+test("initializeDatabaseSchema upgrades v5 contract master runs with metadata columns and unique indexes", () => {
+  const db = new Database(":memory:");
+  createCurrentSchemaV5(db);
+
+  db.prepare(
+    `
+    INSERT INTO dice_contract_master_runs (
+      user_id,
+      cadence,
+      reset_window,
+      sequence_number,
+      contract_id,
+      difficulty,
+      objective_type,
+      required_count,
+      current_count,
+      accepted_via,
+      accepted_at,
+      completed_at,
+      reward_pips,
+      reward_granted_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    "user-1",
+    "daily",
+    "2026-03-28",
+    1,
+    "daily-simple-a",
+    "simple",
+    "roll_count",
+    5,
+    2,
+    "initial",
+    "2026-03-28T10:00:00.000Z",
+    null,
+    15,
+    null,
+    "2026-03-28T10:00:00.000Z",
+  );
+
+  initializeDatabaseSchema(db);
+
+  assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
+  assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_description"), true);
+  assert.equal(hasIndex(db, "idx_dice_contract_master_initial_offers_contract_id"), true);
+  assert.equal(hasIndex(db, "idx_dice_contract_master_runs_contract_id"), true);
+  assert.deepEqual(
+    db
+      .prepare(
+        `
+        SELECT contract_title, contract_description
+        FROM dice_contract_master_runs
+        WHERE user_id = ? AND cadence = ? AND reset_window = ? AND sequence_number = ?
+      `,
+      )
+      .get("user-1", "daily", "2026-03-28", 1),
+    { contract_title: "", contract_description: "" },
+  );
+  assert.equal(db.pragma("user_version", { simple: true }), 6);
 });
 
 test("initializeDatabaseSchema migrates legacy world boss stats and persisted source ids", () => {

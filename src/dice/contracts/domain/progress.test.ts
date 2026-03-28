@@ -1,126 +1,149 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createContractProgress, recordProgress, recordProgressAcrossContracts } from "./progress";
-import { contractFromData } from "./types";
+import {
+  applyCompletionToCadenceState,
+  createAcceptedRun,
+  createEmptyContractCadenceState,
+  getActiveRun,
+  getUsedContractIds,
+  updateContractRunProgress,
+} from "./progress";
+import type { ContractOfferChoice } from "./progress";
 
-const makeContract = (requiredCount: number = 3) =>
-  contractFromData("daily", {
-    id: "c1",
-    title: "Daily contract",
-    description: "Do the thing",
+const makeChoice = (source: ContractOfferChoice["source"] = "initial"): ContractOfferChoice => ({
+  cadence: "daily",
+  difficulty: "serious",
+  source,
+  rerollUsed: source === "reroll",
+  rerollAvailable: source === "initial",
+  offer: {
+    id: "daily-serious-roll",
+    title: "Serious Roller",
+    description: "Use /roll 10 times.",
+    cadence: "daily",
+    difficulty: "serious",
     objective: {
       type: "roll_count",
-      requiredCount,
+      requiredCount: 10,
     },
-    reward: {
-      fame: 2,
-      pips: 5,
-    },
-  });
+    rewardPips: 20,
+  },
+});
 
-test("progress accumulates and rewards exactly once", () => {
-  const contract = makeContract(3);
-  const base = createContractProgress(contract);
+test("accepted runs capture the selected offer snapshot", () => {
+  const run = createAcceptedRun(
+    makeChoice(),
+    "user-1",
+    "2026-03-28",
+    1,
+    new Date("2026-03-28T10:00:00.000Z"),
+  );
 
-  const first = recordProgress(base, "roll_count", 1, new Date("2026-03-01T00:00:00Z"));
-  assert.equal(first.progress.currentCount, 1);
-  assert.equal(first.rewardGranted, null);
-  assert.equal(first.newlyCompleted, false);
+  assert.equal(run.contractId, "daily-serious-roll");
+  assert.equal(run.contractTitle, "Serious Roller");
+  assert.equal(run.rewardPips, 20);
+  assert.equal(run.acceptedVia, "initial");
+});
 
-  const second = recordProgress(first.progress, "roll_count", 2, new Date("2026-03-01T00:05:00Z"));
-  assert.equal(second.progress.currentCount, 3);
-  assert.notEqual(second.progress.completedAt, undefined);
-  assert.notEqual(second.progress.rewardedAt, undefined);
-  assert.deepEqual(second.rewardGranted, { fame: 2, pips: 5 });
+test("progress updates complete a run and grant pips once", () => {
+  const baseRun = createAcceptedRun(
+    makeChoice("reroll"),
+    "user-1",
+    "2026-03-28",
+    1,
+    new Date("2026-03-28T10:00:00.000Z"),
+  );
+
+  const first = updateContractRunProgress(
+    baseRun,
+    "roll_count",
+    4,
+    new Date("2026-03-28T10:10:00.000Z"),
+  );
+  assert(first);
+  assert(first.run);
+  assert.equal(first.run.currentCount, 4);
+  assert.equal(first.rewardGrantedPips, 0);
+
+  const second = updateContractRunProgress(
+    first.run,
+    "roll_count",
+    6,
+    new Date("2026-03-28T10:20:00.000Z"),
+  );
+  assert(second);
+  assert(second.run);
+  assert.equal(second.run.currentCount, 10);
+  assert.equal(second.rewardGrantedPips, 20);
   assert.equal(second.newlyCompleted, true);
 
-  const third = recordProgress(second.progress, "roll_count", 5, new Date("2026-03-01T00:10:00Z"));
-  assert.equal(third.progress.currentCount, 3);
-  assert.equal(third.rewardGranted, null);
-  assert.equal(third.newlyCompleted, false);
+  const third = updateContractRunProgress(
+    second.run,
+    "roll_count",
+    2,
+    new Date("2026-03-28T10:30:00.000Z"),
+  );
+  assert.equal(third, null);
 });
 
-test("mismatched objective types do not alter progress", () => {
-  const contract = makeContract(2);
-  const base = createContractProgress(contract);
-
-  const result = recordProgress(base, "pvp_win_count", 1, new Date("2026-03-01T01:00:00Z"));
-  assert.equal(result.progress.currentCount, 0);
-  assert.equal(result.rewardGranted, null);
-});
-
-test("non-positive increments do not reduce or advance progress", () => {
-  const contract = makeContract(3);
-  const base = createContractProgress(contract);
-
-  const seeded = recordProgress(base, "roll_count", 2, new Date("2026-03-01T02:00:00Z"));
-  assert.equal(seeded.progress.currentCount, 2);
-
-  const zeroIncrement = recordProgress(
-    seeded.progress,
-    "roll_count",
-    0,
-    new Date("2026-03-01T02:05:00Z"),
-  );
-  assert.equal(zeroIncrement.progress.currentCount, 2);
-  assert.equal(zeroIncrement.newlyCompleted, false);
-  assert.equal(zeroIncrement.rewardGranted, null);
-
-  const negativeIncrement = recordProgress(
-    seeded.progress,
-    "roll_count",
-    -5,
-    new Date("2026-03-01T02:10:00Z"),
-  );
-  assert.equal(negativeIncrement.progress.currentCount, 2);
-  assert.equal(negativeIncrement.newlyCompleted, false);
-  assert.equal(negativeIncrement.rewardGranted, null);
-});
-
-test("single event can update multiple active contracts", () => {
-  const daily = createContractProgress(
-    contractFromData("daily", {
-      id: "daily-roll",
-      title: "Daily roll",
-      description: "Roll once",
-      objective: { type: "roll_count", requiredCount: 1 },
-      reward: { fame: 1, pips: 2 },
-    }),
-  );
-  const weekly = createContractProgress(
-    contractFromData("weekly", {
-      id: "weekly-roll",
-      title: "Weekly roll",
-      description: "Roll thrice",
-      objective: { type: "roll_count", requiredCount: 3 },
-      reward: { fame: 4, pips: 10 },
-    }),
-  );
-  const unrelated = createContractProgress(
-    contractFromData("daily", {
-      id: "daily-pvp",
-      title: "Daily pvp",
-      description: "Win pvp",
-      objective: { type: "pvp_win_count", requiredCount: 1 },
-      reward: { fame: 1, pips: 1 },
-    }),
-  );
-
-  const updates = recordProgressAcrossContracts(
-    [daily, weekly, unrelated],
-    "roll_count",
+test("completion state unlocks exactly one refill and caps at two completions", () => {
+  const state = createEmptyContractCadenceState("user-1", "daily", "2026-03-28");
+  const firstRun = createAcceptedRun(
+    makeChoice(),
+    "user-1",
+    "2026-03-28",
     1,
-    new Date("2026-03-01T03:00:00Z"),
+    new Date("2026-03-28T10:00:00.000Z"),
+  );
+  const secondRun = createAcceptedRun(
+    makeChoice("refill"),
+    "user-1",
+    "2026-03-28",
+    2,
+    new Date("2026-03-28T11:00:00.000Z"),
   );
 
-  assert.equal(updates.length, 2);
-  assert.deepEqual(
-    updates.map((entry) => entry.contractId),
-    ["daily-roll", "weekly-roll"],
+  const afterFirst = applyCompletionToCadenceState(
+    state,
+    { ...firstRun, completedAt: new Date("2026-03-28T10:30:00.000Z") },
+    new Date("2026-03-28T10:30:00.000Z"),
   );
-  assert.equal(updates[0]?.update.progress.currentCount, 1);
-  assert.notEqual(updates[0]?.update.progress.rewardedAt, undefined);
-  assert.equal(updates[1]?.update.progress.currentCount, 1);
-  assert.equal(updates[1]?.update.rewardGranted, null);
+  assert.equal(afterFirst.completionCount, 1);
+  assert.equal(afterFirst.refillAvailableDifficulty, "serious");
+
+  const afterSecond = applyCompletionToCadenceState(
+    afterFirst,
+    { ...secondRun, completedAt: new Date("2026-03-28T11:30:00.000Z") },
+    new Date("2026-03-28T11:30:00.000Z"),
+  );
+  assert.equal(afterSecond.completionCount, 2);
+  assert.equal(afterSecond.refillAvailableDifficulty, undefined);
+});
+
+test("active run lookup and used contract ids reflect accepted history", () => {
+  const firstRun = createAcceptedRun(
+    makeChoice(),
+    "user-1",
+    "2026-03-28",
+    1,
+    new Date("2026-03-28T10:00:00.000Z"),
+  );
+  const secondRun = createAcceptedRun(
+    {
+      ...makeChoice("refill"),
+      offer: { ...makeChoice("refill").offer, id: "daily-serious-refill" },
+    },
+    "user-1",
+    "2026-03-28",
+    2,
+    new Date("2026-03-28T11:00:00.000Z"),
+  );
+  const runs = [{ ...firstRun, completedAt: new Date("2026-03-28T10:30:00.000Z") }, secondRun];
+
+  assert.equal(getActiveRun(runs)?.contractId, "daily-serious-refill");
+  assert.deepEqual([...getUsedContractIds(runs)].sort(), [
+    "daily-serious-refill",
+    "daily-serious-roll",
+  ]);
 });

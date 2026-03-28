@@ -44,3 +44,21 @@ test("achievements channel config activates when the env var is set", () => {
     assert.equal(achievementsChannelConfig.inactiveReason, null);
   });
 });
+
+test("contract master config stays inactive when the env var is unset", () => {
+  withEnv({ CONTRACT_MASTER_CHANNEL_ID: undefined }, () => {
+    const { contractMasterConfig } = loadConfig();
+    assert.equal(contractMasterConfig.enabled, false);
+    assert.equal(contractMasterConfig.channelId, null);
+    assert.equal(contractMasterConfig.inactiveReason, "CONTRACT_MASTER_CHANNEL_ID is not set.");
+  });
+});
+
+test("contract master config activates when the env var is set", () => {
+  withEnv({ CONTRACT_MASTER_CHANNEL_ID: "0987654321" }, () => {
+    const { contractMasterConfig } = loadConfig();
+    assert.equal(contractMasterConfig.enabled, true);
+    assert.equal(contractMasterConfig.channelId, "0987654321");
+    assert.equal(contractMasterConfig.inactiveReason, null);
+  });
+});

@@ -1,121 +1,110 @@
+import { buildContractCadenceContext, buildContractCadenceView } from "../contract-master-state";
 import type {
+  ContractCadenceView,
+  ContractsCadenceResolver,
   ContractsCatalogReader,
+  ContractsInitialOfferRepository,
+  ContractsRerollUsageRepository,
   ContractsRotationRepository,
-  ContractsRotationResolver,
+  ContractsRunRepository,
+  ContractsUserCadenceStateRepository,
 } from "../ports";
-import {
-  buildContractRotation,
-  dailyActiveCount,
-  getDailyPeriodKey,
-  getWeeklyPeriodKey,
-  weeklyActiveCount,
-} from "../../domain/rotation";
-import type { ContractCadence, ContractDefinition } from "../../domain/types";
+import { getContractResetWindow } from "../../domain/rotation";
+import type { ContractCadence, ContractDefinition, ContractOffer } from "../../domain/types";
 
-const parsePeriodKeyDate = (periodKey: string): Date => {
-  const [year, month, day] = periodKey.split("-").map((part) => Number.parseInt(part, 10));
-  return new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
+type ContractMasterDependencies = {
+  catalogReader: ContractsCatalogReader;
+  initialOfferRepository: ContractsInitialOfferRepository;
+  userCadenceStateRepository: ContractsUserCadenceStateRepository;
+  runRepository: ContractsRunRepository;
+  rerollUsageRepository: ContractsRerollUsageRepository;
 };
 
-const getResetAt = (cadence: ContractCadence, periodKey: string): Date => {
-  const periodStart = parsePeriodKeyDate(periodKey);
-  const resetAt = new Date(periodStart.getTime());
-  resetAt.setUTCDate(resetAt.getUTCDate() + (cadence === "daily" ? 1 : 7));
-  return resetAt;
-};
-
-type Dependencies = {
+type RemovedSharedBoardDependencies = {
   catalogReader: ContractsCatalogReader;
   rotationRepository: ContractsRotationRepository;
 };
 
-export const createResolveContractsRotationUseCase = ({
+const toDefinition = (offer: ContractOffer): ContractDefinition => ({
+  id: offer.id,
+  title: offer.title,
+  description: offer.description,
+  cadence: offer.cadence,
+  objective: offer.objective,
+  reward: {
+    fame: 0,
+    pips: offer.rewardPips,
+  },
+});
+
+export const createResolveContractCadenceViewUseCase = ({
   catalogReader,
-  rotationRepository,
-}: Dependencies): ContractsRotationResolver => {
-  const resolveActiveRotation: ContractsRotationResolver["resolveActiveRotation"] = (now) => {
-    const catalog = catalogReader.getCatalog();
-    const contractById = new Map<string, ContractDefinition>();
-    for (const contract of [...catalog.daily, ...catalog.weekly]) {
-      contractById.set(contract.id, contract);
-    }
-
-    const dailyPeriodKey = getDailyPeriodKey(now);
-    const weeklyPeriodKey = getWeeklyPeriodKey(now);
-
-    const existingDaily = rotationRepository.getRotation("daily", dailyPeriodKey);
-    const existingWeekly = rotationRepository.getRotation("weekly", weeklyPeriodKey);
-
-    const freshRotation =
-      !existingDaily || !existingWeekly ? buildContractRotation(catalog, now) : null;
-
-    const resolveContractsForRecord = (
-      record: typeof existingDaily,
-      expectedCount: number,
-    ): ContractDefinition[] | null => {
-      if (!record) return null;
-      if (record.contractIds.length > expectedCount) {
-        throw new Error(
-          `Persisted ${record.cadence} contract rotation for ${record.periodKey} is invalid`,
-        );
-      }
-      const contracts = record.contractIds
-        .map((id) => contractById.get(id))
-        .filter((value): value is ContractDefinition => Boolean(value));
-      if (contracts.length !== record.contractIds.length) {
-        throw new Error(
-          `Persisted ${record.cadence} contract rotation for ${record.periodKey} no longer matches the catalog`,
-        );
-      }
-      return contracts;
-    };
-
-    const ensureRotation = (
-      cadence: ContractCadence,
-      periodKey: string,
-      record: typeof existingDaily,
-      expectedCount: number,
-      fallbackContracts: ContractDefinition[],
-    ) => {
-      const existingContracts = resolveContractsForRecord(record, expectedCount);
-      if (existingContracts) {
-        return { cadence, periodKey, contracts: existingContracts };
-      }
-
-      const resetAt = getResetAt(cadence, periodKey);
-      const activatedAt = now;
-      rotationRepository.saveRotation({
-        cadence,
-        periodKey,
-        contractIds: fallbackContracts.map((contract) => contract.id),
-        activatedAt,
-        resetAt,
-      });
-      return { cadence, periodKey, contracts: fallbackContracts };
-    };
-
-    const dailyContracts =
-      freshRotation?.daily.contracts ?? catalog.daily.slice(0, dailyActiveCount);
-    const weeklyContracts =
-      freshRotation?.weekly.contracts ?? catalog.weekly.slice(0, weeklyActiveCount);
-
-    const daily = ensureRotation(
-      "daily",
-      dailyPeriodKey,
-      existingDaily,
-      dailyActiveCount,
-      dailyContracts,
-    );
-    const weekly = ensureRotation(
-      "weekly",
-      weeklyPeriodKey,
-      existingWeekly,
-      weeklyActiveCount,
-      weeklyContracts,
+  initialOfferRepository,
+  userCadenceStateRepository,
+  runRepository,
+  rerollUsageRepository,
+}: ContractMasterDependencies): ContractsCadenceResolver => {
+  const resolveCadenceView = ({
+    userId,
+    cadence,
+    now,
+  }: {
+    userId: string;
+    cadence: "daily" | "weekly";
+    now: Date;
+  }): ContractCadenceView => {
+    const context = buildContractCadenceContext(
+      {
+        catalogReader,
+        initialOfferRepository,
+        userCadenceStateRepository,
+        runRepository,
+        rerollUsageRepository,
+      },
+      userId,
+      cadence,
+      now,
     );
 
-    return { daily, weekly };
+    return buildContractCadenceView(context, initialOfferRepository, now);
   };
 
-  return { resolveActiveRotation };
+  const resolveActiveRotation = (now: Date) => {
+    const buildContracts = (cadence: ContractCadence) =>
+      resolveCadenceView({
+        userId: "__contracts-global-board__",
+        cadence,
+        now,
+      })
+        .offers.map((offer) => offer.offer)
+        .filter((offer): offer is ContractOffer => Boolean(offer))
+        .map(toDefinition);
+
+    return {
+      daily: {
+        cadence: "daily" as const,
+        periodKey: getContractResetWindow("daily", now),
+        contracts: buildContracts("daily"),
+      },
+      weekly: {
+        cadence: "weekly" as const,
+        periodKey: getContractResetWindow("weekly", now),
+        contracts: buildContracts("weekly"),
+      },
+    };
+  };
+
+  return { resolveCadenceView, resolveActiveRotation };
+};
+
+export const createResolveContractsRotationUseCase = (
+  dependencies: ContractMasterDependencies | RemovedSharedBoardDependencies,
+): ContractsCadenceResolver => {
+  if ("rotationRepository" in dependencies) {
+    throw new Error(
+      "Shared-board contract rotations were removed. Use Contract Master cadence resolution instead.",
+    );
+  }
+
+  return createResolveContractCadenceViewUseCase(dependencies);
 };

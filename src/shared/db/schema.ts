@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 5;
+const currentSchemaVersion = 6;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -239,6 +239,8 @@ const currentSchemaColumns = new Map<string, string[]>([
       "reset_window",
       "sequence_number",
       "contract_id",
+      "contract_title",
+      "contract_description",
       "difficulty",
       "objective_type",
       "required_count",
@@ -738,6 +740,8 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       reset_window TEXT NOT NULL,
       sequence_number INTEGER NOT NULL,
       contract_id TEXT NOT NULL,
+      contract_title TEXT NOT NULL,
+      contract_description TEXT NOT NULL,
       difficulty TEXT NOT NULL,
       objective_type TEXT NOT NULL,
       required_count INTEGER NOT NULL,
@@ -754,6 +758,12 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
     CREATE INDEX IF NOT EXISTS idx_dice_contract_master_runs_user_reset_window
       ON dice_contract_master_runs (user_id, cadence, reset_window);
 
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_contract_master_initial_offers_contract_id
+      ON dice_contract_master_initial_offers (cadence, reset_window, contract_id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_contract_master_runs_contract_id
+      ON dice_contract_master_runs (user_id, cadence, reset_window, contract_id);
+
     CREATE TABLE IF NOT EXISTS dice_contract_master_reroll_usage (
       user_id TEXT NOT NULL,
       cadence TEXT NOT NULL,
@@ -764,6 +774,20 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       PRIMARY KEY (user_id, cadence, reset_window, difficulty)
     );
   `);
+
+  if (!hasColumn(db, "dice_contract_master_runs", "contract_title")) {
+    db.exec(`
+      ALTER TABLE dice_contract_master_runs
+      ADD COLUMN contract_title TEXT NOT NULL DEFAULT '';
+    `);
+  }
+
+  if (!hasColumn(db, "dice_contract_master_runs", "contract_description")) {
+    db.exec(`
+      ALTER TABLE dice_contract_master_runs
+      ADD COLUMN contract_description TEXT NOT NULL DEFAULT '';
+    `);
+  }
 };
 
 const resetLegacyContractsStateForContractMaster = (

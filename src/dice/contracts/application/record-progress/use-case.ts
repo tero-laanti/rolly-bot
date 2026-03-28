@@ -1,103 +1,87 @@
-import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-work";
 import type {
   ContractsProgressRecorder,
   ContractsProgressRepository,
-  ContractsProgressResult,
   ContractsRewardGranter,
   ContractsRotationResolver,
+  ContractsRunRepository,
+  ContractsUnitOfWork,
+  ContractsUserCadenceStateRepository,
 } from "../ports";
-import { createContractProgress, recordProgressAcrossContracts } from "../../domain/progress";
-import type { ContractObjectiveType } from "../../domain/types";
+import {
+  applyCompletionToCadenceState,
+  createEmptyContractCadenceState,
+  getActiveRun,
+  type ContractProgressUpdate,
+  updateContractRunProgress,
+} from "../../domain/progress";
+import { getContractResetWindow } from "../../domain/rotation";
+import type { ContractCadence } from "../../domain/types";
 
-type Dependencies = {
-  rotationResolver: ContractsRotationResolver;
-  progressRepository: ContractsProgressRepository;
+type ContractMasterDependencies = {
+  runRepository: ContractsRunRepository;
+  userCadenceStateRepository: ContractsUserCadenceStateRepository;
   rewardGranter: ContractsRewardGranter;
-  unitOfWork: UnitOfWork;
+  unitOfWork: ContractsUnitOfWork;
 };
 
-const hasProgressChanged = (
-  before: ReturnType<typeof createContractProgress>,
-  after: ReturnType<typeof createContractProgress>,
-) =>
-  before.currentCount !== after.currentCount ||
-  (before.completedAt?.getTime() ?? 0) !== (after.completedAt?.getTime() ?? 0) ||
-  (before.rewardedAt?.getTime() ?? 0) !== (after.rewardedAt?.getTime() ?? 0);
+type RemovedSharedBoardDependencies = {
+  rotationResolver: Pick<ContractsRotationResolver, "resolveActiveRotation">;
+  progressRepository: ContractsProgressRepository;
+  rewardGranter: ContractsRewardGranter;
+  unitOfWork: ContractsUnitOfWork;
+};
 
-const supportedObjectiveTypes = new Set<ContractObjectiveType>([
-  "roll_count",
-  "pvp_win_count",
-  "casino_game_count",
-  "world_boss_join_count",
-]);
+const contractCadences: ContractCadence[] = ["daily", "weekly"];
 
-export const createRecordContractsProgressUseCase = ({
-  rotationResolver,
-  progressRepository,
-  rewardGranter,
-  unitOfWork,
-}: Dependencies): ContractsProgressRecorder => {
-  const recordProgress: ContractsProgressRecorder["recordProgress"] = (event) => {
-    const rotations = rotationResolver.resolveActiveRotation(event.occurredAt);
-    const activeContracts = [
-      ...rotations.daily.contracts.map((contract) => ({
-        contract,
-        periodKey: rotations.daily.periodKey,
-      })),
-      ...rotations.weekly.contracts.map((contract) => ({
-        contract,
-        periodKey: rotations.weekly.periodKey,
-      })),
-    ];
-
-    for (const { contract } of activeContracts) {
-      if (!supportedObjectiveTypes.has(contract.objective.type)) {
-        throw new Error(`Unsupported contract objective type: ${contract.objective.type}`);
-      }
-    }
-
-    const eligibleContracts = activeContracts.filter(
-      ({ contract }) => contract.objective.type === event.objectiveType,
+export const createRecordContractsProgressUseCase = (
+  dependencies: ContractMasterDependencies | RemovedSharedBoardDependencies,
+): ContractsProgressRecorder => {
+  if ("rotationResolver" in dependencies || "progressRepository" in dependencies) {
+    throw new Error(
+      "Shared-board contracts progress was removed. Record progress against accepted Contract Master runs instead.",
     );
+  }
 
-    if (eligibleContracts.length < 1) {
-      return null;
-    }
+  const { runRepository, userCadenceStateRepository, rewardGranter, unitOfWork } = dependencies;
 
-    const updates: ContractsProgressResult["updates"] = [];
+  const recordProgress: ContractsProgressRecorder["recordProgress"] = (event) => {
+    const updates: ContractProgressUpdate[] = [];
 
     unitOfWork.runInTransaction(() => {
-      for (const { contract, periodKey } of eligibleContracts) {
-        const existing =
-          progressRepository.getProgress(event.userId, contract.id, contract.cadence, periodKey) ??
-          createContractProgress(contract);
+      for (const cadence of contractCadences) {
+        const resetWindow = getContractResetWindow(cadence, event.occurredAt);
+        const runs = runRepository.listRuns(event.userId, cadence, resetWindow);
+        const activeRun = getActiveRun(runs);
+        if (!activeRun) {
+          continue;
+        }
 
-        const [update] = recordProgressAcrossContracts(
-          [existing],
+        const update = updateContractRunProgress(
+          activeRun,
           event.objectiveType,
           event.increment,
           event.occurredAt,
         );
-
-        if (!update) {
+        if (!update?.run) {
           continue;
         }
 
-        const changed = hasProgressChanged(existing, update.update.progress);
-        if (!changed && !update.update.rewardGranted) {
-          continue;
+        runRepository.saveRun(update.run);
+        const grantedPips = update.rewardGrantedPips ?? 0;
+        if (grantedPips > 0) {
+          rewardGranter.grantPips?.(event.userId, grantedPips);
         }
 
-        if (update.update.rewardGranted) {
-          rewardGranter.grantReward(event.userId, update.update.rewardGranted);
+        if (update.newlyCompleted) {
+          const state =
+            userCadenceStateRepository.getState(event.userId, cadence, resetWindow) ??
+            createEmptyContractCadenceState(event.userId, cadence, resetWindow);
+          userCadenceStateRepository.saveState(
+            applyCompletionToCadenceState(state, update.run, event.occurredAt),
+          );
         }
 
-        progressRepository.saveProgress(event.userId, update.update.progress, periodKey);
-
-        updates.push({
-          progress: update.update.progress,
-          rewardGranted: update.update.rewardGranted,
-        });
+        updates.push(update);
       }
     });
 

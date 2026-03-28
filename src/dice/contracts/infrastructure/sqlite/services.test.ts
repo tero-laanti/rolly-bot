@@ -21,6 +21,7 @@ const clearContractsModuleGraph = (): void => {
   clearModules([
     "../../../../rolly-data/load",
     "../../../../rolly-data/paths",
+    "../contract-master-service",
     "../rolly-data/contracts-catalog",
     "./services",
   ]);
@@ -133,6 +134,50 @@ test("gameplay progress port still throws when contracts.v2.json exists but is i
       process.chdir(originalCwd);
       clearContractsModuleGraph();
       fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("services wire Contract Master acceptance, gameplay progress, and summary replies together", () => {
+  withEnv({ ROLLY_DATA_DIR: exampleRollyDataDir }, () => {
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+      const now = new Date("2026-03-28T11:00:00.000Z");
+      const service = services.createSqliteContractMasterService(db);
+      const gameplayPort = services.createSqliteContractsGameplayProgressPort(db);
+      const queryContracts = services.createSqliteQueryContractsUseCase(db);
+
+      assert.ok(gameplayPort);
+
+      service.acceptOffer({
+        userId: "player-1",
+        cadence: "daily",
+        difficulty: "simple",
+        now,
+      });
+
+      for (let index = 0; index < 12; index += 1) {
+        gameplayPort?.recordRoll({
+          userId: "player-1",
+          occurredAt: now,
+        });
+      }
+
+      const reply = queryContracts.createContractsReply({
+        userId: "player-1",
+        userMention: "<@player-1>",
+        now,
+      });
+
+      assert.match(reply.content, /Daily Contracts/);
+      assert.match(reply.content, /Completed this window: 1\/2/);
+      assert.match(reply.content, /Available for simple difficulty\./);
+    } finally {
+      clearContractsModuleGraph();
     }
   });
 });

@@ -28,6 +28,8 @@ export type ContractMasterRunRecord = {
   resetWindow: string;
   sequenceNumber: number;
   contractId: string;
+  contractTitle: string;
+  contractDescription: string;
   difficulty: ContractMasterDifficulty;
   objectiveType: string;
   requiredCount: number;
@@ -73,6 +75,8 @@ type RunRow = {
   reset_window: string;
   sequence_number: number;
   contract_id: string;
+  contract_title: string;
+  contract_description: string;
   difficulty: ContractMasterDifficulty;
   objective_type: string;
   required_count: number;
@@ -128,6 +132,8 @@ const runRowToRecord = (row: RunRow): ContractMasterRunRecord => ({
   resetWindow: row.reset_window,
   sequenceNumber: row.sequence_number,
   contractId: row.contract_id,
+  contractTitle: row.contract_title,
+  contractDescription: row.contract_description,
   difficulty: row.difficulty,
   objectiveType: row.objective_type,
   requiredCount: row.required_count,
@@ -325,6 +331,8 @@ export const createSqliteContractMasterRunRepository = (db: SqliteDatabase) => {
           reset_window,
           sequence_number,
           contract_id,
+          contract_title,
+          contract_description,
           difficulty,
           objective_type,
           required_count,
@@ -362,6 +370,8 @@ export const createSqliteContractMasterRunRepository = (db: SqliteDatabase) => {
           reset_window,
           sequence_number,
           contract_id,
+          contract_title,
+          contract_description,
           difficulty,
           objective_type,
           required_count,
@@ -392,6 +402,8 @@ export const createSqliteContractMasterRunRepository = (db: SqliteDatabase) => {
         reset_window,
         sequence_number,
         contract_id,
+        contract_title,
+        contract_description,
         difficulty,
         objective_type,
         required_count,
@@ -408,6 +420,8 @@ export const createSqliteContractMasterRunRepository = (db: SqliteDatabase) => {
         @resetWindow,
         @sequenceNumber,
         @contractId,
+        @contractTitle,
+        @contractDescription,
         @difficulty,
         @objectiveType,
         @requiredCount,
@@ -422,6 +436,8 @@ export const createSqliteContractMasterRunRepository = (db: SqliteDatabase) => {
       ON CONFLICT(user_id, cadence, reset_window, sequence_number)
       DO UPDATE SET
         contract_id = excluded.contract_id,
+        contract_title = excluded.contract_title,
+        contract_description = excluded.contract_description,
         difficulty = excluded.difficulty,
         objective_type = excluded.objective_type,
         required_count = excluded.required_count,
@@ -439,6 +455,8 @@ export const createSqliteContractMasterRunRepository = (db: SqliteDatabase) => {
       resetWindow: record.resetWindow,
       sequenceNumber: record.sequenceNumber,
       contractId: record.contractId,
+      contractTitle: record.contractTitle,
+      contractDescription: record.contractDescription,
       difficulty: record.difficulty,
       objectiveType: record.objectiveType,
       requiredCount: record.requiredCount,

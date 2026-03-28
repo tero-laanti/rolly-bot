@@ -1,11 +1,30 @@
-import type { ContractRotation } from "../domain/rotation";
+import type { UnitOfWork } from "../../../shared-kernel/application/unit-of-work";
+import type {
+  ContractAcceptedVia,
+  ContractCadenceState,
+  ContractOfferChoice,
+  ContractProgress,
+  ContractProgressUpdate,
+  ContractRun,
+} from "../domain/progress";
 import type {
   ContractCadence,
+  ContractCatalog,
   ContractDefinition,
+  ContractDifficulty,
   ContractObjectiveType,
+  ContractOffer,
   ContractReward,
 } from "../domain/types";
-import type { ContractProgress } from "../domain/progress";
+
+export type LegacyContractCatalog = {
+  daily: ContractDefinition[];
+  weekly: ContractDefinition[];
+};
+
+export interface ContractsCatalogReader {
+  getCatalog(): ContractCatalog | LegacyContractCatalog;
+}
 
 export type ContractRotationRecord = {
   cadence: ContractCadence;
@@ -14,10 +33,6 @@ export type ContractRotationRecord = {
   activatedAt: Date;
   resetAt: Date;
 };
-
-export interface ContractsCatalogReader {
-  getCatalog(): { daily: ContractDefinition[]; weekly: ContractDefinition[] };
-}
 
 export interface ContractsRotationRepository {
   getRotation(cadence: ContractCadence, periodKey: string): ContractRotationRecord | null;
@@ -36,8 +51,72 @@ export interface ContractsProgressRepository {
   saveProgress(userId: string, progress: ContractProgressRecord, periodKey: string): void;
 }
 
+export interface ContractsInitialOfferRepository {
+  getOffer(
+    cadence: ContractCadence,
+    difficulty: ContractDifficulty,
+    resetWindow: string,
+  ): { contractId: string } | null;
+  listOffers(
+    cadence: ContractCadence,
+    resetWindow: string,
+  ): Array<{
+    difficulty: ContractDifficulty;
+    contractId: string;
+  }>;
+  saveOffer(record: {
+    cadence: ContractCadence;
+    difficulty: ContractDifficulty;
+    resetWindow: string;
+    contractId: string;
+    createdAt: Date;
+  }): void;
+}
+
+export interface ContractsUserCadenceStateRepository {
+  getState(
+    userId: string,
+    cadence: ContractCadence,
+    resetWindow: string,
+  ): ContractCadenceState | null;
+  saveState(record: ContractCadenceState): void;
+}
+
+export interface ContractsRunRepository {
+  getRun(
+    userId: string,
+    cadence: ContractCadence,
+    resetWindow: string,
+    sequenceNumber: number,
+  ): ContractRun | null;
+  listRuns(userId: string, cadence: ContractCadence, resetWindow: string): ContractRun[];
+  saveRun(record: ContractRun): void;
+}
+
+export interface ContractsRerollUsageRepository {
+  getUsage(
+    userId: string,
+    cadence: ContractCadence,
+    resetWindow: string,
+    difficulty: ContractDifficulty,
+  ): { usedAt: Date } | null;
+  listUsage(
+    userId: string,
+    cadence: ContractCadence,
+    resetWindow: string,
+  ): Array<{ difficulty: ContractDifficulty; usedAt: Date }>;
+  saveUsage(record: {
+    userId: string;
+    cadence: ContractCadence;
+    resetWindow: string;
+    difficulty: ContractDifficulty;
+    usedAt: Date;
+  }): void;
+}
+
 export interface ContractsRewardGranter {
-  grantReward(userId: string, reward: ContractReward): void;
+  grantPips?: (userId: string, pips: number) => void;
+  grantReward?: (userId: string, reward: ContractReward) => void;
 }
 
 export type ContractsProgressEvent = {
@@ -47,24 +126,12 @@ export type ContractsProgressEvent = {
   occurredAt: Date;
 };
 
-export type ContractsProgressUpdate = {
-  progress: ContractProgressRecord;
-  rewardGranted: ContractReward | null;
-};
-
 export type ContractsProgressResult = {
-  updates: ContractsProgressUpdate[];
+  updates: ContractProgressUpdate[];
 };
 
 export interface ContractsProgressRecorder {
   recordProgress(event: ContractsProgressEvent): ContractsProgressResult | null;
-}
-
-export interface ContractsRotationResolver {
-  resolveActiveRotation(now: Date): {
-    daily: ContractRotation;
-    weekly: ContractRotation;
-  };
 }
 
 export type ContractsGameplayProgressEvent = {
@@ -78,3 +145,75 @@ export interface ContractsGameplayProgressPort {
   recordCasinoGameCompletion(event: ContractsGameplayProgressEvent): ContractsProgressResult | null;
   recordWorldBossJoin(event: ContractsGameplayProgressEvent): ContractsProgressResult | null;
 }
+
+export type ContractOfferView = {
+  difficulty: ContractDifficulty;
+  label: string;
+  rewardPips: number;
+  offer: ContractOffer | null;
+  source: ContractAcceptedVia | null;
+  rerollUsed: boolean;
+  rerollAvailable: boolean;
+  selectable: boolean;
+  unavailableReason?: string;
+};
+
+export type ContractCadenceView = {
+  cadence: ContractCadence;
+  label: string;
+  chooserTitle: string;
+  chooserDescription: string;
+  resetWindow: string;
+  resetAt: Date;
+  activeRun: ContractRun | null;
+  completionCount: number;
+  refillAvailableDifficulty?: ContractDifficulty;
+  refillClaimed: boolean;
+  offers: ContractOfferView[];
+};
+
+export interface ContractsCadenceResolver {
+  resolveCadenceView(input: {
+    userId: string;
+    cadence: ContractCadence;
+    now: Date;
+  }): ContractCadenceView;
+  resolveActiveRotation: (now: Date) => {
+    daily: { cadence: ContractCadence; periodKey: string; contracts: ContractDefinition[] };
+    weekly: { cadence: ContractCadence; periodKey: string; contracts: ContractDefinition[] };
+  };
+}
+
+export interface ContractsRotationResolver {
+  resolveActiveRotation(now: Date): {
+    daily: { cadence: ContractCadence; periodKey: string; contracts: ContractDefinition[] };
+    weekly: { cadence: ContractCadence; periodKey: string; contracts: ContractDefinition[] };
+  };
+}
+
+export type ContractSelectionResult = {
+  cadenceView: ContractCadenceView;
+  acceptedRun: ContractRun;
+  acceptedChoice: ContractOfferChoice;
+};
+
+export interface ContractsSelectionManager {
+  acceptOffer(input: {
+    userId: string;
+    cadence: ContractCadence;
+    difficulty: ContractDifficulty;
+    now: Date;
+  }): ContractSelectionResult;
+  rerollOffer(input: {
+    userId: string;
+    cadence: ContractCadence;
+    difficulty: ContractDifficulty;
+    now: Date;
+  }): ContractCadenceView;
+}
+
+export type QueryContractsDependencies = {
+  cadenceResolver: ContractsCadenceResolver | null;
+};
+
+export type ContractsUnitOfWork = UnitOfWork;

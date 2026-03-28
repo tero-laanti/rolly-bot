@@ -45,6 +45,12 @@ export type WorldBossConfig = {
   quietHours: QuietHoursConfig;
 };
 
+export type ContractMasterConfig = {
+  enabled: boolean;
+  inactiveReason: string | null;
+  channelId: string | null;
+};
+
 const parseNumberWithFallback = (
   rawValue: string | undefined,
   fallback: number,
@@ -232,6 +238,18 @@ const worldBossActivation = resolveFeatureActivation({
   channelId: worldBossChannelId,
   channelEnvName: "WORLD_BOSS_CHANNEL_ID",
 });
+
+const contractMasterChannelId = parseOptionalString(process.env.CONTRACT_MASTER_CHANNEL_ID);
+const contractMasterActivation = resolveFeatureActivation({
+  channelId: contractMasterChannelId,
+  channelEnvName: "CONTRACT_MASTER_CHANNEL_ID",
+});
+
+export const contractMasterConfig: ContractMasterConfig = {
+  enabled: contractMasterActivation.enabled,
+  inactiveReason: contractMasterActivation.inactiveReason,
+  channelId: contractMasterChannelId,
+};
 
 export const worldBossConfig: WorldBossConfig = {
   enabled: worldBossActivation.enabled,

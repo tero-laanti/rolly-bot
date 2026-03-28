@@ -5,26 +5,15 @@ import {
   truncateDiscordText,
 } from "../../../../shared/discord";
 import { truncateWithSuffix } from "../../../../shared/text";
-import { createContractProgress } from "../../domain/progress";
-import { getContractRotationResetAt } from "../../domain/rotation";
-import type { ContractProgress } from "../../domain/progress";
-import type { ContractDefinition } from "../../domain/types";
-import type { ContractsProgressRepository, ContractsRotationResolver } from "../ports";
+import type { QueryContractsDependencies } from "../ports";
+import type { ContractCadenceView } from "../ports";
 
-const fullTitleMaxLength = 72;
-const compactTitleMaxLength = 56;
-const fullDescriptionMaxLength = 180;
-const compactDescriptionMaxLength = 96;
+const descriptionMaxLength = 180;
 const trimmedSuffix = "\n...";
 
 export type DiceContractsView = {
   content: string;
   ephemeral: boolean;
-};
-
-type QueryContractsDependencies = {
-  rotationResolver: Pick<ContractsRotationResolver, "resolveActiveRotation"> | null;
-  progressRepository: Pick<ContractsProgressRepository, "getProgress"> | null;
 };
 
 type QueryContractsInput = {
@@ -33,213 +22,93 @@ type QueryContractsInput = {
   now?: Date;
 };
 
-type ContractEntryView = {
-  title: string;
-  description: string;
-  progressLabel: string;
-  rewardLabel: string;
-  statusLabel: string;
+const formatRerollStatus = (view: ContractCadenceView): string => {
+  return view.offers
+    .map((offer) => `${offer.label}: ${offer.rerollUsed ? "used" : "ready"}`)
+    .join(" | ");
 };
 
-type ContractSectionView = {
-  title: string;
-  resetAt: Date;
-  entries: ContractEntryView[];
+const formatRefillStatus = (view: ContractCadenceView): string => {
+  if (view.completionCount < 1) {
+    return "Locked until your first completion.";
+  }
+
+  if (view.completionCount >= 2) {
+    return "Exhausted for this reset window.";
+  }
+
+  if (view.refillClaimed) {
+    return `Claimed from ${view.refillAvailableDifficulty ?? "unknown"} difficulty.`;
+  }
+
+  return `Available for ${view.refillAvailableDifficulty ?? "unknown"} difficulty.`;
 };
 
-const renderRewardLabel = (progress: ContractProgress): string => {
-  const parts: string[] = [];
-  if (progress.reward.pips > 0) {
-    parts.push(`${progress.reward.pips} Pip${progress.reward.pips === 1 ? "" : "s"}`);
-  }
-  if (progress.reward.fame > 0) {
-    parts.push(`${progress.reward.fame} Fame`);
+const renderActiveRun = (view: ContractCadenceView): string[] => {
+  if (!view.activeRun) {
+    return ["No accepted contract right now."];
   }
 
-  return parts.join(" + ");
-};
-
-const getStatusLabel = (progress: ContractProgress): string => {
-  if (progress.rewardedAt) {
-    return "Auto-claimed";
-  }
-  if (progress.completedAt) {
-    return "Completed";
-  }
-  if (progress.currentCount > 0) {
-    return "In progress";
-  }
-  return "Not started";
-};
-
-const buildContractEntryView = (
-  contract: ContractDefinition,
-  progress: ContractProgress,
-): ContractEntryView => {
-  return {
-    title: contract.title,
-    description: contract.description,
-    progressLabel: `${progress.currentCount}/${progress.requiredCount}`,
-    rewardLabel: renderRewardLabel(progress),
-    statusLabel: getStatusLabel(progress),
-  };
-};
-
-const renderContractEntry = (
-  entry: ContractEntryView,
-  {
-    titleMaxLength,
-    descriptionMaxLength,
-    includeDescription,
-  }: {
-    titleMaxLength: number;
-    descriptionMaxLength: number;
-    includeDescription: boolean;
-  },
-): string[] => {
-  const lines = [
-    `- **${truncateDiscordText(entry.title, titleMaxLength)}**`,
-    `  Progress: ${entry.progressLabel} | Reward: ${entry.rewardLabel} | Status: ${entry.statusLabel}`,
-  ];
-
-  if (includeDescription) {
-    lines.splice(1, 0, `  ${truncateDiscordText(entry.description, descriptionMaxLength)}`);
-  }
-
-  return lines;
-};
-
-const renderContractSection = (
-  section: ContractSectionView,
-  options: {
-    titleMaxLength: number;
-    descriptionMaxLength: number;
-    includeDescription: boolean;
-  },
-): string => {
-  const header = [
-    `**${section.title}**`,
-    `Resets ${formatDiscordRelativeTime(section.resetAt.getTime())} (${formatDiscordFullTime(section.resetAt.getTime())})`,
-  ];
-
-  if (section.entries.length < 1) {
-    return [...header, "No active contracts right now."].join("\n");
-  }
+  const progressLabel = `${view.activeRun.currentCount}/${view.activeRun.requiredCount}`;
+  const statusLabel = view.activeRun.completedAt ? "Completed" : "In progress";
 
   return [
-    ...header,
-    ...section.entries.flatMap((entry) => renderContractEntry(entry, options)),
+    `**${truncateDiscordText(view.activeRun.contractTitle, 72)}**`,
+    truncateDiscordText(view.activeRun.contractDescription, descriptionMaxLength),
+    `Difficulty: ${view.activeRun.difficulty} | Progress: ${progressLabel} | Reward: ${view.activeRun.rewardPips} Pips | Status: ${statusLabel}`,
+  ];
+};
+
+const renderCadenceSection = (view: ContractCadenceView): string => {
+  const totalEarnedPips = view.activeRun
+    ? view.activeRun.rewardGrantedAt
+      ? view.activeRun.rewardPips
+      : 0
+    : 0;
+
+  return [
+    `**${view.label} Contracts**`,
+    `Resets ${formatDiscordRelativeTime(view.resetAt.getTime())} (${formatDiscordFullTime(view.resetAt.getTime())})`,
+    ...renderActiveRun(view),
+    `Completed this window: ${view.completionCount}/2`,
+    `Rerolls: ${formatRerollStatus(view)}`,
+    `Refill: ${formatRefillStatus(view)}`,
+    `Pips granted from current accepted run: ${totalEarnedPips}`,
   ].join("\n");
 };
 
-const renderContractsContent = (
-  userMention: string,
-  daily: ContractSectionView,
-  weekly: ContractSectionView,
-  options: {
-    titleMaxLength: number;
-    descriptionMaxLength: number;
-    includeDescription: boolean;
-  },
-): string => {
-  return [
-    `**Rolly Contracts for ${userMention}**`,
-    renderContractSection(daily, options),
-    renderContractSection(weekly, options),
-  ].join("\n\n");
-};
+const createUnavailableContractsReply = (): DiceContractsView => ({
+  content:
+    "**Rolly Contracts**\nContracts are currently unavailable on this bot. Add `contracts.v2.json` to the active rolly-data source to enable /contracts.",
+  ephemeral: false,
+});
 
-const buildContentWithinLimit = (
-  userMention: string,
-  daily: ContractSectionView,
-  weekly: ContractSectionView,
-): string => {
-  const fullContent = renderContractsContent(userMention, daily, weekly, {
-    titleMaxLength: fullTitleMaxLength,
-    descriptionMaxLength: fullDescriptionMaxLength,
-    includeDescription: true,
-  });
-  if (fullContent.length <= discordMessageCharacterLimit) {
-    return fullContent;
-  }
-
-  const compactContent = renderContractsContent(userMention, daily, weekly, {
-    titleMaxLength: compactTitleMaxLength,
-    descriptionMaxLength: compactDescriptionMaxLength,
-    includeDescription: true,
-  });
-  if (compactContent.length <= discordMessageCharacterLimit) {
-    return compactContent;
-  }
-
-  const noDescriptionContent = renderContractsContent(userMention, daily, weekly, {
-    titleMaxLength: compactTitleMaxLength,
-    descriptionMaxLength: 0,
-    includeDescription: false,
-  });
-  return truncateWithSuffix(noDescriptionContent, discordMessageCharacterLimit, trimmedSuffix);
-};
-
-const createUnavailableContractsReply = (): DiceContractsView => {
-  return {
-    content:
-      "**Rolly Contracts**\nContracts are currently unavailable on this bot. Add `contracts.v2.json` to the active rolly-data source to enable /contracts.",
-    ephemeral: false,
-  };
-};
-
-export const createQueryContractsUseCase = ({
-  rotationResolver,
-  progressRepository,
-}: QueryContractsDependencies) => {
+export const createQueryContractsUseCase = ({ cadenceResolver }: QueryContractsDependencies) => {
   const createContractsReply = ({
     userId,
     userMention = `<@${userId}>`,
     now = new Date(),
   }: QueryContractsInput): DiceContractsView => {
-    if (!rotationResolver || !progressRepository) {
+    if (!cadenceResolver) {
       return createUnavailableContractsReply();
     }
 
-    const rotation = rotationResolver.resolveActiveRotation(now);
-    const buildSection = (
-      title: string,
-      cadence: ContractDefinition["cadence"],
-      periodKey: string,
-      contracts: ContractDefinition[],
-    ): ContractSectionView => {
-      return {
-        title,
-        resetAt: getContractRotationResetAt(cadence, periodKey),
-        entries: contracts.map((contract) => {
-          const progress =
-            progressRepository.getProgress(userId, contract.id, contract.cadence, periodKey) ??
-            createContractProgress(contract);
-          return buildContractEntryView(contract, progress);
-        }),
-      };
-    };
-
-    const daily = buildSection(
-      "Daily Contracts",
-      "daily",
-      rotation.daily.periodKey,
-      rotation.daily.contracts,
-    );
-    const weekly = buildSection(
-      "Weekly Contracts",
-      "weekly",
-      rotation.weekly.periodKey,
-      rotation.weekly.contracts,
-    );
+    const daily = cadenceResolver.resolveCadenceView({ userId, cadence: "daily", now });
+    const weekly = cadenceResolver.resolveCadenceView({ userId, cadence: "weekly", now });
+    const content = [
+      `**Rolly Contracts for ${userMention}**`,
+      renderCadenceSection(daily),
+      renderCadenceSection(weekly),
+    ].join("\n\n");
 
     return {
-      content: buildContentWithinLimit(userMention, daily, weekly),
+      content:
+        content.length <= discordMessageCharacterLimit
+          ? content
+          : truncateWithSuffix(content, discordMessageCharacterLimit, trimmedSuffix),
       ephemeral: false,
     };
   };
 
-  return {
-    createContractsReply,
-  };
+  return { createContractsReply };
 };

@@ -2,71 +2,91 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createQueryContractsUseCase } from "./use-case";
-import type { ContractProgress } from "../../domain/progress";
-import { contractFromData } from "../../domain/types";
+import type { ContractCadenceView } from "../ports";
 
-const makeContract = (
+const createCadenceView = (
   cadence: "daily" | "weekly",
-  id: string,
-  overrides: Partial<{
-    title: string;
-    description: string;
-    requiredCount: number;
-    rewardPips: number;
-    rewardFame: number;
-  }> = {},
-) =>
-  contractFromData(cadence, {
-    id,
-    title: overrides.title ?? `${cadence} ${id}`,
-    description: overrides.description ?? `Finish ${id}.`,
-    objective: {
-      type: cadence === "weekly" ? "world_boss_join_count" : "roll_count",
-      requiredCount: overrides.requiredCount ?? 5,
+  overrides: Partial<ContractCadenceView> = {},
+): ContractCadenceView => ({
+  cadence,
+  label: cadence === "daily" ? "Daily" : "Weekly",
+  chooserTitle: cadence === "daily" ? "Daily Contracts" : "Weekly Contracts",
+  chooserDescription: "Pick a contract.",
+  resetWindow: cadence === "daily" ? "2026-03-28" : "2026-03-23",
+  resetAt:
+    cadence === "daily"
+      ? new Date("2026-03-29T00:00:00.000Z")
+      : new Date("2026-03-30T00:00:00.000Z"),
+  activeRun: null,
+  completionCount: 0,
+  refillAvailableDifficulty: undefined,
+  refillClaimed: false,
+  offers: [
+    {
+      difficulty: "simple",
+      label: "Simple",
+      rewardPips: 12,
+      offer: null,
+      source: null,
+      rerollUsed: false,
+      rerollAvailable: true,
+      selectable: true,
     },
-    reward: {
-      pips: overrides.rewardPips ?? 10,
-      fame: overrides.rewardFame ?? 0,
+    {
+      difficulty: "serious",
+      label: "Serious",
+      rewardPips: 20,
+      offer: null,
+      source: null,
+      rerollUsed: false,
+      rerollAvailable: true,
+      selectable: true,
     },
-  });
+    {
+      difficulty: "brutal",
+      label: "Brutal",
+      rewardPips: 32,
+      offer: null,
+      source: null,
+      rerollUsed: false,
+      rerollAvailable: true,
+      selectable: true,
+    },
+  ],
+  ...overrides,
+});
 
-const createHarness = ({
-  dailyContracts = [makeContract("daily", "daily-roll")],
-  weeklyContracts = [makeContract("weekly", "weekly-boss")],
-  progress = new Map<string, ContractProgress>(),
-}: {
-  dailyContracts?: ReturnType<typeof makeContract>[];
-  weeklyContracts?: ReturnType<typeof makeContract>[];
-  progress?: Map<string, ContractProgress>;
-} = {}) => {
+test("contracts reply shows active accepted runs and summary state", () => {
   const useCase = createQueryContractsUseCase({
-    rotationResolver: {
-      resolveActiveRotation: () => ({
-        daily: {
-          cadence: "daily",
-          periodKey: "2026-03-28",
-          contracts: dailyContracts,
-        },
-        weekly: {
-          cadence: "weekly",
-          periodKey: "2026-03-23",
-          contracts: weeklyContracts,
-        },
-      }),
+    cadenceResolver: {
+      resolveCadenceView: ({ cadence }) =>
+        cadence === "daily"
+          ? createCadenceView("daily", {
+              activeRun: {
+                userId: "user-1",
+                cadence: "daily",
+                resetWindow: "2026-03-28",
+                sequenceNumber: 1,
+                contractId: "daily-serious-roll",
+                contractTitle: "Serious Roller",
+                contractDescription: "Use /roll 10 times.",
+                difficulty: "serious",
+                objectiveType: "roll_count",
+                requiredCount: 10,
+                currentCount: 4,
+                acceptedVia: "initial",
+                acceptedAt: new Date("2026-03-28T10:00:00.000Z"),
+                rewardPips: 20,
+              },
+            })
+          : createCadenceView("weekly", {
+              completionCount: 1,
+              refillAvailableDifficulty: "brutal",
+            }),
+      resolveActiveRotation: () => {
+        throw new Error("not used");
+      },
     },
-    progressRepository: {
-      getProgress: (userId, contractId, cadence, periodKey) =>
-        progress.get([userId, contractId, cadence, periodKey].join("|")) ?? null,
-    },
-  });
-
-  return { useCase, progress };
-};
-
-test("contracts reply shows empty daily and weekly states", () => {
-  const { useCase } = createHarness({
-    dailyContracts: [],
-    weeklyContracts: [],
   });
 
   const result = useCase.createContractsReply({
@@ -77,140 +97,18 @@ test("contracts reply shows empty daily and weekly states", () => {
 
   assert.equal(result.ephemeral, false);
   assert.match(result.content, /\*\*Daily Contracts\*\*/);
-  assert.match(result.content, /\*\*Weekly Contracts\*\*/);
-  assert.match(result.content, /No active contracts right now\./);
-});
-
-test("contracts reply shows partial progress", () => {
-  const daily = makeContract("daily", "daily-roll", {
-    title: "Daily Roll Sprint",
-    description: "Use /roll 12 times.",
-    requiredCount: 12,
-    rewardPips: 18,
-  });
-  const weekly = makeContract("weekly", "weekly-boss", {
-    title: "World Boss Crew",
-    description: "Join 3 World Boss encounters.",
-    requiredCount: 3,
-    rewardPips: 20,
-    rewardFame: 25,
-  });
-  const progress = new Map<string, ContractProgress>([
-    [
-      "user-1|daily-roll|daily|2026-03-28",
-      {
-        contractId: daily.id,
-        cadence: "daily",
-        objectiveType: daily.objective.type,
-        requiredCount: 12,
-        currentCount: 4,
-        reward: daily.reward,
-      },
-    ],
-  ]);
-
-  const { useCase } = createHarness({
-    dailyContracts: [daily],
-    weeklyContracts: [weekly],
-    progress,
-  });
-  const result = useCase.createContractsReply({
-    userId: "user-1",
-    userMention: "<@user-1>",
-    now: new Date("2026-03-28T12:00:00.000Z"),
-  });
-
-  assert.match(result.content, /Daily Roll Sprint/);
-  assert.match(result.content, /Progress: 4\/12 \| Reward: 18 Pips \| Status: In progress/);
-  assert.match(result.content, /World Boss Crew/);
+  assert.match(result.content, /Serious Roller/);
   assert.match(
     result.content,
-    /Progress: 0\/3 \| Reward: 20 Pips \+ 25 Fame \| Status: Not started/,
+    /Difficulty: serious \| Progress: 4\/10 \| Reward: 20 Pips \| Status: In progress/,
   );
+  assert.match(result.content, /Rerolls: Simple: ready \| Serious: ready \| Brutal: ready/);
+  assert.match(result.content, /Refill: Available for brutal difficulty\./);
 });
 
-test("contracts reply shows completed and auto-claimed state", () => {
-  const weekly = makeContract("weekly", "weekly-boss", {
-    title: "World Boss Crew",
-    description: "Join 3 World Boss encounters.",
-    requiredCount: 3,
-    rewardPips: 20,
-    rewardFame: 25,
-  });
-  const progress = new Map<string, ContractProgress>([
-    [
-      "user-1|weekly-boss|weekly|2026-03-23",
-      {
-        contractId: weekly.id,
-        cadence: "weekly",
-        objectiveType: weekly.objective.type,
-        requiredCount: 3,
-        currentCount: 3,
-        completedAt: new Date("2026-03-25T10:00:00.000Z"),
-        rewardedAt: new Date("2026-03-25T10:00:00.000Z"),
-        reward: weekly.reward,
-      },
-    ],
-  ]);
-
-  const { useCase } = createHarness({
-    weeklyContracts: [weekly],
-    progress,
-  });
-  const result = useCase.createContractsReply({
-    userId: "user-1",
-    userMention: "<@user-1>",
-    now: new Date("2026-03-28T12:00:00.000Z"),
-  });
-
-  assert.match(
-    result.content,
-    /Progress: 3\/3 \| Reward: 20 Pips \+ 25 Fame \| Status: Auto-claimed/,
-  );
-});
-
-test("contracts reply resets progress after a new period starts", () => {
-  const daily = makeContract("daily", "daily-roll", {
-    title: "Daily Roll Sprint",
-    description: "Use /roll 12 times.",
-    requiredCount: 12,
-    rewardPips: 18,
-  });
-  const progress = new Map<string, ContractProgress>([
-    [
-      "user-1|daily-roll|daily|2026-03-27",
-      {
-        contractId: daily.id,
-        cadence: "daily",
-        objectiveType: daily.objective.type,
-        requiredCount: 12,
-        currentCount: 12,
-        completedAt: new Date("2026-03-27T20:00:00.000Z"),
-        rewardedAt: new Date("2026-03-27T20:00:00.000Z"),
-        reward: daily.reward,
-      },
-    ],
-  ]);
-
+test("contracts reply shows unavailable state when contracts are disabled", () => {
   const useCase = createQueryContractsUseCase({
-    rotationResolver: {
-      resolveActiveRotation: () => ({
-        daily: {
-          cadence: "daily",
-          periodKey: "2026-03-28",
-          contracts: [daily],
-        },
-        weekly: {
-          cadence: "weekly",
-          periodKey: "2026-03-23",
-          contracts: [],
-        },
-      }),
-    },
-    progressRepository: {
-      getProgress: (userId, contractId, cadence, periodKey) =>
-        progress.get([userId, contractId, cadence, periodKey].join("|")) ?? null,
-    },
+    cadenceResolver: null,
   });
 
   const result = useCase.createContractsReply({
@@ -219,25 +117,37 @@ test("contracts reply resets progress after a new period starts", () => {
     now: new Date("2026-03-28T12:00:00.000Z"),
   });
 
-  assert.match(result.content, /Progress: 0\/12 \| Reward: 18 Pips \| Status: Not started/);
-  assert.match(result.content, /Resets <t:\d+:R> \(<t:\d+:f>\)/);
+  assert.match(result.content, /Contracts are currently unavailable/);
+  assert.match(result.content, /contracts\.v2\.json/);
 });
 
 test("contracts reply trims oversized content to Discord limits", () => {
-  const longTitle = "Longest Contract Title ".repeat(12).trim();
-  const longDescription = "This description is intentionally very long. ".repeat(80).trim();
-  const dailyContracts = [
-    makeContract("daily", "daily-1", { title: longTitle, description: longDescription }),
-    makeContract("daily", "daily-2", { title: longTitle, description: longDescription }),
-    makeContract("daily", "daily-3", { title: longTitle, description: longDescription }),
-  ];
-  const weeklyContracts = [
-    makeContract("weekly", "weekly-1", { title: longTitle, description: longDescription }),
-    makeContract("weekly", "weekly-2", { title: longTitle, description: longDescription }),
-  ];
-  const { useCase } = createHarness({
-    dailyContracts,
-    weeklyContracts,
+  const longDescription = "Very long description. ".repeat(120).trim();
+  const useCase = createQueryContractsUseCase({
+    cadenceResolver: {
+      resolveCadenceView: ({ cadence }) =>
+        createCadenceView(cadence, {
+          activeRun: {
+            userId: "user-1",
+            cadence,
+            resetWindow: cadence === "daily" ? "2026-03-28" : "2026-03-23",
+            sequenceNumber: 1,
+            contractId: `${cadence}-active`,
+            contractTitle: `${cadence} title`,
+            contractDescription: longDescription,
+            difficulty: "brutal",
+            objectiveType: "roll_count",
+            requiredCount: 200,
+            currentCount: 150,
+            acceptedVia: "initial",
+            acceptedAt: new Date("2026-03-28T10:00:00.000Z"),
+            rewardPips: 70,
+          },
+        }),
+      resolveActiveRotation: () => {
+        throw new Error("not used");
+      },
+    },
   });
 
   const result = useCase.createContractsReply({
@@ -247,19 +157,4 @@ test("contracts reply trims oversized content to Discord limits", () => {
   });
 
   assert.ok(result.content.length <= 2_000);
-  assert.match(result.content, /\*\*Daily Contracts\*\*/);
-  assert.match(result.content, /\*\*Weekly Contracts\*\*/);
-});
-
-test("contracts reply shows unavailable state when contracts are disabled", () => {
-  const useCase = createQueryContractsUseCase({
-    rotationResolver: null,
-    progressRepository: null,
-  });
-
-  const result = useCase.createContractsReply({
-    userId: "user-1",
-  });
-
-  assert.match(result.content, /Contracts are currently unavailable/);
 });

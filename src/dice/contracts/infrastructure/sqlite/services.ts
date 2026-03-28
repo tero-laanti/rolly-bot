@@ -1,101 +1,132 @@
 import type { SqliteDatabase } from "../../../../shared/db";
-import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite/unit-of-work";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import { createContractsGameplayProgressPort } from "../../application/gameplay-progress/use-case";
 import { createQueryContractsUseCase } from "../../application/query-contracts/use-case";
 import { createRecordContractsProgressUseCase } from "../../application/record-progress/use-case";
-import { createResolveContractsRotationUseCase } from "../../application/resolve-rotation/use-case";
-import type {
-  ContractsCatalogReader,
-  ContractsGameplayProgressPort,
-  ContractsRewardGranter,
-} from "../../application/ports";
+import { createResolveContractCadenceViewUseCase } from "../../application/resolve-rotation/use-case";
 import {
   createOptionalRollyDataContractsCatalogReader,
   createRollyDataContractsCatalogReader,
 } from "../rolly-data/contracts-catalog";
 import {
-  createSqliteContractsProgressRepository,
-  createSqliteContractsRotationRepository,
-} from "./contracts-repository";
+  createOptionalSqliteContractMasterService,
+  createSqliteContractMasterService,
+} from "../contract-master-service";
+import {
+  createSqliteContractMasterInitialOfferRepository,
+  createSqliteContractMasterRerollUsageRepository,
+  createSqliteContractMasterRunRepository,
+  createSqliteContractMasterUserCadenceStateRepository,
+} from "./contract-master-repository";
+import { createSqliteUnitOfWork } from "../../../../shared/infrastructure/sqlite/unit-of-work";
 
-const createSqliteContractsRewardGranter = (db: SqliteDatabase): ContractsRewardGranter => {
+const createUnavailableContractsReply = () => {
+  return {
+    content:
+      "**Rolly Contracts**\nContracts are currently unavailable on this bot. Add `contracts.v2.json` to the active rolly-data source to enable /contracts.",
+    ephemeral: false as const,
+  };
+};
+
+const createStrictContractMasterDependencies = (db: SqliteDatabase) => {
+  const catalogReader = createRollyDataContractsCatalogReader();
+
+  return {
+    catalogReader,
+    initialOfferRepository: createSqliteContractMasterInitialOfferRepository(db),
+    userCadenceStateRepository: createSqliteContractMasterUserCadenceStateRepository(db),
+    runRepository: createSqliteContractMasterRunRepository(db),
+    rerollUsageRepository: createSqliteContractMasterRerollUsageRepository(db),
+    unitOfWork: createSqliteUnitOfWork(db),
+  };
+};
+
+const createOptionalContractMasterDependencies = (db: SqliteDatabase) => {
+  const catalogReader = createOptionalRollyDataContractsCatalogReader();
+  if (!catalogReader) {
+    return null;
+  }
+
+  catalogReader.getCatalog();
+
+  return {
+    catalogReader,
+    initialOfferRepository: createSqliteContractMasterInitialOfferRepository(db),
+    userCadenceStateRepository: createSqliteContractMasterUserCadenceStateRepository(db),
+    runRepository: createSqliteContractMasterRunRepository(db),
+    rerollUsageRepository: createSqliteContractMasterRerollUsageRepository(db),
+    unitOfWork: createSqliteUnitOfWork(db),
+  };
+};
+
+const createRewardGranter = (db: SqliteDatabase) => {
   const economy = createSqliteEconomyRepository(db);
 
   return {
-    grantReward: (userId, reward) => {
-      if (reward.fame > 0) {
-        economy.applyFameDelta({ userId, amount: reward.fame });
-      }
-      if (reward.pips > 0) {
-        economy.applyPipsDelta({ userId, amount: reward.pips });
+    grantPips: (userId: string, pips: number) => {
+      if (pips > 0) {
+        economy.applyPipsDelta({ userId, amount: pips });
       }
     },
   };
 };
 
-const createContractsProgressRecorder = (
-  db: SqliteDatabase,
-  catalogReader: ContractsCatalogReader,
-) => {
-  const rotationRepository = createSqliteContractsRotationRepository(db);
-  const progressRepository = createSqliteContractsProgressRepository(db);
-  const rewardGranter = createSqliteContractsRewardGranter(db);
-  const unitOfWork = createSqliteUnitOfWork(db);
-
-  const rotationResolver = createResolveContractsRotationUseCase({
-    catalogReader,
-    rotationRepository,
-  });
-
-  return createRecordContractsProgressUseCase({
-    rotationResolver,
-    progressRepository,
-    rewardGranter,
-    unitOfWork,
-  });
-};
-
 export const createSqliteContractsRotationResolver = (db: SqliteDatabase) => {
-  const catalogReader = createRollyDataContractsCatalogReader();
-  const rotationRepository = createSqliteContractsRotationRepository(db);
+  const dependencies = createStrictContractMasterDependencies(db);
 
-  return createResolveContractsRotationUseCase({
-    catalogReader,
-    rotationRepository,
+  return createResolveContractCadenceViewUseCase({
+    catalogReader: dependencies.catalogReader,
+    initialOfferRepository: dependencies.initialOfferRepository,
+    userCadenceStateRepository: dependencies.userCadenceStateRepository,
+    runRepository: dependencies.runRepository,
+    rerollUsageRepository: dependencies.rerollUsageRepository,
   });
 };
 
 export const createSqliteContractsProgressRecorder = (db: SqliteDatabase) => {
-  return createContractsProgressRecorder(db, createRollyDataContractsCatalogReader());
+  const dependencies = createStrictContractMasterDependencies(db);
+
+  return createRecordContractsProgressUseCase({
+    runRepository: dependencies.runRepository,
+    userCadenceStateRepository: dependencies.userCadenceStateRepository,
+    rewardGranter: createRewardGranter(db),
+    unitOfWork: dependencies.unitOfWork,
+  });
 };
 
-export const createSqliteContractsGameplayProgressPort = (
-  db: SqliteDatabase,
-): ContractsGameplayProgressPort | undefined => {
-  const catalogReader = createOptionalRollyDataContractsCatalogReader();
-  if (catalogReader === null) {
+export const createSqliteContractsGameplayProgressPort = (db: SqliteDatabase) => {
+  const dependencies = createOptionalContractMasterDependencies(db);
+  if (dependencies === null) {
     return undefined;
   }
 
-  const progressRecorder = createContractsProgressRecorder(db, catalogReader);
   return createContractsGameplayProgressPort({
-    progressRecorder,
+    progressRecorder: createRecordContractsProgressUseCase({
+      runRepository: dependencies.runRepository,
+      userCadenceStateRepository: dependencies.userCadenceStateRepository,
+      rewardGranter: createRewardGranter(db),
+      unitOfWork: dependencies.unitOfWork,
+    }),
   });
 };
 
 export const createSqliteQueryContractsUseCase = (db: SqliteDatabase) => {
-  const catalogReader = createOptionalRollyDataContractsCatalogReader();
-  const progressRepository = createSqliteContractsProgressRepository(db);
+  const dependencies = createOptionalContractMasterDependencies(db);
+  if (dependencies === null) {
+    return {
+      createContractsReply: () => createUnavailableContractsReply(),
+    };
+  }
 
   return createQueryContractsUseCase({
-    rotationResolver:
-      catalogReader === null
-        ? null
-        : createResolveContractsRotationUseCase({
-            catalogReader,
-            rotationRepository: createSqliteContractsRotationRepository(db),
-          }),
-    progressRepository,
+    cadenceResolver: createResolveContractCadenceViewUseCase({
+      catalogReader: dependencies.catalogReader,
+      initialOfferRepository: dependencies.initialOfferRepository,
+      userCadenceStateRepository: dependencies.userCadenceStateRepository,
+      runRepository: dependencies.runRepository,
+      rerollUsageRepository: dependencies.rerollUsageRepository,
+    }),
   });
 };
+
+export { createOptionalSqliteContractMasterService, createSqliteContractMasterService };
