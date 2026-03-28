@@ -1,3 +1,4 @@
+import type { APIEmbed } from "discord.js";
 import type { Client } from "discord.js";
 import { renderActionView } from "../../../app/discord/render-action-result";
 import type { ContractMasterConfig } from "../../../shared/config";
@@ -16,6 +17,7 @@ export type ContractMasterPanelMessage = {
 
 export type ContractMasterPanelMessagePayload = {
   content: string;
+  embeds: APIEmbed[];
   components: unknown[];
 };
 
@@ -25,12 +27,14 @@ export interface ContractMasterPanelPublisher {
   createMessage(input: {
     channelId: string;
     content: string;
+    embeds: APIEmbed[];
     components: unknown[];
   }): Promise<{ messageId: string }>;
   editMessage(input: {
     channelId: string;
     messageId: string;
     content: string;
+    embeds: APIEmbed[];
     components: unknown[];
   }): Promise<void>;
   deleteMessage(input: { channelId: string; messageId: string }): Promise<void>;
@@ -104,6 +108,7 @@ export const createSyncContractMasterPanelUseCase = ({
         channelId: config.channelId,
         messageId: currentPanel.messageId,
         content: panelMessage.content,
+        embeds: panelMessage.embeds,
         components: panelMessage.components,
       });
       editedCount += 1;
@@ -111,6 +116,7 @@ export const createSyncContractMasterPanelUseCase = ({
       await publisher.createMessage({
         channelId: config.channelId,
         content: panelMessage.content,
+        embeds: panelMessage.embeds,
         components: panelMessage.components,
       });
       createdCount += 1;
@@ -159,6 +165,8 @@ const createPanelSource = (
         return null;
       }
 
+      const panelEmbeds = service.createPanelEmbeds();
+
       const rendered = renderActionView<ContractMasterButtonAction>(
         service.createPanelView(),
         encodeContractMasterButtonAction,
@@ -166,6 +174,18 @@ const createPanelSource = (
 
       return {
         content: rendered.content ?? "",
+        embeds: [
+          {
+            title: panelEmbeds.artwork.title,
+            image: {
+              url: panelEmbeds.artwork.imageUrl,
+            },
+          },
+          {
+            title: panelEmbeds.details.title,
+            description: panelEmbeds.details.description,
+          },
+        ],
         components: rendered.components ?? [],
       };
     },

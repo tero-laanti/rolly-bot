@@ -87,7 +87,6 @@ const createDiceItemInput = () => ({
 type ContractsInput = {
   panel: {
     title: string;
-    npcName: string;
     imageUrl: string;
     description: string;
     helperText: string;
@@ -221,7 +220,6 @@ const createCadenceInput = (
 const createContractsInput = (): ContractsInput => ({
   panel: {
     title: "Contract Master",
-    npcName: "Contract Master",
     imageUrl: "https://example.com/rolly/contract-master.png",
     description: "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
     helperText:

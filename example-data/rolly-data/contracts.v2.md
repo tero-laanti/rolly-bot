@@ -30,7 +30,6 @@ Panel shape:
 ```json
 {
   "title": "Contract Master",
-  "npcName": "Contract Master",
   "imageUrl": "https://example.com/rolly/contract-master.png",
   "description": "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
   "helperText": "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",

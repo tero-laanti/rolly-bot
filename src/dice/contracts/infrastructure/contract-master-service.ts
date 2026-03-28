@@ -50,8 +50,20 @@ type OfferMutationInput = CadenceViewInput & {
   difficulty: ContractDifficulty;
 };
 
+export type ContractMasterPanelEmbeds = {
+  artwork: {
+    title: string;
+    imageUrl: string;
+  };
+  details: {
+    title: string;
+    description: string;
+  };
+};
+
 export type ContractMasterService = {
   createPanelView: () => ActionView<ContractMasterButtonAction>;
+  createPanelEmbeds: () => ContractMasterPanelEmbeds;
   createCadenceView: (input: CadenceViewInput) => ActionView<ContractMasterButtonAction>;
   createChooserView: (input: CadenceViewInput) => ActionView<ContractMasterButtonAction>;
   acceptOffer: (input: OfferMutationInput) => ActionView<ContractMasterButtonAction>;
@@ -238,15 +250,7 @@ const hasOpenChooserSlot = (view: ContractCadenceView): boolean => {
 const buildPanelView = (
   panel: ContractCatalog["panel"],
 ): ActionView<ContractMasterButtonAction> => {
-  const content = limitDiscordMessage(
-    [
-      `**${panel.title}**`,
-      `**${panel.npcName}**`,
-      panel.description,
-      panel.helperText,
-      `Artwork: ${panel.imageUrl}`,
-    ].join("\n"),
-  );
+  const content = "";
 
   return {
     content,
@@ -268,6 +272,19 @@ const buildPanelView = (
         style: "secondary",
       },
     ]),
+  };
+};
+
+const buildPanelEmbeds = (panel: ContractCatalog["panel"]): ContractMasterPanelEmbeds => {
+  return {
+    artwork: {
+      title: "\u200B",
+      imageUrl: panel.imageUrl,
+    },
+    details: {
+      title: panel.title,
+      description: limitDiscordMessage([panel.description, panel.helperText].join("\n")),
+    },
   };
 };
 
@@ -380,6 +397,7 @@ export const createOptionalSqliteContractMasterService = (
 
   return {
     createPanelView: () => buildPanelView(catalog.panel),
+    createPanelEmbeds: () => buildPanelEmbeds(catalog.panel),
     createCadenceView: ({ userId, cadence, now }) =>
       buildCadenceView({
         panel: catalog.panel,

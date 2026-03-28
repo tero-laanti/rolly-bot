@@ -1,6 +1,7 @@
 import { Collection } from "discord.js";
 import type {
   ActionRowBuilder,
+  APIEmbed,
   Client,
   Message,
   MessageActionRowComponentBuilder,
@@ -12,6 +13,7 @@ type SendableMessageChannel = {
   id: string;
   send: (options: {
     content: string;
+    embeds: APIEmbed[];
     components: ActionRowBuilder<MessageActionRowComponentBuilder>[];
   }) => Promise<Message>;
   messages: {
@@ -109,20 +111,22 @@ export const createDiscordContractMasterPanelPublisher = (
           createdTimestamp: message.createdTimestamp,
         }));
     },
-    createMessage: async ({ channelId, content, components }) => {
+    createMessage: async ({ channelId, content, embeds, components }) => {
       const channel = await resolveSendableMessageChannel(client, channelId);
       const message = await channel.send({
         content,
+        embeds,
         components: components as ActionRowBuilder<MessageActionRowComponentBuilder>[],
       });
 
       return { messageId: message.id };
     },
-    editMessage: async ({ channelId, messageId, content, components }) => {
+    editMessage: async ({ channelId, messageId, content, embeds, components }) => {
       const channel = await resolveSendableMessageChannel(client, channelId);
       const message = await channel.messages.fetch(messageId);
       await message.edit({
         content,
+        embeds,
         components: components as ActionRowBuilder<MessageActionRowComponentBuilder>[],
       });
     },

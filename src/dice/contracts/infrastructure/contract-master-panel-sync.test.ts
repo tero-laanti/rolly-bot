@@ -2,16 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createSyncContractMasterPanelUseCase } from "./contract-master-panel-sync";
 
+const embeds = [{ title: "\u200B", image: { url: "https://example.com/contracts.png" } }];
+
 const createPublisher = (
   panelMessages: Array<{ messageId: string; createdTimestamp: number }> = [],
 ) => {
   const calls = {
     assertedChannelIds: [] as string[],
-    created: [] as Array<{ channelId: string; content: string; components: unknown[] }>,
+    created: [] as Array<{
+      channelId: string;
+      content: string;
+      embeds: unknown[];
+      components: unknown[];
+    }>,
     edited: [] as Array<{
       channelId: string;
       messageId: string;
       content: string;
+      embeds: unknown[];
       components: unknown[];
     }>,
     deleted: [] as Array<{ channelId: string; messageId: string }>,
@@ -27,6 +35,7 @@ const createPublisher = (
       createMessage: async (input: {
         channelId: string;
         content: string;
+        embeds: unknown[];
         components: unknown[];
       }) => {
         calls.created.push(input);
@@ -36,6 +45,7 @@ const createPublisher = (
         channelId: string;
         messageId: string;
         content: string;
+        embeds: unknown[];
         components: unknown[];
       }) => {
         calls.edited.push(input);
@@ -58,6 +68,7 @@ test("contract master panel sync skips when the config is inactive", async () =>
     panelSource: {
       getPanelMessage: () => ({
         content: "panel",
+        embeds,
         components: [],
       }),
     },
@@ -111,6 +122,7 @@ test("contract master panel sync creates the panel when the channel has none", a
     panelSource: {
       getPanelMessage: () => ({
         content: "panel",
+        embeds,
         components: ["buttons"],
       }),
     },
@@ -132,6 +144,7 @@ test("contract master panel sync creates the panel when the channel has none", a
     {
       channelId: "contract-channel",
       content: "panel",
+      embeds,
       components: ["buttons"],
     },
   ]);
@@ -154,6 +167,7 @@ test("contract master panel sync edits the newest panel and deletes older duplic
     panelSource: {
       getPanelMessage: () => ({
         content: "fresh panel",
+        embeds,
         components: ["buttons"],
       }),
     },
@@ -175,6 +189,7 @@ test("contract master panel sync edits the newest panel and deletes older duplic
       channelId: "contract-channel",
       messageId: "newer-panel",
       content: "fresh panel",
+      embeds,
       components: ["buttons"],
     },
   ]);

@@ -172,7 +172,6 @@ export type DiceContractOfferData = Omit<DiceContractData, "reward">;
 
 export type DiceContractsPanelData = {
   title: string;
-  npcName: string;
   imageUrl: string;
   description: string;
   helperText: string;

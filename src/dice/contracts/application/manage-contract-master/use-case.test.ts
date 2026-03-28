@@ -19,7 +19,6 @@ import type { ContractCatalog, ContractDifficulty } from "../../domain/types";
 const createCatalog = (): ContractCatalog => ({
   panel: {
     title: "Contract Master",
-    npcName: "Contract Master",
     imageUrl: "https://example.com/contracts.png",
     description: "Pick a contract.",
     helperText: "Helper",

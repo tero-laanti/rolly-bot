@@ -1497,7 +1497,6 @@ const readContractsPanel = (value: unknown, label: string): DiceContractsPanelDa
 
   const parsed = {
     title: readNonEmptyString(record.title, `${label}.title`),
-    npcName: readNonEmptyString(record.npcName, `${label}.npcName`),
     imageUrl,
     description: readNonEmptyString(record.description, `${label}.description`),
     helperText: readNonEmptyString(record.helperText, `${label}.helperText`),
