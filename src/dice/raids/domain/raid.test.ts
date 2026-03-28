@@ -72,10 +72,10 @@ test("applied raid reward summaries reflect permanent pip bonus outcomes", () =>
 
   assert.equal(
     describeAppliedRaidReward(reward, [12, 12]),
-    "12 pips and x12 roll buff for the next 2 /rolls per eligible raider",
+    "12 pips and x12 roll buff for the next 2 /rolls per eligible player",
   );
   assert.equal(
     describeAppliedRaidReward(reward, [12, 14]),
-    "12-14 pips, based on permanent bonuses and x12 roll buff for the next 2 /rolls per eligible raider",
+    "12-14 pips, based on permanent bonuses and x12 roll buff for the next 2 /rolls per eligible player",
   );
 });
