@@ -46,6 +46,7 @@ const withEnv = (overrides: Record<string, string | undefined>, run: () => void)
 const createRollyDataCopyWithoutContracts = (targetDir: string): void => {
   fs.cpSync(exampleRollyDataDir, targetDir, { recursive: true });
   fs.rmSync(path.join(targetDir, "contracts.v1.json"), { force: true });
+  fs.rmSync(path.join(targetDir, "contracts.v2.json"), { force: true });
 };
 
 test("createSqliteContractsGameplayProgressPort disables contracts for missing local contracts.v1.json", () => {
@@ -128,6 +129,43 @@ test("gameplay progress port still throws when contracts.v1.json exists but is i
       assert.throws(
         () => services.createSqliteContractsGameplayProgressPort(db),
         /contractsV1\.(daily|weekly)|at least/i,
+      );
+    } finally {
+      process.chdir(originalCwd);
+      clearContractsModuleGraph();
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("contracts services fall back to contracts.v2.json when contracts.v1.json is absent", () => {
+  const originalCwd = process.cwd();
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-v2-"));
+  const projectDir = path.join(tempRoot, "project");
+  const localRollyDataDir = path.join(projectDir, "rolly-data");
+
+  fs.mkdirSync(projectDir, { recursive: true });
+  fs.cpSync(exampleRollyDataDir, localRollyDataDir, { recursive: true });
+  fs.rmSync(path.join(localRollyDataDir, "contracts.v1.json"), { force: true });
+  fs.copyFileSync(
+    path.join(exampleRollyDataDir, "contracts.v1.json"),
+    path.join(localRollyDataDir, "contracts.v2.json"),
+  );
+
+  withEnv({ ROLLY_DATA_DIR: undefined }, () => {
+    process.chdir(projectDir);
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+
+      assert.notEqual(services.createSqliteContractsGameplayProgressPort(db), undefined);
+      assert.doesNotThrow(() =>
+        services.createSqliteContractsRotationResolver(db).resolveActiveRotation(
+          new Date("2026-03-28T11:00:00.000Z"),
+        ),
       );
     } finally {
       process.chdir(originalCwd);
