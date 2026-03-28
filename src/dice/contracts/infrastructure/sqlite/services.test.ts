@@ -127,7 +127,7 @@ test("gameplay progress port still throws when contracts.v2.json exists but is i
 
       assert.throws(
         () => services.createSqliteContractsGameplayProgressPort(db),
-        /contracts\.(daily|weekly)|at least/i,
+        /contracts\.(panel|daily|weekly)/i,
       );
     } finally {
       process.chdir(originalCwd);
