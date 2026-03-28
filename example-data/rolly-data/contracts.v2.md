@@ -1,4 +1,4 @@
-# `contracts.v1.json`
+# `contracts.v2.json`
 
 This file defines daily and weekly contracts.
 
@@ -38,7 +38,7 @@ Contract entry shape:
 
 Objective rules:
 
-- Only counter objectives are supported in v1.
+- Only counter objectives are supported in the current format.
 - Supported objective types:
   - `roll_count`
   - `pvp_win_count`
@@ -48,7 +48,7 @@ Objective rules:
 
 Reward rules:
 
-- Only `pips` and `fame` rewards are supported in v1.
+- Only `pips` and `fame` rewards are supported in the current format.
 - At least one of `reward.pips` or `reward.fame` must be present.
 - Reward values must be integers >= 1.
 - Rewards are auto-claimed on completion in the runtime.

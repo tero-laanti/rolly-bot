@@ -183,7 +183,7 @@ const buildContentWithinLimit = (
 const createUnavailableContractsReply = (): DiceContractsView => {
   return {
     content:
-      "**Rolly Contracts**\nContracts are currently unavailable on this bot. Add `contracts.v1.json` to the active rolly-data source to enable /contracts.",
+      "**Rolly Contracts**\nContracts are currently unavailable on this bot. Add `contracts.v2.json` to the active rolly-data source to enable /contracts.",
     ephemeral: false,
   };
 };

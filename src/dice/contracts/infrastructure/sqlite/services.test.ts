@@ -45,11 +45,10 @@ const withEnv = (overrides: Record<string, string | undefined>, run: () => void)
 
 const createRollyDataCopyWithoutContracts = (targetDir: string): void => {
   fs.cpSync(exampleRollyDataDir, targetDir, { recursive: true });
-  fs.rmSync(path.join(targetDir, "contracts.v1.json"), { force: true });
   fs.rmSync(path.join(targetDir, "contracts.v2.json"), { force: true });
 };
 
-test("createSqliteContractsGameplayProgressPort disables contracts for missing local contracts.v1.json", () => {
+test("createSqliteContractsGameplayProgressPort disables contracts for missing local contracts.v2.json", () => {
   const originalCwd = process.cwd();
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-local-"));
   const projectDir = path.join(tempRoot, "project");
@@ -76,7 +75,7 @@ test("createSqliteContractsGameplayProgressPort disables contracts for missing l
   });
 });
 
-test("strict contracts resolver still fails loudly when local contracts.v1.json is missing", () => {
+test("strict contracts resolver still fails loudly when local contracts.v2.json is missing", () => {
   const originalCwd = process.cwd();
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-strict-"));
   const projectDir = path.join(tempRoot, "project");
@@ -107,7 +106,7 @@ test("strict contracts resolver still fails loudly when local contracts.v1.json 
   });
 });
 
-test("gameplay progress port still throws when contracts.v1.json exists but is invalid", () => {
+test("gameplay progress port still throws when contracts.v2.json exists but is invalid", () => {
   const originalCwd = process.cwd();
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-invalid-"));
   const projectDir = path.join(tempRoot, "project");
@@ -115,7 +114,7 @@ test("gameplay progress port still throws when contracts.v1.json exists but is i
 
   fs.mkdirSync(projectDir, { recursive: true });
   fs.cpSync(exampleRollyDataDir, localRollyDataDir, { recursive: true });
-  fs.writeFileSync(path.join(localRollyDataDir, "contracts.v1.json"), "{}\n");
+  fs.writeFileSync(path.join(localRollyDataDir, "contracts.v2.json"), "{}\n");
 
   withEnv({ ROLLY_DATA_DIR: undefined }, () => {
     process.chdir(projectDir);
@@ -128,44 +127,7 @@ test("gameplay progress port still throws when contracts.v1.json exists but is i
 
       assert.throws(
         () => services.createSqliteContractsGameplayProgressPort(db),
-        /contractsV1\.(daily|weekly)|at least/i,
-      );
-    } finally {
-      process.chdir(originalCwd);
-      clearContractsModuleGraph();
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
-  });
-});
-
-test("contracts services fall back to contracts.v2.json when contracts.v1.json is absent", () => {
-  const originalCwd = process.cwd();
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contracts-services-v2-"));
-  const projectDir = path.join(tempRoot, "project");
-  const localRollyDataDir = path.join(projectDir, "rolly-data");
-
-  fs.mkdirSync(projectDir, { recursive: true });
-  fs.cpSync(exampleRollyDataDir, localRollyDataDir, { recursive: true });
-  fs.rmSync(path.join(localRollyDataDir, "contracts.v1.json"), { force: true });
-  fs.copyFileSync(
-    path.join(exampleRollyDataDir, "contracts.v1.json"),
-    path.join(localRollyDataDir, "contracts.v2.json"),
-  );
-
-  withEnv({ ROLLY_DATA_DIR: undefined }, () => {
-    process.chdir(projectDir);
-    clearContractsModuleGraph();
-
-    try {
-      const services = moduleRequire("./services") as typeof import("./services");
-      const db = new Database(":memory:");
-      initializeDatabaseSchema(db);
-
-      assert.notEqual(services.createSqliteContractsGameplayProgressPort(db), undefined);
-      assert.doesNotThrow(() =>
-        services
-          .createSqliteContractsRotationResolver(db)
-          .resolveActiveRotation(new Date("2026-03-28T11:00:00.000Z")),
+        /contracts\.(daily|weekly)|at least/i,
       );
     } finally {
       process.chdir(originalCwd);

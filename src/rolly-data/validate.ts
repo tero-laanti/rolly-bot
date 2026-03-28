@@ -11,7 +11,7 @@ import type {
   DiceContractObjectiveData,
   DiceContractObjectiveType,
   DiceContractRewardData,
-  DiceContractsV1Data,
+  DiceContractsData,
   DicePvpData,
   DiceItemData,
   DiceItemEffect,
@@ -1687,29 +1687,27 @@ export const parseWorldBossData = (value: unknown): DiceWorldBossData => {
   return parsed;
 };
 
-export const parseDiceContractsV1Data = (value: unknown): DiceContractsV1Data => {
-  const record = assertRecord(value, "contractsV1");
+export const parseDiceContractsData = (value: unknown): DiceContractsData => {
+  const record = assertRecord(value, "contracts");
   if (!Array.isArray(record.daily)) {
-    throw new Error("contractsV1.daily must be an array.");
+    throw new Error("contracts.daily must be an array.");
   }
   if (!Array.isArray(record.weekly)) {
-    throw new Error("contractsV1.weekly must be an array.");
+    throw new Error("contracts.weekly must be an array.");
   }
 
   const daily = record.daily.map((entry, index) =>
-    readContract(entry, `contractsV1.daily[${index}]`),
+    readContract(entry, `contracts.daily[${index}]`),
   );
   const weekly = record.weekly.map((entry, index) =>
-    readContract(entry, `contractsV1.weekly[${index}]`),
+    readContract(entry, `contracts.weekly[${index}]`),
   );
 
   if (daily.length < minimumDailyContracts) {
-    throw new Error(`contractsV1.daily must include at least ${minimumDailyContracts} contracts.`);
+    throw new Error(`contracts.daily must include at least ${minimumDailyContracts} contracts.`);
   }
   if (weekly.length < minimumWeeklyContracts) {
-    throw new Error(
-      `contractsV1.weekly must include at least ${minimumWeeklyContracts} contracts.`,
-    );
+    throw new Error(`contracts.weekly must include at least ${minimumWeeklyContracts} contracts.`);
   }
 
   const ids = new Set<string>();
@@ -1721,10 +1719,10 @@ export const parseDiceContractsV1Data = (value: unknown): DiceContractsV1Data =>
   }
 
   daily.forEach((contract, index) =>
-    validateContractDiscordText(contract, `contractsV1.daily[${index}]`, "daily"),
+    validateContractDiscordText(contract, `contracts.daily[${index}]`, "daily"),
   );
   weekly.forEach((contract, index) =>
-    validateContractDiscordText(contract, `contractsV1.weekly[${index}]`, "weekly"),
+    validateContractDiscordText(contract, `contracts.weekly[${index}]`, "weekly"),
   );
 
   return {

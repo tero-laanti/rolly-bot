@@ -366,9 +366,9 @@ const initializeRollyData = (): void => {
   }
 
   console.log(`[rolly-data] Loaded game data from ${sourceDescription}.`);
-  if (loaded.contractsV1 === null) {
+  if (loaded.contracts === null) {
     console.warn(
-      "[contracts] contracts.v1.json is missing from local rolly-data. Contracts are disabled.",
+      "[contracts] contracts.v2.json is missing from local rolly-data. Contracts are disabled.",
     );
   }
 };

@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   parseDiceAchievements,
   parseDiceBalance,
-  parseDiceContractsV1Data,
+  parseDiceContractsData,
   parseDiceItems,
   parseWorldBossData,
   parseIntroPostsV1Data,
@@ -84,7 +84,7 @@ const createDiceItemInput = () => ({
   },
 });
 
-type ContractsV1Input = {
+type ContractsInput = {
   daily: Array<{
     id: string;
     title: string;
@@ -113,7 +113,7 @@ type ContractsV1Input = {
   }>;
 };
 
-const createContractsV1Input = (): ContractsV1Input => ({
+const createContractsInput = (): ContractsInput => ({
   daily: [
     {
       id: "daily-roll-streak",
@@ -569,8 +569,8 @@ test("parseWorldBossData rejects boss names that overflow World Boss titles", ()
   );
 });
 
-test("parseDiceContractsV1Data accepts supported objective and reward shapes", () => {
-  const parsed = parseDiceContractsV1Data(createContractsV1Input());
+test("parseDiceContractsData accepts supported objective and reward shapes", () => {
+  const parsed = parseDiceContractsData(createContractsInput());
 
   assert.equal(parsed.daily.length, 3);
   assert.equal(parsed.weekly.length, 2);
@@ -578,50 +578,50 @@ test("parseDiceContractsV1Data accepts supported objective and reward shapes", (
   assert.equal(parsed.weekly[0]?.objective.type, "world_boss_join_count");
 });
 
-test("parseDiceContractsV1Data rejects unsupported objective types", () => {
-  const input = createContractsV1Input();
+test("parseDiceContractsData rejects unsupported objective types", () => {
+  const input = createContractsInput();
   input.daily[0].objective.type = "item_use_count";
 
   assert.throws(
-    () => parseDiceContractsV1Data(input),
-    /contractsV1\.daily\[0\]\.objective\.type must be one of/i,
+    () => parseDiceContractsData(input),
+    /contracts\.daily\[0\]\.objective\.type must be one of/i,
   );
 });
 
-test("parseDiceContractsV1Data rejects rewards without pips or fame", () => {
-  const input = createContractsV1Input();
+test("parseDiceContractsData rejects rewards without pips or fame", () => {
+  const input = createContractsInput();
   input.daily[0].reward = {};
 
   assert.throws(
-    () => parseDiceContractsV1Data(input),
-    /contractsV1\.daily\[0\]\.reward must include pips and\/or fame/i,
+    () => parseDiceContractsData(input),
+    /contracts\.daily\[0\]\.reward must include pips and\/or fame/i,
   );
 });
 
-test("parseDiceContractsV1Data rejects duplicate ids across daily and weekly contracts", () => {
-  const input = createContractsV1Input();
+test("parseDiceContractsData rejects duplicate ids across daily and weekly contracts", () => {
+  const input = createContractsInput();
   input.weekly[0].id = input.daily[0].id;
 
-  assert.throws(() => parseDiceContractsV1Data(input), /Duplicate contract id/i);
+  assert.throws(() => parseDiceContractsData(input), /Duplicate contract id/i);
 });
 
-test("parseDiceContractsV1Data rejects insufficient daily contract catalog size", () => {
-  const input = createContractsV1Input();
+test("parseDiceContractsData rejects insufficient daily contract catalog size", () => {
+  const input = createContractsInput();
   input.daily = input.daily.slice(0, 2);
 
   assert.throws(
-    () => parseDiceContractsV1Data(input),
-    /contractsV1\.daily must include at least 3 contracts/i,
+    () => parseDiceContractsData(input),
+    /contracts\.daily must include at least 3 contracts/i,
   );
 });
 
-test("parseDiceContractsV1Data rejects contract previews that exceed Discord message limits", () => {
-  const input = createContractsV1Input();
+test("parseDiceContractsData rejects contract previews that exceed Discord message limits", () => {
+  const input = createContractsInput();
   input.daily[0].description = "A".repeat(2_100);
 
   assert.throws(
-    () => parseDiceContractsV1Data(input),
-    /contractsV1\.daily\[0\] as rendered in \/contracts must be <= 2000 characters/i,
+    () => parseDiceContractsData(input),
+    /contracts\.daily\[0\] as rendered in \/contracts must be <= 2000 characters/i,
   );
 });
 

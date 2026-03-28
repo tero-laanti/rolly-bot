@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  getDiceContractsV1Data,
+  getDiceContractsData,
   getRandomEventContentPackV1,
   getRollyDataSourceDescription,
 } from "./load";
@@ -32,7 +32,7 @@ test("example rolly-data source loads a non-empty random-event pack", () => {
 });
 
 test("example rolly-data source loads contracts with daily and weekly entries", () => {
-  const contracts = getDiceContractsV1Data();
+  const contracts = getDiceContractsData();
 
   assert.ok(
     contracts.daily.length > 0 && contracts.weekly.length > 0,

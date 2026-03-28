@@ -166,7 +166,7 @@ export type DiceContractData = {
   reward: DiceContractRewardData;
 };
 
-export type DiceContractsV1Data = {
+export type DiceContractsData = {
   daily: DiceContractData[];
   weekly: DiceContractData[];
 };
@@ -329,7 +329,7 @@ export type LoadedRollyData = {
   source: RollyDataSource;
   achievements: DiceAchievementData[];
   casinoV1: DiceCasinoData;
-  contractsV1: DiceContractsV1Data | null;
+  contracts: DiceContractsData | null;
   diceBalance: DiceBalanceData;
   introPostsV1: IntroPostsV1Data;
   pvp: DicePvpData;

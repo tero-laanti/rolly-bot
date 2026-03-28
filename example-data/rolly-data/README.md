@@ -10,7 +10,7 @@ This directory contains safe example data for the public `rolly-bot` repository.
 - Files expected in a data directory:
   - `achievements.json`
   - `casino.v1.json`
-  - `contracts.v1.json`
+  - `contracts.v2.json`
   - `dice-balance.json`
   - `intro-posts.v1.json`
   - `items.v1.json`
@@ -21,6 +21,6 @@ This directory contains safe example data for the public `rolly-bot` repository.
 
 These example values are safe to expose and do not need to match the private game data used outside this public repo.
 
-`contracts.v1.json` powers the shared `/contracts` view plus the auto-claimed gameplay contract progression hooks.
+`contracts.v2.json` powers the shared `/contracts` view plus the auto-claimed gameplay contract progression hooks.
 
 For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

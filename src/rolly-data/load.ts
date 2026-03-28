@@ -4,7 +4,7 @@ import type {
   DiceAchievementData,
   DiceCasinoData,
   DiceBalanceData,
-  DiceContractsV1Data,
+  DiceContractsData,
   DiceItemData,
   DicePvpData,
   DiceRandomEventBalanceData,
@@ -17,7 +17,7 @@ import {
   parseDiceAchievements,
   parseDiceCasinoData,
   parseDiceBalance,
-  parseDiceContractsV1Data,
+  parseDiceContractsData,
   parseDicePvpData,
   parseDiceItems,
   parseWorldBossData,
@@ -30,7 +30,6 @@ import type { RandomEventScenario } from "../dice/random-events/domain/content";
 
 const achievementsFileName = "achievements.json";
 const casinoV1FileName = "casino.v1.json";
-const contractsV1FileName = "contracts.v1.json";
 const contractsV2FileName = "contracts.v2.json";
 const diceBalanceFileName = "dice-balance.json";
 const introPostsV1FileName = "intro-posts.v1.json";
@@ -86,21 +85,19 @@ const readOptionalJsonFile = (source: RollyDataSource, fileName: string): unknow
   }
 };
 
-const loadContractsV1 = (source: RollyDataSource): DiceContractsV1Data | null => {
-  const rawContracts =
-    readOptionalJsonFile(source, contractsV1FileName) ??
-    readOptionalJsonFile(source, contractsV2FileName);
+const loadContracts = (source: RollyDataSource): DiceContractsData | null => {
+  const rawContracts = readOptionalJsonFile(source, contractsV2FileName);
   if (rawContracts === null) {
     if (source.kind === "local") {
       return null;
     }
 
     throw new Error(
-      `Required rolly-data file is missing: ${getRollyDataFilePath(source, contractsV1FileName)} or ${getRollyDataFilePath(source, contractsV2FileName)}`,
+      `Required rolly-data file is missing: ${getRollyDataFilePath(source, contractsV2FileName)}`,
     );
   }
 
-  return parseDiceContractsV1Data(rawContracts);
+  return parseDiceContractsData(rawContracts);
 };
 
 const loadRollyData = (): LoadedRollyData => {
@@ -113,7 +110,7 @@ const loadRollyData = (): LoadedRollyData => {
     source,
     achievements: parseDiceAchievements(readJsonFile(source, achievementsFileName)),
     casinoV1: parseDiceCasinoData(readJsonFile(source, casinoV1FileName)),
-    contractsV1: loadContractsV1(source),
+    contracts: loadContracts(source),
     diceBalance: parseDiceBalance(readJsonFile(source, diceBalanceFileName)),
     introPostsV1: parseIntroPostsV1Data(readJsonFile(source, introPostsV1FileName)),
     itemsV1,
@@ -157,19 +154,19 @@ export const getDiceCasinoData = (): DiceCasinoData => {
   return getRollyData().casinoV1;
 };
 
-export const getDiceContractsV1Data = (): DiceContractsV1Data => {
+export const getDiceContractsData = (): DiceContractsData => {
   const loaded = getRollyData();
-  if (loaded.contractsV1 === null) {
+  if (loaded.contracts === null) {
     throw new Error(
-      `Contracts data is unavailable from ${describeRollyDataSource(loaded.source)}. Add contracts.v1.json or contracts.v2.json to enable contracts.`,
+      `Contracts data is unavailable from ${describeRollyDataSource(loaded.source)}. Add contracts.v2.json to enable contracts.`,
     );
   }
 
-  return loaded.contractsV1;
+  return loaded.contracts;
 };
 
-export const getOptionalDiceContractsV1Data = (): DiceContractsV1Data | null => {
-  return getRollyData().contractsV1;
+export const getOptionalDiceContractsData = (): DiceContractsData | null => {
+  return getRollyData().contracts;
 };
 
 export const getDiceItemsData = (): DiceItemData[] => {
