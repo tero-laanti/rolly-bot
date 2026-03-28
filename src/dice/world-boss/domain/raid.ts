@@ -1,39 +1,39 @@
-import { getDiceRaidData } from "../../../rolly-data/load";
+import { getWorldBossData } from "../../../rolly-data/load";
 
-export type RaidRewardDefinition = {
+export type WorldBossRewardDefinition = {
   pips: number;
   rollPassMultiplier: number;
   rollPassRolls: number;
 };
 
-export type RaidBossDefinition = {
+export type WorldBossDefinition = {
   name: string;
   level: number;
   maxHp: number;
-  reward: RaidRewardDefinition;
+  reward: WorldBossRewardDefinition;
 };
 
-const getRaidBalance = () => {
-  return getDiceRaidData();
+const getWorldBossBalance = () => {
+  return getWorldBossData();
 };
 
-export const calculateRaidParticipantStrength = (prestige: number): number => {
+export const calculateWorldBossParticipantStrength = (prestige: number): number => {
   const normalizedPrestige = Math.max(0, Math.floor(prestige));
-  return getRaidBalance().participantStrength.prestigeMultiplier ** normalizedPrestige;
+  return getWorldBossBalance().participantStrength.prestigeMultiplier ** normalizedPrestige;
 };
 
 const clampBossLevel = (value: number): number => {
-  const { maxBossLevel } = getRaidBalance().bossBalance;
+  const { maxBossLevel } = getWorldBossBalance().bossBalance;
   return Math.max(1, Math.min(maxBossLevel, Math.round(value)));
 };
 
 const getBossLevelWeightRatio = (): number => {
-  const { levelHalfLifeLevels } = getRaidBalance().bossBalance;
+  const { levelHalfLifeLevels } = getWorldBossBalance().bossBalance;
   return Math.pow(0.5, 1 / levelHalfLifeLevels);
 };
 
-export const rollRaidBossLevel = (random: () => number = Math.random): number => {
-  const { maxBossLevel } = getRaidBalance().bossBalance;
+export const rollWorldBossLevel = (random: () => number = Math.random): number => {
+  const { maxBossLevel } = getWorldBossBalance().bossBalance;
   if (maxBossLevel <= 1) {
     return 1;
   }
@@ -54,16 +54,16 @@ export const rollRaidBossLevel = (random: () => number = Math.random): number =>
   return maxBossLevel;
 };
 
-export const calculateRaidBossMaxHp = (bossLevel: number): number => {
-  return calculateRaidBossMaxHpForStrength(bossLevel, 1);
+export const calculateWorldBossMaxHp = (bossLevel: number): number => {
+  return calculateWorldBossMaxHpForStrength(bossLevel, 1);
 };
 
-export const calculateRaidBossMaxHpForStrength = (
+export const calculateWorldBossMaxHpForStrength = (
   bossLevel: number,
   raiderStrength: number,
 ): number => {
   const normalizedBossLevel = clampBossLevel(bossLevel);
-  const { baseHp, hpIncreasePerBossLevelPercent } = getRaidBalance().bossBalance;
+  const { baseHp, hpIncreasePerBossLevelPercent } = getWorldBossBalance().bossBalance;
   const hpMultiplier = (1 + hpIncreasePerBossLevelPercent / 100) ** (normalizedBossLevel - 1);
   const baseLevelHp = Math.max(1, Math.round(baseHp * hpMultiplier));
   const normalizedRaiderStrength = Math.max(1, raiderStrength);
@@ -71,14 +71,14 @@ export const calculateRaidBossMaxHpForStrength = (
 };
 
 const pickBossName = (random: () => number): string => {
-  const { prefixes, suffixes } = getRaidBalance().bossNames;
+  const { prefixes, suffixes } = getWorldBossBalance().bossNames;
   const prefix = prefixes[Math.floor(random() * prefixes.length)] ?? prefixes[0];
   const suffix = suffixes[Math.floor(random() * suffixes.length)] ?? suffixes[0];
   return `${prefix} ${suffix}`;
 };
 
-const resolveRaidRewardPips = (bossLevel: number): number => {
-  const reward = getRaidBalance().reward;
+const resolveWorldBossRewardPips = (bossLevel: number): number => {
+  const reward = getWorldBossBalance().reward;
 
   if ("pipsFormula" in reward) {
     const { flatPips, flatPipsThroughBossLevel } = reward.pipsFormula;
@@ -98,8 +98,8 @@ const resolveRaidRewardPips = (bossLevel: number): number => {
   return matchedTier?.pips ?? 0;
 };
 
-const resolveRaidRewardRollPassMultiplier = (bossLevel: number): number => {
-  const { rollPassBuff } = getRaidBalance().reward;
+const resolveWorldBossRewardRollPassMultiplier = (bossLevel: number): number => {
+  const { rollPassBuff } = getWorldBossBalance().reward;
   const scaledMultiplier = Math.round(bossLevel * rollPassBuff.multiplierPerBossLevel);
   return Math.max(
     rollPassBuff.minimumMultiplier,
@@ -107,68 +107,71 @@ const resolveRaidRewardRollPassMultiplier = (bossLevel: number): number => {
   );
 };
 
-const resolveRaidRewardRollPassRolls = (bossLevel: number): number => {
-  const { rollPassBuff } = getRaidBalance().reward;
+const resolveWorldBossRewardRollPassRolls = (bossLevel: number): number => {
+  const { rollPassBuff } = getWorldBossBalance().reward;
   const scaledRolls = Math.ceil(bossLevel / rollPassBuff.rollsPerBossLevelDivisor);
   return Math.max(rollPassBuff.minimumRolls, Math.min(rollPassBuff.maximumRolls, scaledRolls));
 };
 
-export const getDefaultRaidReward = (bossLevel: number): RaidRewardDefinition => {
+export const getDefaultWorldBossReward = (bossLevel: number): WorldBossRewardDefinition => {
   return {
-    pips: resolveRaidRewardPips(bossLevel),
-    rollPassMultiplier: resolveRaidRewardRollPassMultiplier(bossLevel),
-    rollPassRolls: resolveRaidRewardRollPassRolls(bossLevel),
+    pips: resolveWorldBossRewardPips(bossLevel),
+    rollPassMultiplier: resolveWorldBossRewardRollPassMultiplier(bossLevel),
+    rollPassRolls: resolveWorldBossRewardRollPassRolls(bossLevel),
   };
 };
 
-const buildRaidRewardSummary = (reward: RaidRewardDefinition, pipText: string): string => {
+const buildWorldBossRewardSummary = (
+  reward: WorldBossRewardDefinition,
+  pipText: string,
+): string => {
   const rollBuffText = `x${reward.rollPassMultiplier} roll buff for the next ${reward.rollPassRolls} /roll${reward.rollPassRolls === 1 ? "" : "s"}`;
   return `${pipText} and ${rollBuffText} per eligible player`;
 };
 
-export const describeRaidReward = (reward: RaidRewardDefinition): string => {
+export const describeWorldBossReward = (reward: WorldBossRewardDefinition): string => {
   const pipText = `${reward.pips} pip${reward.pips === 1 ? "" : "s"}`;
-  return buildRaidRewardSummary(reward, pipText);
+  return buildWorldBossRewardSummary(reward, pipText);
 };
 
-export const describeAppliedRaidReward = (
-  reward: RaidRewardDefinition,
+export const describeAppliedWorldBossReward = (
+  reward: WorldBossRewardDefinition,
   awardedPipAmounts: readonly number[],
 ): string => {
   const normalizedAwardedPips = awardedPipAmounts
     .map((amount) => Math.max(0, Math.floor(amount)))
     .filter((amount) => amount > 0);
   if (normalizedAwardedPips.length < 1) {
-    return describeRaidReward(reward);
+    return describeWorldBossReward(reward);
   }
 
   const minimumAwardedPips = Math.min(...normalizedAwardedPips);
   const maximumAwardedPips = Math.max(...normalizedAwardedPips);
   if (minimumAwardedPips === maximumAwardedPips) {
     const pipText = `${minimumAwardedPips} pip${minimumAwardedPips === 1 ? "" : "s"}`;
-    return buildRaidRewardSummary(reward, pipText);
+    return buildWorldBossRewardSummary(reward, pipText);
   }
 
-  return buildRaidRewardSummary(
+  return buildWorldBossRewardSummary(
     reward,
     `${minimumAwardedPips}-${maximumAwardedPips} pips, based on permanent bonuses`,
   );
 };
 
-export const createRaidBoss = ({
+export const createWorldBoss = ({
   random = Math.random,
   raiderStrength = 1,
 }: {
   random?: () => number;
   raiderStrength?: number;
-} = {}): RaidBossDefinition => {
-  const level = rollRaidBossLevel(random);
-  const reward = getDefaultRaidReward(level);
+} = {}): WorldBossDefinition => {
+  const level = rollWorldBossLevel(random);
+  const reward = getDefaultWorldBossReward(level);
 
   return {
     name: pickBossName(random),
     level,
-    maxHp: calculateRaidBossMaxHpForStrength(level, raiderStrength),
+    maxHp: calculateWorldBossMaxHpForStrength(level, raiderStrength),
     reward,
   };
 };

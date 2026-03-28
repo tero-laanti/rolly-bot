@@ -50,8 +50,8 @@ test("active World Boss thread names are truncated to Discord limits", async () 
     const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
     const originalGetDatabase = sharedDb.getDatabase;
     const raidDomain = moduleRequire("../domain/raid") as typeof import("../domain/raid");
-    const originalCreateRaidBoss = raidDomain.createRaidBoss;
-    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+    const originalCreateWorldBoss = raidDomain.createWorldBoss;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -59,9 +59,9 @@ test("active World Boss thread names are truncated to Discord limits", async () 
       const longBossName = "Ancient Guardian ".repeat(10).trim();
       (
         raidDomain as {
-          createRaidBoss: typeof raidDomain.createRaidBoss;
+          createWorldBoss: typeof raidDomain.createWorldBoss;
         }
-      ).createRaidBoss = () => ({
+      ).createWorldBoss = () => ({
         name: longBossName,
         level: 99,
         maxHp: 9999,
@@ -79,13 +79,13 @@ test("active World Boss thread names are truncated to Discord limits", async () 
         startThread: async (options: { name: string; autoArchiveDuration: number }) => {
           startedThreadNames.push(options.name);
           return {
-            id: "raid-thread-1",
+            id: "world-boss-thread-1",
           };
         },
       };
       const announcementMessage = {
-        id: "raid-message-1",
-        channelId: "raid-channel",
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
         channel: {
           send: async () => activeMessage,
         },
@@ -98,7 +98,7 @@ test("active World Boss thread names are truncated to Discord limits", async () 
       const client = {
         channels: {
           fetch: async (channelId: string) => {
-            if (channelId === "raid-channel") {
+            if (channelId === "world-boss-channel") {
               return raidChannel;
             }
 
@@ -107,18 +107,18 @@ test("active World Boss thread names are truncated to Discord limits", async () 
         },
       } as never;
 
-      const { createRaidsLiveRuntime } = moduleRequire(
+      const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
       ) as typeof import("./live-runtime");
-      const raidRuntime = createRaidsLiveRuntime({
+      const raidRuntime = createWorldBossLiveRuntime({
         client,
         config: {
           enabled: true,
           inactiveReason: null,
-          channelId: "raid-channel",
+          channelId: "world-boss-channel",
           joinLeadMs: 50,
           activeDurationMs: 60_000,
-          targetRaidsPerDay: 0,
+          targetWorldBossesPerDay: 0,
           minGapMs: 1,
           retryDelayMs: 1,
           jitterRatio: 0,
@@ -136,14 +136,14 @@ test("active World Boss thread names are truncated to Discord limits", async () 
       });
       runtime = raidRuntime;
 
-      const triggerResult = await raidRuntime.triggerRaidNow();
+      const triggerResult = await raidRuntime.triggerWorldBossNow();
       assert.equal(triggerResult.created, true);
       if (!triggerResult.created) {
-        throw new Error("Expected live raid to be created.");
+        throw new Error("Expected live World Boss to be created.");
       }
 
       await raidRuntime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: {
           id: "user-1",
         },
@@ -171,16 +171,16 @@ test("active World Boss thread names are truncated to Discord limits", async () 
       ).getDatabase = originalGetDatabase;
       (
         raidDomain as {
-          createRaidBoss: typeof raidDomain.createRaidBoss;
+          createWorldBoss: typeof raidDomain.createWorldBoss;
         }
-      ).createRaidBoss = originalCreateRaidBoss;
+      ).createWorldBoss = originalCreateWorldBoss;
       db.close();
       clearModules(modulePaths);
     }
   });
 });
 
-test("raid join publishes achievement announcements even if the signup prompt edit fails", async () => {
+test("World Boss join publishes achievement announcements even if the signup prompt edit fails", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
@@ -200,7 +200,7 @@ test("raid join publishes achievement announcements even if the signup prompt ed
       "../../progression/application/achievement-awards",
     ) as typeof import("../../progression/application/achievement-awards");
     const originalAwardManualDiceAchievements = achievementAwards.awardManualDiceAchievements;
-    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -208,9 +208,9 @@ test("raid join publishes achievement announcements even if the signup prompt ed
         achievementAwards as {
           awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
         }
-      ).awardManualDiceAchievements = () => ["raid-join-test"];
+      ).awardManualDiceAchievements = () => ["world-boss-join-test"];
 
-      const { createRaidsLiveRuntime } = moduleRequire(
+      const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
       ) as typeof import("./live-runtime");
       const publishedPayloads: Array<{
@@ -246,8 +246,8 @@ test("raid join publishes achievement announcements even if the signup prompt ed
         },
       };
       announcementMessage = {
-        id: "raid-message-1",
-        channelId: "raid-channel",
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
         channel: raidChannel,
         edit: async () => {
           throw new Error("prompt edit failed");
@@ -257,7 +257,7 @@ test("raid join publishes achievement announcements even if the signup prompt ed
       const client = {
         channels: {
           fetch: async (channelId: string) => {
-            if (channelId === "raid-channel") {
+            if (channelId === "world-boss-channel") {
               return raidChannel;
             }
 
@@ -270,15 +270,15 @@ test("raid join publishes achievement announcements even if the signup prompt ed
         },
       } as never;
 
-      runtime = createRaidsLiveRuntime({
+      runtime = createWorldBossLiveRuntime({
         client,
         config: {
           enabled: true,
           inactiveReason: null,
-          channelId: "raid-channel",
+          channelId: "world-boss-channel",
           joinLeadMs: 60_000,
           activeDurationMs: 60_000,
-          targetRaidsPerDay: 0,
+          targetWorldBossesPerDay: 0,
           minGapMs: 1,
           retryDelayMs: 1,
           jitterRatio: 0,
@@ -295,16 +295,16 @@ test("raid join publishes achievement announcements even if the signup prompt ed
         },
       });
 
-      const triggerResult = await runtime.triggerRaidNow();
+      const triggerResult = await runtime.triggerWorldBossNow();
       assert.equal(triggerResult.created, true);
       if (!triggerResult.created) {
-        throw new Error("Expected live raid to be created.");
+        throw new Error("Expected live World Boss to be created.");
       }
 
       let deferred = false;
       const replies: Array<{ content: string; ephemeral: boolean }> = [];
       await runtime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: {
           id: "user-1",
         },
@@ -321,7 +321,7 @@ test("raid join publishes achievement announcements even if the signup prompt ed
       assert.deepEqual(replies, []);
       assert.deepEqual(publishedPayloads, [
         {
-          content: "<@user-1> Achievement unlocked: raid-join-test.",
+          content: "<@user-1> Achievement unlocked: world-boss-join-test.",
           allowedMentions: {
             parse: [],
             users: ["user-1"],
@@ -369,7 +369,7 @@ test("World Boss join still succeeds when contract progress recording fails", as
     ) as typeof import("../../contracts/infrastructure/sqlite/services");
     const originalCreateSqliteContractsGameplayProgressPort =
       contractsServices.createSqliteContractsGameplayProgressPort;
-    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -388,8 +388,8 @@ test("World Boss join still succeeds when contract progress recording fails", as
 
       const warnings: unknown[][] = [];
       const announcementMessage = {
-        id: "raid-message-1",
-        channelId: "raid-channel",
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
         channel: {
           send: async () => announcementMessage,
         },
@@ -402,7 +402,7 @@ test("World Boss join still succeeds when contract progress recording fails", as
       const client = {
         channels: {
           fetch: async (channelId: string) => {
-            if (channelId === "raid-channel") {
+            if (channelId === "world-boss-channel") {
               return raidChannel;
             }
 
@@ -411,18 +411,18 @@ test("World Boss join still succeeds when contract progress recording fails", as
         },
       } as never;
 
-      const { createRaidsLiveRuntime } = moduleRequire(
+      const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
       ) as typeof import("./live-runtime");
-      runtime = createRaidsLiveRuntime({
+      runtime = createWorldBossLiveRuntime({
         client,
         config: {
           enabled: true,
           inactiveReason: null,
-          channelId: "raid-channel",
+          channelId: "world-boss-channel",
           joinLeadMs: 60_000,
           activeDurationMs: 60_000,
-          targetRaidsPerDay: 0,
+          targetWorldBossesPerDay: 0,
           minGapMs: 1,
           retryDelayMs: 1,
           jitterRatio: 0,
@@ -441,14 +441,14 @@ test("World Boss join still succeeds when contract progress recording fails", as
         },
       });
 
-      const triggerResult = await runtime.triggerRaidNow();
+      const triggerResult = await runtime.triggerWorldBossNow();
       assert.equal(triggerResult.created, true);
       if (!triggerResult.created) {
-        throw new Error("Expected live raid to be created.");
+        throw new Error("Expected live World Boss to be created.");
       }
 
       await runtime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: {
           id: "user-1",
         },
@@ -457,7 +457,7 @@ test("World Boss join still succeeds when contract progress recording fails", as
         reply: async () => undefined,
       } as never);
 
-      const snapshot = runtime.getLiveRaidsSnapshot();
+      const snapshot = runtime.getLiveWorldBossesSnapshot();
       assert.equal(snapshot.length, 1);
       assert.equal(snapshot[0]?.participantCount, 1);
       assert.equal(warnings.length, 1);
@@ -504,7 +504,7 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
     ) as typeof import("../../contracts/infrastructure/sqlite/services");
     const originalCreateSqliteContractsGameplayProgressPort =
       contractsServices.createSqliteContractsGameplayProgressPort;
-    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -516,8 +516,8 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
 
       const warnings: unknown[][] = [];
       const announcementMessage = {
-        id: "raid-message-1",
-        channelId: "raid-channel",
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
         channel: {
           send: async () => announcementMessage,
         },
@@ -530,7 +530,7 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
       const client = {
         channels: {
           fetch: async (channelId: string) => {
-            if (channelId === "raid-channel") {
+            if (channelId === "world-boss-channel") {
               return raidChannel;
             }
 
@@ -539,18 +539,18 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
         },
       } as never;
 
-      const { createRaidsLiveRuntime } = moduleRequire(
+      const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
       ) as typeof import("./live-runtime");
-      runtime = createRaidsLiveRuntime({
+      runtime = createWorldBossLiveRuntime({
         client,
         config: {
           enabled: true,
           inactiveReason: null,
-          channelId: "raid-channel",
+          channelId: "world-boss-channel",
           joinLeadMs: 60_000,
           activeDurationMs: 60_000,
-          targetRaidsPerDay: 0,
+          targetWorldBossesPerDay: 0,
           minGapMs: 1,
           retryDelayMs: 1,
           jitterRatio: 0,
@@ -569,14 +569,14 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
         },
       });
 
-      const triggerResult = await runtime.triggerRaidNow();
+      const triggerResult = await runtime.triggerWorldBossNow();
       assert.equal(triggerResult.created, true);
       if (!triggerResult.created) {
-        throw new Error("Expected live raid to be created.");
+        throw new Error("Expected live World Boss to be created.");
       }
 
       await runtime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: {
           id: "user-1",
         },
@@ -585,7 +585,7 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
         reply: async () => undefined,
       } as never);
 
-      const snapshot = runtime.getLiveRaidsSnapshot();
+      const snapshot = runtime.getLiveWorldBossesSnapshot();
       assert.equal(snapshot.length, 1);
       assert.equal(snapshot[0]?.participantCount, 1);
       assert.equal(warnings.length, 0);
@@ -611,7 +611,7 @@ test("World Boss join still succeeds when contracts are disabled at runtime wiri
   });
 });
 
-test("raiders can leave during signup and rejoining the same raid does not republish join achievements", async () => {
+test("players can leave during signup and rejoining the same World Boss does not republish join achievements", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
@@ -637,7 +637,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
       "../../progression/application/achievement-awards",
     ) as typeof import("../../progression/application/achievement-awards");
     const originalAwardManualDiceAchievements = achievementAwards.awardManualDiceAchievements;
-    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -645,7 +645,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
         achievementAwards as {
           awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
         }
-      ).awardManualDiceAchievements = () => ["raid-join-test"];
+      ).awardManualDiceAchievements = () => ["world-boss-join-test"];
       const recordedWorldBossJoins: string[] = [];
       (
         contractsServices as {
@@ -661,7 +661,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
         },
       });
 
-      const { createRaidsLiveRuntime } = moduleRequire(
+      const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
       ) as typeof import("./live-runtime");
       const publishedPayloads: Array<{
@@ -673,8 +673,8 @@ test("raiders can leave during signup and rejoining the same raid does not repub
       }> = [];
       const announcementEdits: unknown[] = [];
       const announcementMessage = {
-        id: "raid-message-1",
-        channelId: "raid-channel",
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
         channel: {
           send: async () => announcementMessage,
         },
@@ -704,7 +704,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
       const client = {
         channels: {
           fetch: async (channelId: string) => {
-            if (channelId === "raid-channel") {
+            if (channelId === "world-boss-channel") {
               return raidChannel;
             }
 
@@ -717,15 +717,15 @@ test("raiders can leave during signup and rejoining the same raid does not repub
         },
       } as never;
 
-      runtime = createRaidsLiveRuntime({
+      runtime = createWorldBossLiveRuntime({
         client,
         config: {
           enabled: true,
           inactiveReason: null,
-          channelId: "raid-channel",
+          channelId: "world-boss-channel",
           joinLeadMs: 60_000,
           activeDurationMs: 60_000,
-          targetRaidsPerDay: 0,
+          targetWorldBossesPerDay: 0,
           minGapMs: 1,
           retryDelayMs: 1,
           jitterRatio: 0,
@@ -742,14 +742,14 @@ test("raiders can leave during signup and rejoining the same raid does not repub
         },
       });
 
-      const triggerResult = await runtime.triggerRaidNow();
+      const triggerResult = await runtime.triggerWorldBossNow();
       assert.equal(triggerResult.created, true);
       if (!triggerResult.created) {
-        throw new Error("Expected live raid to be created.");
+        throw new Error("Expected live World Boss to be created.");
       }
 
       await runtime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: { id: "user-1" },
         client,
         deferUpdate: async () => undefined,
@@ -757,7 +757,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
       } as never);
 
       await runtime.handleButtonInteraction({
-        customId: `raid-leave:${triggerResult.raidId}`,
+        customId: `world-boss-leave:${triggerResult.worldBossId}`,
         user: { id: "user-1" },
         client,
         deferUpdate: async () => undefined,
@@ -765,7 +765,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
       } as never);
 
       await runtime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: { id: "user-1" },
         client,
         deferUpdate: async () => undefined,
@@ -773,7 +773,8 @@ test("raiders can leave during signup and rejoining the same raid does not repub
       } as never);
 
       assert.equal(
-        publishedPayloads.filter((payload) => payload.content.includes("raid-join-test")).length,
+        publishedPayloads.filter((payload) => payload.content.includes("world-boss-join-test"))
+          .length,
         1,
       );
       assert.deepEqual(recordedWorldBossJoins, ["user-1"]);
@@ -805,7 +806,7 @@ test("raiders can leave during signup and rejoining the same raid does not repub
   });
 });
 
-test("resolved raids publish achievement announcements even if the active prompt edit fails", async () => {
+test("resolved World Boss fights publish achievement announcements even if the active prompt edit fails", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
@@ -825,7 +826,7 @@ test("resolved raids publish achievement announcements even if the active prompt
       "../../progression/application/achievement-awards",
     ) as typeof import("../../progression/application/achievement-awards");
     const originalAwardManualDiceAchievements = achievementAwards.awardManualDiceAchievements;
-    let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
 
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -834,14 +835,14 @@ test("resolved raids publish achievement announcements even if the active prompt
           awardManualDiceAchievements: typeof achievementAwards.awardManualDiceAchievements;
         }
       ).awardManualDiceAchievements = (_progression, _userId, achievementIds) => {
-        if (achievementIds.includes("raid-first-clear")) {
-          return ["raid-resolve-test"];
+        if (achievementIds.includes("world-boss-first-clear")) {
+          return ["world-boss-resolve-test"];
         }
 
         return [];
       };
 
-      const { createRaidsLiveRuntime } = moduleRequire(
+      const { createWorldBossLiveRuntime } = moduleRequire(
         "./live-runtime",
       ) as typeof import("./live-runtime");
       const publishedPayloads: Array<{
@@ -864,12 +865,12 @@ test("resolved raids publish achievement announcements even if the active prompt
           return payload;
         },
         startThread: async () => ({
-          id: "raid-thread-1",
+          id: "world-boss-thread-1",
         }),
       };
       const announcementMessage = {
-        id: "raid-message-1",
-        channelId: "raid-channel",
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
         channel: {
           send: async () => activeMessage,
         },
@@ -899,7 +900,7 @@ test("resolved raids publish achievement announcements even if the active prompt
       const client = {
         channels: {
           fetch: async (channelId: string) => {
-            if (channelId === "raid-channel") {
+            if (channelId === "world-boss-channel") {
               return raidChannel;
             }
 
@@ -912,15 +913,15 @@ test("resolved raids publish achievement announcements even if the active prompt
         },
       } as never;
 
-      runtime = createRaidsLiveRuntime({
+      runtime = createWorldBossLiveRuntime({
         client,
         config: {
           enabled: true,
           inactiveReason: null,
-          channelId: "raid-channel",
+          channelId: "world-boss-channel",
           joinLeadMs: 10,
           activeDurationMs: 60_000,
-          targetRaidsPerDay: 0,
+          targetWorldBossesPerDay: 0,
           minGapMs: 1,
           retryDelayMs: 1,
           jitterRatio: 0,
@@ -937,14 +938,14 @@ test("resolved raids publish achievement announcements even if the active prompt
         },
       });
 
-      const triggerResult = await runtime.triggerRaidNow();
+      const triggerResult = await runtime.triggerWorldBossNow();
       assert.equal(triggerResult.created, true);
       if (!triggerResult.created) {
-        throw new Error("Expected live raid to be created.");
+        throw new Error("Expected live World Boss to be created.");
       }
 
       await runtime.handleButtonInteraction({
-        customId: `raid-join:${triggerResult.raidId}`,
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
         user: {
           id: "user-1",
         },
@@ -958,7 +959,7 @@ test("resolved raids publish achievement announcements even if the active prompt
       await new Promise((resolve) => setTimeout(resolve, 30));
 
       const result = runtime.applyDiceRoll({
-        channelId: "raid-thread-1",
+        channelId: "world-boss-thread-1",
         userId: "user-1",
         userMention: "<@user-1>",
         damage: 1_000_000,
@@ -969,7 +970,7 @@ test("resolved raids publish achievement announcements even if the active prompt
 
       assert.deepEqual(publishedPayloads, [
         {
-          content: "<@user-1> Achievement unlocked: raid-resolve-test.",
+          content: "<@user-1> Achievement unlocked: world-boss-resolve-test.",
           allowedMentions: {
             parse: [],
             users: ["user-1"],

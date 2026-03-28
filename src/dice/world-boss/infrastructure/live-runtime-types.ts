@@ -1,31 +1,31 @@
 import type { Message } from "discord.js";
 import type { AchievementAnnouncement } from "../../progression/application/achievement-announcements";
-import type { RaidOutcome, RaidStatus } from "../application/ports";
-import type { RaidRewardDefinition } from "../domain/raid";
+import type { WorldBossOutcome, WorldBossStatus } from "../application/ports";
+import type { WorldBossRewardDefinition } from "../domain/raid";
 
-export type RaidsLiveRuntimeLogger = {
+export type WorldBossLiveRuntimeLogger = {
   info: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
 };
 
-export type ActiveRaidBossRecord = {
+export type ActiveWorldBossBossRecord = {
   name: string;
   level: number;
   currentHp: number;
   maxHp: number;
-  reward: RaidRewardDefinition;
+  reward: WorldBossRewardDefinition;
   totalDamage: number;
   totalAttacks: number;
   damageByUserId: Map<string, number>;
 };
 
-export type ActiveRaidRecord = {
-  raidId: string;
+export type ActiveWorldBossRecord = {
+  worldBossId: string;
   title: string;
   createdAtMs: number;
-  status: RaidStatus;
-  outcome: RaidOutcome | null;
+  status: WorldBossStatus;
+  outcome: WorldBossOutcome | null;
   scheduledStartAtMs: number;
   startedAtMs: number | null;
   expiresAtMs: number | null;
@@ -36,10 +36,10 @@ export type ActiveRaidRecord = {
   resolvedRewardSummary: string | null;
   achievementAnnouncements: AchievementAnnouncement[];
   activeThreadId: string | null;
-  boss: ActiveRaidBossRecord | null;
+  boss: ActiveWorldBossBossRecord | null;
 };
 
-export type ActiveRaidHandles = {
+export type ActiveWorldBossHandles = {
   announcementMessage: Message;
   activeMessage: Message | null;
   activeRenderTimer: ReturnType<typeof setTimeout> | null;
@@ -51,7 +51,7 @@ export type ActiveRaidHandles = {
   transitionChain: Promise<void>;
 };
 
-export type ActiveRaidContext = {
-  raid: ActiveRaidRecord;
-  handles: ActiveRaidHandles;
+export type ActiveWorldBossContext = {
+  worldBoss: ActiveWorldBossRecord;
+  handles: ActiveWorldBossHandles;
 };

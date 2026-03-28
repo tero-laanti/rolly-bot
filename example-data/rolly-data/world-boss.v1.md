@@ -1,7 +1,7 @@
-# `raids.json`
+# `world-boss.v1.json`
 
 This file controls World Boss rewards, boss naming, and World Boss balance tuning.
-Player-facing copy uses `World Boss`, while internal identifiers remain `raids` and `raids.json`.
+Player-facing copy uses `World Boss`, while internal identifiers remain `world-boss` and `world-boss.v1.json`.
 
 `reward` supports two pip payout shapes:
 

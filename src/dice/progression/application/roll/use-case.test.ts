@@ -564,11 +564,11 @@ test("reward text includes both fame and pip rewards when both are earned", () =
   }
 });
 
-test("raid damage uses the highest roll set total instead of summing all roll sets", () => {
+test("world boss damage uses the highest roll set total instead of summing all roll sets", () => {
   const originalRandom = Math.random;
   const randomValues = [0, 0.8, 0.5, 0.5];
   let randomIndex = 0;
-  let appliedRaidDamage = 0;
+  let appliedWorldBossDamage = 0;
   let appliedBestRollSet: readonly number[] | null | undefined;
   Math.random = () => {
     const value = randomValues[randomIndex] ?? 0;
@@ -627,13 +627,19 @@ test("raid damage uses the highest roll set total instead of summing all roll se
         getActiveDiceLockout: () => null,
         getActiveDoubleRoll: () => null,
       },
-      raids: {
-        applyDiceRoll: ({ damage, bestRollSet }) => {
-          appliedRaidDamage = damage;
+      worldBoss: {
+        applyDiceRoll: ({
+          damage,
+          bestRollSet,
+        }: {
+          damage: number;
+          bestRollSet?: readonly number[] | null;
+        }) => {
+          appliedWorldBossDamage = damage;
           appliedBestRollSet = bestRollSet;
           return {
             kind: "applied",
-            summary: `Raid damage: ${damage}`,
+            summary: `World Boss damage: ${damage}`,
             defeated: false,
           };
         },
@@ -646,13 +652,13 @@ test("raid damage uses the highest roll set total instead of summing all roll se
     const result = useCase({
       userId: "user-6",
       userMention: "<@user-6>",
-      raidThreadId: "raid-thread-1",
+      worldBossThreadId: "world-boss-thread-1",
       nowMs: 1_710_000_000_000,
     });
 
-    assert.equal(appliedRaidDamage, 8);
+    assert.equal(appliedWorldBossDamage, 8);
     assert.deepEqual(appliedBestRollSet, [4, 4]);
-    assert.match(result.content, /Raid damage: 8/);
+    assert.match(result.content, /World Boss damage: 8/);
   } finally {
     Math.random = originalRandom;
   }

@@ -19,13 +19,13 @@ import type {
   IntroPostsV1Data,
   DiceBalanceVarietyConfig,
   DiceRandomEventBalanceData,
-  DiceRaidBossBalanceData,
-  DiceRaidBossNamesData,
-  DiceRaidData,
-  DiceRaidParticipantStrengthData,
-  DiceRaidPipRewardFormulaData,
-  DiceRaidPipRewardTierData,
-  DiceRaidRewardData,
+  DiceWorldBossBossBalanceData,
+  DiceWorldBossBossNamesData,
+  DiceWorldBossData,
+  DiceWorldBossParticipantStrengthData,
+  DiceWorldBossPipRewardFormulaData,
+  DiceWorldBossPipRewardTierData,
+  DiceWorldBossRewardData,
 } from "./types";
 import {
   validateRandomEventScenarios,
@@ -81,7 +81,7 @@ const achievementCategories = [
   "casino",
   "pvp",
   "random-events",
-  "raids",
+  "world-boss",
   "items",
   "meta",
 ] as const;
@@ -1244,29 +1244,29 @@ const validateRandomEventScenarioDiscordText = (
   });
 };
 
-const buildLongestRaidBossName = (raids: DiceRaidData): string => {
-  const prefix = getLongestString(raids.bossNames.prefixes);
-  const suffix = getLongestString(raids.bossNames.suffixes);
+const buildLongestWorldBossName = (worldBoss: DiceWorldBossData): string => {
+  const prefix = getLongestString(worldBoss.bossNames.prefixes);
+  const suffix = getLongestString(worldBoss.bossNames.suffixes);
   return `${prefix} ${suffix}`.trim();
 };
 
-const validateRaidDiscordText = (raids: DiceRaidData): void => {
-  const bossName = buildLongestRaidBossName(raids);
-  const maxBossLevel = raids.bossBalance.maxBossLevel;
+const validateWorldBossDiscordText = (worldBoss: DiceWorldBossData): void => {
+  const bossName = buildLongestWorldBossName(worldBoss);
+  const maxBossLevel = worldBoss.bossBalance.maxBossLevel;
 
   assertDiscordTextLength(
     `${bossName} - Lv.${maxBossLevel}`,
-    "raids.bossNames as rendered in the active raid title",
+    "worldBoss.bossNames as rendered in the active World Boss title",
     discordEmbedTitleCharacterLimit,
   );
   assertDiscordTextLength(
-    `Raid cleared - ${bossName} Lv.${maxBossLevel}`,
-    "raids.bossNames as rendered in the resolved raid title",
+    `World Boss cleared - ${bossName} Lv.${maxBossLevel}`,
+    "worldBoss.bossNames as rendered in the resolved World Boss title",
     discordEmbedTitleCharacterLimit,
   );
   assertDiscordTextLength(
-    `Raid failed - ${bossName} Lv.${maxBossLevel}`,
-    "raids.bossNames as rendered in the failed raid title",
+    `World Boss failed - ${bossName} Lv.${maxBossLevel}`,
+    "worldBoss.bossNames as rendered in the failed World Boss title",
     discordEmbedTitleCharacterLimit,
   );
 };
@@ -1430,12 +1430,12 @@ const readCasinoPushYourLuckPayout = (
   };
 };
 
-const readRaidRewardConfig = (value: unknown, label: string): DiceRaidRewardData => {
+const readWorldBossRewardConfig = (value: unknown, label: string): DiceWorldBossRewardData => {
   const record = assertRecord(value, label);
 
   let parsedPipRewards:
-    | { pipsFormula: DiceRaidPipRewardFormulaData }
-    | { pipsByBossLevel: DiceRaidPipRewardTierData[] };
+    | { pipsFormula: DiceWorldBossPipRewardFormulaData }
+    | { pipsByBossLevel: DiceWorldBossPipRewardTierData[] };
 
   if (record.pipsFormula !== undefined) {
     const pipsFormula = assertRecord(record.pipsFormula, `${label}.pipsFormula`);
@@ -1540,7 +1540,10 @@ const readRaidRewardConfig = (value: unknown, label: string): DiceRaidRewardData
   };
 };
 
-const readRaidBossNamesConfig = (value: unknown, label: string): DiceRaidBossNamesData => {
+const readWorldBossBossNamesConfig = (
+  value: unknown,
+  label: string,
+): DiceWorldBossBossNamesData => {
   const record = assertRecord(value, label);
   const prefixes = readStringArray(record.prefixes, `${label}.prefixes`);
   const suffixes = readStringArray(record.suffixes, `${label}.suffixes`);
@@ -1559,7 +1562,10 @@ const readRaidBossNamesConfig = (value: unknown, label: string): DiceRaidBossNam
   };
 };
 
-const readRaidBossBalanceConfig = (value: unknown, label: string): DiceRaidBossBalanceData => {
+const readWorldBossBossBalanceConfig = (
+  value: unknown,
+  label: string,
+): DiceWorldBossBossBalanceData => {
   const record = assertRecord(value, label);
   return {
     baseHp: readInteger(record.baseHp, `${label}.baseHp`, 1),
@@ -1577,10 +1583,10 @@ const readRaidBossBalanceConfig = (value: unknown, label: string): DiceRaidBossB
   };
 };
 
-const readRaidParticipantStrengthConfig = (
+const readWorldBossParticipantStrengthConfig = (
   value: unknown,
   label: string,
-): DiceRaidParticipantStrengthData => {
+): DiceWorldBossParticipantStrengthData => {
   const record = assertRecord(value, label);
 
   return {
@@ -1665,19 +1671,19 @@ export const parseRandomEventBalance = (value: unknown): DiceRandomEventBalanceD
   };
 };
 
-export const parseDiceRaidsData = (value: unknown): DiceRaidData => {
-  const record = assertRecord(value, "raids");
+export const parseWorldBossData = (value: unknown): DiceWorldBossData => {
+  const record = assertRecord(value, "world-boss");
   const parsed = {
-    reward: readRaidRewardConfig(record.reward, "raids.reward"),
-    bossNames: readRaidBossNamesConfig(record.bossNames, "raids.bossNames"),
-    bossBalance: readRaidBossBalanceConfig(record.bossBalance, "raids.bossBalance"),
-    participantStrength: readRaidParticipantStrengthConfig(
+    reward: readWorldBossRewardConfig(record.reward, "worldBoss.reward"),
+    bossNames: readWorldBossBossNamesConfig(record.bossNames, "worldBoss.bossNames"),
+    bossBalance: readWorldBossBossBalanceConfig(record.bossBalance, "worldBoss.bossBalance"),
+    participantStrength: readWorldBossParticipantStrengthConfig(
       record.participantStrength,
-      "raids.participantStrength",
+      "worldBoss.participantStrength",
     ),
   };
 
-  validateRaidDiscordText(parsed);
+  validateWorldBossDiscordText(parsed);
   return parsed;
 };
 

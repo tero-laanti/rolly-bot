@@ -1,9 +1,13 @@
-import type { RaidQuietHoursConfig, TriggerRaidNowOutcome } from "../application/ports";
-import type { RaidsConfig } from "../../../shared/config";
+import type { TriggerWorldBossNowOutcome, WorldBossQuietHoursConfig } from "../application/ports";
+import type { WorldBossConfig } from "../../../shared/config";
 import { dayMs } from "../../../shared/time";
-import { getLastRaidTriggeredAt, setLastRaidTriggeredAt, type RaidsState } from "./state-store";
+import {
+  getLastWorldBossTriggeredAt,
+  setLastWorldBossTriggeredAt,
+  type WorldBossState,
+} from "./state-store";
 
-type RaidsFoundationLogger = {
+type WorldBossFoundationLogger = {
   info: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
@@ -20,26 +24,26 @@ type TriggerOpportunityContext = {
   now: Date;
 };
 
-export type RaidTriggerGateReason = "ready" | "quiet-hours" | "min-gap" | "active-raid";
+export type WorldBossTriggerGateReason = "ready" | "quiet-hours" | "min-gap" | "active-world-boss";
 
-export type RaidTriggerGateResult = {
-  reason: RaidTriggerGateReason;
+export type WorldBossTriggerGateResult = {
+  reason: WorldBossTriggerGateReason;
   shouldTrigger: boolean;
   retryDelayMs: number;
 };
 
-export type StartRaidsFoundationSchedulerInput = {
-  config: RaidsConfig;
-  state: RaidsState;
-  hasBlockingRaid: () => boolean;
+export type StartWorldBossFoundationSchedulerInput = {
+  config: WorldBossConfig;
+  state: WorldBossState;
+  hasBlockingWorldBoss: () => boolean;
   onTriggerOpportunity?: (
     context: TriggerOpportunityContext,
-  ) => TriggerRaidNowOutcome | Promise<TriggerRaidNowOutcome>;
-  logger?: RaidsFoundationLogger;
+  ) => TriggerWorldBossNowOutcome | Promise<TriggerWorldBossNowOutcome>;
+  logger?: WorldBossFoundationLogger;
   timingHooks?: Partial<SchedulerTimingHooks>;
 };
 
-export type RaidsFoundationSchedulerController = {
+export type WorldBossFoundationSchedulerController = {
   stop: () => void;
   getNextCheckAt: () => Date | null;
 };
@@ -119,7 +123,7 @@ const getMinutesInTimezone = (date: Date, timezone: string): number => {
   return hours * 60 + minutes;
 };
 
-const isWithinQuietHours = (now: Date, quietHours: RaidQuietHoursConfig): boolean => {
+const isWithinQuietHours = (now: Date, quietHours: WorldBossQuietHoursConfig): boolean => {
   const startMinutes = parseClockToMinutes(quietHours.start);
   const endMinutes = parseClockToMinutes(quietHours.end);
   if (startMinutes === null || endMinutes === null || startMinutes === endMinutes) {
@@ -134,16 +138,20 @@ const isWithinQuietHours = (now: Date, quietHours: RaidQuietHoursConfig): boolea
   return currentMinutes >= startMinutes || currentMinutes < endMinutes;
 };
 
-const getRandomCadenceDelayMs = (config: RaidsConfig, random: () => number): number => {
-  const baselineIntervalMs = dayMs / Math.max(1, config.targetRaidsPerDay);
+const getRandomCadenceDelayMs = (config: WorldBossConfig, random: () => number): number => {
+  const baselineIntervalMs = dayMs / Math.max(1, config.targetWorldBossesPerDay);
   const jitterRangeMs = baselineIntervalMs * config.jitterRatio;
   const randomOffsetMs = (random() * 2 - 1) * jitterRangeMs;
   const randomizedDelayMs = baselineIntervalMs + randomOffsetMs;
   return Math.max(config.minGapMs, Math.round(randomizedDelayMs));
 };
 
-const getMinGapRetryDelayMs = (state: RaidsState, now: Date, config: RaidsConfig): number => {
-  const lastTriggeredAt = getLastRaidTriggeredAt(state);
+const getMinGapRetryDelayMs = (
+  state: WorldBossState,
+  now: Date,
+  config: WorldBossConfig,
+): number => {
+  const lastTriggeredAt = getLastWorldBossTriggeredAt(state);
   if (!lastTriggeredAt) {
     return 0;
   }
@@ -156,15 +164,15 @@ const getMinGapRetryDelayMs = (state: RaidsState, now: Date, config: RaidsConfig
   return Math.max(1, config.minGapMs - elapsedMs);
 };
 
-export const evaluateRaidTrigger = (
-  state: RaidsState,
+export const evaluateWorldBossTrigger = (
+  state: WorldBossState,
   now: Date,
-  config: RaidsConfig,
-  hasBlockingRaid: boolean,
-): RaidTriggerGateResult => {
-  if (hasBlockingRaid) {
+  config: WorldBossConfig,
+  hasBlockingWorldBoss: boolean,
+): WorldBossTriggerGateResult => {
+  if (hasBlockingWorldBoss) {
     return {
-      reason: "active-raid",
+      reason: "active-world-boss",
       shouldTrigger: false,
       retryDelayMs: config.retryDelayMs,
     };
@@ -194,14 +202,14 @@ export const evaluateRaidTrigger = (
   };
 };
 
-export const startRaidsFoundationScheduler = ({
+export const startWorldBossFoundationScheduler = ({
   config,
   state,
-  hasBlockingRaid,
+  hasBlockingWorldBoss,
   onTriggerOpportunity,
   logger,
   timingHooks,
-}: StartRaidsFoundationSchedulerInput): RaidsFoundationSchedulerController => {
+}: StartWorldBossFoundationSchedulerInput): WorldBossFoundationSchedulerController => {
   const hooks: SchedulerTimingHooks = {
     ...defaultTimingHooks,
     ...timingHooks,
@@ -242,7 +250,7 @@ export const startRaidsFoundationScheduler = ({
     }
 
     const now = hooks.now();
-    const gate = evaluateRaidTrigger(state, now, config, hasBlockingRaid());
+    const gate = evaluateWorldBossTrigger(state, now, config, hasBlockingWorldBoss());
     if (!gate.shouldTrigger) {
       scheduleNextRun(gate.retryDelayMs);
       return;
@@ -255,9 +263,9 @@ export const startRaidsFoundationScheduler = ({
         return;
       }
 
-      setLastRaidTriggeredAt(state, now);
+      setLastWorldBossTriggeredAt(state, now);
     } catch (error) {
-      logger?.error("[raids] Trigger opportunity failed.", error);
+      logger?.error("[world-boss] Trigger opportunity failed.", error);
       scheduleNextRun(config.retryDelayMs);
       return;
     }
@@ -265,7 +273,7 @@ export const startRaidsFoundationScheduler = ({
     scheduleNextRun(getRandomCadenceDelayMs(config, hooks.random));
   };
 
-  if (!config.enabled || config.targetRaidsPerDay <= 0) {
+  if (!config.enabled || config.targetWorldBossesPerDay <= 0) {
     return {
       stop: () => {
         stopped = true;

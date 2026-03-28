@@ -4,7 +4,7 @@ import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import type { RandomEventsAdminPort } from "../../../random-events/application/ports";
 import type { DiceTemporaryEffect } from "../../../progression/domain/temporary-effects";
-import type { RaidsAdminPort } from "../../../raids/application/ports";
+import type { WorldBossAdminPort } from "../../../world-boss/application/ports";
 
 export type DiceAdminAction =
   | {
@@ -23,12 +23,12 @@ export type DiceAdminAction =
       targetUserId: string;
     }
   | {
-      type: "raid-status";
+      type: "world-boss-status";
       ownerId: string;
       targetUserId: string;
     }
   | {
-      type: "raid-trigger";
+      type: "world-boss-trigger";
       ownerId: string;
       targetUserId: string;
     }
@@ -55,7 +55,7 @@ type ManageAdminDependencies = {
     "getActiveDoubleRoll" | "getActiveDiceLockout" | "setDicePvpEffects"
   >;
   randomEventsAdmin: RandomEventsAdminPort;
-  raidsAdmin: RaidsAdminPort;
+  worldBossAdmin: WorldBossAdminPort;
 };
 
 export const createDiceAdminReply = (
@@ -85,7 +85,7 @@ export const createDiceAdminUseCase = ({
   progression,
   pvp,
   randomEventsAdmin,
-  raidsAdmin,
+  worldBossAdmin,
 }: ManageAdminDependencies) => {
   const handleDiceAdminAction = async (
     ownerId: string | null,
@@ -107,14 +107,16 @@ export const createDiceAdminUseCase = ({
       );
     }
 
-    if (action.type === "raid-status") {
+    if (action.type === "world-boss-status") {
       return updateView(
-        buildRaidStatusView(raidsAdmin, action.ownerId, action.targetUserId, guildId),
+        buildWorldBossStatusView(worldBossAdmin, action.ownerId, action.targetUserId, guildId),
       );
     }
 
-    if (action.type === "raid-trigger") {
-      return editView(await buildRaidTriggerView(raidsAdmin, action.ownerId, action.targetUserId));
+    if (action.type === "world-boss-trigger") {
+      return editView(
+        await buildWorldBossTriggerView(worldBossAdmin, action.ownerId, action.targetUserId),
+      );
     }
 
     if (action.type === "effects-user") {
@@ -160,12 +162,12 @@ const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAd
           style: "primary",
         },
         {
-          action: { type: "raid-status", ownerId, targetUserId },
+          action: { type: "world-boss-status", ownerId, targetUserId },
           label: "World Boss status",
           style: "primary",
         },
         {
-          action: { type: "raid-trigger", ownerId, targetUserId },
+          action: { type: "world-boss-trigger", ownerId, targetUserId },
           label: "World Boss trigger",
           style: "primary",
         },
@@ -327,13 +329,13 @@ const buildEventTriggerView = async (
   };
 };
 
-const buildRaidStatusView = (
-  raidsAdmin: RaidsAdminPort,
+const buildWorldBossStatusView = (
+  worldBossAdmin: WorldBossAdminPort,
   ownerId: string,
   targetUserId: string,
   guildId: string | null,
 ): ActionView<DiceAdminAction> => {
-  const status = raidsAdmin.getAdminStatus();
+  const status = worldBossAdmin.getAdminStatus();
   if (!status) {
     return {
       content: "**Dice admin · world boss status**\nWorld Boss runtime is currently unavailable.",
@@ -347,25 +349,26 @@ const buildRaidStatusView = (
     `- Channel: ${status.channelId ? `<#${status.channelId}>` : "not configured"}`,
     `- Join lead: ${Math.round(status.joinLeadMs / 60_000)} min`,
     `- Active duration: ${Math.round(status.activeDurationMs / 60_000)} min`,
-    `- Random World Bosses per day: ${status.targetRaidsPerDay}`,
+    `- Random World Bosses per day: ${status.targetWorldBossesPerDay}`,
     `- Min gap: ${Math.round(status.minGapMs / 60_000)} min`,
     `- Retry delay: ${Math.round(status.retryDelayMs / 1_000)} sec`,
     `- Quiet hours: ${status.quietHours.start}-${status.quietHours.end} (${status.quietHours.timezone})`,
-    `- Live World Boss count: ${status.snapshot.liveRaidCount}`,
+    `- Live World Boss count: ${status.snapshot.liveWorldBossCount}`,
     `- Last trigger: ${formatTimestamp(status.snapshot.lastTriggeredAt)}`,
     `- Next scheduler check: ${formatTimestamp(status.snapshot.nextCheckAt)}`,
   ];
 
-  if (status.liveRaids.length > 0) {
+  if (status.liveWorldBosses.length > 0) {
     lines.push("", "**Live World Bosses**");
-    for (const raid of status.liveRaids) {
-      const messageId = raid.activeThreadId ?? raid.activeMessageId ?? raid.announcementMessageId;
-      const bossText = raid.boss
-        ? ` • boss: ${raid.boss.name} Lv.${raid.boss.level} HP ${raid.boss.currentHp}/${raid.boss.maxHp}`
+    for (const worldBoss of status.liveWorldBosses) {
+      const messageId =
+        worldBoss.activeThreadId ?? worldBoss.activeMessageId ?? worldBoss.announcementMessageId;
+      const bossText = worldBoss.boss
+        ? ` • boss: ${worldBoss.boss.name} Lv.${worldBoss.boss.level} HP ${worldBoss.boss.currentHp}/${worldBoss.boss.maxHp}`
         : "";
-      const outcomeText = raid.outcome ? ` • outcome: ${raid.outcome}` : "";
+      const outcomeText = worldBoss.outcome ? ` • outcome: ${worldBoss.outcome}` : "";
       lines.push(
-        `- ${raid.title} [${raid.status}]${outcomeText} • participants: ${raid.participantCount} • eligible: ${raid.eligibleParticipantCount}${bossText} • starts: ${formatTimestamp(raid.scheduledStartAt)} • expires: ${formatTimestamp(raid.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${raid.channelId}/${messageId}`,
+        `- ${worldBoss.title} [${worldBoss.status}]${outcomeText} • participants: ${worldBoss.participantCount} • eligible: ${worldBoss.eligibleParticipantCount}${bossText} • starts: ${formatTimestamp(worldBoss.scheduledStartAt)} • expires: ${formatTimestamp(worldBoss.expiresAt)} • https://discord.com/channels/${guildId ?? "@me"}/${worldBoss.channelId}/${messageId}`,
       );
     }
   }
@@ -376,17 +379,17 @@ const buildRaidStatusView = (
   };
 };
 
-const buildRaidTriggerView = async (
-  raidsAdmin: RaidsAdminPort,
+const buildWorldBossTriggerView = async (
+  worldBossAdmin: WorldBossAdminPort,
   ownerId: string,
   targetUserId: string,
 ): Promise<ActionView<DiceAdminAction>> => {
-  const result = await raidsAdmin.triggerRaidNow();
+  const result = await worldBossAdmin.triggerWorldBossNow();
   if (!result.ok) {
     const content =
       result.reason === "disabled"
         ? "**Dice admin · world boss trigger**\nWorld Boss is disabled in config."
-        : result.reason === "active-raid-exists"
+        : result.reason === "active-world-boss-exists"
           ? "**Dice admin · world boss trigger**\nA World Boss is already active. Use World Boss status first."
           : "**Dice admin · world boss trigger**\nWorld Boss runtime is currently unavailable.";
 
@@ -408,7 +411,7 @@ const buildRaidTriggerView = async (
     content: [
       "**Dice admin · world boss trigger**",
       "World Boss announced.",
-      `- World Boss id: ${result.result.raidId ?? "unknown"}`,
+      `- World Boss id: ${result.result.worldBossId ?? "unknown"}`,
       `- Scheduled start: ${formatTimestamp(result.result.scheduledStartAt ?? null)}`,
     ].join("\n"),
     components: buildBackComponents(ownerId, targetUserId),

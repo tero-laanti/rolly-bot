@@ -1,7 +1,7 @@
 import type { SqliteDatabase } from "../../../shared/db";
-import type { DiceRaidAchievementStats } from "../application/achievement-rules";
+import type { DiceWorldBossAchievementStats } from "../application/achievement-rules";
 
-type DiceRaidAchievementStatsRow = {
+type DiceWorldBossAchievementStatsRow = {
   user_id: string;
   joined_count: number;
   hit_count: number;
@@ -16,7 +16,7 @@ type DiceRaidAchievementStatsRow = {
 const getStatsRow = (
   db: SqliteDatabase,
   userId: string,
-): DiceRaidAchievementStatsRow | undefined => {
+): DiceWorldBossAchievementStatsRow | undefined => {
   return db
     .prepare(
       `
@@ -30,14 +30,17 @@ const getStatsRow = (
         highest_cleared_boss_level,
         tourist_success_count,
         updated_at
-      FROM dice_raid_achievement_stats
+      FROM dice_world_boss_achievement_stats
       WHERE user_id = ?
     `,
     )
-    .get(userId) as DiceRaidAchievementStatsRow | undefined;
+    .get(userId) as DiceWorldBossAchievementStatsRow | undefined;
 };
 
-const getOrCreateStatsRow = (db: SqliteDatabase, userId: string): DiceRaidAchievementStatsRow => {
+const getOrCreateStatsRow = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceWorldBossAchievementStatsRow => {
   const existing = getStatsRow(db, userId);
   if (existing) {
     return existing;
@@ -46,7 +49,7 @@ const getOrCreateStatsRow = (db: SqliteDatabase, userId: string): DiceRaidAchiev
   const updatedAt = new Date().toISOString();
   db.prepare(
     `
-    INSERT INTO dice_raid_achievement_stats (
+    INSERT INTO dice_world_boss_achievement_stats (
       user_id,
       joined_count,
       hit_count,
@@ -68,13 +71,13 @@ const getOrCreateStatsRow = (db: SqliteDatabase, userId: string): DiceRaidAchiev
 
   const created = getStatsRow(db, userId);
   if (!created) {
-    throw new Error(`Failed to initialize raid achievement stats for user ${userId}`);
+    throw new Error(`Failed to initialize World Boss achievement stats for user ${userId}`);
   }
 
   return created;
 };
 
-const mapStats = (row: DiceRaidAchievementStatsRow): DiceRaidAchievementStats => {
+const mapStats = (row: DiceWorldBossAchievementStatsRow): DiceWorldBossAchievementStats => {
   return {
     joinedCount: row.joined_count,
     hitCount: row.hit_count,
@@ -86,13 +89,16 @@ const mapStats = (row: DiceRaidAchievementStatsRow): DiceRaidAchievementStats =>
   };
 };
 
-export const recordRaidJoin = (db: SqliteDatabase, userId: string): DiceRaidAchievementStats => {
+export const recordWorldBossJoin = (
+  db: SqliteDatabase,
+  userId: string,
+): DiceWorldBossAchievementStats => {
   const stats = getOrCreateStatsRow(db, userId);
   const updatedAt = new Date().toISOString();
 
   db.prepare(
     `
-    UPDATE dice_raid_achievement_stats
+    UPDATE dice_world_boss_achievement_stats
     SET joined_count = @joinedCount, updated_at = @updatedAt
     WHERE user_id = @userId
   `,
@@ -108,7 +114,7 @@ export const recordRaidJoin = (db: SqliteDatabase, userId: string): DiceRaidAchi
   };
 };
 
-export const recordRaidHit = (
+export const recordWorldBossHit = (
   db: SqliteDatabase,
   {
     userId,
@@ -117,13 +123,13 @@ export const recordRaidHit = (
     userId: string;
     damage: number;
   },
-): DiceRaidAchievementStats => {
+): DiceWorldBossAchievementStats => {
   const stats = getOrCreateStatsRow(db, userId);
   const updatedAt = new Date().toISOString();
 
   db.prepare(
     `
-    UPDATE dice_raid_achievement_stats
+    UPDATE dice_world_boss_achievement_stats
     SET
       hit_count = @hitCount,
       lifetime_damage = @lifetimeDamage,
@@ -144,7 +150,7 @@ export const recordRaidHit = (
   };
 };
 
-export const recordRaidSuccessResolution = (
+export const recordWorldBossSuccessResolution = (
   db: SqliteDatabase,
   {
     userId,
@@ -159,13 +165,13 @@ export const recordRaidSuccessResolution = (
     topDamage: boolean;
     tourist: boolean;
   },
-): DiceRaidAchievementStats => {
+): DiceWorldBossAchievementStats => {
   const stats = getOrCreateStatsRow(db, userId);
   const updatedAt = new Date().toISOString();
 
   db.prepare(
     `
-    UPDATE dice_raid_achievement_stats
+    UPDATE dice_world_boss_achievement_stats
     SET
       eligible_clear_count = @eligibleClearCount,
       top_damage_clear_count = @topDamageClearCount,

@@ -170,3 +170,97 @@ test("initializeDatabaseSchema adds the personal charge table on the supported v
     pips: 11,
   });
 });
+
+test("initializeDatabaseSchema migrates legacy world boss stats and persisted source ids", () => {
+  const db = new Database(":memory:");
+  createCurrentSchemaV2(db);
+
+  db.exec(`
+    CREATE TABLE dice_raid_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      joined_count INTEGER NOT NULL DEFAULT 0,
+      hit_count INTEGER NOT NULL DEFAULT 0,
+      eligible_clear_count INTEGER NOT NULL DEFAULT 0,
+      top_damage_clear_count INTEGER NOT NULL DEFAULT 0,
+      lifetime_damage INTEGER NOT NULL DEFAULT 0,
+      highest_cleared_boss_level INTEGER NOT NULL DEFAULT 0,
+      tourist_success_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  db.prepare(
+    `
+    INSERT INTO dice_raid_achievement_stats (
+      user_id,
+      joined_count,
+      hit_count,
+      eligible_clear_count,
+      top_damage_clear_count,
+      lifetime_damage,
+      highest_cleared_boss_level,
+      tourist_success_count,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  ).run("user-1", 2, 3, 4, 1, 500, 12, 1, "2026-03-28T10:00:00.000Z");
+  db.prepare(
+    `
+    INSERT INTO dice_temporary_effects (
+      id,
+      user_id,
+      effect_code,
+      kind,
+      source,
+      magnitude,
+      remaining_rolls,
+      expires_at,
+      consume_on_command,
+      stack_group,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    "effect-1",
+    "user-1",
+    "roll-pass-multiplier",
+    "positive",
+    "raid:legacy-boss-1",
+    2,
+    3,
+    null,
+    "dice",
+    "world-boss-reward-roll-pass-multiplier",
+    "2026-03-28T10:00:00.000Z",
+    "2026-03-28T10:00:00.000Z",
+  );
+
+  initializeDatabaseSchema(db);
+
+  assert.equal(hasTable(db, "dice_raid_achievement_stats"), false);
+  assert.deepEqual(
+    db
+      .prepare(
+        `
+      SELECT joined_count, hit_count, eligible_clear_count, top_damage_clear_count, lifetime_damage,
+             highest_cleared_boss_level, tourist_success_count
+      FROM dice_world_boss_achievement_stats
+      WHERE user_id = ?
+    `,
+      )
+      .get("user-1"),
+    {
+      joined_count: 2,
+      hit_count: 3,
+      eligible_clear_count: 4,
+      top_damage_clear_count: 1,
+      lifetime_damage: 500,
+      highest_cleared_boss_level: 12,
+      tourist_success_count: 1,
+    },
+  );
+  assert.deepEqual(
+    db.prepare("SELECT source FROM dice_temporary_effects WHERE id = ?").get("effect-1"),
+    { source: "world-boss:legacy-boss-1" },
+  );
+});

@@ -5,7 +5,7 @@ import {
   parseDiceBalance,
   parseDiceContractsV1Data,
   parseDiceItems,
-  parseDiceRaidsData,
+  parseWorldBossData,
   parseIntroPostsV1Data,
   parseRandomEventBalance,
   parseRandomEventScenarios,
@@ -494,8 +494,8 @@ test("parseDiceBalance defaults firstDailyRollPipReward to zero when omitted", (
   assert.equal(parsed.firstDailyRollPipReward, 0);
 });
 
-test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
-  const raids = parseDiceRaidsData({
+test("parseWorldBossData keeps legacy pipsByBossLevel rewards readable", () => {
+  const worldBoss = parseWorldBossData({
     reward: {
       pipsByBossLevel: [
         { bossLevelAtLeast: 1, pips: 4 },
@@ -525,18 +525,18 @@ test("parseDiceRaidsData keeps legacy pipsByBossLevel rewards readable", () => {
     },
   });
 
-  assert.ok("pipsByBossLevel" in raids.reward);
-  assert.deepEqual(raids.reward.pipsByBossLevel, [
+  assert.ok("pipsByBossLevel" in worldBoss.reward);
+  assert.deepEqual(worldBoss.reward.pipsByBossLevel, [
     { bossLevelAtLeast: 1, pips: 4 },
     { bossLevelAtLeast: 5, pips: 6 },
   ]);
-  assert.equal(raids.participantStrength.prestigeMultiplier, 1.5);
+  assert.equal(worldBoss.participantStrength.prestigeMultiplier, 1.5);
 });
 
-test("parseDiceRaidsData rejects boss names that overflow raid titles", () => {
+test("parseWorldBossData rejects boss names that overflow World Boss titles", () => {
   assert.throws(
     () =>
-      parseDiceRaidsData({
+      parseWorldBossData({
         reward: {
           pipsFormula: {
             flatPips: 5,
@@ -565,7 +565,7 @@ test("parseDiceRaidsData rejects boss names that overflow raid titles", () => {
           prestigeMultiplier: 1.5,
         },
       }),
-    /active raid title must be <= 256 characters/i,
+    /active World Boss title must be <= 256 characters/i,
   );
 });
 

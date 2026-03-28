@@ -69,13 +69,13 @@ sequenceDiagram
 
 ### Gameplay contexts
 
-- [src/dice/](../src/dice/) is organized by game context, not by technical layer. If a change belongs to progression, economy, inventory, PvP, raids, or random events, start in that owning context.
+- [src/dice/](../src/dice/) is organized by game context, not by technical layer. If a change belongs to progression, economy, inventory, PvP, world-boss, or random events, start in that owning context.
 - Most command-driven contexts use the same split:
   `domain/` for rules and value types,
   `application/` for use cases and ports,
   `infrastructure/` for SQLite and other concrete adapters,
   `interfaces/discord/` for slash commands, button ids, and presenters.
-- `random-events` and `raids` are intentionally different. Their [src/dice/random-events/infrastructure/](../src/dice/random-events/infrastructure/) and [src/dice/raids/infrastructure/](../src/dice/raids/infrastructure/) folders own live runtimes, schedulers, admin control, and Discord orchestration. Their `interfaces/discord/` folders stay narrow and mostly handle button ids, prompts, and interaction helpers.
+- `random-events` and `world-boss` are intentionally different. Their [src/dice/random-events/infrastructure/](../src/dice/random-events/infrastructure/) and [src/dice/world-boss/infrastructure/](../src/dice/world-boss/infrastructure/) folders own live runtimes, schedulers, admin control, and Discord orchestration. Their `interfaces/discord/` folders stay narrow and mostly handle button ids, prompts, and interaction helpers.
 - Search for `DiceEconomyRepository` or other context `ports.ts` symbols when you need the application-facing repository contracts.
 
 #### Context shape
@@ -85,10 +85,10 @@ flowchart LR
     X["interfaces/discord/"] --> A["application/"]
     A --> D["domain/"]
     A --> I["infrastructure/"]
-    I -. "runtime orchestration<br/>(raids / random-events only)" .-> X
+    I -. "runtime orchestration<br/>(world-boss / random-events only)" .-> X
 ```
 
-Runtime orchestration includes the scheduler, live runtime, admin control, and Discord orchestration that `random-events` and `raids` keep in `infrastructure/`.
+Runtime orchestration includes the scheduler, live runtime, admin control, and Discord orchestration that `random-events` and `world-boss` keep in `infrastructure/`.
 
 ### Shared systems
 
@@ -102,7 +102,7 @@ Runtime orchestration includes the scheduler, live runtime, admin control, and D
 - New slash command or button flow: start in the owning context under `interfaces/discord/`, then register it explicitly through the shared command registry in [src/app/discord/](../src/app/discord/).
 - Gameplay rules, value objects, or balance-sensitive logic: start in the owning context `domain/` or `application/` layer.
 - SQLite-backed persistence: use the owning context `infrastructure/` layer and prefer its `infrastructure/sqlite/services.ts` builder when that pattern exists.
-- Random-event or raid scheduling, lifecycle management, or live Discord orchestration: work in the corresponding `infrastructure/` folder for that context.
+- Random-event or World Boss scheduling, lifecycle management, or live Discord orchestration: work in the corresponding `infrastructure/` folder for that context.
 - Shared interaction rendering: use [src/shared-kernel/](../src/shared-kernel/) plus the renderers in [src/app/discord/](../src/app/discord/).
 - Gameplay data contracts or authored content loading: use [src/rolly-data/](../src/rolly-data/) and the public examples in [example-data/rolly-data/](../example-data/rolly-data/).
 
@@ -111,7 +111,7 @@ Runtime orchestration includes the scheduler, live runtime, admin control, and D
 - `application/` and `domain/` code should stay free of Discord runtime imports and concrete infrastructure dependencies. Adapters belong in `infrastructure/`, `interfaces/discord/`, or `src/app/`.
 - Slash commands and button handlers are registered explicitly rather than discovered from the filesystem.
 - For SQLite-backed command flows, prefer context `infrastructure/sqlite/services.ts` builders at the interface edge. New application code should depend on ports and `UnitOfWork`, not direct `shared/db` imports.
-- `random-events` and `raids` keep long-lived runtimes and scheduler orchestration in `infrastructure/`. Their `interfaces/discord/` folders should stay presentation- and identifier-oriented.
+- `random-events` and `world-boss` keep long-lived runtimes and scheduler orchestration in `infrastructure/`. Their `interfaces/discord/` folders should stay presentation- and identifier-oriented.
 - Real gameplay content and tuning live outside the public app repo. The files in [example-data/rolly-data/](../example-data/rolly-data/) are public examples and contract documentation, not the private balance or spoiler-heavy content used in a private `rolly-data` checkout.
 - `dist/` is generated output. Source-of-truth code lives under `src/`.
 

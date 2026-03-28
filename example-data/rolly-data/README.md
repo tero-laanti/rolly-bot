@@ -15,7 +15,7 @@ This directory contains safe example data for the public `rolly-bot` repository.
   - `intro-posts.v1.json`
   - `items.v1.json`
   - `pvp.json`
-  - `raids.json`
+  - `world-boss.v1.json`
   - `random-events-balance.json`
   - `random-events.v1.json`
 

@@ -162,7 +162,7 @@ const schemaVersion2Columns = new Map<string, string[]>([
     ],
   ],
   [
-    "dice_raid_achievement_stats",
+    "dice_world_boss_achievement_stats",
     [
       "user_id",
       "joined_count",
@@ -216,8 +216,124 @@ const currentSchemaColumns = new Map<string, string[]>([
   ],
 ]);
 
+const ensureWorldBossAchievementStatsTable = (db: SqliteDatabase): void => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dice_world_boss_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      joined_count INTEGER NOT NULL DEFAULT 0,
+      hit_count INTEGER NOT NULL DEFAULT 0,
+      eligible_clear_count INTEGER NOT NULL DEFAULT 0,
+      top_damage_clear_count INTEGER NOT NULL DEFAULT 0,
+      lifetime_damage INTEGER NOT NULL DEFAULT 0,
+      highest_cleared_boss_level INTEGER NOT NULL DEFAULT 0,
+      tourist_success_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+  `);
+};
+
+const migrateLegacyWorldBossPersistence = (db: SqliteDatabase): void => {
+  if (hasTable(db, "dice_raid_achievement_stats")) {
+    ensureWorldBossAchievementStatsTable(db);
+    db.exec(`
+      INSERT OR IGNORE INTO dice_world_boss_achievement_stats (
+        user_id,
+        joined_count,
+        hit_count,
+        eligible_clear_count,
+        top_damage_clear_count,
+        lifetime_damage,
+        highest_cleared_boss_level,
+        tourist_success_count,
+        updated_at
+      )
+      SELECT
+        user_id,
+        joined_count,
+        hit_count,
+        eligible_clear_count,
+        top_damage_clear_count,
+        lifetime_damage,
+        highest_cleared_boss_level,
+        tourist_success_count,
+        updated_at
+      FROM dice_raid_achievement_stats;
+
+      UPDATE dice_world_boss_achievement_stats
+      SET
+        joined_count = MAX(
+          joined_count,
+          COALESCE(
+            (SELECT joined_count FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            joined_count
+          )
+        ),
+        hit_count = MAX(
+          hit_count,
+          COALESCE(
+            (SELECT hit_count FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            hit_count
+          )
+        ),
+        eligible_clear_count = MAX(
+          eligible_clear_count,
+          COALESCE(
+            (SELECT eligible_clear_count FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            eligible_clear_count
+          )
+        ),
+        top_damage_clear_count = MAX(
+          top_damage_clear_count,
+          COALESCE(
+            (SELECT top_damage_clear_count FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            top_damage_clear_count
+          )
+        ),
+        lifetime_damage = MAX(
+          lifetime_damage,
+          COALESCE(
+            (SELECT lifetime_damage FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            lifetime_damage
+          )
+        ),
+        highest_cleared_boss_level = MAX(
+          highest_cleared_boss_level,
+          COALESCE(
+            (SELECT highest_cleared_boss_level FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            highest_cleared_boss_level
+          )
+        ),
+        tourist_success_count = MAX(
+          tourist_success_count,
+          COALESCE(
+            (SELECT tourist_success_count FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            tourist_success_count
+          )
+        ),
+        updated_at = MAX(
+          updated_at,
+          COALESCE(
+            (SELECT updated_at FROM dice_raid_achievement_stats WHERE user_id = dice_world_boss_achievement_stats.user_id),
+            updated_at
+          )
+        );
+
+      DROP TABLE dice_raid_achievement_stats;
+    `);
+  }
+
+  if (hasColumn(db, "dice_temporary_effects", "source")) {
+    db.exec(`
+      UPDATE dice_temporary_effects
+      SET source = 'world-boss:' || substr(source, 6)
+      WHERE source LIKE 'raid:%'
+    `);
+  }
+};
+
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   if (hasExistingUserTables(db)) {
+    migrateLegacyWorldBossPersistence(db);
     assertSchemaArtifacts(db, schemaVersion2Columns);
     createAdditiveSchemaArtifacts(db);
     assertCurrentSchemaArtifacts(db);
@@ -440,7 +556,7 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS dice_raid_achievement_stats (
+    CREATE TABLE IF NOT EXISTS dice_world_boss_achievement_stats (
       user_id TEXT PRIMARY KEY,
       joined_count INTEGER NOT NULL DEFAULT 0,
       hit_count INTEGER NOT NULL DEFAULT 0,

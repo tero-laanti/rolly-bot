@@ -8,9 +8,9 @@ import type {
   JSONEncodable,
 } from "discord.js";
 import {
-  buildRaidActivePrompt,
-  buildRaidAnnouncementPrompt,
-  buildRaidResolvedPrompt,
+  buildWorldBossActivePrompt,
+  buildWorldBossAnnouncementPrompt,
+  buildWorldBossResolvedPrompt,
 } from "./prompt";
 
 const getEmbedDescription = (embed: APIEmbed | JSONEncodable<APIEmbed> | undefined) => {
@@ -33,8 +33,8 @@ const getButtonLabels = (prompt: BaseMessageOptions) => {
   );
 };
 
-test("active raid prompt trims long contribution sections without dropping the core raid status", () => {
-  const prompt = buildRaidActivePrompt({
+test("active World Boss prompt trims long contribution sections without dropping the core status", () => {
+  const prompt = buildWorldBossActivePrompt({
     participantIds: Array.from({ length: 40 }, (_, index) => `user-${index + 1}`),
     eligibleParticipantCount: 12,
     startedAtMs: 0,
@@ -60,8 +60,8 @@ test("active raid prompt trims long contribution sections without dropping the c
   assert.match(description, /Base reward on success:/);
 });
 
-test("resolved raid prompt trims long leaderboards without dropping the outcome summary", () => {
-  const prompt = buildRaidResolvedPrompt({
+test("resolved World Boss prompt trims long leaderboards without dropping the outcome summary", () => {
+  const prompt = buildWorldBossResolvedPrompt({
     participantIds: Array.from({ length: 30 }, (_, index) => `user-${index + 1}`),
     eligibleParticipantCount: 10,
     resolvedAtMs: 120_000,
@@ -83,8 +83,8 @@ test("resolved raid prompt trims long leaderboards without dropping the outcome 
   assert.match(description, /Reward applied to 10 eligible players/);
 });
 
-test("active raid prompt omits the damage leaders section when no damage has been logged yet", () => {
-  const prompt = buildRaidActivePrompt({
+test("active World Boss prompt omits the damage leaders section when no damage has been logged yet", () => {
+  const prompt = buildWorldBossActivePrompt({
     participantIds: ["user-1"],
     eligibleParticipantCount: 1,
     startedAtMs: 0,
@@ -106,9 +106,9 @@ test("active raid prompt omits the damage leaders section when no damage has bee
   assert.doesNotMatch(description, /No damage logged yet\./);
 });
 
-test("raid announcement prompt renders join and leave signup buttons", () => {
-  const prompt = buildRaidAnnouncementPrompt({
-    raidId: "raid-1",
+test("World Boss announcement prompt renders join and leave signup buttons", () => {
+  const prompt = buildWorldBossAnnouncementPrompt({
+    worldBossId: "world-boss-1",
     participantIds: ["user-1"],
     scheduledStartAtMs: 60_000,
   });

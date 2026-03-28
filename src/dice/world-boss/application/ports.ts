@@ -1,6 +1,6 @@
 import type { AchievementAnnouncement } from "../../progression/application/achievement-announcements";
 
-export type RaidStatus =
+export type WorldBossStatus =
   | "joining"
   | "starting"
   | "active"
@@ -10,15 +10,15 @@ export type RaidStatus =
   | "resolved"
   | "cleanup-needed";
 
-export type RaidOutcome = "success" | "failure";
+export type WorldBossOutcome = "success" | "failure";
 
-export type RaidQuietHoursConfig = {
+export type WorldBossQuietHoursConfig = {
   start: string;
   end: string;
   timezone: string;
 };
 
-export type RaidBossSnapshot = {
+export type WorldBossBossSnapshot = {
   name: string;
   level: number;
   currentHp: number;
@@ -26,11 +26,11 @@ export type RaidBossSnapshot = {
   rewardSummary: string;
 };
 
-export type RaidAdminLiveRaidSnapshot = {
-  raidId: string;
+export type WorldBossAdminLiveSnapshot = {
+  worldBossId: string;
   title: string;
-  status: RaidStatus;
-  outcome: RaidOutcome | null;
+  status: WorldBossStatus;
+  outcome: WorldBossOutcome | null;
   participantCount: number;
   eligibleParticipantCount: number;
   scheduledStartAt: Date;
@@ -39,54 +39,54 @@ export type RaidAdminLiveRaidSnapshot = {
   announcementMessageId: string;
   activeMessageId: string | null;
   activeThreadId: string | null;
-  boss: RaidBossSnapshot | null;
+  boss: WorldBossBossSnapshot | null;
 };
 
-export type RaidAdminStateSnapshot = {
-  liveRaidCount: number;
+export type WorldBossAdminStateSnapshot = {
+  liveWorldBossCount: number;
   lastTriggeredAt: Date | null;
   nextCheckAt: Date | null;
 };
 
-export type RaidAdminStatus = {
+export type WorldBossAdminStatus = {
   enabled: boolean;
   channelId: string | null;
   joinLeadMs: number;
   activeDurationMs: number;
-  targetRaidsPerDay: number;
+  targetWorldBossesPerDay: number;
   minGapMs: number;
   retryDelayMs: number;
-  quietHours: RaidQuietHoursConfig;
-  snapshot: RaidAdminStateSnapshot;
-  liveRaids: RaidAdminLiveRaidSnapshot[];
+  quietHours: WorldBossQuietHoursConfig;
+  snapshot: WorldBossAdminStateSnapshot;
+  liveWorldBosses: WorldBossAdminLiveSnapshot[];
 };
 
-export type TriggerRaidNowOutcome =
+export type TriggerWorldBossNowOutcome =
   | {
       created: true;
-      raidId: string;
+      worldBossId: string;
       scheduledStartAt: Date;
     }
   | {
       created: false;
     };
 
-export type TriggerRaidNowResult =
+export type TriggerWorldBossNowResult =
   | {
       ok: false;
-      reason: "unavailable" | "disabled" | "active-raid-exists";
+      reason: "unavailable" | "disabled" | "active-world-boss-exists";
     }
   | {
       ok: true;
-      result: TriggerRaidNowOutcome;
+      result: TriggerWorldBossNowOutcome;
     };
 
-export type RaidsAdminPort = {
-  getAdminStatus: () => RaidAdminStatus | null;
-  triggerRaidNow: () => Promise<TriggerRaidNowResult>;
+export type WorldBossAdminPort = {
+  getAdminStatus: () => WorldBossAdminStatus | null;
+  triggerWorldBossNow: () => Promise<TriggerWorldBossNowResult>;
 };
 
-export type ApplyRaidDiceRollInput = {
+export type ApplyWorldBossDiceRollInput = {
   channelId: string | null;
   userId: string;
   userMention: string;
@@ -95,9 +95,9 @@ export type ApplyRaidDiceRollInput = {
   nowMs?: number;
 };
 
-export type ApplyRaidDiceRollResult =
+export type ApplyWorldBossDiceRollResult =
   | {
-      kind: "no-raid";
+      kind: "no-world-boss";
     }
   | {
       kind: "ignored";
@@ -111,6 +111,6 @@ export type ApplyRaidDiceRollResult =
       achievementAnnouncements?: AchievementAnnouncement[];
     };
 
-export type RaidDiceRollPort = {
-  applyDiceRoll: (input: ApplyRaidDiceRollInput) => ApplyRaidDiceRollResult;
+export type WorldBossDiceRollPort = {
+  applyDiceRoll: (input: ApplyWorldBossDiceRollInput) => ApplyWorldBossDiceRollResult;
 };

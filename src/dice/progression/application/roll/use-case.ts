@@ -33,7 +33,7 @@ import {
 import { rollDieWithBans } from "../../../progression/domain/bans";
 import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
-import type { RaidDiceRollPort } from "../../../raids/application/ports";
+import type { WorldBossDiceRollPort } from "../../../world-boss/application/ports";
 import {
   buildDiceRollReplyContent,
   formatMatchingRollSummary,
@@ -64,7 +64,7 @@ export type DiceRollResult = {
 type RunRollDiceUseCaseInput = {
   userId: string;
   userMention: string;
-  raidThreadId?: string | null;
+  worldBossThreadId?: string | null;
   source?: "manual" | "auto";
   nowMs?: number;
 };
@@ -95,7 +95,7 @@ type RunRollDiceDependencies = {
     | "setLastPersonalDiceRollAt"
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
-  raids?: Pick<RaidDiceRollPort, "applyDiceRoll">;
+  worldBoss?: Pick<WorldBossDiceRollPort, "applyDiceRoll">;
   contracts?: Pick<ContractsGameplayProgressPort, "recordRoll">;
   unitOfWork: UnitOfWork;
 };
@@ -134,14 +134,14 @@ export const createRunRollDiceUseCase = ({
   permanentBonuses,
   progression,
   pvp,
-  raids,
+  worldBoss,
   contracts,
   unitOfWork,
 }: RunRollDiceDependencies) => {
   return ({
     userId,
     userMention,
-    raidThreadId = null,
+    worldBossThreadId = null,
     source = "manual",
     nowMs = Date.now(),
   }: RunRollDiceUseCaseInput): DiceRollResult => {
@@ -363,27 +363,29 @@ export const createRunRollDiceUseCase = ({
       matchCount: allSameCount,
       rewardText,
     });
-    const bestRaidRollSet = getHighestRollSet(rollPasses);
-    const raidDamage = getRollSetTotal(bestRaidRollSet);
-    const raidResult =
-      raidDamage > 0
-        ? (raids?.applyDiceRoll({
-            channelId: raidThreadId,
+    const bestWorldBossRollSet = getHighestRollSet(rollPasses);
+    const worldBossDamage = getRollSetTotal(bestWorldBossRollSet);
+    const worldBossResult =
+      worldBossDamage > 0
+        ? (worldBoss?.applyDiceRoll({
+            channelId: worldBossThreadId,
             userId,
             userMention,
-            damage: raidDamage,
-            bestRollSet: rollPasses.length > 1 ? bestRaidRollSet : null,
+            damage: worldBossDamage,
+            bestRollSet: rollPasses.length > 1 ? bestWorldBossRollSet : null,
             nowMs,
           }) ?? null)
         : null;
     const content =
-      raidResult && raidResult.kind !== "no-raid"
-        ? appendRaidSummaryWithinLimit(baseContent, raidResult.summary)
+      worldBossResult && worldBossResult.kind !== "no-world-boss"
+        ? appendWorldBossSummaryWithinLimit(baseContent, worldBossResult.summary)
         : baseContent;
     const achievementAnnouncements = mergeAchievementAnnouncements(
       [
         createAchievementAnnouncement(userId, result.newlyEarned),
-        ...(raidResult?.kind === "applied" ? (raidResult.achievementAnnouncements ?? []) : []),
+        ...(worldBossResult?.kind === "applied"
+          ? (worldBossResult.achievementAnnouncements ?? [])
+          : []),
       ].flatMap((announcement) => (announcement ? [announcement] : [])),
     );
 
@@ -542,14 +544,21 @@ const getRollSetTotal = (rolls: readonly number[]): number => {
   return rolls.reduce((rollTotal, roll) => rollTotal + roll, 0);
 };
 
-const appendRaidSummaryWithinLimit = (baseContent: string, raidSummary: string): string => {
+const appendWorldBossSummaryWithinLimit = (
+  baseContent: string,
+  worldBossSummary: string,
+): string => {
   const separator = "\n\n";
-  const combined = `${baseContent}${separator}${raidSummary}`;
+  const combined = `${baseContent}${separator}${worldBossSummary}`;
   if (combined.length <= discordMessageCharacterLimit) {
     return combined;
   }
 
-  const normalizedSummary = truncateWithSuffix(raidSummary, discordMessageCharacterLimit, "...");
+  const normalizedSummary = truncateWithSuffix(
+    worldBossSummary,
+    discordMessageCharacterLimit,
+    "...",
+  );
   const maxBaseLength = discordMessageCharacterLimit - normalizedSummary.length - separator.length;
   if (maxBaseLength <= 0) {
     return normalizedSummary;

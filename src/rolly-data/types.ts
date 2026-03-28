@@ -12,7 +12,7 @@ export type DiceAchievementCategory =
   | "casino"
   | "pvp"
   | "random-events"
-  | "raids"
+  | "world-boss"
   | "items"
   | "meta";
 
@@ -97,17 +97,17 @@ export type DiceRandomEventBalanceData = {
   variety: DiceBalanceVarietyConfig;
 };
 
-export type DiceRaidPipRewardTierData = {
+export type DiceWorldBossPipRewardTierData = {
   bossLevelAtLeast: number;
   pips: number;
 };
 
-export type DiceRaidPipRewardFormulaData = {
+export type DiceWorldBossPipRewardFormulaData = {
   flatPips: number;
   flatPipsThroughBossLevel: number;
 };
 
-export type DiceRaidRollPassRewardData = {
+export type DiceWorldBossRollPassRewardData = {
   multiplierPerBossLevel: number;
   minimumMultiplier: number;
   maximumMultiplier: number;
@@ -116,29 +116,29 @@ export type DiceRaidRollPassRewardData = {
   maximumRolls: number;
 };
 
-export type DiceRaidRewardData =
+export type DiceWorldBossRewardData =
   | {
-      pipsFormula: DiceRaidPipRewardFormulaData;
-      rollPassBuff: DiceRaidRollPassRewardData;
+      pipsFormula: DiceWorldBossPipRewardFormulaData;
+      rollPassBuff: DiceWorldBossRollPassRewardData;
     }
   | {
-      pipsByBossLevel: DiceRaidPipRewardTierData[];
-      rollPassBuff: DiceRaidRollPassRewardData;
+      pipsByBossLevel: DiceWorldBossPipRewardTierData[];
+      rollPassBuff: DiceWorldBossRollPassRewardData;
     };
 
-export type DiceRaidBossNamesData = {
+export type DiceWorldBossBossNamesData = {
   prefixes: string[];
   suffixes: string[];
 };
 
-export type DiceRaidBossBalanceData = {
+export type DiceWorldBossBossBalanceData = {
   baseHp: number;
   hpIncreasePerBossLevelPercent: number;
   levelHalfLifeLevels: number;
   maxBossLevel: number;
 };
 
-export type DiceRaidParticipantStrengthData = {
+export type DiceWorldBossParticipantStrengthData = {
   prestigeMultiplier: number;
 };
 
@@ -184,11 +184,11 @@ export type DiceBalanceData = {
   };
 };
 
-export type DiceRaidData = {
-  reward: DiceRaidRewardData;
-  bossNames: DiceRaidBossNamesData;
-  bossBalance: DiceRaidBossBalanceData;
-  participantStrength: DiceRaidParticipantStrengthData;
+export type DiceWorldBossData = {
+  reward: DiceWorldBossRewardData;
+  bossNames: DiceWorldBossBossNamesData;
+  bossBalance: DiceWorldBossBossBalanceData;
+  participantStrength: DiceWorldBossParticipantStrengthData;
 };
 
 export type DiceCasinoPayoutRatio = {
@@ -334,7 +334,7 @@ export type LoadedRollyData = {
   introPostsV1: IntroPostsV1Data;
   pvp: DicePvpData;
   randomEventBalance: DiceRandomEventBalanceData;
-  raids: DiceRaidData;
+  worldBoss: DiceWorldBossData;
   itemsV1: DiceItemData[];
   randomEventsV1: RandomEventScenario[];
 };

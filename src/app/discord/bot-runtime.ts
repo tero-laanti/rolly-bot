@@ -10,7 +10,11 @@ import {
   dispatchStringSelectMenuInteraction,
   registerStringSelectMenuHandler,
 } from "./string-select-menu-router";
-import { introPostsConfig, randomEventsFoundationConfig, raidsConfig } from "../../shared/config";
+import {
+  introPostsConfig,
+  randomEventsFoundationConfig,
+  worldBossConfig,
+} from "../../shared/config";
 import { getDatabase, initDatabase } from "../../shared/db";
 import { requireEnv } from "../../shared/env";
 import { getRollyDataSourceDescription, primeRollyData } from "../../rolly-data/load";
@@ -23,17 +27,17 @@ import {
 } from "../../dice/random-events/infrastructure/admin-controller";
 import { createRandomEventsState } from "../../dice/random-events/infrastructure/state-store";
 import { randomEventButtonPrefix } from "../../dice/random-events/interfaces/discord/button-ids";
-import { createRaidsLiveRuntime } from "../../dice/raids/infrastructure/live-runtime";
-import { startRaidsFoundationScheduler } from "../../dice/raids/infrastructure/foundation-scheduler";
+import { createWorldBossLiveRuntime } from "../../dice/world-boss/infrastructure/live-runtime";
+import { startWorldBossFoundationScheduler } from "../../dice/world-boss/infrastructure/foundation-scheduler";
 import {
-  clearRaidsAdminController,
-  registerRaidsAdminController,
-} from "../../dice/raids/infrastructure/admin-controller";
+  clearWorldBossAdminController,
+  registerWorldBossAdminController,
+} from "../../dice/world-boss/infrastructure/admin-controller";
 import {
-  raidJoinButtonPrefix,
-  raidLeaveButtonPrefix,
-} from "../../dice/raids/interfaces/discord/button-ids";
-import { createRaidsState } from "../../dice/raids/infrastructure/state-store";
+  worldBossJoinButtonPrefix,
+  worldBossLeaveButtonPrefix,
+} from "../../dice/world-boss/interfaces/discord/button-ids";
+import { createWorldBossState } from "../../dice/world-boss/infrastructure/state-store";
 import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastructure/challenge-expiration-runtime";
 import { syncIntroPostsOnStartup } from "../../system/intro-posts/infrastructure/startup-sync";
 
@@ -57,8 +61,8 @@ const registerDiscordCommands = (): void => {
 
 let randomEventsLiveRuntime: ReturnType<typeof createRandomEventsLiveRuntime> | null = null;
 let stopRandomEventsScheduler: (() => void) | null = null;
-let raidsLiveRuntime: ReturnType<typeof createRaidsLiveRuntime> | null = null;
-let stopRaidsScheduler: (() => void) | null = null;
+let worldBossLiveRuntime: ReturnType<typeof createWorldBossLiveRuntime> | null = null;
+let stopWorldBossScheduler: (() => void) | null = null;
 let stopDicePvpChallengeExpirationRuntime: (() => void) | null = null;
 
 const handleRandomEventButton = async (interaction: ButtonInteraction): Promise<void> => {
@@ -73,16 +77,16 @@ const handleRandomEventButton = async (interaction: ButtonInteraction): Promise<
   await randomEventsLiveRuntime.handleButtonInteraction(interaction);
 };
 
-const handleRaidJoinButton = async (interaction: ButtonInteraction): Promise<void> => {
-  if (!raidsLiveRuntime) {
+const handleWorldBossButton = async (interaction: ButtonInteraction): Promise<void> => {
+  if (!worldBossLiveRuntime) {
     await interaction.reply({
-      content: "Raids are currently unavailable.",
+      content: "World Boss is currently unavailable.",
       ephemeral: true,
     });
     return;
   }
 
-  await raidsLiveRuntime.handleButtonInteraction(interaction);
+  await worldBossLiveRuntime.handleButtonInteraction(interaction);
 };
 
 const registerDiscordButtonHandlers = (): void => {
@@ -91,8 +95,8 @@ const registerDiscordButtonHandlers = (): void => {
   }
 
   registerButtonHandler(randomEventButtonPrefix, handleRandomEventButton);
-  registerButtonHandler(raidJoinButtonPrefix, handleRaidJoinButton);
-  registerButtonHandler(raidLeaveButtonPrefix, handleRaidJoinButton);
+  registerButtonHandler(worldBossJoinButtonPrefix, handleWorldBossButton);
+  registerButtonHandler(worldBossLeaveButtonPrefix, handleWorldBossButton);
 };
 
 const registerDiscordStringSelectMenuHandlers = (): void => {
@@ -139,51 +143,52 @@ const startRandomEventsFoundation = (): void => {
   console.log("[random-events] Foundation scheduler started.");
 };
 
-const startRaidsFoundation = (): void => {
-  if (!raidsConfig.enabled) {
-    registerRaidsAdminController({
-      config: raidsConfig,
+const startWorldBossFoundation = (): void => {
+  if (!worldBossConfig.enabled) {
+    registerWorldBossAdminController({
+      config: worldBossConfig,
       runtime: null,
       state: null,
       scheduler: null,
     });
     console.log(
-      `[raids] Lifecycle runtime inactive. ${raidsConfig.inactiveReason ?? "No activation reason provided."}`,
+      `[world-boss] Lifecycle runtime inactive. ${worldBossConfig.inactiveReason ?? "No activation reason provided."}`,
     );
     return;
   }
 
-  if (raidsLiveRuntime || stopRaidsScheduler) {
+  if (worldBossLiveRuntime || stopWorldBossScheduler) {
     return;
   }
 
-  const raidsState = createRaidsState();
-  raidsLiveRuntime = createRaidsLiveRuntime({
+  const worldBossState = createWorldBossState();
+  worldBossLiveRuntime = createWorldBossLiveRuntime({
     client,
-    config: raidsConfig,
+    config: worldBossConfig,
     logger: console,
   });
 
-  const raidsScheduler = startRaidsFoundationScheduler({
-    config: raidsConfig,
-    state: raidsState,
-    hasBlockingRaid: raidsLiveRuntime.hasBlockingRaid,
-    onTriggerOpportunity: async () => raidsLiveRuntime?.triggerRaidNow() ?? { created: false },
+  const worldBossScheduler = startWorldBossFoundationScheduler({
+    config: worldBossConfig,
+    state: worldBossState,
+    hasBlockingWorldBoss: worldBossLiveRuntime.hasBlockingWorldBoss,
+    onTriggerOpportunity: async () =>
+      worldBossLiveRuntime?.triggerWorldBossNow() ?? { created: false },
     logger: console,
   });
-  stopRaidsScheduler = raidsScheduler.stop;
+  stopWorldBossScheduler = worldBossScheduler.stop;
 
-  registerRaidsAdminController({
-    config: raidsConfig,
-    runtime: raidsLiveRuntime,
-    state: raidsState,
-    scheduler: raidsScheduler,
+  registerWorldBossAdminController({
+    config: worldBossConfig,
+    runtime: worldBossLiveRuntime,
+    state: worldBossState,
+    scheduler: worldBossScheduler,
   });
 
   console.log(
-    raidsConfig.targetRaidsPerDay > 0
-      ? "[raids] Lifecycle runtime and scheduler started."
-      : "[raids] Lifecycle runtime started. Random scheduling is off.",
+    worldBossConfig.targetWorldBossesPerDay > 0
+      ? "[world-boss] Lifecycle runtime and scheduler started."
+      : "[world-boss] Lifecycle runtime started. Random scheduling is off.",
   );
 };
 
@@ -203,7 +208,7 @@ const startDicePvpChallengeExpiration = (): void => {
 
 const stopBackgroundSchedulers = async (): Promise<void> => {
   clearRandomEventsAdminController();
-  clearRaidsAdminController();
+  clearWorldBossAdminController();
 
   if (stopRandomEventsScheduler) {
     stopRandomEventsScheduler();
@@ -220,14 +225,14 @@ const stopBackgroundSchedulers = async (): Promise<void> => {
     stopDicePvpChallengeExpirationRuntime = null;
   }
 
-  if (stopRaidsScheduler) {
-    stopRaidsScheduler();
-    stopRaidsScheduler = null;
+  if (stopWorldBossScheduler) {
+    stopWorldBossScheduler();
+    stopWorldBossScheduler = null;
   }
 
-  if (raidsLiveRuntime) {
-    await raidsLiveRuntime.stop();
-    raidsLiveRuntime = null;
+  if (worldBossLiveRuntime) {
+    await worldBossLiveRuntime.stop();
+    worldBossLiveRuntime = null;
   }
 };
 
@@ -266,7 +271,7 @@ client.once(Events.ClientReady, (readyClient) => {
     console.error("[intro-posts] Startup sync failed:", error);
   });
   startRandomEventsFoundation();
-  startRaidsFoundation();
+  startWorldBossFoundation();
   startDicePvpChallengeExpiration();
 });
 

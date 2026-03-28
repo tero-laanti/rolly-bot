@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "discord.js";
 import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
-import type { RaidsConfig } from "../../../shared/config";
+import type { WorldBossConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import type { ContractsGameplayProgressPort } from "../../contracts/application/ports";
@@ -15,105 +15,111 @@ import {
 } from "../../progression/application/achievement-announcements";
 import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type {
-  ApplyRaidDiceRollInput,
-  ApplyRaidDiceRollResult,
-  RaidAdminLiveRaidSnapshot,
-  RaidBossSnapshot,
-  RaidOutcome,
-  RaidStatus,
-  TriggerRaidNowOutcome,
+  ApplyWorldBossDiceRollInput,
+  ApplyWorldBossDiceRollResult,
+  WorldBossAdminLiveSnapshot,
+  WorldBossBossSnapshot,
+  WorldBossOutcome,
+  WorldBossStatus,
+  TriggerWorldBossNowOutcome,
 } from "../application/ports";
-import { getDiceRaidAchievementIds } from "../application/achievement-rules";
+import { getDiceWorldBossAchievementIds } from "../application/achievement-rules";
 import {
-  calculateRaidParticipantStrength,
-  createRaidBoss,
-  describeAppliedRaidReward,
-  describeRaidReward,
+  calculateWorldBossParticipantStrength,
+  createWorldBoss,
+  describeAppliedWorldBossReward,
+  describeWorldBossReward,
 } from "../domain/raid";
-import { parseRaidJoinButtonId, parseRaidLeaveButtonId } from "../interfaces/discord/button-ids";
 import {
-  buildRaidActivePrompt,
-  buildRaidAnnouncementPrompt,
-  buildRaidCancelledPrompt,
-  buildRaidInterruptedPrompt,
-  buildRaidResolveFailedPrompt,
-  buildRaidResolvedPrompt,
-  buildRaidStartFailedPrompt,
+  parseWorldBossJoinButtonId,
+  parseWorldBossLeaveButtonId,
+} from "../interfaces/discord/button-ids";
+import {
+  buildWorldBossActivePrompt,
+  buildWorldBossAnnouncementPrompt,
+  buildWorldBossCancelledPrompt,
+  buildWorldBossInterruptedPrompt,
+  buildWorldBossResolveFailedPrompt,
+  buildWorldBossResolvedPrompt,
+  buildWorldBossStartFailedPrompt,
 } from "../interfaces/discord/prompt";
 import { truncateDiscordText } from "../../../shared/discord";
 import type {
-  ActiveRaidContext,
-  ActiveRaidRecord,
-  RaidsLiveRuntimeLogger,
+  ActiveWorldBossContext,
+  ActiveWorldBossRecord,
+  WorldBossLiveRuntimeLogger,
 } from "./live-runtime-types";
 import {
-  recordRaidHit,
-  recordRaidJoin,
-  recordRaidSuccessResolution,
+  recordWorldBossHit,
+  recordWorldBossJoin,
+  recordWorldBossSuccessResolution,
 } from "./achievement-stats-repository";
-import { buildRaidHitSummary } from "./raid-hit-summary";
+import { buildWorldBossHitSummary } from "./raid-hit-summary";
 
-type CreateRaidsLiveRuntimeInput = {
+type CreateWorldBossLiveRuntimeInput = {
   client: Client;
-  config: RaidsConfig;
-  logger?: RaidsLiveRuntimeLogger;
+  config: WorldBossConfig;
+  logger?: WorldBossLiveRuntimeLogger;
 };
 
 type QueueAnnouncementRenderInput = {
-  context: ActiveRaidContext;
+  context: ActiveWorldBossContext;
   logFailureMessage: string;
-  allowedStatuses?: readonly RaidStatus[];
+  allowedStatuses?: readonly WorldBossStatus[];
 };
 
-export type RaidsLiveRuntime = {
-  triggerRaidNow: () => Promise<TriggerRaidNowOutcome>;
+export type WorldBossLiveRuntime = {
+  triggerWorldBossNow: () => Promise<TriggerWorldBossNowOutcome>;
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
-  applyDiceRoll: (input: ApplyRaidDiceRollInput) => ApplyRaidDiceRollResult;
-  getLiveRaidsSnapshot: () => RaidAdminLiveRaidSnapshot[];
-  hasBlockingRaid: () => boolean;
+  applyDiceRoll: (input: ApplyWorldBossDiceRollInput) => ApplyWorldBossDiceRollResult;
+  getLiveWorldBossesSnapshot: () => WorldBossAdminLiveSnapshot[];
+  hasBlockingWorldBoss: () => boolean;
   stop: () => Promise<void>;
 };
 
-const raidTitle = "World Boss";
-const raidProgressRenderThrottleMs = 1_500;
+const worldBossTitle = "World Boss";
+const worldBossProgressRenderThrottleMs = 1_500;
 const maxContributionLines = 5;
 const threadNameCharacterLimit = 100;
 
-const blockingStatuses = new Set<RaidStatus>(["joining", "starting", "active"]);
+const blockingWorldBossStatuses = new Set<WorldBossStatus>(["joining", "starting", "active"]);
 
-const isBlockingRaidStatus = (status: RaidStatus): boolean => {
-  return blockingStatuses.has(status);
+const isBlockingWorldBossStatus = (status: WorldBossStatus): boolean => {
+  return blockingWorldBossStatuses.has(status);
 };
 
-const participantIdsFromContext = (context: ActiveRaidContext): string[] => {
-  return Array.from(context.raid.participantIds);
+const participantIdsFromContext = (context: ActiveWorldBossContext): string[] => {
+  return Array.from(context.worldBoss.participantIds);
 };
 
-const currentRaidStatus = (context: ActiveRaidContext): RaidStatus => {
-  return context.raid.status;
+const currentWorldBossStatus = (context: ActiveWorldBossContext): WorldBossStatus => {
+  return context.worldBoss.status;
 };
 
-const buildRaidBossSnapshot = (context: ActiveRaidContext): RaidBossSnapshot | null => {
-  if (!context.raid.boss) {
+const buildWorldBossBossSnapshot = (
+  context: ActiveWorldBossContext,
+): WorldBossBossSnapshot | null => {
+  if (!context.worldBoss.boss) {
     return null;
   }
 
   return {
-    name: context.raid.boss.name,
-    level: context.raid.boss.level,
-    currentHp: context.raid.boss.currentHp,
-    maxHp: context.raid.boss.maxHp,
+    name: context.worldBoss.boss.name,
+    level: context.worldBoss.boss.level,
+    currentHp: context.worldBoss.boss.currentHp,
+    maxHp: context.worldBoss.boss.maxHp,
     rewardSummary:
-      context.raid.resolvedRewardSummary ?? describeRaidReward(context.raid.boss.reward),
+      context.worldBoss.resolvedRewardSummary ??
+      describeWorldBossReward(context.worldBoss.boss.reward),
   };
 };
 
-const buildContributionLines = (context: ActiveRaidContext): string[] => {
-  if (!context.raid.boss) {
+const buildContributionLines = (context: ActiveWorldBossContext): string[] => {
+  if (!context.worldBoss.boss) {
     return [];
   }
 
-  return Array.from(context.raid.boss.damageByUserId.entries())
+  return Array.from(context.worldBoss.boss.damageByUserId.entries())
     .sort((left, right) => right[1] - left[1])
     .slice(0, maxContributionLines)
     .map(([userId, damage]) => `<@${userId}> - ${damage} dmg`);
@@ -125,7 +131,7 @@ const recordWorldBossJoinContractProgressSafely = ({
   userId,
 }: {
   contracts: Pick<ContractsGameplayProgressPort, "recordWorldBossJoin"> | undefined;
-  logger: RaidsLiveRuntimeLogger;
+  logger: WorldBossLiveRuntimeLogger;
   userId: string;
 }): void => {
   if (!contracts) {
@@ -142,13 +148,13 @@ const recordWorldBossJoinContractProgressSafely = ({
   }
 };
 
-export const createRaidsLiveRuntime = ({
+export const createWorldBossLiveRuntime = ({
   client,
   config,
   logger = console,
-}: CreateRaidsLiveRuntimeInput): RaidsLiveRuntime => {
-  const liveRaidsById = new Map<string, ActiveRaidContext>();
-  const liveRaidIdsByThreadId = new Map<string, string>();
+}: CreateWorldBossLiveRuntimeInput): WorldBossLiveRuntime => {
+  const liveWorldBossesById = new Map<string, ActiveWorldBossContext>();
+  const liveWorldBossIdsByThreadId = new Map<string, string>();
   const db = getDatabase();
   const contracts = createSqliteContractsGameplayProgressPort(db);
   const economy = createSqliteEconomyRepository(db);
@@ -157,11 +163,11 @@ export const createRaidsLiveRuntime = ({
   let stopping = false;
   let triggerChain: Promise<void> = Promise.resolve();
 
-  const isCurrentContext = (context: ActiveRaidContext): boolean => {
-    return liveRaidsById.get(context.raid.raidId) === context;
+  const isCurrentContext = (context: ActiveWorldBossContext): boolean => {
+    return liveWorldBossesById.get(context.worldBoss.worldBossId) === context;
   };
 
-  const clearRaidTimers = (context: ActiveRaidContext): void => {
+  const clearWorldBossTimers = (context: ActiveWorldBossContext): void => {
     if (context.handles.startTimer) {
       clearTimeout(context.handles.startTimer);
       context.handles.startTimer = null;
@@ -178,159 +184,166 @@ export const createRaidsLiveRuntime = ({
     }
   };
 
-  const finalizeRaid = (context: ActiveRaidContext): void => {
-    clearRaidTimers(context);
+  const finalizeWorldBoss = (context: ActiveWorldBossContext): void => {
+    clearWorldBossTimers(context);
     if (!isCurrentContext(context)) {
       return;
     }
 
-    if (context.raid.activeThreadId) {
-      liveRaidIdsByThreadId.delete(context.raid.activeThreadId);
+    if (context.worldBoss.activeThreadId) {
+      liveWorldBossIdsByThreadId.delete(context.worldBoss.activeThreadId);
     }
 
-    liveRaidsById.delete(context.raid.raidId);
+    liveWorldBossesById.delete(context.worldBoss.worldBossId);
   };
 
-  const buildLiveRaidSnapshot = (context: ActiveRaidContext): RaidAdminLiveRaidSnapshot => {
+  const buildLiveWorldBossSnapshot = (
+    context: ActiveWorldBossContext,
+  ): WorldBossAdminLiveSnapshot => {
     return {
-      raidId: context.raid.raidId,
-      title: context.raid.title,
-      status: context.raid.status,
-      outcome: context.raid.outcome,
-      participantCount: context.raid.participantIds.size,
-      eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
-      scheduledStartAt: new Date(context.raid.scheduledStartAtMs),
-      expiresAt: context.raid.expiresAtMs === null ? null : new Date(context.raid.expiresAtMs),
+      worldBossId: context.worldBoss.worldBossId,
+      title: context.worldBoss.title,
+      status: context.worldBoss.status,
+      outcome: context.worldBoss.outcome,
+      participantCount: context.worldBoss.participantIds.size,
+      eligibleParticipantCount: context.worldBoss.rewardEligibleUserIds.size,
+      scheduledStartAt: new Date(context.worldBoss.scheduledStartAtMs),
+      expiresAt:
+        context.worldBoss.expiresAtMs === null ? null : new Date(context.worldBoss.expiresAtMs),
       channelId: context.handles.announcementMessage.channelId,
       announcementMessageId: context.handles.announcementMessage.id,
       activeMessageId: context.handles.activeMessage?.id ?? null,
-      activeThreadId: context.raid.activeThreadId,
-      boss: buildRaidBossSnapshot(context),
+      activeThreadId: context.worldBoss.activeThreadId,
+      boss: buildWorldBossBossSnapshot(context),
     };
   };
 
   const buildAnnouncementPromptForCurrentState = (
-    context: ActiveRaidContext,
+    context: ActiveWorldBossContext,
   ): BaseMessageOptions => {
     const participantIds = participantIdsFromContext(context);
-    const boss = context.raid.boss;
+    const boss = context.worldBoss.boss;
 
-    switch (context.raid.status) {
+    switch (context.worldBoss.status) {
       case "joining":
-        return buildRaidAnnouncementPrompt({
-          raidId: context.raid.raidId,
+        return buildWorldBossAnnouncementPrompt({
+          worldBossId: context.worldBoss.worldBossId,
           participantIds,
-          scheduledStartAtMs: context.raid.scheduledStartAtMs,
+          scheduledStartAtMs: context.worldBoss.scheduledStartAtMs,
         });
       case "starting":
       case "active":
-        return buildRaidAnnouncementPrompt({
-          raidId: context.raid.raidId,
+        return buildWorldBossAnnouncementPrompt({
+          worldBossId: context.worldBoss.worldBossId,
           participantIds,
-          scheduledStartAtMs: context.raid.scheduledStartAtMs,
+          scheduledStartAtMs: context.worldBoss.scheduledStartAtMs,
           disabled: true,
           bossName: boss?.name ?? null,
-          threadId: context.raid.activeThreadId,
+          threadId: context.worldBoss.activeThreadId,
         });
       case "cancelled":
-        return buildRaidCancelledPrompt({
-          scheduledStartAtMs: context.raid.scheduledStartAtMs,
+        return buildWorldBossCancelledPrompt({
+          scheduledStartAtMs: context.worldBoss.scheduledStartAtMs,
         });
       case "interrupted":
-        return buildRaidInterruptedPrompt({
+        return buildWorldBossInterruptedPrompt({
           participantIds,
           bossName: boss?.name ?? null,
         });
       case "start-failed":
-        return buildRaidStartFailedPrompt({
+        return buildWorldBossStartFailedPrompt({
           participantIds,
         });
       case "resolved":
-        if (boss && context.raid.outcome) {
-          return buildRaidResolvedPrompt({
+        if (boss && context.worldBoss.outcome) {
+          return buildWorldBossResolvedPrompt({
             participantIds,
-            eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
-            resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
-            outcome: context.raid.outcome,
+            eligibleParticipantCount: context.worldBoss.rewardEligibleUserIds.size,
+            resolvedAtMs: context.worldBoss.closedAtMs ?? Date.now(),
+            outcome: context.worldBoss.outcome,
             bossName: boss.name,
             bossLevel: boss.level,
             maxHp: boss.maxHp,
-            rewardSummary: context.raid.resolvedRewardSummary ?? describeRaidReward(boss.reward),
+            rewardSummary:
+              context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward),
             contributionLines: buildContributionLines(context),
           });
         }
 
-        return buildRaidInterruptedPrompt({
+        return buildWorldBossInterruptedPrompt({
           participantIds,
         });
       case "cleanup-needed":
-        return buildRaidResolveFailedPrompt({
+        return buildWorldBossResolveFailedPrompt({
           participantIds,
-          resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
+          resolvedAtMs: context.worldBoss.closedAtMs ?? Date.now(),
           bossName: boss?.name ?? null,
-          outcome: context.raid.outcome,
+          outcome: context.worldBoss.outcome,
         });
     }
   };
 
-  const buildActivePromptForCurrentState = (context: ActiveRaidContext): BaseMessageOptions => {
+  const buildActivePromptForCurrentState = (
+    context: ActiveWorldBossContext,
+  ): BaseMessageOptions => {
     const participantIds = participantIdsFromContext(context);
-    const boss = context.raid.boss;
+    const boss = context.worldBoss.boss;
 
-    switch (context.raid.status) {
+    switch (context.worldBoss.status) {
       case "active":
-        if (!boss || !context.raid.activeThreadId) {
-          return buildRaidInterruptedPrompt({
+        if (!boss || !context.worldBoss.activeThreadId) {
+          return buildWorldBossInterruptedPrompt({
             participantIds,
             bossName: boss?.name ?? null,
           });
         }
 
-        return buildRaidActivePrompt({
+        return buildWorldBossActivePrompt({
           participantIds,
-          eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
-          startedAtMs: context.raid.startedAtMs ?? Date.now(),
-          endsAtMs: context.raid.expiresAtMs ?? Date.now(),
-          threadId: context.raid.activeThreadId,
+          eligibleParticipantCount: context.worldBoss.rewardEligibleUserIds.size,
+          startedAtMs: context.worldBoss.startedAtMs ?? Date.now(),
+          endsAtMs: context.worldBoss.expiresAtMs ?? Date.now(),
+          threadId: context.worldBoss.activeThreadId,
           bossName: boss.name,
           bossLevel: boss.level,
           currentHp: boss.currentHp,
           maxHp: boss.maxHp,
-          rewardSummary: describeRaidReward(boss.reward),
+          rewardSummary: describeWorldBossReward(boss.reward),
           totalDamage: boss.totalDamage,
           totalAttacks: boss.totalAttacks,
           contributionLines: buildContributionLines(context),
         });
       case "resolved":
-        if (boss && context.raid.outcome) {
-          return buildRaidResolvedPrompt({
+        if (boss && context.worldBoss.outcome) {
+          return buildWorldBossResolvedPrompt({
             participantIds,
-            eligibleParticipantCount: context.raid.rewardEligibleUserIds.size,
-            resolvedAtMs: context.raid.closedAtMs ?? Date.now(),
-            outcome: context.raid.outcome,
+            eligibleParticipantCount: context.worldBoss.rewardEligibleUserIds.size,
+            resolvedAtMs: context.worldBoss.closedAtMs ?? Date.now(),
+            outcome: context.worldBoss.outcome,
             bossName: boss.name,
             bossLevel: boss.level,
             maxHp: boss.maxHp,
-            rewardSummary: context.raid.resolvedRewardSummary ?? describeRaidReward(boss.reward),
+            rewardSummary:
+              context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward),
             contributionLines: buildContributionLines(context),
           });
         }
 
-        return buildRaidInterruptedPrompt({
+        return buildWorldBossInterruptedPrompt({
           participantIds,
           bossName: boss?.name ?? null,
         });
       case "interrupted":
-        return buildRaidInterruptedPrompt({
+        return buildWorldBossInterruptedPrompt({
           participantIds,
           bossName: boss?.name ?? null,
         });
       case "start-failed":
-        return buildRaidStartFailedPrompt({
+        return buildWorldBossStartFailedPrompt({
           participantIds,
         });
       default:
-        return buildRaidInterruptedPrompt({
+        return buildWorldBossInterruptedPrompt({
           participantIds,
           bossName: boss?.name ?? null,
         });
@@ -369,7 +382,7 @@ export const createRaidsLiveRuntime = ({
           return;
         }
 
-        if (allowedStatuses && !allowedStatuses.includes(context.raid.status)) {
+        if (allowedStatuses && !allowedStatuses.includes(context.worldBoss.status)) {
           return;
         }
 
@@ -388,7 +401,7 @@ export const createRaidsLiveRuntime = ({
     context,
     logFailureMessage,
   }: {
-    context: ActiveRaidContext;
+    context: ActiveWorldBossContext;
     logFailureMessage: string;
   }): Promise<boolean> => {
     if (!context.handles.activeMessage) {
@@ -418,8 +431,11 @@ export const createRaidsLiveRuntime = ({
     return updated;
   };
 
-  const scheduleActiveRender = (context: ActiveRaidContext, logFailureMessage: string): void => {
-    if (!context.handles.activeMessage || currentRaidStatus(context) !== "active") {
+  const scheduleActiveRender = (
+    context: ActiveWorldBossContext,
+    logFailureMessage: string,
+  ): void => {
+    if (!context.handles.activeMessage || currentWorldBossStatus(context) !== "active") {
       return;
     }
 
@@ -428,7 +444,7 @@ export const createRaidsLiveRuntime = ({
     }
 
     const elapsedMs = Date.now() - context.handles.lastActiveRenderAtMs;
-    const delayMs = Math.max(0, raidProgressRenderThrottleMs - elapsedMs);
+    const delayMs = Math.max(0, worldBossProgressRenderThrottleMs - elapsedMs);
 
     context.handles.activeRenderTimer = setTimeout(() => {
       context.handles.activeRenderTimer = null;
@@ -440,7 +456,7 @@ export const createRaidsLiveRuntime = ({
   };
 
   const queueTransition = async (
-    context: ActiveRaidContext,
+    context: ActiveWorldBossContext,
     transition: () => Promise<void>,
   ): Promise<void> => {
     context.handles.transitionChain = context.handles.transitionChain
@@ -456,42 +472,42 @@ export const createRaidsLiveRuntime = ({
     await context.handles.transitionChain;
   };
 
-  const scheduleStart = (context: ActiveRaidContext): void => {
-    const delayMs = Math.max(0, context.raid.scheduledStartAtMs - Date.now());
+  const scheduleStart = (context: ActiveWorldBossContext): void => {
+    const delayMs = Math.max(0, context.worldBoss.scheduledStartAtMs - Date.now());
     context.handles.startTimer = setTimeout(() => {
       void queueTransition(context, async () => {
         await runStartTransition(context);
       }).catch((error) => {
-        logger.warn("[raids] Failed to transition raid into active state.", error);
+        logger.warn("[world-boss] Failed to transition World Boss into active state.", error);
       });
     }, delayMs);
   };
 
-  const scheduleResolve = (context: ActiveRaidContext): void => {
-    const delayMs = Math.max(0, (context.raid.expiresAtMs ?? Date.now()) - Date.now());
+  const scheduleResolve = (context: ActiveWorldBossContext): void => {
+    const delayMs = Math.max(0, (context.worldBoss.expiresAtMs ?? Date.now()) - Date.now());
     context.handles.resolveTimer = setTimeout(() => {
       void queueTransition(context, async () => {
         await runFailureResolveTransition(context);
       }).catch((error) => {
-        logger.warn("[raids] Failed to resolve raid lifecycle.", error);
+        logger.warn("[world-boss] Failed to resolve World Boss lifecycle.", error);
       });
     }, delayMs);
   };
 
-  const transitionToStarting = (context: ActiveRaidContext): void => {
-    context.raid.status = "starting";
-    context.raid.outcome = null;
-    context.raid.startedAtMs = null;
-    context.raid.expiresAtMs = null;
-    context.raid.closedAtMs = null;
-    context.raid.activeThreadId = null;
-    context.raid.rewardEligibleUserIds.clear();
-    context.raid.resolvedRewardSummary = null;
-    context.raid.boss = null;
+  const transitionToStarting = (context: ActiveWorldBossContext): void => {
+    context.worldBoss.status = "starting";
+    context.worldBoss.outcome = null;
+    context.worldBoss.startedAtMs = null;
+    context.worldBoss.expiresAtMs = null;
+    context.worldBoss.closedAtMs = null;
+    context.worldBoss.activeThreadId = null;
+    context.worldBoss.rewardEligibleUserIds.clear();
+    context.worldBoss.resolvedRewardSummary = null;
+    context.worldBoss.boss = null;
   };
 
   const transitionToActive = (
-    context: ActiveRaidContext,
+    context: ActiveWorldBossContext,
     {
       startedAtMs,
       expiresAtMs,
@@ -501,25 +517,25 @@ export const createRaidsLiveRuntime = ({
       startedAtMs: number;
       expiresAtMs: number;
       activeThreadId: string;
-      boss: NonNullable<ActiveRaidRecord["boss"]>;
+      boss: NonNullable<ActiveWorldBossRecord["boss"]>;
     },
   ): void => {
-    context.raid.status = "active";
-    context.raid.outcome = null;
-    context.raid.startedAtMs = startedAtMs;
-    context.raid.expiresAtMs = expiresAtMs;
-    context.raid.closedAtMs = null;
-    context.raid.activeThreadId = activeThreadId;
-    context.raid.rewardEligibleUserIds.clear();
-    context.raid.resolvedRewardSummary = null;
-    context.raid.boss = boss;
-    liveRaidIdsByThreadId.set(activeThreadId, context.raid.raidId);
+    context.worldBoss.status = "active";
+    context.worldBoss.outcome = null;
+    context.worldBoss.startedAtMs = startedAtMs;
+    context.worldBoss.expiresAtMs = expiresAtMs;
+    context.worldBoss.closedAtMs = null;
+    context.worldBoss.activeThreadId = activeThreadId;
+    context.worldBoss.rewardEligibleUserIds.clear();
+    context.worldBoss.resolvedRewardSummary = null;
+    context.worldBoss.boss = boss;
+    liveWorldBossIdsByThreadId.set(activeThreadId, context.worldBoss.worldBossId);
   };
 
   const transitionToTerminal = (
-    context: ActiveRaidContext,
+    context: ActiveWorldBossContext,
     status: Extract<
-      RaidStatus,
+      WorldBossStatus,
       "cancelled" | "interrupted" | "start-failed" | "resolved" | "cleanup-needed"
     >,
     {
@@ -527,16 +543,16 @@ export const createRaidsLiveRuntime = ({
       outcome = null,
     }: {
       closedAtMs?: number;
-      outcome?: RaidOutcome | null;
+      outcome?: WorldBossOutcome | null;
     } = {},
   ): void => {
-    context.raid.status = status;
-    context.raid.outcome = outcome;
-    context.raid.expiresAtMs = null;
-    context.raid.closedAtMs = closedAtMs;
+    context.worldBoss.status = status;
+    context.worldBoss.outcome = outcome;
+    context.worldBoss.expiresAtMs = null;
+    context.worldBoss.closedAtMs = closedAtMs;
   };
 
-  const closeUntrackedRaidMessage = async ({
+  const closeUntrackedWorldBossMessage = async ({
     message,
     participantIds,
     bossName = null,
@@ -549,7 +565,7 @@ export const createRaidsLiveRuntime = ({
   }): Promise<void> => {
     await editMessage({
       message,
-      prompt: buildRaidInterruptedPrompt({
+      prompt: buildWorldBossInterruptedPrompt({
         participantIds,
         bossName,
       }),
@@ -557,14 +573,14 @@ export const createRaidsLiveRuntime = ({
     });
   };
 
-  const applyRaidRewards = (context: ActiveRaidContext): void => {
-    const boss = context.raid.boss;
+  const applyWorldBossRewards = (context: ActiveWorldBossContext): void => {
+    const boss = context.worldBoss.boss;
     if (!boss) {
       return;
     }
 
-    const rewardEligibleUserIds = Array.from(context.raid.rewardEligibleUserIds);
-    const participantIds = Array.from(context.raid.participantIds);
+    const rewardEligibleUserIds = Array.from(context.worldBoss.rewardEligibleUserIds);
+    const participantIds = Array.from(context.worldBoss.participantIds);
     if (rewardEligibleUserIds.length < 1) {
       return;
     }
@@ -590,18 +606,18 @@ export const createRaidsLiveRuntime = ({
           userId: participantId,
           effectCode: "roll-pass-multiplier",
           kind: "positive",
-          source: `raid:${context.raid.raidId}`,
+          source: `world-boss:${context.worldBoss.worldBossId}`,
           magnitude: boss.reward.rollPassMultiplier,
           remainingRolls: boss.reward.rollPassRolls,
           consumeOnCommand: "dice",
-          stackGroup: "raid-reward-roll-pass-multiplier",
+          stackGroup: "world-boss-reward-roll-pass-multiplier",
           stackMode: "refresh",
         });
         const newlyEarned = awardManualDiceAchievements(
           progression,
           participantId,
-          getDiceRaidAchievementIds(
-            recordRaidSuccessResolution(db, {
+          getDiceWorldBossAchievementIds(
+            recordWorldBossSuccessResolution(db, {
               userId: participantId,
               bossLevel: boss.level,
               rewardEligible: true,
@@ -617,15 +633,15 @@ export const createRaidsLiveRuntime = ({
       }
 
       for (const participantId of participantIds) {
-        if (context.raid.rewardEligibleUserIds.has(participantId)) {
+        if (context.worldBoss.rewardEligibleUserIds.has(participantId)) {
           continue;
         }
 
         const newlyEarned = awardManualDiceAchievements(
           progression,
           participantId,
-          getDiceRaidAchievementIds(
-            recordRaidSuccessResolution(db, {
+          getDiceWorldBossAchievementIds(
+            recordWorldBossSuccessResolution(db, {
               userId: participantId,
               bossLevel: boss.level,
               rewardEligible: false,
@@ -640,107 +656,109 @@ export const createRaidsLiveRuntime = ({
         }
       }
 
-      context.raid.resolvedRewardSummary = describeAppliedRaidReward(
+      context.worldBoss.resolvedRewardSummary = describeAppliedWorldBossReward(
         boss.reward,
         awardedPipAmounts,
       );
-      context.raid.achievementAnnouncements =
+      context.worldBoss.achievementAnnouncements =
         mergeAchievementAnnouncements(achievementAnnouncements);
     });
   };
 
-  const finalizeResolvedRaid = async (context: ActiveRaidContext): Promise<void> => {
+  const finalizeResolvedWorldBoss = async (context: ActiveWorldBossContext): Promise<void> => {
     if (!isCurrentContext(context)) {
       return;
     }
 
     if (!context.handles.activeMessage) {
       transitionToTerminal(context, "cleanup-needed", {
-        closedAtMs: context.raid.closedAtMs ?? Date.now(),
-        outcome: context.raid.outcome,
+        closedAtMs: context.worldBoss.closedAtMs ?? Date.now(),
+        outcome: context.worldBoss.outcome,
       });
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["cleanup-needed"],
-        logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
+        logFailureMessage:
+          "[world-boss] Failed to update failed-resolution World Boss announcement.",
       });
       await publishAchievementAnnouncements({
         client,
-        announcements: context.raid.achievementAnnouncements,
+        announcements: context.worldBoss.achievementAnnouncements,
         logger,
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
     const rendered = await queueActiveRenderNow({
       context,
-      logFailureMessage: "[raids] Failed to update resolved raid prompt.",
+      logFailureMessage: "[world-boss] Failed to update resolved World Boss prompt.",
     });
 
-    if (!rendered && isCurrentContext(context) && currentRaidStatus(context) === "resolved") {
+    if (!rendered && isCurrentContext(context) && currentWorldBossStatus(context) === "resolved") {
       transitionToTerminal(context, "cleanup-needed", {
-        closedAtMs: context.raid.closedAtMs ?? Date.now(),
-        outcome: context.raid.outcome,
+        closedAtMs: context.worldBoss.closedAtMs ?? Date.now(),
+        outcome: context.worldBoss.outcome,
       });
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["cleanup-needed"],
-        logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
+        logFailureMessage:
+          "[world-boss] Failed to update failed-resolution World Boss announcement.",
       });
       await publishAchievementAnnouncements({
         client,
-        announcements: context.raid.achievementAnnouncements,
+        announcements: context.worldBoss.achievementAnnouncements,
         logger,
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
     await queueAnnouncementRender({
       context,
       allowedStatuses: ["resolved"],
-      logFailureMessage: "[raids] Failed to update resolved raid announcement.",
+      logFailureMessage: "[world-boss] Failed to update resolved World Boss announcement.",
     });
     await publishAchievementAnnouncements({
       client,
-      announcements: context.raid.achievementAnnouncements,
+      announcements: context.worldBoss.achievementAnnouncements,
       logger,
     });
-    finalizeRaid(context);
+    finalizeWorldBoss(context);
   };
 
-  const resolveRaid = (
-    context: ActiveRaidContext,
-    outcome: RaidOutcome,
+  const resolveWorldBoss = (
+    context: ActiveWorldBossContext,
+    outcome: WorldBossOutcome,
     closedAtMs = Date.now(),
   ): void => {
-    if (!isCurrentContext(context) || context.raid.status !== "active") {
+    if (!isCurrentContext(context) || context.worldBoss.status !== "active") {
       return;
     }
 
-    clearRaidTimers(context);
+    clearWorldBossTimers(context);
     transitionToTerminal(context, "resolved", {
       closedAtMs,
       outcome,
     });
     if (outcome === "success") {
-      applyRaidRewards(context);
+      applyWorldBossRewards(context);
     }
 
     void queueTransition(context, async () => {
-      await finalizeResolvedRaid(context);
+      await finalizeResolvedWorldBoss(context);
     }).catch((error) => {
-      logger.warn("[raids] Failed to finalize resolved raid.", error);
+      logger.warn("[world-boss] Failed to finalize resolved World Boss.", error);
     });
   };
 
-  const runStartTransition = async (context: ActiveRaidContext): Promise<void> => {
-    if (!isCurrentContext(context) || context.raid.status !== "joining") {
+  const runStartTransition = async (context: ActiveWorldBossContext): Promise<void> => {
+    if (!isCurrentContext(context) || context.worldBoss.status !== "joining") {
       return;
     }
 
-    clearRaidTimers(context);
+    clearWorldBossTimers(context);
     if (stopping) {
       return;
     }
@@ -749,46 +767,46 @@ export const createRaidsLiveRuntime = ({
     await queueAnnouncementRender({
       context,
       allowedStatuses: ["starting"],
-      logFailureMessage: "[raids] Failed to close raid signup announcement.",
+      logFailureMessage: "[world-boss] Failed to close World Boss signup announcement.",
     });
 
-    if (!isCurrentContext(context) || currentRaidStatus(context) !== "starting" || stopping) {
+    if (!isCurrentContext(context) || currentWorldBossStatus(context) !== "starting" || stopping) {
       return;
     }
 
-    if (context.raid.participantIds.size < 1) {
+    if (context.worldBoss.participantIds.size < 1) {
       transitionToTerminal(context, "cancelled");
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["cancelled"],
-        logFailureMessage: "[raids] Failed to update cancelled raid announcement.",
+        logFailureMessage: "[world-boss] Failed to update cancelled World Boss announcement.",
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
     const activeChannel = context.handles.announcementMessage.channel;
     if (!("send" in activeChannel) || typeof activeChannel.send !== "function") {
-      logger.error("[raids] Active raid channel is not writable.");
+      logger.error("[world-boss] Active World Boss channel is not writable.");
       transitionToTerminal(context, "start-failed");
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["start-failed"],
-        logFailureMessage: "[raids] Failed to update failed-start raid announcement.",
+        logFailureMessage: "[world-boss] Failed to update failed-start World Boss announcement.",
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
     const participantIds = participantIdsFromContext(context);
-    const totalRaiderStrength = participantIds.reduce((strengthTotal, participantId) => {
+    const totalParticipantStrength = participantIds.reduce((strengthTotal, participantId) => {
       return (
         strengthTotal +
-        calculateRaidParticipantStrength(progression.getActiveDicePrestige(participantId))
+        calculateWorldBossParticipantStrength(progression.getActiveDicePrestige(participantId))
       );
     }, 0);
-    const bossDefinition = createRaidBoss({
-      raiderStrength: totalRaiderStrength,
+    const bossDefinition = createWorldBoss({
+      raiderStrength: totalParticipantStrength,
     });
 
     const activeMessage = await activeChannel
@@ -796,7 +814,7 @@ export const createRaidsLiveRuntime = ({
         content: "Opening World Boss thread...",
       })
       .catch((error: unknown) => {
-        logger.error("[raids] Failed to send active raid prompt.", error);
+        logger.error("[world-boss] Failed to send active World Boss prompt.", error);
         return null;
       });
 
@@ -805,9 +823,9 @@ export const createRaidsLiveRuntime = ({
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["start-failed"],
-        logFailureMessage: "[raids] Failed to update failed-start raid announcement.",
+        logFailureMessage: "[world-boss] Failed to update failed-start World Boss announcement.",
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
@@ -822,34 +840,34 @@ export const createRaidsLiveRuntime = ({
         autoArchiveDuration: 60,
       })
       .catch((error: unknown) => {
-        logger.error("[raids] Failed to open raid thread.", error);
+        logger.error("[world-boss] Failed to open World Boss thread.", error);
         return null;
       });
 
     if (!activeThread) {
       await editMessage({
         message: activeMessage,
-        prompt: buildRaidStartFailedPrompt({
+        prompt: buildWorldBossStartFailedPrompt({
           participantIds,
         }),
-        logFailureMessage: "[raids] Failed to update failed-start active raid prompt.",
+        logFailureMessage: "[world-boss] Failed to update failed-start active World Boss prompt.",
       });
       transitionToTerminal(context, "start-failed");
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["start-failed"],
-        logFailureMessage: "[raids] Failed to update failed-start raid announcement.",
+        logFailureMessage: "[world-boss] Failed to update failed-start World Boss announcement.",
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
-    if (!isCurrentContext(context) || currentRaidStatus(context) !== "starting" || stopping) {
-      await closeUntrackedRaidMessage({
+    if (!isCurrentContext(context) || currentWorldBossStatus(context) !== "starting" || stopping) {
+      await closeUntrackedWorldBossMessage({
         message: activeMessage,
         participantIds,
         bossName: bossDefinition.name,
-        logFailureMessage: "[raids] Failed to close stale active raid message.",
+        logFailureMessage: "[world-boss] Failed to close stale active World Boss message.",
       });
       return;
     }
@@ -876,79 +894,80 @@ export const createRaidsLiveRuntime = ({
 
     const rendered = await queueActiveRenderNow({
       context,
-      logFailureMessage: "[raids] Failed to render active raid prompt.",
+      logFailureMessage: "[world-boss] Failed to render active World Boss prompt.",
     });
     if (!rendered) {
       transitionToTerminal(context, "cleanup-needed");
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["cleanup-needed"],
-        logFailureMessage: "[raids] Failed to update failed-resolution raid announcement.",
+        logFailureMessage:
+          "[world-boss] Failed to update failed-resolution World Boss announcement.",
       });
-      finalizeRaid(context);
+      finalizeWorldBoss(context);
       return;
     }
 
     await queueAnnouncementRender({
       context,
       allowedStatuses: ["active"],
-      logFailureMessage: "[raids] Failed to refresh active raid announcement prompt.",
+      logFailureMessage: "[world-boss] Failed to refresh active World Boss announcement prompt.",
     });
     scheduleResolve(context);
   };
 
-  const runFailureResolveTransition = async (context: ActiveRaidContext): Promise<void> => {
-    if (!isCurrentContext(context) || context.raid.status !== "active") {
+  const runFailureResolveTransition = async (context: ActiveWorldBossContext): Promise<void> => {
+    if (!isCurrentContext(context) || context.worldBoss.status !== "active") {
       return;
     }
 
-    resolveRaid(context, "failure");
+    resolveWorldBoss(context, "failure");
   };
 
-  const runInterruptTransition = async (context: ActiveRaidContext): Promise<void> => {
-    if (!isCurrentContext(context) || !isBlockingRaidStatus(context.raid.status)) {
+  const runInterruptTransition = async (context: ActiveWorldBossContext): Promise<void> => {
+    if (!isCurrentContext(context) || !isBlockingWorldBossStatus(context.worldBoss.status)) {
       return;
     }
 
-    clearRaidTimers(context);
+    clearWorldBossTimers(context);
     transitionToTerminal(context, "interrupted");
 
     const interrupted = await editMessage({
       message: context.handles.activeMessage ?? context.handles.announcementMessage,
-      prompt: buildRaidInterruptedPrompt({
+      prompt: buildWorldBossInterruptedPrompt({
         participantIds: participantIdsFromContext(context),
-        bossName: context.raid.boss?.name ?? null,
+        bossName: context.worldBoss.boss?.name ?? null,
       }),
-      logFailureMessage: "[raids] Failed to close raid during shutdown.",
+      logFailureMessage: "[world-boss] Failed to close World Boss during shutdown.",
     });
 
     if (!interrupted) {
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["interrupted"],
-        logFailureMessage: "[raids] Failed to update interrupted raid announcement.",
+        logFailureMessage: "[world-boss] Failed to update interrupted World Boss announcement.",
       });
     }
 
-    finalizeRaid(context);
+    finalizeWorldBoss(context);
   };
 
-  const triggerRaidNowInternal = async (): Promise<TriggerRaidNowOutcome> => {
+  const triggerWorldBossNowInternal = async (): Promise<TriggerWorldBossNowOutcome> => {
     if (stopping) {
       return { created: false };
     }
 
     if (!config.channelId) {
-      logger.warn("[raids] RAIDS_CHANNEL_ID not set. Skipping trigger.");
+      logger.warn("[world-boss] WORLD_BOSS_CHANNEL_ID not set. Skipping trigger.");
       return { created: false };
     }
 
-    if (hasBlockingRaid()) {
+    if (hasBlockingWorldBoss()) {
       return { created: false };
     }
 
     const channel = await client.channels.fetch(config.channelId).catch((error) => {
-      logger.error("[raids] Failed to fetch configured raid channel.", error);
+      logger.error("[world-boss] Failed to fetch configured World Boss channel.", error);
       return null;
     });
 
@@ -958,26 +977,26 @@ export const createRaidsLiveRuntime = ({
       !("send" in channel) ||
       typeof channel.send !== "function"
     ) {
-      logger.warn("[raids] Configured raid channel is not writable text channel.");
+      logger.warn("[world-boss] Configured World Boss channel is not a writable text channel.");
       return { created: false };
     }
 
-    if (stopping || hasBlockingRaid()) {
+    if (stopping || hasBlockingWorldBoss()) {
       return { created: false };
     }
 
-    const raidId = `raid:${randomUUID()}`;
+    const worldBossId = `world-boss:${randomUUID()}`;
     const scheduledStartAtMs = Date.now() + config.joinLeadMs;
     const announcementMessage = await channel
       .send(
-        buildRaidAnnouncementPrompt({
-          raidId,
+        buildWorldBossAnnouncementPrompt({
+          worldBossId,
           participantIds: [],
           scheduledStartAtMs,
         }),
       )
       .catch((error) => {
-        logger.error("[raids] Failed to send raid announcement.", error);
+        logger.error("[world-boss] Failed to send World Boss announcement.", error);
         return null;
       });
 
@@ -985,19 +1004,19 @@ export const createRaidsLiveRuntime = ({
       return { created: false };
     }
 
-    if (stopping || hasBlockingRaid()) {
-      await closeUntrackedRaidMessage({
+    if (stopping || hasBlockingWorldBoss()) {
+      await closeUntrackedWorldBossMessage({
         message: announcementMessage,
         participantIds: [],
-        logFailureMessage: "[raids] Failed to close stale raid announcement.",
+        logFailureMessage: "[world-boss] Failed to close stale World Boss announcement.",
       });
       return { created: false };
     }
 
-    const context: ActiveRaidContext = {
-      raid: {
-        raidId,
-        title: raidTitle,
+    const context: ActiveWorldBossContext = {
+      worldBoss: {
+        worldBossId,
+        title: worldBossTitle,
         createdAtMs: Date.now(),
         status: "joining",
         outcome: null,
@@ -1026,23 +1045,23 @@ export const createRaidsLiveRuntime = ({
       },
     };
 
-    liveRaidsById.set(raidId, context);
+    liveWorldBossesById.set(worldBossId, context);
     scheduleStart(context);
 
     return {
       created: true,
-      raidId,
+      worldBossId,
       scheduledStartAt: new Date(scheduledStartAtMs),
     };
   };
 
-  const triggerRaidNow = async (): Promise<TriggerRaidNowOutcome> => {
-    let result: TriggerRaidNowOutcome = { created: false };
+  const triggerWorldBossNow = async (): Promise<TriggerWorldBossNowOutcome> => {
+    let result: TriggerWorldBossNowOutcome = { created: false };
 
     triggerChain = triggerChain
       .catch(() => {})
       .then(async () => {
-        result = await triggerRaidNowInternal();
+        result = await triggerWorldBossNowInternal();
       });
 
     await triggerChain;
@@ -1050,25 +1069,25 @@ export const createRaidsLiveRuntime = ({
   };
 
   const handleButtonInteraction = async (interaction: ButtonInteraction): Promise<void> => {
-    const joinRaidId = parseRaidJoinButtonId(interaction.customId);
-    const leaveRaidId = parseRaidLeaveButtonId(interaction.customId);
+    const joinWorldBossId = parseWorldBossJoinButtonId(interaction.customId);
+    const leaveWorldBossId = parseWorldBossLeaveButtonId(interaction.customId);
     const buttonAction =
-      joinRaidId !== null
-        ? { type: "join" as const, raidId: joinRaidId }
-        : leaveRaidId !== null
-          ? { type: "leave" as const, raidId: leaveRaidId }
+      joinWorldBossId !== null
+        ? { type: "join" as const, worldBossId: joinWorldBossId }
+        : leaveWorldBossId !== null
+          ? { type: "leave" as const, worldBossId: leaveWorldBossId }
           : null;
     if (!buttonAction) {
       await interaction.deferUpdate();
       return;
     }
 
-    const context = liveRaidsById.get(buttonAction.raidId);
+    const context = liveWorldBossesById.get(buttonAction.worldBossId);
     if (
       !context ||
       stopping ||
-      context.raid.status !== "joining" ||
-      Date.now() >= context.raid.scheduledStartAtMs
+      context.worldBoss.status !== "joining" ||
+      Date.now() >= context.worldBoss.scheduledStartAtMs
     ) {
       await interaction.reply({
         content: "Too late - this World Boss is already closed.",
@@ -1078,7 +1097,7 @@ export const createRaidsLiveRuntime = ({
     }
 
     if (buttonAction.type === "leave") {
-      if (!context.raid.participantIds.has(interaction.user.id)) {
+      if (!context.worldBoss.participantIds.has(interaction.user.id)) {
         await interaction.reply({
           content: "You're not signed up for this World Boss.",
           ephemeral: true,
@@ -1086,17 +1105,17 @@ export const createRaidsLiveRuntime = ({
         return;
       }
 
-      context.raid.participantIds.delete(interaction.user.id);
+      context.worldBoss.participantIds.delete(interaction.user.id);
       await interaction.deferUpdate();
       await queueAnnouncementRender({
         context,
         allowedStatuses: ["joining"],
-        logFailureMessage: "[raids] Failed to refresh raid announcement prompt.",
+        logFailureMessage: "[world-boss] Failed to refresh World Boss announcement prompt.",
       });
       return;
     }
 
-    if (context.raid.participantIds.has(interaction.user.id)) {
+    if (context.worldBoss.participantIds.has(interaction.user.id)) {
       await interaction.reply({
         content: "You're already signed up for this World Boss.",
         ephemeral: true,
@@ -1104,24 +1123,24 @@ export const createRaidsLiveRuntime = ({
       return;
     }
 
-    context.raid.participantIds.add(interaction.user.id);
-    const isFirstJoinForRaid = !context.raid.joinedUserIds.has(interaction.user.id);
-    context.raid.joinedUserIds.add(interaction.user.id);
-    if (isFirstJoinForRaid) {
+    context.worldBoss.participantIds.add(interaction.user.id);
+    const isFirstWorldBossJoin = !context.worldBoss.joinedUserIds.has(interaction.user.id);
+    context.worldBoss.joinedUserIds.add(interaction.user.id);
+    if (isFirstWorldBossJoin) {
       recordWorldBossJoinContractProgressSafely({
         contracts,
         logger,
         userId: interaction.user.id,
       });
     }
-    const achievementAnnouncements = isFirstJoinForRaid
+    const achievementAnnouncements = isFirstWorldBossJoin
       ? [
           createAchievementAnnouncement(
             interaction.user.id,
             awardManualDiceAchievements(
               progression,
               interaction.user.id,
-              getDiceRaidAchievementIds(recordRaidJoin(db, interaction.user.id)),
+              getDiceWorldBossAchievementIds(recordWorldBossJoin(db, interaction.user.id)),
             ),
           ),
         ].flatMap((announcement) => (announcement ? [announcement] : []))
@@ -1130,7 +1149,7 @@ export const createRaidsLiveRuntime = ({
     await queueAnnouncementRender({
       context,
       allowedStatuses: ["joining"],
-      logFailureMessage: "[raids] Failed to refresh raid announcement prompt.",
+      logFailureMessage: "[world-boss] Failed to refresh World Boss announcement prompt.",
     });
     await publishAchievementAnnouncements({
       client,
@@ -1146,22 +1165,22 @@ export const createRaidsLiveRuntime = ({
     damage,
     bestRollSet = null,
     nowMs = Date.now(),
-  }: ApplyRaidDiceRollInput): ApplyRaidDiceRollResult => {
+  }: ApplyWorldBossDiceRollInput): ApplyWorldBossDiceRollResult => {
     if (!channelId || damage <= 0) {
-      return { kind: "no-raid" };
+      return { kind: "no-world-boss" };
     }
 
-    const raidId = liveRaidIdsByThreadId.get(channelId);
-    if (!raidId) {
-      return { kind: "no-raid" };
+    const worldBossId = liveWorldBossIdsByThreadId.get(channelId);
+    if (!worldBossId) {
+      return { kind: "no-world-boss" };
     }
 
-    const context = liveRaidsById.get(raidId);
-    if (!context || context.raid.activeThreadId !== channelId) {
-      return { kind: "no-raid" };
+    const context = liveWorldBossesById.get(worldBossId);
+    if (!context || context.worldBoss.activeThreadId !== channelId) {
+      return { kind: "no-world-boss" };
     }
 
-    if (stopping || context.raid.status !== "active" || !context.raid.boss) {
+    if (stopping || context.worldBoss.status !== "active" || !context.worldBoss.boss) {
       return {
         kind: "ignored",
         reason: "inactive",
@@ -1169,8 +1188,8 @@ export const createRaidsLiveRuntime = ({
       };
     }
 
-    if ((context.raid.expiresAtMs ?? 0) <= nowMs) {
-      resolveRaid(context, "failure", nowMs);
+    if ((context.worldBoss.expiresAtMs ?? 0) <= nowMs) {
+      resolveWorldBoss(context, "failure", nowMs);
       return {
         kind: "ignored",
         reason: "inactive",
@@ -1178,7 +1197,7 @@ export const createRaidsLiveRuntime = ({
       };
     }
 
-    if (!context.raid.participantIds.has(userId)) {
+    if (!context.worldBoss.participantIds.has(userId)) {
       return {
         kind: "ignored",
         reason: "not-joined",
@@ -1186,40 +1205,41 @@ export const createRaidsLiveRuntime = ({
       };
     }
 
-    context.raid.boss.currentHp = Math.max(0, context.raid.boss.currentHp - damage);
-    context.raid.boss.totalDamage += damage;
-    context.raid.boss.totalAttacks += 1;
-    context.raid.boss.damageByUserId.set(
+    context.worldBoss.boss.currentHp = Math.max(0, context.worldBoss.boss.currentHp - damage);
+    context.worldBoss.boss.totalDamage += damage;
+    context.worldBoss.boss.totalAttacks += 1;
+    context.worldBoss.boss.damageByUserId.set(
       userId,
-      (context.raid.boss.damageByUserId.get(userId) ?? 0) + damage,
+      (context.worldBoss.boss.damageByUserId.get(userId) ?? 0) + damage,
     );
-    context.raid.rewardEligibleUserIds.add(userId);
+    context.worldBoss.rewardEligibleUserIds.add(userId);
     const hitAchievements = awardManualDiceAchievements(
       progression,
       userId,
-      getDiceRaidAchievementIds(recordRaidHit(db, { userId, damage })),
+      getDiceWorldBossAchievementIds(recordWorldBossHit(db, { userId, damage })),
     );
     const achievementAnnouncements = [
       createAchievementAnnouncement(userId, hitAchievements),
     ].flatMap((announcement) => (announcement ? [announcement] : []));
 
-    const boss = context.raid.boss;
+    const boss = context.worldBoss.boss;
     if (boss.currentHp <= 0) {
       const killShotAchievements = awardManualDiceAchievements(progression, userId, [
-        "raid-kill-shot",
+        "world-boss-kill-shot",
       ]);
       achievementAnnouncements.push(
         ...[createAchievementAnnouncement(userId, killShotAchievements)].flatMap((announcement) =>
           announcement ? [announcement] : [],
         ),
       );
-      resolveRaid(context, "success", nowMs);
-      const rewardSummary = context.raid.resolvedRewardSummary ?? describeRaidReward(boss.reward);
-      const eligibleParticipantCount = context.raid.rewardEligibleUserIds.size;
+      resolveWorldBoss(context, "success", nowMs);
+      const rewardSummary =
+        context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward);
+      const eligibleParticipantCount = context.worldBoss.rewardEligibleUserIds.size;
       return {
         kind: "applied",
         defeated: true,
-        summary: buildRaidHitSummary({
+        summary: buildWorldBossHitSummary({
           damage,
           bossName: boss.name,
           bestRollSet,
@@ -1231,11 +1251,14 @@ export const createRaidsLiveRuntime = ({
       };
     }
 
-    scheduleActiveRender(context, "[raids] Failed to refresh active raid progress prompt.");
+    scheduleActiveRender(
+      context,
+      "[world-boss] Failed to refresh active World Boss progress prompt.",
+    );
     return {
       kind: "applied",
       defeated: false,
-      summary: buildRaidHitSummary({
+      summary: buildWorldBossHitSummary({
         damage,
         bossName: boss.name,
         bestRollSet,
@@ -1247,15 +1270,15 @@ export const createRaidsLiveRuntime = ({
     };
   };
 
-  const getLiveRaidsSnapshot = (): RaidAdminLiveRaidSnapshot[] => {
-    return Array.from(liveRaidsById.values())
-      .map(buildLiveRaidSnapshot)
+  const getLiveWorldBossesSnapshot = (): WorldBossAdminLiveSnapshot[] => {
+    return Array.from(liveWorldBossesById.values())
+      .map(buildLiveWorldBossSnapshot)
       .sort((left, right) => left.scheduledStartAt.getTime() - right.scheduledStartAt.getTime());
   };
 
-  const hasBlockingRaid = (): boolean => {
-    return Array.from(liveRaidsById.values()).some((context) =>
-      isBlockingRaidStatus(context.raid.status),
+  const hasBlockingWorldBoss = (): boolean => {
+    return Array.from(liveWorldBossesById.values()).some((context) =>
+      isBlockingWorldBossStatus(context.worldBoss.status),
     );
   };
 
@@ -1267,13 +1290,13 @@ export const createRaidsLiveRuntime = ({
     stopping = true;
     await triggerChain.catch(() => {});
 
-    const liveRaids = Array.from(liveRaidsById.values());
-    for (const context of liveRaids) {
-      clearRaidTimers(context);
+    const liveWorldBosses = Array.from(liveWorldBossesById.values());
+    for (const context of liveWorldBosses) {
+      clearWorldBossTimers(context);
     }
 
     await Promise.allSettled(
-      liveRaids.map((context) =>
+      liveWorldBosses.map((context) =>
         queueTransition(context, async () => {
           await runInterruptTransition(context);
         }),
@@ -1282,11 +1305,11 @@ export const createRaidsLiveRuntime = ({
   };
 
   return {
-    triggerRaidNow,
+    triggerWorldBossNow,
     handleButtonInteraction,
     applyDiceRoll,
-    getLiveRaidsSnapshot,
-    hasBlockingRaid,
+    getLiveWorldBossesSnapshot,
+    hasBlockingWorldBoss,
     stop,
   };
 };

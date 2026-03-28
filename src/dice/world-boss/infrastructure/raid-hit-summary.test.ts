@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildRaidHitSummary } from "./raid-hit-summary";
+import { buildWorldBossHitSummary } from "./raid-hit-summary";
 
-test("raid hit summary includes the best set for multi-set raid rolls", () => {
+test("World Boss hit summary includes the best set for multi-set rolls", () => {
   assert.equal(
-    buildRaidHitSummary({
+    buildWorldBossHitSummary({
       damage: 29,
       bossName: "Bone Dragon",
       bestRollSet: [4, 2, 5, 6, 4, 8],
@@ -16,9 +16,9 @@ test("raid hit summary includes the best set for multi-set raid rolls", () => {
   );
 });
 
-test("raid hit summary omits the best set when there was only one roll set", () => {
+test("World Boss hit summary omits the best set when there was only one roll set", () => {
   assert.equal(
-    buildRaidHitSummary({
+    buildWorldBossHitSummary({
       damage: 29,
       bossName: "Bone Dragon",
       bestRollSet: null,
@@ -30,9 +30,9 @@ test("raid hit summary omits the best set when there was only one roll set", () 
   );
 });
 
-test("raid hit summary caps the best set preview for long multi-set raid rolls", () => {
+test("World Boss hit summary caps the best set preview for long multi-set rolls", () => {
   assert.equal(
-    buildRaidHitSummary({
+    buildWorldBossHitSummary({
       damage: 29,
       bossName: "Bone Dragon",
       bestRollSet: Array.from({ length: 20 }, (_, index) => index + 1),

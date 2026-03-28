@@ -1,4 +1,4 @@
-type BuildRaidHitSummaryInput =
+type BuildWorldBossHitSummaryInput =
   | {
       damage: number;
       bossName: string;
@@ -18,7 +18,7 @@ type BuildRaidHitSummaryInput =
 
 const maxBestRollPreviewDice = 12;
 
-export const buildRaidHitSummary = (input: BuildRaidHitSummaryInput): string => {
+export const buildWorldBossHitSummary = (input: BuildWorldBossHitSummaryInput): string => {
   const lines: string[] = [];
 
   if (input.bestRollSet && input.bestRollSet.length > 0) {

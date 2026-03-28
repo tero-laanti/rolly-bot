@@ -13,10 +13,10 @@ import {
   formatDiscordRelativeTime,
   truncateDiscordText,
 } from "../../../../shared/discord";
-import type { RaidOutcome } from "../../application/ports";
-import { buildRaidJoinButtonId, buildRaidLeaveButtonId } from "./button-ids";
+import type { WorldBossOutcome } from "../../application/ports";
+import { buildWorldBossJoinButtonId, buildWorldBossLeaveButtonId } from "./button-ids";
 
-const raidColor = 0xb33a3a;
+const worldBossColor = 0xb33a3a;
 const successColor = 0x2f9e44;
 const failureColor = 0x8b949e;
 
@@ -79,7 +79,7 @@ const buildContributionLines = (
   return [...visibleLines, formatOverflowLine(hiddenLineCount, "damage line")];
 };
 
-const buildRaidDescriptionWithinLimit = ({
+const buildWorldBossDescriptionWithinLimit = ({
   linesBeforeParticipants,
   participantIds,
   contributionLines = null,
@@ -145,7 +145,7 @@ const buildRaidDescriptionWithinLimit = ({
 };
 
 const getOutcomePresentation = (
-  outcome: RaidOutcome,
+  outcome: WorldBossOutcome,
 ): {
   color: number;
   title: string;
@@ -166,15 +166,15 @@ const getOutcomePresentation = (
   };
 };
 
-export const buildRaidAnnouncementPrompt = ({
-  raidId,
+export const buildWorldBossAnnouncementPrompt = ({
+  worldBossId,
   participantIds,
   scheduledStartAtMs,
   disabled = false,
   bossName = null,
   threadId = null,
 }: {
-  raidId: string;
+  worldBossId: string;
   participantIds: readonly string[];
   scheduledStartAtMs: number;
   disabled?: boolean;
@@ -199,13 +199,13 @@ export const buildRaidAnnouncementPrompt = ({
   }
 
   const title = disabled ? "World Boss signup closed" : "Incoming World Boss";
-  assertDiscordTextLength(title, "raid prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(title, "world boss prompt title", discordEmbedTitleCharacterLimit);
 
   const embed = new EmbedBuilder()
-    .setColor(raidColor)
+    .setColor(worldBossColor)
     .setTitle(title)
     .setDescription(
-      buildRaidDescriptionWithinLimit({
+      buildWorldBossDescriptionWithinLimit({
         linesBeforeParticipants: descriptionLines,
         participantIds,
       }),
@@ -218,12 +218,12 @@ export const buildRaidAnnouncementPrompt = ({
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(buildRaidJoinButtonId(raidId))
+      .setCustomId(buildWorldBossJoinButtonId(worldBossId))
       .setLabel("Join World Boss")
       .setStyle(ButtonStyle.Success)
       .setDisabled(disabled),
     new ButtonBuilder()
-      .setCustomId(buildRaidLeaveButtonId(raidId))
+      .setCustomId(buildWorldBossLeaveButtonId(worldBossId))
       .setLabel("Leave World Boss")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled),
@@ -235,7 +235,7 @@ export const buildRaidAnnouncementPrompt = ({
   };
 };
 
-export const buildRaidActivePrompt = ({
+export const buildWorldBossActivePrompt = ({
   participantIds,
   eligibleParticipantCount,
   startedAtMs,
@@ -265,12 +265,12 @@ export const buildRaidActivePrompt = ({
   contributionLines: readonly string[];
 }): BaseMessageOptions => {
   const title = `${bossName} - Lv.${bossLevel}`;
-  assertDiscordTextLength(title, "raid active prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(title, "world boss active prompt title", discordEmbedTitleCharacterLimit);
   const embed = new EmbedBuilder()
-    .setColor(raidColor)
+    .setColor(worldBossColor)
     .setTitle(title)
     .setDescription(
-      buildRaidDescriptionWithinLimit({
+      buildWorldBossDescriptionWithinLimit({
         linesBeforeParticipants: [
           `Fight in <#${threadId}>.`,
           `World Boss opened ${formatDiscordRelativeTime(startedAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
@@ -294,7 +294,7 @@ export const buildRaidActivePrompt = ({
   };
 };
 
-export const buildRaidResolvedPrompt = ({
+export const buildWorldBossResolvedPrompt = ({
   participantIds,
   eligibleParticipantCount,
   resolvedAtMs,
@@ -308,7 +308,7 @@ export const buildRaidResolvedPrompt = ({
   participantIds: readonly string[];
   eligibleParticipantCount: number;
   resolvedAtMs: number;
-  outcome: RaidOutcome;
+  outcome: WorldBossOutcome;
   bossName: string;
   bossLevel: number;
   maxHp: number;
@@ -321,13 +321,17 @@ export const buildRaidResolvedPrompt = ({
       ? `Reward applied to ${eligibleParticipantCount} eligible player${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
       : "";
   const title = `${presentation.title} - ${bossName} Lv.${bossLevel}`;
-  assertDiscordTextLength(title, "raid resolved prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    title,
+    "world boss resolved prompt title",
+    discordEmbedTitleCharacterLimit,
+  );
 
   const embed = new EmbedBuilder()
     .setColor(presentation.color)
     .setTitle(title)
     .setDescription(
-      buildRaidDescriptionWithinLimit({
+      buildWorldBossDescriptionWithinLimit({
         linesBeforeParticipants: [
           `${presentation.summaryLine} The World Boss ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
           `Boss HP pool: **${maxHp}**.`,
@@ -344,7 +348,7 @@ export const buildRaidResolvedPrompt = ({
   };
 };
 
-export const buildRaidResolveFailedPrompt = ({
+export const buildWorldBossResolveFailedPrompt = ({
   participantIds,
   resolvedAtMs,
   bossName,
@@ -353,7 +357,7 @@ export const buildRaidResolveFailedPrompt = ({
   participantIds: readonly string[];
   resolvedAtMs: number;
   bossName: string | null;
-  outcome: RaidOutcome | null;
+  outcome: WorldBossOutcome | null;
 }): BaseMessageOptions => {
   const outcomeText =
     outcome === "success"
@@ -362,13 +366,17 @@ export const buildRaidResolveFailedPrompt = ({
         ? "The World Boss timer expired."
         : "The World Boss ended.";
   const title = "World Boss ended with cleanup needed";
-  assertDiscordTextLength(title, "raid cleanup prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    title,
+    "world boss cleanup prompt title",
+    discordEmbedTitleCharacterLimit,
+  );
 
   const embed = new EmbedBuilder()
     .setColor(failureColor)
     .setTitle(title)
     .setDescription(
-      buildRaidDescriptionWithinLimit({
+      buildWorldBossDescriptionWithinLimit({
         linesBeforeParticipants: [
           `${outcomeText} Cleanup failed ${formatDiscordRelativeTime(resolvedAtMs)}.`,
           bossName ? `Boss: **${bossName}**.` : "",
@@ -384,7 +392,7 @@ export const buildRaidResolveFailedPrompt = ({
   };
 };
 
-export const buildRaidInterruptedPrompt = ({
+export const buildWorldBossInterruptedPrompt = ({
   participantIds,
   bossName = null,
 }: {
@@ -392,12 +400,16 @@ export const buildRaidInterruptedPrompt = ({
   bossName?: string | null;
 }): BaseMessageOptions => {
   const title = "World Boss interrupted";
-  assertDiscordTextLength(title, "raid interrupted prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    title,
+    "world boss interrupted prompt title",
+    discordEmbedTitleCharacterLimit,
+  );
   const embed = new EmbedBuilder()
     .setColor(failureColor)
     .setTitle(title)
     .setDescription(
-      buildRaidDescriptionWithinLimit({
+      buildWorldBossDescriptionWithinLimit({
         linesBeforeParticipants: [
           "This World Boss was closed while the bot restarted.",
           bossName ? `Boss: **${bossName}**.` : "",
@@ -412,18 +424,22 @@ export const buildRaidInterruptedPrompt = ({
   };
 };
 
-export const buildRaidStartFailedPrompt = ({
+export const buildWorldBossStartFailedPrompt = ({
   participantIds,
 }: {
   participantIds: readonly string[];
 }): BaseMessageOptions => {
   const title = "World Boss failed to start";
-  assertDiscordTextLength(title, "raid start failed prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    title,
+    "world boss start failed prompt title",
+    discordEmbedTitleCharacterLimit,
+  );
   const embed = new EmbedBuilder()
     .setColor(failureColor)
     .setTitle(title)
     .setDescription(
-      buildRaidDescriptionWithinLimit({
+      buildWorldBossDescriptionWithinLimit({
         linesBeforeParticipants: [
           "World Boss signup closed, but the boss thread could not be opened.",
         ],
@@ -437,13 +453,17 @@ export const buildRaidStartFailedPrompt = ({
   };
 };
 
-export const buildRaidCancelledPrompt = ({
+export const buildWorldBossCancelledPrompt = ({
   scheduledStartAtMs,
 }: {
   scheduledStartAtMs: number;
 }): BaseMessageOptions => {
   const title = "World Boss cancelled";
-  assertDiscordTextLength(title, "raid cancelled prompt title", discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    title,
+    "world boss cancelled prompt title",
+    discordEmbedTitleCharacterLimit,
+  );
   const embed = new EmbedBuilder()
     .setColor(failureColor)
     .setTitle(title)

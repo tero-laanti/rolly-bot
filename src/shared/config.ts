@@ -32,13 +32,13 @@ export type RandomEventsFoundationConfig = {
   quietHours: QuietHoursConfig;
 };
 
-export type RaidsConfig = {
+export type WorldBossConfig = {
   enabled: boolean;
   inactiveReason: string | null;
   channelId: string | null;
   joinLeadMs: number;
   activeDurationMs: number;
-  targetRaidsPerDay: number;
+  targetWorldBossesPerDay: number;
   minGapMs: number;
   retryDelayMs: number;
   jitterRatio: number;
@@ -131,10 +131,10 @@ const defaultRandomEventsConfig = {
   },
 };
 
-const defaultRaidsConfig = {
+const defaultWorldBossConfig = {
   joinLeadMinutes: 30,
   activeDurationMinutes: 12,
-  targetRaidsPerDay: 0,
+  targetWorldBossesPerDay: 0,
   minGapMinutes: 180,
   retryDelaySeconds: 10 * 60,
   jitterRatio: 0.35,
@@ -227,58 +227,69 @@ export const randomEventsFoundationConfig: RandomEventsFoundationConfig = {
   },
 };
 
-const raidsChannelId = parseOptionalString(process.env.RAIDS_CHANNEL_ID);
-const raidsActivation = resolveFeatureActivation({
-  channelId: raidsChannelId,
-  channelEnvName: "RAIDS_CHANNEL_ID",
+const worldBossChannelId = parseOptionalString(process.env.WORLD_BOSS_CHANNEL_ID);
+const worldBossActivation = resolveFeatureActivation({
+  channelId: worldBossChannelId,
+  channelEnvName: "WORLD_BOSS_CHANNEL_ID",
 });
 
-export const raidsConfig: RaidsConfig = {
-  enabled: raidsActivation.enabled,
-  inactiveReason: raidsActivation.inactiveReason,
-  channelId: raidsChannelId,
+export const worldBossConfig: WorldBossConfig = {
+  enabled: worldBossActivation.enabled,
+  inactiveReason: worldBossActivation.inactiveReason,
+  channelId: worldBossChannelId,
   joinLeadMs: minutesToMs(
     parseNumberWithFallback(
-      process.env.RAIDS_JOIN_LEAD_MINUTES,
-      defaultRaidsConfig.joinLeadMinutes,
+      process.env.WORLD_BOSS_JOIN_LEAD_MINUTES,
+      defaultWorldBossConfig.joinLeadMinutes,
       1,
     ),
   ),
   activeDurationMs: minutesToMs(
     parseNumberWithFallback(
-      process.env.RAIDS_ACTIVE_DURATION_MINUTES,
-      defaultRaidsConfig.activeDurationMinutes,
+      process.env.WORLD_BOSS_ACTIVE_DURATION_MINUTES,
+      defaultWorldBossConfig.activeDurationMinutes,
       1,
     ),
   ),
-  targetRaidsPerDay: parseNumberWithFallback(
-    process.env.RAIDS_TARGET_PER_DAY,
-    defaultRaidsConfig.targetRaidsPerDay,
+  targetWorldBossesPerDay: parseNumberWithFallback(
+    process.env.WORLD_BOSS_TARGET_PER_DAY,
+    defaultWorldBossConfig.targetWorldBossesPerDay,
     0,
   ),
   minGapMs: minutesToMs(
-    parseNumberWithFallback(process.env.RAIDS_MIN_GAP_MINUTES, defaultRaidsConfig.minGapMinutes, 1),
+    parseNumberWithFallback(
+      process.env.WORLD_BOSS_MIN_GAP_MINUTES,
+      defaultWorldBossConfig.minGapMinutes,
+      1,
+    ),
   ),
   retryDelayMs: secondsToMs(
     parseNumberWithFallback(
-      process.env.RAIDS_RETRY_DELAY_SECONDS,
-      defaultRaidsConfig.retryDelaySeconds,
+      process.env.WORLD_BOSS_RETRY_DELAY_SECONDS,
+      defaultWorldBossConfig.retryDelaySeconds,
       15,
     ),
   ),
   jitterRatio: Math.min(
     0.95,
-    parseNumberWithFallback(process.env.RAIDS_JITTER_RATIO, defaultRaidsConfig.jitterRatio, 0),
+    parseNumberWithFallback(
+      process.env.WORLD_BOSS_JITTER_RATIO,
+      defaultWorldBossConfig.jitterRatio,
+      0,
+    ),
   ),
   quietHours: {
     start: parseQuietHoursValue(
-      process.env.RAIDS_QUIET_HOURS_START,
-      defaultRaidsConfig.quietHours.start,
+      process.env.WORLD_BOSS_QUIET_HOURS_START,
+      defaultWorldBossConfig.quietHours.start,
     ),
-    end: parseQuietHoursValue(process.env.RAIDS_QUIET_HOURS_END, defaultRaidsConfig.quietHours.end),
+    end: parseQuietHoursValue(
+      process.env.WORLD_BOSS_QUIET_HOURS_END,
+      defaultWorldBossConfig.quietHours.end,
+    ),
     timezone: parseQuietHoursTimezone(
-      process.env.RAIDS_QUIET_HOURS_TIMEZONE,
-      defaultRaidsConfig.quietHours.timezone,
+      process.env.WORLD_BOSS_QUIET_HOURS_TIMEZONE,
+      defaultWorldBossConfig.quietHours.timezone,
     ),
   },
 };
