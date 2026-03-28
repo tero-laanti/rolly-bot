@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 4;
+const currentSchemaVersion = 5;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -214,6 +214,47 @@ const currentSchemaColumns = new Map<string, string[]>([
       "updated_at",
     ],
   ],
+  [
+    "dice_contract_master_initial_offers",
+    ["cadence", "difficulty", "reset_window", "contract_id", "created_at", "updated_at"],
+  ],
+  [
+    "dice_contract_master_user_cadence_state",
+    [
+      "user_id",
+      "cadence",
+      "reset_window",
+      "completion_count",
+      "refill_available_difficulty",
+      "refill_claimed_at",
+      "last_completed_at",
+      "updated_at",
+    ],
+  ],
+  [
+    "dice_contract_master_runs",
+    [
+      "user_id",
+      "cadence",
+      "reset_window",
+      "sequence_number",
+      "contract_id",
+      "difficulty",
+      "objective_type",
+      "required_count",
+      "current_count",
+      "accepted_via",
+      "accepted_at",
+      "completed_at",
+      "reward_pips",
+      "reward_granted_at",
+      "updated_at",
+    ],
+  ],
+  [
+    "dice_contract_master_reroll_usage",
+    ["user_id", "cadence", "reset_window", "difficulty", "used_at", "updated_at"],
+  ],
 ]);
 
 const ensureWorldBossAchievementStatsTable = (db: SqliteDatabase): void => {
@@ -332,10 +373,12 @@ const migrateLegacyWorldBossPersistence = (db: SqliteDatabase): void => {
 };
 
 export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
+  const previousSchemaVersion = Number(db.pragma("user_version", { simple: true }) ?? 0);
   if (hasExistingUserTables(db)) {
     migrateLegacyWorldBossPersistence(db);
     assertSchemaArtifacts(db, schemaVersion2Columns);
     createAdditiveSchemaArtifacts(db);
+    resetLegacyContractsStateForContractMaster(db, previousSchemaVersion);
     assertCurrentSchemaArtifacts(db);
     db.pragma(`user_version = ${currentSchemaVersion}`);
     return;
@@ -588,6 +631,7 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
   `);
 
   createAdditiveSchemaArtifacts(db);
+  resetLegacyContractsStateForContractMaster(db, previousSchemaVersion);
   assertCurrentSchemaArtifacts(db);
   db.pragma(`user_version = ${currentSchemaVersion}`);
 };
@@ -662,6 +706,81 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (user_id, contract_id, cadence, period_key)
     );
+
+    CREATE TABLE IF NOT EXISTS dice_contract_master_initial_offers (
+      cadence TEXT NOT NULL,
+      difficulty TEXT NOT NULL,
+      reset_window TEXT NOT NULL,
+      contract_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (cadence, difficulty, reset_window)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dice_contract_master_initial_offers_reset_window
+      ON dice_contract_master_initial_offers (cadence, reset_window);
+
+    CREATE TABLE IF NOT EXISTS dice_contract_master_user_cadence_state (
+      user_id TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      reset_window TEXT NOT NULL,
+      completion_count INTEGER NOT NULL DEFAULT 0,
+      refill_available_difficulty TEXT,
+      refill_claimed_at TEXT,
+      last_completed_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, cadence, reset_window)
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_contract_master_runs (
+      user_id TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      reset_window TEXT NOT NULL,
+      sequence_number INTEGER NOT NULL,
+      contract_id TEXT NOT NULL,
+      difficulty TEXT NOT NULL,
+      objective_type TEXT NOT NULL,
+      required_count INTEGER NOT NULL,
+      current_count INTEGER NOT NULL DEFAULT 0,
+      accepted_via TEXT NOT NULL,
+      accepted_at TEXT NOT NULL,
+      completed_at TEXT,
+      reward_pips INTEGER NOT NULL DEFAULT 0,
+      reward_granted_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, cadence, reset_window, sequence_number)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dice_contract_master_runs_user_reset_window
+      ON dice_contract_master_runs (user_id, cadence, reset_window);
+
+    CREATE TABLE IF NOT EXISTS dice_contract_master_reroll_usage (
+      user_id TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      reset_window TEXT NOT NULL,
+      difficulty TEXT NOT NULL,
+      used_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, cadence, reset_window, difficulty)
+    );
+  `);
+};
+
+const resetLegacyContractsStateForContractMaster = (
+  db: SqliteDatabase,
+  previousSchemaVersion: number,
+): void => {
+  if (previousSchemaVersion >= currentSchemaVersion) {
+    return;
+  }
+
+  if (!hasTable(db, "dice_contract_rotations") || !hasTable(db, "dice_contract_progress")) {
+    return;
+  }
+
+  db.exec(`
+    DELETE FROM dice_contract_rotations;
+    DELETE FROM dice_contract_progress;
   `);
 };
 

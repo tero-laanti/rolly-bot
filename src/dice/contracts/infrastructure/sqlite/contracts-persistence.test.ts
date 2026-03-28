@@ -4,6 +4,10 @@ import Database from "better-sqlite3";
 import { initializeDatabaseSchema } from "../../../../shared/db/schema";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import {
+  createSqliteContractMasterInitialOfferRepository,
+  createSqliteContractMasterRerollUsageRepository,
+  createSqliteContractMasterRunRepository,
+  createSqliteContractMasterUserCadenceStateRepository,
   createSqliteContractsRotationRepository,
   createSqliteContractsProgressRepository,
 } from "./contracts-repository";
@@ -416,5 +420,116 @@ test("unsupported objective families fail loudly during progress recording", () 
         occurredAt: new Date("2026-03-27T12:00:00.000Z"),
       }),
     /Unsupported contract objective type/,
+  );
+});
+
+test("contract master repositories persist offers, cadence state, runs, and reroll usage", () => {
+  const db = new Database(":memory:");
+  initializeDatabaseSchema(db);
+
+  const initialOfferRepository = createSqliteContractMasterInitialOfferRepository(db);
+  const cadenceStateRepository = createSqliteContractMasterUserCadenceStateRepository(db);
+  const runRepository = createSqliteContractMasterRunRepository(db);
+  const rerollUsageRepository = createSqliteContractMasterRerollUsageRepository(db);
+
+  initialOfferRepository.saveOffer({
+    cadence: "daily",
+    difficulty: "simple",
+    resetWindow: "2026-03-28",
+    contractId: "daily-simple-a",
+    createdAt: new Date("2026-03-28T10:00:00.000Z"),
+  });
+  initialOfferRepository.saveOffer({
+    cadence: "daily",
+    difficulty: "brutal",
+    resetWindow: "2026-03-28",
+    contractId: "daily-brutal-a",
+    createdAt: new Date("2026-03-28T10:01:00.000Z"),
+  });
+  initialOfferRepository.saveOffer({
+    cadence: "daily",
+    difficulty: "serious",
+    resetWindow: "2026-03-28",
+    contractId: "daily-serious-a",
+    createdAt: new Date("2026-03-28T10:02:00.000Z"),
+  });
+
+  cadenceStateRepository.saveState({
+    userId: "user-1",
+    cadence: "daily",
+    resetWindow: "2026-03-28",
+    completionCount: 1,
+    refillAvailableDifficulty: "serious",
+    lastCompletedAt: new Date("2026-03-28T11:00:00.000Z"),
+  });
+
+  runRepository.saveRun({
+    userId: "user-1",
+    cadence: "daily",
+    resetWindow: "2026-03-28",
+    sequenceNumber: 1,
+    contractId: "daily-serious-a",
+    difficulty: "serious",
+    objectiveType: "roll_count",
+    requiredCount: 10,
+    currentCount: 10,
+    acceptedVia: "initial",
+    acceptedAt: new Date("2026-03-28T10:05:00.000Z"),
+    completedAt: new Date("2026-03-28T11:00:00.000Z"),
+    rewardPips: 25,
+    rewardGrantedAt: new Date("2026-03-28T11:00:05.000Z"),
+  });
+  runRepository.saveRun({
+    userId: "user-1",
+    cadence: "daily",
+    resetWindow: "2026-03-28",
+    sequenceNumber: 2,
+    contractId: "daily-serious-b",
+    difficulty: "serious",
+    objectiveType: "roll_count",
+    requiredCount: 15,
+    currentCount: 3,
+    acceptedVia: "refill",
+    acceptedAt: new Date("2026-03-28T11:01:00.000Z"),
+    rewardPips: 30,
+  });
+
+  rerollUsageRepository.saveUsage({
+    userId: "user-1",
+    cadence: "daily",
+    resetWindow: "2026-03-28",
+    difficulty: "brutal",
+    usedAt: new Date("2026-03-28T10:03:00.000Z"),
+  });
+
+  assert.equal(
+    initialOfferRepository.getOffer("daily", "serious", "2026-03-28")?.contractId,
+    "daily-serious-a",
+  );
+  assert.deepEqual(
+    initialOfferRepository
+      .listOffers("daily", "2026-03-28")
+      .map((record) => `${record.difficulty}:${record.contractId}`),
+    ["simple:daily-simple-a", "serious:daily-serious-a", "brutal:daily-brutal-a"],
+  );
+  assert.deepEqual(cadenceStateRepository.getState("user-1", "daily", "2026-03-28"), {
+    userId: "user-1",
+    cadence: "daily",
+    resetWindow: "2026-03-28",
+    completionCount: 1,
+    refillAvailableDifficulty: "serious",
+    refillClaimedAt: undefined,
+    lastCompletedAt: new Date("2026-03-28T11:00:00.000Z"),
+  });
+  assert.equal(runRepository.getRun("user-1", "daily", "2026-03-28", 1)?.rewardPips, 25);
+  assert.deepEqual(
+    runRepository
+      .listRuns("user-1", "daily", "2026-03-28")
+      .map((record) => `${record.sequenceNumber}:${record.contractId}:${record.acceptedVia}`),
+    ["1:daily-serious-a:initial", "2:daily-serious-b:refill"],
+  );
+  assert.equal(
+    rerollUsageRepository.getUsage("user-1", "daily", "2026-03-28", "brutal")?.difficulty,
+    "brutal",
   );
 });

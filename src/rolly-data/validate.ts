@@ -8,10 +8,16 @@ import type {
   DiceAchievementRule,
   DiceBalanceData,
   DiceContractData,
+  DiceContractDifficulty,
+  DiceContractOfferData,
   DiceContractObjectiveData,
   DiceContractObjectiveType,
   DiceContractRewardData,
+  DiceContractsCadenceData,
+  DiceContractsCadenceMetadataData,
   DiceContractsData,
+  DiceContractsDifficultyData,
+  DiceContractsPanelData,
   DicePvpData,
   DiceItemData,
   DiceItemEffect,
@@ -104,8 +110,8 @@ const contractObjectiveTypes = [
   "casino_game_count",
   "world_boss_join_count",
 ] as const;
-const minimumDailyContracts = 3;
-const minimumWeeklyContracts = 2;
+const contractDifficulties = ["simple", "serious", "brutal"] as const;
+const minimumOffersPerDifficultyPool = 1;
 const introPostContentMaxLength = discordMessageCharacterLimit;
 const randomEventTemplateVariablePattern = /\$\{([a-zA-Z0-9_]+)\}/g;
 
@@ -1288,59 +1294,50 @@ const readContractObjective = (value: unknown, label: string): DiceContractObjec
   };
 };
 
-const readContractReward = (value: unknown, label: string): DiceContractRewardData => {
+const readContractOffer = (value: unknown, label: string): DiceContractOfferData => {
   const record = assertRecord(value, label);
-  const pips = readOptionalInteger(record.pips, `${label}.pips`, 1);
-  const fame = readOptionalInteger(record.fame, `${label}.fame`, 1);
-
-  if (pips === undefined && fame === undefined) {
-    throw new Error(`${label} must include pips and/or fame.`);
+  if (record.reward !== undefined) {
+    throw new Error(`${label}.reward is not supported. Set rewardPips on the difficulty instead.`);
   }
 
-  return {
-    pips,
-    fame,
-  };
-};
-
-const readContract = (value: unknown, label: string): DiceContractData => {
-  const record = assertRecord(value, label);
   return {
     id: readNonEmptyString(record.id, `${label}.id`),
     title: readNonEmptyString(record.title, `${label}.title`),
     description: readNonEmptyString(record.description, `${label}.description`),
     objective: readContractObjective(record.objective, `${label}.objective`),
-    reward: readContractReward(record.reward, `${label}.reward`),
   };
 };
 
-const formatContractRewardText = (reward: DiceContractRewardData): string => {
-  const parts: string[] = [];
-  if (reward.pips !== undefined) {
-    parts.push(`${reward.pips} pips`);
-  }
-  if (reward.fame !== undefined) {
-    parts.push(`${reward.fame} fame`);
-  }
-
-  return parts.join(" + ");
+const createContractReward = (rewardPips: number): DiceContractRewardData => {
+  return {
+    pips: rewardPips,
+  };
 };
 
-const buildSingleContractPreview = (contract: DiceContractData, cadence: "daily" | "weekly") => {
-  const cadenceLabel = cadence === "daily" ? "Daily Contract" : "Weekly Contract";
+const applyContractReward = (
+  offer: DiceContractOfferData,
+  rewardPips: number,
+): DiceContractData => {
+  return {
+    ...offer,
+    reward: createContractReward(rewardPips),
+  };
+};
+
+const buildContractPreview = (contract: DiceContractData, cadenceLabel: string): string => {
   return [
-    `**${cadenceLabel}**`,
-    `${contract.title}`,
+    `**${cadenceLabel} Contract**`,
+    contract.title,
     contract.description,
     `Objective: ${contract.objective.type} x${contract.objective.requiredCount}`,
-    `Reward: ${formatContractRewardText(contract.reward)}`,
+    `Reward: ${contract.reward.pips} pips`,
   ].join("\n");
 };
 
 const validateContractDiscordText = (
   contract: DiceContractData,
   label: string,
-  cadence: "daily" | "weekly",
+  cadenceLabel: string,
 ): void => {
   assertDiscordTextLength(
     contract.title,
@@ -1353,10 +1350,189 @@ const validateContractDiscordText = (
     discordEmbedDescriptionCharacterLimit,
   );
   assertDiscordTextLength(
-    buildSingleContractPreview(contract, cadence),
+    buildContractPreview(contract, cadenceLabel),
     `${label} as rendered in /contracts`,
     discordMessageCharacterLimit,
   );
+};
+
+const readContractDifficulty = (
+  value: unknown,
+  label: string,
+  cadenceLabel: string,
+): DiceContractsDifficultyData => {
+  const record = assertRecord(value, label);
+  const rewardPips = readInteger(record.rewardPips, `${label}.rewardPips`, 1);
+
+  if (!Array.isArray(record.initialOffers)) {
+    throw new Error(`${label}.initialOffers must be an array.`);
+  }
+  if (!Array.isArray(record.refillOffers)) {
+    throw new Error(`${label}.refillOffers must be an array.`);
+  }
+
+  if (record.initialOffers.length < minimumOffersPerDifficultyPool) {
+    throw new Error(
+      `${label}.initialOffers must include at least ${minimumOffersPerDifficultyPool} offer.`,
+    );
+  }
+  if (record.refillOffers.length < minimumOffersPerDifficultyPool) {
+    throw new Error(
+      `${label}.refillOffers must include at least ${minimumOffersPerDifficultyPool} offer.`,
+    );
+  }
+
+  const initialOffers = record.initialOffers.map((entry, index) =>
+    applyContractReward(readContractOffer(entry, `${label}.initialOffers[${index}]`), rewardPips),
+  );
+  const refillOffers = record.refillOffers.map((entry, index) =>
+    applyContractReward(readContractOffer(entry, `${label}.refillOffers[${index}]`), rewardPips),
+  );
+
+  initialOffers.forEach((contract, index) =>
+    validateContractDiscordText(contract, `${label}.initialOffers[${index}]`, cadenceLabel),
+  );
+  refillOffers.forEach((contract, index) =>
+    validateContractDiscordText(contract, `${label}.refillOffers[${index}]`, cadenceLabel),
+  );
+
+  return {
+    label: readNonEmptyString(record.label, `${label}.label`),
+    rewardPips,
+    initialOffers,
+    refillOffers,
+  };
+};
+
+const readContractsCadenceMetadata = (
+  value: unknown,
+  label: string,
+): DiceContractsCadenceMetadataData => {
+  const record = assertRecord(value, label);
+  const cadenceLabel = readNonEmptyString(record.label, `${label}.label`);
+  const difficultiesRecord = assertRecord(record.difficulties, `${label}.difficulties`);
+
+  const difficulties = Object.fromEntries(
+    contractDifficulties.map((difficulty) => [
+      difficulty,
+      readContractDifficulty(
+        difficultiesRecord[difficulty],
+        `${label}.difficulties.${difficulty}`,
+        cadenceLabel,
+      ),
+    ]),
+  ) as Record<DiceContractDifficulty, DiceContractsDifficultyData>;
+
+  const chooserTitle = readNonEmptyString(record.chooserTitle, `${label}.chooserTitle`);
+  const chooserDescription = readNonEmptyString(
+    record.chooserDescription,
+    `${label}.chooserDescription`,
+  );
+
+  assertDiscordTextLength(
+    cadenceLabel,
+    `${label}.label`,
+    discordStringSelectOptionLabelCharacterLimit,
+  );
+  assertDiscordTextLength(chooserTitle, `${label}.chooserTitle`, discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    chooserDescription,
+    `${label}.chooserDescription`,
+    discordEmbedDescriptionCharacterLimit,
+  );
+
+  return {
+    label: cadenceLabel,
+    chooserTitle,
+    chooserDescription,
+    difficulties,
+  };
+};
+
+const buildContractsCadenceData = (
+  metadata: DiceContractsCadenceMetadataData,
+): DiceContractsCadenceData => {
+  const allContracts = contractDifficulties.flatMap((difficulty) => {
+    const entry = metadata.difficulties[difficulty];
+    return [...entry.initialOffers, ...entry.refillOffers];
+  });
+
+  return Object.assign(allContracts, metadata);
+};
+
+const assertDistinctContractIds = (contracts: DiceContractData[], seenIds: Set<string>): void => {
+  for (const contract of contracts) {
+    if (seenIds.has(contract.id)) {
+      throw new Error(`Duplicate contract id: ${contract.id}`);
+    }
+
+    seenIds.add(contract.id);
+  }
+};
+
+const assertStrictlyIncreasingRewardPips = (
+  cadence: DiceContractsCadenceMetadataData,
+  label: string,
+): void => {
+  const simpleReward = cadence.difficulties.simple.rewardPips;
+  const seriousReward = cadence.difficulties.serious.rewardPips;
+  const brutalReward = cadence.difficulties.brutal.rewardPips;
+
+  if (!(simpleReward < seriousReward && seriousReward < brutalReward)) {
+    throw new Error(
+      `${label}.difficulties rewardPips must increase strictly from simple to serious to brutal.`,
+    );
+  }
+};
+
+const readContractsPanel = (value: unknown, label: string): DiceContractsPanelData => {
+  const record = assertRecord(value, label);
+  const imageUrl = readNonEmptyString(record.imageUrl, `${label}.imageUrl`);
+
+  try {
+    new URL(imageUrl);
+  } catch {
+    throw new Error(`${label}.imageUrl must be a valid URL.`);
+  }
+
+  const parsed = {
+    title: readNonEmptyString(record.title, `${label}.title`),
+    npcName: readNonEmptyString(record.npcName, `${label}.npcName`),
+    imageUrl,
+    description: readNonEmptyString(record.description, `${label}.description`),
+    helperText: readNonEmptyString(record.helperText, `${label}.helperText`),
+    dailyButtonLabel: readNonEmptyString(record.dailyButtonLabel, `${label}.dailyButtonLabel`),
+    weeklyButtonLabel: readNonEmptyString(record.weeklyButtonLabel, `${label}.weeklyButtonLabel`),
+    askForContractButtonLabel: readNonEmptyString(
+      record.askForContractButtonLabel,
+      `${label}.askForContractButtonLabel`,
+    ),
+  };
+
+  assertDiscordTextLength(parsed.title, `${label}.title`, discordEmbedTitleCharacterLimit);
+  assertDiscordTextLength(
+    parsed.description,
+    `${label}.description`,
+    discordEmbedDescriptionCharacterLimit,
+  );
+  assertDiscordTextLength(parsed.helperText, `${label}.helperText`, discordMessageCharacterLimit);
+  assertDiscordTextLength(
+    parsed.dailyButtonLabel,
+    `${label}.dailyButtonLabel`,
+    discordButtonLabelCharacterLimit,
+  );
+  assertDiscordTextLength(
+    parsed.weeklyButtonLabel,
+    `${label}.weeklyButtonLabel`,
+    discordButtonLabelCharacterLimit,
+  );
+  assertDiscordTextLength(
+    parsed.askForContractButtonLabel,
+    `${label}.askForContractButtonLabel`,
+    discordButtonLabelCharacterLimit,
+  );
+
+  return parsed;
 };
 
 export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => {
@@ -1689,43 +1865,27 @@ export const parseWorldBossData = (value: unknown): DiceWorldBossData => {
 
 export const parseDiceContractsData = (value: unknown): DiceContractsData => {
   const record = assertRecord(value, "contracts");
-  if (!Array.isArray(record.daily)) {
-    throw new Error("contracts.daily must be an array.");
-  }
-  if (!Array.isArray(record.weekly)) {
-    throw new Error("contracts.weekly must be an array.");
-  }
+  const panel = readContractsPanel(record.panel, "contracts.panel");
+  const dailyMetadata = readContractsCadenceMetadata(record.daily, "contracts.daily");
+  const weeklyMetadata = readContractsCadenceMetadata(record.weekly, "contracts.weekly");
 
-  const daily = record.daily.map((entry, index) =>
-    readContract(entry, `contracts.daily[${index}]`),
-  );
-  const weekly = record.weekly.map((entry, index) =>
-    readContract(entry, `contracts.weekly[${index}]`),
-  );
-
-  if (daily.length < minimumDailyContracts) {
-    throw new Error(`contracts.daily must include at least ${minimumDailyContracts} contracts.`);
-  }
-  if (weekly.length < minimumWeeklyContracts) {
-    throw new Error(`contracts.weekly must include at least ${minimumWeeklyContracts} contracts.`);
-  }
+  assertStrictlyIncreasingRewardPips(dailyMetadata, "contracts.daily");
+  assertStrictlyIncreasingRewardPips(weeklyMetadata, "contracts.weekly");
 
   const ids = new Set<string>();
-  for (const contract of [...daily, ...weekly]) {
-    if (ids.has(contract.id)) {
-      throw new Error(`Duplicate contract id: ${contract.id}`);
+  for (const cadence of [dailyMetadata, weeklyMetadata]) {
+    for (const difficulty of contractDifficulties) {
+      const entry = cadence.difficulties[difficulty];
+      assertDistinctContractIds(entry.initialOffers, ids);
+      assertDistinctContractIds(entry.refillOffers, ids);
     }
-    ids.add(contract.id);
   }
 
-  daily.forEach((contract, index) =>
-    validateContractDiscordText(contract, `contracts.daily[${index}]`, "daily"),
-  );
-  weekly.forEach((contract, index) =>
-    validateContractDiscordText(contract, `contracts.weekly[${index}]`, "weekly"),
-  );
+  const daily = buildContractsCadenceData(dailyMetadata);
+  const weekly = buildContractsCadenceData(weeklyMetadata);
 
   return {
+    panel,
     daily,
     weekly,
   };

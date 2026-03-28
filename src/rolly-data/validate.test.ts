@@ -85,100 +85,153 @@ const createDiceItemInput = () => ({
 });
 
 type ContractsInput = {
-  daily: Array<{
-    id: string;
+  panel: {
     title: string;
+    npcName: string;
+    imageUrl: string;
     description: string;
-    objective: {
-      type: string;
-      requiredCount: number;
-    };
-    reward: {
-      pips?: number;
-      fame?: number;
-    };
-  }>;
-  weekly: Array<{
-    id: string;
-    title: string;
-    description: string;
-    objective: {
-      type: string;
-      requiredCount: number;
-    };
-    reward: {
-      pips?: number;
-      fame?: number;
-    };
-  }>;
+    helperText: string;
+    dailyButtonLabel: string;
+    weeklyButtonLabel: string;
+    askForContractButtonLabel: string;
+  };
+  daily: ContractsCadenceInput;
+  weekly: ContractsCadenceInput;
 };
 
+type ContractOfferInput = {
+  id: string;
+  title: string;
+  description: string;
+  objective: {
+    type: string;
+    requiredCount: number;
+  };
+};
+
+type ContractsDifficultyInput = {
+  label: string;
+  rewardPips: number;
+  initialOffers: ContractOfferInput[];
+  refillOffers: ContractOfferInput[];
+};
+
+type ContractsCadenceInput = {
+  label: string;
+  chooserTitle: string;
+  chooserDescription: string;
+  difficulties: Record<"simple" | "serious" | "brutal", ContractsDifficultyInput>;
+};
+
+const createContractOfferInput = (
+  id: string,
+  title: string,
+  description: string,
+  type: string,
+  requiredCount: number,
+): ContractOfferInput => ({
+  id,
+  title,
+  description,
+  objective: {
+    type,
+    requiredCount,
+  },
+});
+
+const createCadenceInput = (
+  label: string,
+  simpleRewardPips: number,
+  seriousRewardPips: number,
+  brutalRewardPips: number,
+): ContractsCadenceInput => ({
+  label,
+  chooserTitle: `${label} Contracts`,
+  chooserDescription: `Choose a ${label.toLowerCase()} contract from one of three difficulties.`,
+  difficulties: {
+    simple: {
+      label: "Simple",
+      rewardPips: simpleRewardPips,
+      initialOffers: [
+        createContractOfferInput(
+          `${label.toLowerCase()}-simple-roll`,
+          `${label} Roll Routine`,
+          `Use /roll ${label === "Daily" ? 12 : 80} times.`,
+          "roll_count",
+          label === "Daily" ? 12 : 80,
+        ),
+      ],
+      refillOffers: [
+        createContractOfferInput(
+          `${label.toLowerCase()}-simple-casino`,
+          `${label} Casino Warmup`,
+          `Finish ${label === "Daily" ? 2 : 10} casino games.`,
+          "casino_game_count",
+          label === "Daily" ? 2 : 10,
+        ),
+      ],
+    },
+    serious: {
+      label: "Serious",
+      rewardPips: seriousRewardPips,
+      initialOffers: [
+        createContractOfferInput(
+          `${label.toLowerCase()}-serious-pvp`,
+          `${label} Duel Duty`,
+          `Win ${label === "Daily" ? 1 : 4} PvP challenge${label === "Daily" ? "" : "s"}.`,
+          "pvp_win_count",
+          label === "Daily" ? 1 : 4,
+        ),
+      ],
+      refillOffers: [
+        createContractOfferInput(
+          `${label.toLowerCase()}-serious-world-boss`,
+          `${label} World Boss Detail`,
+          `Join ${label === "Daily" ? 1 : 2} World Boss encounter${label === "Daily" ? "" : "s"}.`,
+          "world_boss_join_count",
+          label === "Daily" ? 1 : 2,
+        ),
+      ],
+    },
+    brutal: {
+      label: "Brutal",
+      rewardPips: brutalRewardPips,
+      initialOffers: [
+        createContractOfferInput(
+          `${label.toLowerCase()}-brutal-roll`,
+          `${label} Marathon`,
+          `Use /roll ${label === "Daily" ? 30 : 180} times.`,
+          "roll_count",
+          label === "Daily" ? 30 : 180,
+        ),
+      ],
+      refillOffers: [
+        createContractOfferInput(
+          `${label.toLowerCase()}-brutal-casino`,
+          `${label} High Stakes`,
+          `Finish ${label === "Daily" ? 8 : 30} casino games.`,
+          "casino_game_count",
+          label === "Daily" ? 8 : 30,
+        ),
+      ],
+    },
+  },
+});
+
 const createContractsInput = (): ContractsInput => ({
-  daily: [
-    {
-      id: "daily-roll-streak",
-      title: "Daily Roller",
-      description: "Use /roll 10 times.",
-      objective: {
-        type: "roll_count",
-        requiredCount: 10,
-      },
-      reward: {
-        pips: 15,
-      },
-    },
-    {
-      id: "daily-pvp-win",
-      title: "First Blood",
-      description: "Win 1 PvP challenge.",
-      objective: {
-        type: "pvp_win_count",
-        requiredCount: 1,
-      },
-      reward: {
-        fame: 5,
-      },
-    },
-    {
-      id: "daily-casino-run",
-      title: "Lucky Table",
-      description: "Finish 3 casino games.",
-      objective: {
-        type: "casino_game_count",
-        requiredCount: 3,
-      },
-      reward: {
-        pips: 8,
-        fame: 2,
-      },
-    },
-  ],
-  weekly: [
-    {
-      id: "weekly-world-boss",
-      title: "Boss Attendance",
-      description: "Join 2 World Boss encounters.",
-      objective: {
-        type: "world_boss_join_count",
-        requiredCount: 2,
-      },
-      reward: {
-        fame: 20,
-      },
-    },
-    {
-      id: "weekly-roll-volume",
-      title: "Dice Marathon",
-      description: "Use /roll 60 times.",
-      objective: {
-        type: "roll_count",
-        requiredCount: 60,
-      },
-      reward: {
-        pips: 50,
-      },
-    },
-  ],
+  panel: {
+    title: "Contract Master",
+    npcName: "Contract Master",
+    imageUrl: "https://example.com/rolly/contract-master.png",
+    description: "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
+    helperText:
+      "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",
+    dailyButtonLabel: "Daily Contracts",
+    weeklyButtonLabel: "Weekly Contracts",
+    askForContractButtonLabel: "Ask for a new contract",
+  },
+  daily: createCadenceInput("Daily", 12, 20, 32),
+  weekly: createCadenceInput("Weekly", 30, 45, 70),
 });
 
 test("parseDiceBalance preserves firstDailyRollPipReward when provided", () => {
@@ -569,59 +622,94 @@ test("parseWorldBossData rejects boss names that overflow World Boss titles", ()
   );
 });
 
-test("parseDiceContractsData accepts supported objective and reward shapes", () => {
+test("parseDiceContractsData accepts Contract Master panel metadata and difficulty pools", () => {
   const parsed = parseDiceContractsData(createContractsInput());
 
-  assert.equal(parsed.daily.length, 3);
-  assert.equal(parsed.weekly.length, 2);
-  assert.equal(parsed.daily[0]?.objective.type, "roll_count");
-  assert.equal(parsed.weekly[0]?.objective.type, "world_boss_join_count");
+  assert.equal(parsed.panel.title, "Contract Master");
+  assert.equal(parsed.daily.label, "Daily");
+  assert.equal(parsed.daily.difficulties.simple.rewardPips, 12);
+  assert.equal(parsed.daily.difficulties.brutal.initialOffers[0]?.reward.pips, 32);
+  assert.equal(
+    parsed.weekly.difficulties.serious.refillOffers[0]?.objective.type,
+    "world_boss_join_count",
+  );
 });
 
 test("parseDiceContractsData rejects unsupported objective types", () => {
   const input = createContractsInput();
-  input.daily[0].objective.type = "item_use_count";
+  input.daily.difficulties.simple.initialOffers[0].objective.type = "item_use_count";
 
   assert.throws(
     () => parseDiceContractsData(input),
-    /contracts\.daily\[0\]\.objective\.type must be one of/i,
+    /contracts\.daily\.difficulties\.simple\.initialOffers\[0\]\.objective\.type must be one of/i,
   );
 });
 
-test("parseDiceContractsData rejects rewards without pips or fame", () => {
+test("parseDiceContractsData rejects invalid Contract Master image URLs", () => {
   const input = createContractsInput();
-  input.daily[0].reward = {};
+  input.panel.imageUrl = "not-a-url";
 
   assert.throws(
     () => parseDiceContractsData(input),
-    /contracts\.daily\[0\]\.reward must include pips and\/or fame/i,
+    /contracts\.panel\.imageUrl must be a valid URL/i,
   );
 });
 
-test("parseDiceContractsData rejects duplicate ids across daily and weekly contracts", () => {
+test("parseDiceContractsData rejects duplicate ids across cadence difficulty pools", () => {
   const input = createContractsInput();
-  input.weekly[0].id = input.daily[0].id;
+  input.weekly.difficulties.simple.initialOffers[0].id =
+    input.daily.difficulties.simple.initialOffers[0].id;
 
   assert.throws(() => parseDiceContractsData(input), /Duplicate contract id/i);
 });
 
-test("parseDiceContractsData rejects insufficient daily contract catalog size", () => {
-  const input = createContractsInput();
-  input.daily = input.daily.slice(0, 2);
+test("parseDiceContractsData rejects authored per-offer rewards", () => {
+  const input = createContractsInput() as ContractsInput & {
+    daily: ContractsCadenceInput & {
+      difficulties: {
+        simple: ContractsDifficultyInput & {
+          initialOffers: Array<ContractOfferInput & { reward?: { pips?: number; fame?: number } }>;
+        };
+        serious: ContractsDifficultyInput;
+        brutal: ContractsDifficultyInput;
+      };
+    };
+  };
+  input.daily.difficulties.simple.initialOffers[0].reward = { fame: 5 };
 
   assert.throws(
     () => parseDiceContractsData(input),
-    /contracts\.daily must include at least 3 contracts/i,
+    /contracts\.daily\.difficulties\.simple\.initialOffers\[0\]\.reward is not supported/i,
+  );
+});
+
+test("parseDiceContractsData rejects empty refill pools", () => {
+  const input = createContractsInput();
+  input.daily.difficulties.simple.refillOffers = [];
+
+  assert.throws(
+    () => parseDiceContractsData(input),
+    /contracts\.daily\.difficulties\.simple\.refillOffers must include at least 1 offer/i,
+  );
+});
+
+test("parseDiceContractsData rejects non-monotonic difficulty rewards", () => {
+  const input = createContractsInput();
+  input.daily.difficulties.serious.rewardPips = input.daily.difficulties.simple.rewardPips;
+
+  assert.throws(
+    () => parseDiceContractsData(input),
+    /contracts\.daily\.difficulties rewardPips must increase strictly/i,
   );
 });
 
 test("parseDiceContractsData rejects contract previews that exceed Discord message limits", () => {
   const input = createContractsInput();
-  input.daily[0].description = "A".repeat(2_100);
+  input.daily.difficulties.simple.initialOffers[0].description = "A".repeat(2_100);
 
   assert.throws(
     () => parseDiceContractsData(input),
-    /contracts\.daily\[0\] as rendered in \/contracts must be <= 2000 characters/i,
+    /contracts\.daily\.difficulties\.simple\.initialOffers\[0\] as rendered in \/contracts must be <= 2000 characters/i,
   );
 });
 

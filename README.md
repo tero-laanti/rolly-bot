@@ -48,7 +48,7 @@ npm run dev
 If you have a private `rolly-data` checkout, place it in `./rolly-data` or point `ROLLY_DATA_DIR` at it. Otherwise Rolly falls back to the public examples in [example-data/rolly-data/](example-data/rolly-data/). See [docs/development.md](docs/development.md) for more information.
 
 Private `rolly-data` is validated against the Discord transport limits used by the live bot surfaces at startup, so authored text that would overflow shop, random-event, or World Boss payloads is rejected before the bot comes online.
-Contracts authored in `contracts.v2.json` are also validated against the `/contracts` surface, and the command shows the shared daily/weekly rotations with auto-claimed reward progress.
+`contracts.v2.json` defines the Contract Master panel copy plus Daily and Weekly difficulty pools, and the authored contract data is validated against the Discord limits used by the contracts surfaces.
 
 ## Further Reading
 

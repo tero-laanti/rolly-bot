@@ -1,37 +1,81 @@
 # `contracts.v2.json`
 
-This file defines daily and weekly contracts.
+This file defines the authored data for the Contract Master surface.
 
-- Daily contracts rotate globally at `00:00 UTC`.
-- Weekly contracts rotate globally at `Monday 00:00 UTC`.
-- `/contracts` shows the same active rotations for every player, while progress is tracked per player.
+- `panel` defines the persistent Contract Master panel copy and image.
+- `daily` and `weekly` each define three difficulty tiers:
+  - `simple`
+  - `serious`
+  - `brutal`
+- Each difficulty tier carries one Pip reward value plus two offer pools:
+  - `initialOffers` for the global first offer in that tier
+  - `refillOffers` for same-difficulty follow-up offers after a completion
 
 Contract catalog shape:
 
 ```json
 {
-  "daily": [],
-  "weekly": []
+  "panel": {},
+  "daily": {},
+  "weekly": {}
 }
 ```
 
-- `daily` must include at least 3 entries.
-- `weekly` must include at least 2 entries.
-- Contract `id` values must be unique across both arrays.
+- Contract `id` values must be unique across all cadences, difficulties, and offer pools.
+- Each difficulty must include at least one `initialOffers` entry and one `refillOffers` entry.
+- Pip rewards must increase strictly from `simple` to `serious` to `brutal` within each cadence.
 
-Contract entry shape:
+Panel shape:
 
 ```json
 {
-  "id": "daily-roll-sprint",
-  "title": "Daily Roll Sprint",
+  "title": "Contract Master",
+  "npcName": "Contract Master",
+  "imageUrl": "https://example.com/rolly/contract-master.png",
+  "description": "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
+  "helperText": "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",
+  "dailyButtonLabel": "Daily Contracts",
+  "weeklyButtonLabel": "Weekly Contracts",
+  "askForContractButtonLabel": "Ask for a new contract"
+}
+```
+
+Cadence shape:
+
+```json
+{
+  "label": "Daily",
+  "chooserTitle": "Daily Contracts",
+  "chooserDescription": "Choose a Daily contract from one of three difficulties.",
+  "difficulties": {
+    "simple": {},
+    "serious": {},
+    "brutal": {}
+  }
+}
+```
+
+Difficulty shape:
+
+```json
+{
+  "label": "Simple",
+  "rewardPips": 12,
+  "initialOffers": [],
+  "refillOffers": []
+}
+```
+
+Offer shape:
+
+```json
+{
+  "id": "daily-simple-roll-routine",
+  "title": "Roll Routine",
   "description": "Use /roll 12 times.",
   "objective": {
     "type": "roll_count",
     "requiredCount": 12
-  },
-  "reward": {
-    "pips": 18
   }
 }
 ```
@@ -48,13 +92,12 @@ Objective rules:
 
 Reward rules:
 
-- Only `pips` and `fame` rewards are supported in the current format.
-- At least one of `reward.pips` or `reward.fame` must be present.
-- Reward values must be integers >= 1.
-- Rewards are auto-claimed on completion in the runtime.
+- Only Pip rewards are supported in the current format.
+- Offers do not define a `reward` object directly.
+- Set `rewardPips` on the difficulty instead.
+- Higher difficulties must pay more Pips than easier ones in the same cadence.
 
 Discord text safety:
 
-- Contract titles and descriptions are validated for Discord payload limits.
-- Each authored contract must fit within a single `/contracts` message preview entry.
-- `/contracts` trims very long live output to stay under Discord's 2,000-character message limit, so keep titles and descriptions concise even when they pass validation.
+- Panel titles, helper text, button labels, chooser copy, and contract titles/descriptions are validated against the Discord payload limits used by the contracts surfaces.
+- Each authored offer must fit within a single contract summary entry as rendered by the bot.

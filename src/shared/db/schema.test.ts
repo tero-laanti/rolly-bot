@@ -89,6 +89,17 @@ const createCurrentSchemaV2 = (db: Database.Database): void => {
   db.pragma("user_version = 2");
 };
 
+const createCurrentSchemaV4 = (db: Database.Database): void => {
+  initializeDatabaseSchema(db);
+  db.exec(`
+    DROP TABLE dice_contract_master_initial_offers;
+    DROP TABLE dice_contract_master_user_cadence_state;
+    DROP TABLE dice_contract_master_runs;
+    DROP TABLE dice_contract_master_reroll_usage;
+  `);
+  db.pragma("user_version = 4");
+};
+
 test("initializeDatabaseSchema creates the current schema on an empty database", () => {
   const db = new Database(":memory:");
 
@@ -99,10 +110,14 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasTable(db, "dice_analytics_by_prestige"), true);
   assert.equal(hasTable(db, "dice_progression_achievement_stats"), true);
   assert.equal(hasTable(db, "dice_personal_charge_state"), true);
+  assert.equal(hasTable(db, "dice_contract_master_initial_offers"), true);
+  assert.equal(hasTable(db, "dice_contract_master_user_cadence_state"), true);
+  assert.equal(hasTable(db, "dice_contract_master_runs"), true);
+  assert.equal(hasTable(db, "dice_contract_master_reroll_usage"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_dice_sets_rolled"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_roll_commands_called"), true);
   assert.equal(hasColumn(db, "dice_analytics_by_prestige", "prestige_started_at"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 4);
+  assert.equal(db.pragma("user_version", { simple: true }), 5);
 });
 
 test("initializeDatabaseSchema rejects unsupported legacy progression schema without mutating the database", () => {
@@ -164,11 +179,78 @@ test("initializeDatabaseSchema adds the personal charge table on the supported v
   initializeDatabaseSchema(db);
 
   assert.equal(hasTable(db, "dice_personal_charge_state"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 4);
+  assert.equal(hasTable(db, "dice_contract_master_runs"), true);
+  assert.equal(db.pragma("user_version", { simple: true }), 5);
   assert.deepEqual(db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get("user-1"), {
     fame: 7,
     pips: 11,
   });
+});
+
+test("initializeDatabaseSchema resets legacy contracts rows and adds contract master tables during v5 rollout", () => {
+  const db = new Database(":memory:");
+  createCurrentSchemaV4(db);
+
+  db.prepare(
+    `
+    INSERT INTO dice_contract_rotations (cadence, period_key, contract_ids_json, reset_at, activated_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    "daily",
+    "2026-03-28",
+    JSON.stringify(["daily-roll"]),
+    "2026-03-29T00:00:00.000Z",
+    "2026-03-28T10:00:00.000Z",
+    "2026-03-28T10:00:00.000Z",
+  );
+  db.prepare(
+    `
+    INSERT INTO dice_contract_progress (
+      user_id,
+      contract_id,
+      cadence,
+      period_key,
+      objective_type,
+      required_count,
+      current_count,
+      completed_at,
+      rewarded_at,
+      reward_pips,
+      reward_fame,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    "user-1",
+    "daily-roll",
+    "daily",
+    "2026-03-28",
+    "roll_count",
+    10,
+    5,
+    null,
+    null,
+    10,
+    2,
+    "2026-03-28T10:00:00.000Z",
+  );
+
+  initializeDatabaseSchema(db);
+
+  assert.equal(hasTable(db, "dice_contract_master_initial_offers"), true);
+  assert.equal(hasTable(db, "dice_contract_master_user_cadence_state"), true);
+  assert.equal(hasTable(db, "dice_contract_master_runs"), true);
+  assert.equal(hasTable(db, "dice_contract_master_reroll_usage"), true);
+  assert.deepEqual(
+    db.prepare("SELECT COUNT(*) AS count FROM dice_contract_rotations").get() as { count: number },
+    { count: 0 },
+  );
+  assert.deepEqual(
+    db.prepare("SELECT COUNT(*) AS count FROM dice_contract_progress").get() as { count: number },
+    { count: 0 },
+  );
+  assert.equal(db.pragma("user_version", { simple: true }), 5);
 });
 
 test("initializeDatabaseSchema migrates legacy world boss stats and persisted source ids", () => {

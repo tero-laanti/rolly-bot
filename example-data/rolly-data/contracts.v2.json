@@ -1,92 +1,182 @@
 {
-  "daily": [
-    {
-      "id": "daily-roll-sprint",
-      "title": "Daily Roll Sprint",
-      "description": "Use /roll 12 times.",
-      "objective": {
-        "type": "roll_count",
-        "requiredCount": 12
+  "panel": {
+    "title": "Contract Master",
+    "npcName": "Contract Master",
+    "imageUrl": "https://example.com/rolly/contract-master.png",
+    "description": "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
+    "helperText": "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",
+    "dailyButtonLabel": "Daily Contracts",
+    "weeklyButtonLabel": "Weekly Contracts",
+    "askForContractButtonLabel": "Ask for a new contract"
+  },
+  "daily": {
+    "label": "Daily",
+    "chooserTitle": "Daily Contracts",
+    "chooserDescription": "Choose a Daily contract from one of three difficulties.",
+    "difficulties": {
+      "simple": {
+        "label": "Simple",
+        "rewardPips": 12,
+        "initialOffers": [
+          {
+            "id": "daily-simple-roll-routine",
+            "title": "Roll Routine",
+            "description": "Use /roll 12 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 12
+            }
+          }
+        ],
+        "refillOffers": [
+          {
+            "id": "daily-simple-casino-warmup",
+            "title": "Casino Warmup",
+            "description": "Finish 2 casino games.",
+            "objective": {
+              "type": "casino_game_count",
+              "requiredCount": 2
+            }
+          }
+        ]
       },
-      "reward": {
-        "pips": 18
-      }
-    },
-    {
-      "id": "daily-casino-circuit",
-      "title": "Casino Circuit",
-      "description": "Finish 4 casino games.",
-      "objective": {
-        "type": "casino_game_count",
-        "requiredCount": 4
+      "serious": {
+        "label": "Serious",
+        "rewardPips": 20,
+        "initialOffers": [
+          {
+            "id": "daily-serious-duel-duty",
+            "title": "Duel Duty",
+            "description": "Win 1 PvP challenge.",
+            "objective": {
+              "type": "pvp_win_count",
+              "requiredCount": 1
+            }
+          }
+        ],
+        "refillOffers": [
+          {
+            "id": "daily-serious-world-boss-detail",
+            "title": "World Boss Detail",
+            "description": "Join 1 World Boss encounter.",
+            "objective": {
+              "type": "world_boss_join_count",
+              "requiredCount": 1
+            }
+          }
+        ]
       },
-      "reward": {
-        "pips": 12,
-        "fame": 4
-      }
-    },
-    {
-      "id": "daily-pvp-victory",
-      "title": "PvP Victory",
-      "description": "Win 1 PvP challenge.",
-      "objective": {
-        "type": "pvp_win_count",
-        "requiredCount": 1
-      },
-      "reward": {
-        "fame": 8
-      }
-    },
-    {
-      "id": "daily-world-boss-join",
-      "title": "World Boss Scout",
-      "description": "Join 1 World Boss encounter.",
-      "objective": {
-        "type": "world_boss_join_count",
-        "requiredCount": 1
-      },
-      "reward": {
-        "pips": 10
+      "brutal": {
+        "label": "Brutal",
+        "rewardPips": 32,
+        "initialOffers": [
+          {
+            "id": "daily-brutal-marathon",
+            "title": "Marathon",
+            "description": "Use /roll 30 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 30
+            }
+          }
+        ],
+        "refillOffers": [
+          {
+            "id": "daily-brutal-high-stakes",
+            "title": "High Stakes",
+            "description": "Finish 8 casino games.",
+            "objective": {
+              "type": "casino_game_count",
+              "requiredCount": 8
+            }
+          }
+        ]
       }
     }
-  ],
-  "weekly": [
-    {
-      "id": "weekly-roll-marathon",
-      "title": "Roll Marathon",
-      "description": "Use /roll 70 times.",
-      "objective": {
-        "type": "roll_count",
-        "requiredCount": 70
+  },
+  "weekly": {
+    "label": "Weekly",
+    "chooserTitle": "Weekly Contracts",
+    "chooserDescription": "Choose a Weekly contract from one of three difficulties.",
+    "difficulties": {
+      "simple": {
+        "label": "Simple",
+        "rewardPips": 30,
+        "initialOffers": [
+          {
+            "id": "weekly-simple-roll-routine",
+            "title": "Roll Routine",
+            "description": "Use /roll 80 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 80
+            }
+          }
+        ],
+        "refillOffers": [
+          {
+            "id": "weekly-simple-casino-warmup",
+            "title": "Casino Warmup",
+            "description": "Finish 10 casino games.",
+            "objective": {
+              "type": "casino_game_count",
+              "requiredCount": 10
+            }
+          }
+        ]
       },
-      "reward": {
-        "pips": 60
-      }
-    },
-    {
-      "id": "weekly-world-boss-crew",
-      "title": "World Boss Crew",
-      "description": "Join 3 World Boss encounters.",
-      "objective": {
-        "type": "world_boss_join_count",
-        "requiredCount": 3
+      "serious": {
+        "label": "Serious",
+        "rewardPips": 45,
+        "initialOffers": [
+          {
+            "id": "weekly-serious-duel-duty",
+            "title": "Duel Duty",
+            "description": "Win 4 PvP challenges.",
+            "objective": {
+              "type": "pvp_win_count",
+              "requiredCount": 4
+            }
+          }
+        ],
+        "refillOffers": [
+          {
+            "id": "weekly-serious-world-boss-detail",
+            "title": "World Boss Detail",
+            "description": "Join 2 World Boss encounters.",
+            "objective": {
+              "type": "world_boss_join_count",
+              "requiredCount": 2
+            }
+          }
+        ]
       },
-      "reward": {
-        "fame": 25,
-        "pips": 20
-      }
-    },
-    {
-      "id": "weekly-casino-volume",
-      "title": "High Roller Shift",
-      "description": "Finish 15 casino games.",
-      "objective": {
-        "type": "casino_game_count",
-        "requiredCount": 15
-      },
-      "reward": {
-        "fame": 18
+      "brutal": {
+        "label": "Brutal",
+        "rewardPips": 70,
+        "initialOffers": [
+          {
+            "id": "weekly-brutal-marathon",
+            "title": "Marathon",
+            "description": "Use /roll 180 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 180
+            }
+          }
+        ],
+        "refillOffers": [
+          {
+            "id": "weekly-brutal-high-stakes",
+            "title": "High Stakes",
+            "description": "Finish 30 casino games.",
+            "objective": {
+              "type": "casino_game_count",
+              "requiredCount": 30
+            }
+          }
+        ]
       }
     }
-  ]
+  }
 }

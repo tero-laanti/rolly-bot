@@ -217,3 +217,20 @@ export const createSqliteContractsProgressRepository = (
 
   return { getProgress, saveProgress };
 };
+
+export {
+  createSqliteContractMasterInitialOfferRepository,
+  createSqliteContractMasterRerollUsageRepository,
+  createSqliteContractMasterRunRepository,
+  createSqliteContractMasterUserCadenceStateRepository,
+} from "./contract-master-repository";
+
+export type {
+  ContractMasterAcceptedVia,
+  ContractMasterCadence,
+  ContractMasterDifficulty,
+  ContractMasterInitialOfferRecord,
+  ContractMasterRerollUsageRecord,
+  ContractMasterRunRecord,
+  ContractMasterUserCadenceStateRecord,
+} from "./contract-master-repository";

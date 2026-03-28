@@ -166,9 +166,41 @@ export type DiceContractData = {
   reward: DiceContractRewardData;
 };
 
+export type DiceContractDifficulty = "simple" | "serious" | "brutal";
+
+export type DiceContractOfferData = Omit<DiceContractData, "reward">;
+
+export type DiceContractsPanelData = {
+  title: string;
+  npcName: string;
+  imageUrl: string;
+  description: string;
+  helperText: string;
+  dailyButtonLabel: string;
+  weeklyButtonLabel: string;
+  askForContractButtonLabel: string;
+};
+
+export type DiceContractsDifficultyData = {
+  label: string;
+  rewardPips: number;
+  initialOffers: DiceContractData[];
+  refillOffers: DiceContractData[];
+};
+
+export type DiceContractsCadenceMetadataData = {
+  label: string;
+  chooserTitle: string;
+  chooserDescription: string;
+  difficulties: Record<DiceContractDifficulty, DiceContractsDifficultyData>;
+};
+
+export type DiceContractsCadenceData = DiceContractData[] & DiceContractsCadenceMetadataData;
+
 export type DiceContractsData = {
-  daily: DiceContractData[];
-  weekly: DiceContractData[];
+  panel: DiceContractsPanelData;
+  daily: DiceContractsCadenceData;
+  weekly: DiceContractsCadenceData;
 };
 
 export type DiceBalanceData = {

@@ -21,6 +21,6 @@ This directory contains safe example data for the public `rolly-bot` repository.
 
 These example values are safe to expose and do not need to match the private game data used outside this public repo.
 
-`contracts.v2.json` powers the shared `/contracts` view plus the auto-claimed gameplay contract progression hooks.
+`contracts.v2.json` defines the Contract Master panel metadata plus Daily and Weekly difficulty pools for contracts gameplay.
 
 For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

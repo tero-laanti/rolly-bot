@@ -31,11 +31,13 @@ test("example rolly-data source loads a non-empty random-event pack", () => {
   );
 });
 
-test("example rolly-data source loads contracts with daily and weekly entries", () => {
+test("example rolly-data source loads Contract Master cadence and difficulty data", () => {
   const contracts = getDiceContractsData();
 
   assert.ok(
-    contracts.daily.length > 0 && contracts.weekly.length > 0,
+    contracts.panel.title === "Contract Master" &&
+      contracts.daily.difficulties.simple.initialOffers.length > 0 &&
+      contracts.weekly.difficulties.brutal.refillOffers.length > 0,
     `Expected contracts content from ${getRollyDataSourceDescription()}`,
   );
 });
