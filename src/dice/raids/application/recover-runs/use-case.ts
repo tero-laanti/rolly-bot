@@ -112,6 +112,7 @@ export const createRecoverRaidRunsUseCase = ({
               runId: currentRun.run.runId,
               now,
               publicMessageId: republished.messageId,
+              closeOpenRunAsInterrupted: true,
             });
           }
           continue;

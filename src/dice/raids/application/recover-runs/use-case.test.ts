@@ -99,6 +99,7 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       publicMessageId,
       privateChannelId,
       participantRoleId,
+      closeOpenRunAsInterrupted,
     }) => {
       const current = store.get(runId);
       if (!current) {
@@ -113,6 +114,15 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       }
       if (participantRoleId !== undefined) {
         current.run.participantRoleId = participantRoleId;
+      }
+      if (closeOpenRunAsInterrupted && current.run.isOpen) {
+        current.run.status = "interrupted";
+        current.run.isOpen = false;
+        current.members = current.members.map((member) => ({
+          ...member,
+          active: false,
+          updatedAt: new Date(now.getTime()),
+        }));
       }
       current.run.version += 1;
       current.run.updatedAt = new Date(now.getTime());
@@ -503,6 +513,65 @@ test("recovery deletes a republished recruitment message if attachment fails", a
   assert.equal(summary.resumedCount, 0);
   assert.equal(deletedRepublishedMessage, true);
   assert.equal(repository.getRaidRun("raid-run-1")?.run.publicMessageId, "message-1");
+});
+
+test("recovery interrupts an open run if republish attach and delete both fail", async () => {
+  const repository = createRecoveryRepository([
+    createRaidRun({
+      runId: "raid-run-1",
+      status: "recruiting",
+      recruitmentExpiresAt: new Date("2026-03-29T10:30:00.000Z"),
+      publicMessageId: "message-1",
+    }),
+  ]);
+
+  const defaultUpdateRaidRun = repository.updateRaidRun.bind(repository);
+  repository.updateRaidRun = (input) => {
+    if (input.runId === "raid-run-1" && input.publicMessageId === "message-2") {
+      return { ok: false as const, reason: "stale" as const };
+    }
+
+    return defaultUpdateRaidRun(input);
+  };
+
+  const useCase = createRecoverRaidRunsUseCase({
+    catalogReader: buildCatalogReader(),
+    repository,
+    inspector: {
+      hasPublicStatusMessage: async () => false,
+      deletePublicStatusMessage: async () => {
+        throw new Error("not used");
+      },
+      inspectProvisionedRunResources: async () => ({
+        privateChannelExists: true,
+        participantRoleExists: true,
+        participantAssignmentsValid: true,
+      }),
+      cleanupProvisionedRunResources: async () => {
+        throw new Error("not used");
+      },
+    },
+    publishStatusMessage: async () => ({
+      messageId: "message-2",
+      deletePublishedMessage: async () => {
+        throw new Error("delete failed");
+      },
+    }),
+    buildRecruitmentView: () => ({
+      content: "Recruitment",
+      components: [],
+    }),
+  });
+
+  const summary = await useCase({
+    now: new Date("2026-03-29T10:00:00.000Z"),
+  });
+
+  assert.equal(summary.republishedCount, 0);
+  assert.equal(summary.resumedCount, 0);
+  assert.equal(repository.getRaidRun("raid-run-1")?.run.status, "interrupted");
+  assert.equal(repository.getRaidRun("raid-run-1")?.run.isOpen, false);
+  assert.equal(repository.getRaidRun("raid-run-1")?.run.publicMessageId, "message-2");
 });
 
 test("recovery continues past closed-run cleanup failures", async () => {

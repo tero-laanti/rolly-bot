@@ -130,6 +130,7 @@ export type RaidRunRepository = {
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    closeOpenRunAsInterrupted?: boolean;
   }) => UpdateRaidRunStoredReferencesResult;
   listRaidRunsByStatuses: (statuses: readonly RaidRunStatus[]) => RaidRunAggregate[];
 };

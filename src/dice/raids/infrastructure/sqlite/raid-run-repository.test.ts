@@ -402,6 +402,38 @@ test("updateRaidRunStoredReferences can persist cleanup pointers without an opti
   assert.ok(updated.raidRun.members.every((member) => member.active === true));
 });
 
+test("updateRaidRunStoredReferences can close an open run as interrupted for cleanup", () => {
+  const repository = createTestRepository();
+  const now = new Date("2026-03-29T10:00:00.000Z");
+
+  const created = repository.createRecruitingRaidRun({
+    runId: "raid-run-1",
+    tierId: "bronze",
+    bossId: "bone-dragon",
+    leaderUserId: "leader-1",
+    publicChannelId: "channel-1",
+    recruitmentExpiresAt: new Date(now.getTime() + raidRecruitmentDurationMs),
+    now,
+  });
+  assert.equal(created.ok, true);
+
+  const updated = repository.updateRaidRunStoredReferences({
+    runId: "raid-run-1",
+    now: new Date("2026-03-29T10:01:00.000Z"),
+    publicMessageId: "message-1",
+    closeOpenRunAsInterrupted: true,
+  });
+  assert.equal(updated.ok, true);
+  if (!updated.ok) {
+    throw new Error("expected reference update to succeed");
+  }
+
+  assert.equal(updated.raidRun.run.status, "interrupted");
+  assert.equal(updated.raidRun.run.isOpen, false);
+  assert.equal(updated.raidRun.run.publicMessageId, "message-1");
+  assert.ok(updated.raidRun.members.every((member) => member.active === false));
+});
+
 test("listRaidRunsByStatuses returns only matching runs in creation order", () => {
   const repository = createTestRepository();
   const now = new Date("2026-03-29T10:00:00.000Z");

@@ -285,6 +285,7 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       publicMessageId,
       privateChannelId,
       participantRoleId,
+      closeOpenRunAsInterrupted,
     }) => {
       const current = runs.get(runId);
       if (!current) {
@@ -299,6 +300,15 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       }
       if (participantRoleId !== undefined) {
         current.run.participantRoleId = participantRoleId;
+      }
+      if (closeOpenRunAsInterrupted && current.run.isOpen) {
+        current.run.status = "interrupted";
+        current.run.isOpen = false;
+        current.members = current.members.map((member) => ({
+          ...member,
+          active: false,
+          updatedAt: new Date(now.getTime()),
+        }));
       }
       current.run.version += 1;
       current.run.updatedAt = new Date(now.getTime());
@@ -451,6 +461,60 @@ test("choose-boss deletes the published message and cancels the run when attachm
   assert.ok(raidRun);
   assert.equal(raidRun.run.status, "cancelled");
   assert.equal(raidRun.run.publicMessageId, null);
+});
+
+test("choose-boss interrupts an open run when message deletion also fails", async () => {
+  const repository = createInMemoryRaidRunRepository();
+  const useCase = createManageRaidLobbyUseCase({
+    catalogReader: buildCatalogReader(),
+    repository,
+    provisioner: {
+      provisionRaidInstance: async () => {
+        throw new Error("not used");
+      },
+      cleanupRaidInstance: async () => {
+        throw new Error("not used");
+      },
+    },
+    randomId: () => "raid-run-1",
+  });
+
+  const staleVersion = repository.updateRaidRun.bind(repository);
+  repository.updateRaidRun = (input) => {
+    if (input.runId === "raid-run-1" && input.publicMessageId === "message-1") {
+      return { ok: false as const, reason: "stale" as const };
+    }
+
+    return staleVersion(input);
+  };
+
+  const result = await useCase.handleRaidAction({
+    actorId: "user-1",
+    action: {
+      kind: "choose-boss",
+      tierId: "bronze",
+      bossId: "bone-dragon",
+    },
+    channelId: "channel-1",
+    now: new Date("2026-03-29T10:00:00.000Z"),
+    publishRecruitment: async () => ({
+      messageId: "message-1",
+      url: "https://example.test/recruitment/1",
+      deletePublishedMessage: async () => {
+        throw new Error("delete failed");
+      },
+    }),
+  });
+
+  assert.equal(result.kind, "update");
+  assert.equal(result.payload.type, "message");
+  assert.match(result.payload.content, /operator cleanup/i);
+
+  const raidRun = repository.getRaidRun("raid-run-1");
+  assert.ok(raidRun);
+  assert.equal(raidRun.run.status, "interrupted");
+  assert.equal(raidRun.run.isOpen, false);
+  assert.equal(raidRun.run.publicMessageId, "message-1");
 });
 
 test("join-run updates the recruitment view and rejects stale versions", async () => {

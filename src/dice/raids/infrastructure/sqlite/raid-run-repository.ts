@@ -886,6 +886,7 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    closeOpenRunAsInterrupted?: boolean;
   }) => {
     try {
       const raidRun = runInTransaction(db, () => {
@@ -905,11 +906,17 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           input.participantRoleId !== undefined
             ? input.participantRoleId
             : raidRunRecord.run.participantRoleId;
+        const shouldCloseOpenRun =
+          input.closeOpenRunAsInterrupted === true && raidRunRecord.run.isOpen;
+        const nextStatus = shouldCloseOpenRun ? "interrupted" : raidRunRecord.run.status;
+        const nextIsOpen = shouldCloseOpenRun ? 0 : raidRunRecord.run.isOpen ? 1 : 0;
 
         db.prepare(
           `
             UPDATE dice_raid_runs
             SET
+              status = ?,
+              is_open = ?,
               public_message_id = ?,
               private_channel_id = ?,
               participant_role_id = ?,
@@ -918,12 +925,24 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             WHERE run_id = ?
           `,
         ).run(
+          nextStatus,
+          nextIsOpen,
           nextPublicMessageId,
           nextPrivateChannelId,
           nextParticipantRoleId,
           updatedAt,
           input.runId,
         );
+
+        if (shouldCloseOpenRun) {
+          db.prepare(
+            `
+              UPDATE dice_raid_run_members
+              SET active = 0, updated_at = ?
+              WHERE run_id = ? AND active = 1
+            `,
+          ).run(updatedAt, input.runId);
+        }
 
         return loadRaidRunAggregate(db, input.runId) ?? fail("not-found");
       });

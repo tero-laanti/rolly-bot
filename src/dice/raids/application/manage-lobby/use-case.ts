@@ -334,6 +334,7 @@ export const createManageRaidLobbyUseCase = ({
                 runId: created.raidRun.run.runId,
                 now,
                 publicMessageId: published.messageId,
+                closeOpenRunAsInterrupted: true,
               });
           if (closed.ok && deletedPublishedMessage) {
             return updateMessage(
