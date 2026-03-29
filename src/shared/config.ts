@@ -51,6 +51,18 @@ export type ContractMasterConfig = {
   channelId: string | null;
 };
 
+export type RaidTierBindingConfig = {
+  panelChannelId: string;
+  accessRoleId: string;
+};
+
+export type RaidsConfig = {
+  enabled: boolean;
+  inactiveReason: string | null;
+  instanceCategoryId: string | null;
+  tierBindings: Record<string, RaidTierBindingConfig>;
+};
+
 const parseNumberWithFallback = (
   rawValue: string | undefined,
   fallback: number,
@@ -102,6 +114,68 @@ const parseOptionalString = (rawValue: string | undefined): string | null => {
 
   const normalized = rawValue.trim();
   return normalized.length > 0 ? normalized : null;
+};
+
+const parseRequiredConfigString = (rawValue: unknown, label: string): string => {
+  if (typeof rawValue !== "string") {
+    throw new Error(`${label} must be a string.`);
+  }
+
+  const normalized = rawValue.trim();
+  if (normalized.length < 1) {
+    throw new Error(`${label} must not be empty.`);
+  }
+
+  return normalized;
+};
+
+const parseRaidTierBindings = (
+  rawValue: string | undefined,
+): Record<string, RaidTierBindingConfig> => {
+  if (!rawValue || rawValue.trim().length < 1) {
+    return {};
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawValue) as unknown;
+  } catch (error) {
+    throw new Error(
+      `RAIDS_TIER_BINDINGS_JSON must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("RAIDS_TIER_BINDINGS_JSON must be a JSON object keyed by tierId.");
+  }
+
+  const bindings: Record<string, RaidTierBindingConfig> = {};
+
+  for (const [tierId, value] of Object.entries(parsed)) {
+    const normalizedTierId = tierId.trim();
+    if (normalizedTierId.length < 1) {
+      throw new Error("RAIDS_TIER_BINDINGS_JSON includes an empty tierId key.");
+    }
+
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new Error(
+        `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId} must be an object with panelChannelId and accessRoleId.`,
+      );
+    }
+
+    bindings[normalizedTierId] = {
+      panelChannelId: parseRequiredConfigString(
+        (value as { panelChannelId?: unknown }).panelChannelId,
+        `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId}.panelChannelId`,
+      ),
+      accessRoleId: parseRequiredConfigString(
+        (value as { accessRoleId?: unknown }).accessRoleId,
+        `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId}.accessRoleId`,
+      ),
+    };
+  }
+
+  return bindings;
 };
 
 const resolveFeatureActivation = ({
@@ -249,6 +323,38 @@ export const contractMasterConfig: ContractMasterConfig = {
   enabled: contractMasterActivation.enabled,
   inactiveReason: contractMasterActivation.inactiveReason,
   channelId: contractMasterChannelId,
+};
+
+const raidsInstanceCategoryId = parseOptionalString(process.env.RAIDS_INSTANCE_CATEGORY_ID);
+const raidsTierBindings = parseRaidTierBindings(process.env.RAIDS_TIER_BINDINGS_JSON);
+const raidsTierBindingCount = Object.keys(raidsTierBindings).length;
+
+const raidsActivation = (() => {
+  if (!raidsInstanceCategoryId) {
+    return {
+      enabled: false,
+      inactiveReason: "RAIDS_INSTANCE_CATEGORY_ID is not set.",
+    };
+  }
+
+  if (raidsTierBindingCount < 1) {
+    return {
+      enabled: false,
+      inactiveReason: "RAIDS_TIER_BINDINGS_JSON is not set.",
+    };
+  }
+
+  return {
+    enabled: true,
+    inactiveReason: null,
+  };
+})();
+
+export const raidsConfig: RaidsConfig = {
+  enabled: raidsActivation.enabled,
+  inactiveReason: raidsActivation.inactiveReason,
+  instanceCategoryId: raidsInstanceCategoryId,
+  tierBindings: raidsTierBindings,
 };
 
 export const worldBossConfig: WorldBossConfig = {

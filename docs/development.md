@@ -49,6 +49,11 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 
 - `INTRO_POST_CHANNEL_ID`: Optional. Channel ID where the bot manages startup-synced intro posts from `intro-posts.v1.json`. The feature stays inactive until this is set.
 
+### Player-started raids
+
+- `RAIDS_INSTANCE_CATEGORY_ID`: Optional. Discord category ID where the bot creates private raid instance channels. Player-started raids stay inactive until this and `RAIDS_TIER_BINDINGS_JSON` are set.
+- `RAIDS_TIER_BINDINGS_JSON`: Optional. JSON object keyed by authored `raids.json` `tierId` values. Each entry must include a `panelChannelId` for the public tier panel and an `accessRoleId` for the Discord role allowed to start or join that tier. Example: `{"bronze":{"panelChannelId":"123","accessRoleId":"456"},"silver":{"panelChannelId":"789","accessRoleId":"012"}}`.
+
 ### Achievement posts
 
 - `ACHIEVEMENTS_CHANNEL_ID`: Optional. Channel ID where the bot posts batched achievement unlock announcements. Achievements are still awarded when this is unset; only the announcement posts are skipped.
@@ -104,6 +109,7 @@ When command names, descriptions, or options change, run `npm run deploy:command
 - Public contract docs live in [example-data/rolly-data/README.md](../example-data/rolly-data/README.md) and [example-data/rolly-data/AUTHORING.md](../example-data/rolly-data/AUTHORING.md).
 - Shop, raids, World Boss, and random-event payloads now fail fast on authored text that exceeds the Discord limits used by their live prompts.
 - Managed intro posts are inactive until `INTRO_POST_CHANNEL_ID` is set.
+- Player-started raids are inactive until both `RAIDS_INSTANCE_CATEGORY_ID` and `RAIDS_TIER_BINDINGS_JSON` are set.
 - Achievement posts are inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.
 - Random events are inactive until `RANDOM_EVENTS_CHANNEL_ID` is set.
 - World Boss runtime is inactive until `WORLD_BOSS_CHANNEL_ID` is set.

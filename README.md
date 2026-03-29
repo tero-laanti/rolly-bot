@@ -50,6 +50,7 @@ If you have a private `rolly-data` checkout, place it in `./rolly-data` or point
 Private `rolly-data` is validated against the Discord transport limits used by the live bot surfaces at startup, so authored text that would overflow shop, raids, random-event, or World Boss payloads is rejected before the bot comes online.
 `contracts.v2.json` defines the Contract Master panel copy plus Daily and Weekly difficulty pools, and the authored contract data is validated against the Discord limits used by the contracts surfaces.
 `raids.json` defines authored raid tiers, static raid bosses, and the copy used by the player-started raids lobby surfaces.
+Player-started raids use startup-synced tier panels instead of a `/raids` slash command. To enable them on a server, set both `RAIDS_INSTANCE_CATEGORY_ID` and `RAIDS_TIER_BINDINGS_JSON` so each authored raid tier points at one public panel channel plus its access role.
 
 ## Further Reading
 

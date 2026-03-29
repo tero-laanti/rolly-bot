@@ -62,3 +62,91 @@ test("contract master config activates when the env var is set", () => {
     assert.equal(contractMasterConfig.inactiveReason, null);
   });
 });
+
+test("raids config stays inactive when the instance category id is unset", () => {
+  withEnv(
+    {
+      RAIDS_INSTANCE_CATEGORY_ID: undefined,
+      RAIDS_TIER_BINDINGS_JSON: JSON.stringify({
+        bronze: {
+          panelChannelId: "111",
+          accessRoleId: "222",
+        },
+      }),
+    },
+    () => {
+      const { raidsConfig } = loadConfig();
+      assert.equal(raidsConfig.enabled, false);
+      assert.equal(raidsConfig.instanceCategoryId, null);
+      assert.equal(raidsConfig.inactiveReason, "RAIDS_INSTANCE_CATEGORY_ID is not set.");
+      assert.deepEqual(raidsConfig.tierBindings, {
+        bronze: {
+          panelChannelId: "111",
+          accessRoleId: "222",
+        },
+      });
+    },
+  );
+});
+
+test("raids config stays inactive when tier bindings are unset", () => {
+  withEnv(
+    {
+      RAIDS_INSTANCE_CATEGORY_ID: "category-1",
+      RAIDS_TIER_BINDINGS_JSON: undefined,
+    },
+    () => {
+      const { raidsConfig } = loadConfig();
+      assert.equal(raidsConfig.enabled, false);
+      assert.equal(raidsConfig.instanceCategoryId, "category-1");
+      assert.equal(raidsConfig.inactiveReason, "RAIDS_TIER_BINDINGS_JSON is not set.");
+      assert.deepEqual(raidsConfig.tierBindings, {});
+    },
+  );
+});
+
+test("raids config parses tier bindings when both env vars are set", () => {
+  withEnv(
+    {
+      RAIDS_INSTANCE_CATEGORY_ID: "category-1",
+      RAIDS_TIER_BINDINGS_JSON: JSON.stringify({
+        bronze: {
+          panelChannelId: "111",
+          accessRoleId: "222",
+        },
+        silver: {
+          panelChannelId: "333",
+          accessRoleId: "444",
+        },
+      }),
+    },
+    () => {
+      const { raidsConfig } = loadConfig();
+      assert.equal(raidsConfig.enabled, true);
+      assert.equal(raidsConfig.instanceCategoryId, "category-1");
+      assert.equal(raidsConfig.inactiveReason, null);
+      assert.deepEqual(raidsConfig.tierBindings, {
+        bronze: {
+          panelChannelId: "111",
+          accessRoleId: "222",
+        },
+        silver: {
+          panelChannelId: "333",
+          accessRoleId: "444",
+        },
+      });
+    },
+  );
+});
+
+test("raids config rejects invalid tier binding json", () => {
+  withEnv(
+    {
+      RAIDS_INSTANCE_CATEGORY_ID: "category-1",
+      RAIDS_TIER_BINDINGS_JSON: "{not-json",
+    },
+    () => {
+      assert.throws(() => loadConfig(), /RAIDS_TIER_BINDINGS_JSON must be valid JSON/i);
+    },
+  );
+});
