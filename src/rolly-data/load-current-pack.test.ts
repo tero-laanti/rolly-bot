@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getDiceContractsData,
+  getDiceRaidsData,
   getRandomEventContentPackV1,
   getRollyDataSourceDescription,
 } from "./load";
@@ -39,5 +40,17 @@ test("example rolly-data source loads Contract Master cadence and difficulty dat
       contracts.daily.difficulties.simple.initialOffers.length > 0 &&
       contracts.weekly.difficulties.brutal.refillOffers.length > 0,
     `Expected contracts content from ${getRollyDataSourceDescription()}`,
+  );
+});
+
+test("example rolly-data source loads authored raid tiers and bosses", () => {
+  const raids = getDiceRaidsData();
+
+  assert.ok(
+    raids.tiers.length > 0 &&
+      raids.bosses.length > 0 &&
+      raids.tiers[0]?.bossIds.length > 0 &&
+      raids.copy.panelTitle === "Rolly Raids",
+    `Expected raids content from ${getRollyDataSourceDescription()}`,
   );
 });

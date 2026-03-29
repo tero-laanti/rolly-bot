@@ -15,6 +15,7 @@ This directory contains safe example data for the public `rolly-bot` repository.
   - `intro-posts.v1.json`
   - `items.v1.json`
   - `pvp.json`
+  - `raids.json`
   - `world-boss.v1.json`
   - `random-events-balance.json`
   - `random-events.v1.json`
@@ -22,5 +23,6 @@ This directory contains safe example data for the public `rolly-bot` repository.
 These example values are safe to expose and do not need to match the private game data used outside this public repo.
 
 `contracts.v2.json` defines the Contract Master panel metadata plus Daily and Weekly difficulty pools for contracts gameplay.
+`raids.json` defines ordered raid tiers, static raid bosses, and shared player-facing copy for raids gameplay.
 
 For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

@@ -25,6 +25,12 @@ import type {
   IntroPostsV1Data,
   DiceBalanceVarietyConfig,
   DiceRandomEventBalanceData,
+  DiceRaidBossCopyData,
+  DiceRaidBossData,
+  DiceRaidsCopyData,
+  DiceRaidsData,
+  DiceRaidRewardData,
+  DiceRaidTierData,
   DiceWorldBossBossBalanceData,
   DiceWorldBossBossNamesData,
   DiceWorldBossData,
@@ -1277,6 +1283,75 @@ const validateWorldBossDiscordText = (worldBoss: DiceWorldBossData): void => {
   );
 };
 
+const validateRaidsDiscordText = (raids: DiceRaidsData): void => {
+  assertDiscordTextLength(
+    raids.copy.panelTitle,
+    "raids.copy.panelTitle",
+    discordEmbedTitleCharacterLimit,
+  );
+  assertDiscordTextLength(
+    raids.copy.startRaidButtonLabel,
+    "raids.copy.startRaidButtonLabel",
+    discordButtonLabelCharacterLimit,
+  );
+  assertDiscordTextLength(
+    raids.copy.joinRaidButtonLabel,
+    "raids.copy.joinRaidButtonLabel",
+    discordButtonLabelCharacterLimit,
+  );
+  assertDiscordTextLength(
+    raids.copy.leaveRaidButtonLabel,
+    "raids.copy.leaveRaidButtonLabel",
+    discordButtonLabelCharacterLimit,
+  );
+  assertDiscordTextLength(
+    raids.copy.startEncounterButtonLabel,
+    "raids.copy.startEncounterButtonLabel",
+    discordButtonLabelCharacterLimit,
+  );
+  assertDiscordTextLength(
+    raids.copy.cancelRaidButtonLabel,
+    "raids.copy.cancelRaidButtonLabel",
+    discordButtonLabelCharacterLimit,
+  );
+
+  for (const tier of raids.tiers) {
+    assertDiscordTextLength(
+      tier.name,
+      `raids.tiers.${tier.tierId}.name`,
+      discordEmbedTitleCharacterLimit,
+    );
+    assertDiscordTextLength(
+      tier.summary,
+      `raids.tiers.${tier.tierId}.summary`,
+      discordMessageCharacterLimit,
+    );
+  }
+
+  for (const boss of raids.bosses) {
+    assertDiscordTextLength(
+      boss.copy.recruitmentSummary,
+      `raids.bosses.${boss.bossId}.copy.recruitmentSummary`,
+      discordMessageCharacterLimit,
+    );
+    assertDiscordTextLength(
+      boss.copy.encounterTitle,
+      `raids.bosses.${boss.bossId}.copy.encounterTitle`,
+      discordEmbedTitleCharacterLimit,
+    );
+    assertDiscordTextLength(
+      boss.copy.successSummary,
+      `raids.bosses.${boss.bossId}.copy.successSummary`,
+      discordMessageCharacterLimit,
+    );
+    assertDiscordTextLength(
+      boss.copy.failureSummary,
+      `raids.bosses.${boss.bossId}.copy.failureSummary`,
+      discordMessageCharacterLimit,
+    );
+  }
+};
+
 const readContractObjectiveType = (value: unknown, label: string): DiceContractObjectiveType => {
   const parsed = readNonEmptyString(value, label);
   if (!contractObjectiveTypes.includes(parsed as DiceContractObjectiveType)) {
@@ -1772,6 +1847,192 @@ const readWorldBossParticipantStrengthConfig = (
   };
 };
 
+const readRaidRollPassReward = (value: unknown, label: string) => {
+  const rollPassBuff = assertRecord(value, label);
+
+  return {
+    multiplierPerBossLevel: readInteger(
+      rollPassBuff.multiplierPerBossLevel,
+      `${label}.rollPassBuff.multiplierPerBossLevel`,
+      0,
+    ),
+    minimumMultiplier: readInteger(
+      rollPassBuff.minimumMultiplier,
+      `${label}.rollPassBuff.minimumMultiplier`,
+      1,
+    ),
+    maximumMultiplier: readInteger(
+      rollPassBuff.maximumMultiplier,
+      `${label}.rollPassBuff.maximumMultiplier`,
+      1,
+    ),
+    rollsPerBossLevelDivisor: readPositiveFiniteNumber(
+      rollPassBuff.rollsPerBossLevelDivisor,
+      `${label}.rollPassBuff.rollsPerBossLevelDivisor`,
+    ),
+    minimumRolls: readInteger(rollPassBuff.minimumRolls, `${label}.rollPassBuff.minimumRolls`, 1),
+    maximumRolls: readInteger(rollPassBuff.maximumRolls, `${label}.rollPassBuff.maximumRolls`, 1),
+  };
+};
+
+const readRaidReward = (value: unknown, label: string): DiceRaidRewardData => {
+  const record = assertRecord(value, label);
+
+  return {
+    pips: readInteger(record.pips, `${label}.pips`, 0),
+    rollPassBuff: readRaidRollPassReward(record.rollPassBuff, `${label}.rollPassBuff`),
+  };
+};
+
+const readRaidBossCopy = (value: unknown, label: string): DiceRaidBossCopyData => {
+  const record = assertRecord(value, label);
+
+  return {
+    recruitmentSummary: readNonEmptyString(
+      record.recruitmentSummary,
+      `${label}.recruitmentSummary`,
+    ),
+    encounterTitle: readNonEmptyString(record.encounterTitle, `${label}.encounterTitle`),
+    successSummary: readNonEmptyString(record.successSummary, `${label}.successSummary`),
+    failureSummary: readNonEmptyString(record.failureSummary, `${label}.failureSummary`),
+  };
+};
+
+const readRaidBosses = (value: unknown, label: string): DiceRaidBossData[] => {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array.`);
+  }
+
+  return value.map((entry, index) => {
+    const record = assertRecord(entry, `${label}[${index}]`);
+
+    return {
+      bossId: readNonEmptyString(record.bossId, `${label}[${index}].bossId`),
+      tierId: readNonEmptyString(record.tierId, `${label}[${index}].tierId`),
+      name: readNonEmptyString(record.name, `${label}[${index}].name`),
+      level: readInteger(record.level, `${label}[${index}].level`, 1),
+      maxHp: readInteger(record.maxHp, `${label}[${index}].maxHp`, 1),
+      reward: readRaidReward(record.reward, `${label}[${index}].reward`),
+      copy: readRaidBossCopy(record.copy, `${label}[${index}].copy`),
+    };
+  });
+};
+
+const readRaidTiers = (value: unknown, label: string): DiceRaidTierData[] => {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array.`);
+  }
+
+  return value.map((entry, index) => {
+    const record = assertRecord(entry, `${label}[${index}]`);
+
+    return {
+      tierId: readNonEmptyString(record.tierId, `${label}[${index}].tierId`),
+      name: readNonEmptyString(record.name, `${label}[${index}].name`),
+      order: readInteger(record.order, `${label}[${index}].order`, 1),
+      summary: readNonEmptyString(record.summary, `${label}[${index}].summary`),
+      bossIds: readStringArray(record.bossIds, `${label}[${index}].bossIds`),
+    };
+  });
+};
+
+const readRaidsCopy = (value: unknown, label: string): DiceRaidsCopyData => {
+  const record = assertRecord(value, label);
+
+  return {
+    panelTitle: readNonEmptyString(record.panelTitle, `${label}.panelTitle`),
+    panelDescription: readNonEmptyString(record.panelDescription, `${label}.panelDescription`),
+    startRaidButtonLabel: readNonEmptyString(
+      record.startRaidButtonLabel,
+      `${label}.startRaidButtonLabel`,
+    ),
+    joinRaidButtonLabel: readNonEmptyString(
+      record.joinRaidButtonLabel,
+      `${label}.joinRaidButtonLabel`,
+    ),
+    leaveRaidButtonLabel: readNonEmptyString(
+      record.leaveRaidButtonLabel,
+      `${label}.leaveRaidButtonLabel`,
+    ),
+    startEncounterButtonLabel: readNonEmptyString(
+      record.startEncounterButtonLabel,
+      `${label}.startEncounterButtonLabel`,
+    ),
+    cancelRaidButtonLabel: readNonEmptyString(
+      record.cancelRaidButtonLabel,
+      `${label}.cancelRaidButtonLabel`,
+    ),
+  };
+};
+
+const assertDistinctRaidTierIds = (tiers: DiceRaidTierData[]): void => {
+  const ids = new Set<string>();
+  const orders = new Set<number>();
+
+  for (const tier of tiers) {
+    if (ids.has(tier.tierId)) {
+      throw new Error(`Duplicate raids tierId: ${tier.tierId}`);
+    }
+
+    if (orders.has(tier.order)) {
+      throw new Error(`Duplicate raids tier order: ${tier.order}`);
+    }
+
+    ids.add(tier.tierId);
+    orders.add(tier.order);
+  }
+};
+
+const assertDistinctRaidBossIds = (bosses: DiceRaidBossData[]): void => {
+  const ids = new Set<string>();
+
+  for (const boss of bosses) {
+    if (ids.has(boss.bossId)) {
+      throw new Error(`Duplicate raids bossId: ${boss.bossId}`);
+    }
+
+    ids.add(boss.bossId);
+  }
+};
+
+const validateRaidReferences = (raids: DiceRaidsData): void => {
+  const tierIds = new Set(raids.tiers.map((tier) => tier.tierId));
+  const bossesById = new Map(raids.bosses.map((boss) => [boss.bossId, boss] as const));
+
+  for (const boss of raids.bosses) {
+    if (!tierIds.has(boss.tierId)) {
+      throw new Error(`raids boss ${boss.bossId} references unknown tierId ${boss.tierId}`);
+    }
+  }
+
+  for (const tier of raids.tiers) {
+    const seenBossIds = new Set<string>();
+
+    if (tier.bossIds.length < 1) {
+      throw new Error(`raids tier ${tier.tierId} must include at least one bossId`);
+    }
+
+    for (const bossId of tier.bossIds) {
+      if (seenBossIds.has(bossId)) {
+        throw new Error(`raids tier ${tier.tierId} includes duplicate bossId ${bossId}`);
+      }
+
+      const boss = bossesById.get(bossId);
+      if (!boss) {
+        throw new Error(`raids tier ${tier.tierId} references unknown bossId ${bossId}`);
+      }
+
+      if (boss.tierId !== tier.tierId) {
+        throw new Error(
+          `raids tier ${tier.tierId} references bossId ${bossId} owned by tier ${boss.tierId}`,
+        );
+      }
+
+      seenBossIds.add(bossId);
+    }
+  }
+};
+
 export const parseDiceBalance = (value: unknown): DiceBalanceData => {
   const record = assertRecord(value, "diceBalance");
   const charge = assertRecord(record.charge, "diceBalance.charge");
@@ -1858,6 +2119,24 @@ export const parseWorldBossData = (value: unknown): DiceWorldBossData => {
   };
 
   validateWorldBossDiscordText(parsed);
+  return parsed;
+};
+
+export const parseRaidsData = (value: unknown): DiceRaidsData => {
+  const record = assertRecord(value, "raids");
+  const parsed = {
+    tiers: readRaidTiers(record.tiers, "raids.tiers").sort(
+      (left, right) => left.order - right.order,
+    ),
+    bosses: readRaidBosses(record.bosses, "raids.bosses"),
+    copy: readRaidsCopy(record.copy, "raids.copy"),
+  };
+
+  assertDistinctRaidTierIds(parsed.tiers);
+  assertDistinctRaidBossIds(parsed.bosses);
+  validateRaidReferences(parsed);
+  validateRaidsDiscordText(parsed);
+
   return parsed;
 };
 

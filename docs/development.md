@@ -39,10 +39,11 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 
 ### Gameplay data
 
-- `ROLLY_DATA_DIR`: Optional. Absolute or repo-relative path to a private `rolly-data` checkout. If omitted, Rolly tries `./rolly-data` and then [example-data/rolly-data/](../example-data/rolly-data/). The data directory is expected to include `achievements.json`, `casino.v1.json`, `contracts.v2.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `world-boss.v1.json`, `random-events-balance.json`, and `random-events.v1.json`.
+- `ROLLY_DATA_DIR`: Optional. Absolute or repo-relative path to a private `rolly-data` checkout. If omitted, Rolly tries `./rolly-data` and then [example-data/rolly-data/](../example-data/rolly-data/). The data directory is expected to include `achievements.json`, `casino.v1.json`, `contracts.v2.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `world-boss.v1.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - `random-events.v1.json` can reference consumable rewards from `items.v1.json`; startup validation rejects missing or non-consumable item ids.
-- Startup validation also rejects authored gameplay text that would overflow the Discord surfaces used by shop, random events, or World Boss fights. Runtime-only overflow from live World Boss/event state is trimmed when the message is rendered.
+- Startup validation also rejects authored gameplay text that would overflow the Discord surfaces used by shop, raids, random events, or World Boss fights. Runtime-only overflow from live World Boss or raid state is trimmed when the message is rendered.
 - `contracts.v2.json` defines the Contract Master panel metadata plus Daily and Weekly difficulty pools. If it is missing from local `./rolly-data`, gameplay contracts hooks are disabled and `/contracts` shows an unavailable message instead of crashing the rest of the bot.
+- `raids.json` defines authored raid tiers, static raid bosses, and shared player-facing copy for the player-started raids flow.
 
 ### Intro posts
 
@@ -96,11 +97,12 @@ When command names, descriptions, or options change, run `npm run deploy:command
 
 - Runtime state is stored in `./data/rolly-bot.sqlite`.
 - Gameplay data loads in this order: `ROLLY_DATA_DIR`, `./rolly-data`, then [example-data/rolly-data/](../example-data/rolly-data/).
-- The expected data files are `achievements.json`, `casino.v1.json`, `contracts.v2.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `world-boss.v1.json`, `random-events-balance.json`, and `random-events.v1.json`.
+- The expected data files are `achievements.json`, `casino.v1.json`, `contracts.v2.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `world-boss.v1.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - World Boss balance is defined in `world-boss.v1.json` using a weighted random boss-level roll, per-level HP scaling, and a configurable prestige multiplier for joined-player strength locked at fight start. The public contract lives in [example-data/rolly-data/world-boss.v1.md](../example-data/rolly-data/world-boss.v1.md).
 - Contracts are defined in `contracts.v2.json`. The authored contract includes Contract Master panel copy, cadence-specific difficulty pools, initial offers, refill offers, and Pip-only reward ladders. The public contract lives in [example-data/rolly-data/contracts.v2.md](../example-data/rolly-data/contracts.v2.md).
+- Raids are defined in `raids.json`. The authored contract includes ordered tiers, static bosses, raid rewards, and shared panel or recruitment copy. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
 - Public contract docs live in [example-data/rolly-data/README.md](../example-data/rolly-data/README.md) and [example-data/rolly-data/AUTHORING.md](../example-data/rolly-data/AUTHORING.md).
-- Shop, World Boss, and random-event payloads now fail fast on authored text that exceeds the Discord limits used by their live prompts.
+- Shop, raids, World Boss, and random-event payloads now fail fast on authored text that exceeds the Discord limits used by their live prompts.
 - Managed intro posts are inactive until `INTRO_POST_CHANNEL_ID` is set.
 - Achievement posts are inactive until `ACHIEVEMENTS_CHANNEL_ID` is set.
 - Random events are inactive until `RANDOM_EVENTS_CHANNEL_ID` is set.

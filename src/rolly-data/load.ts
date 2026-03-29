@@ -7,6 +7,7 @@ import type {
   DiceContractsData,
   DiceItemData,
   DicePvpData,
+  DiceRaidsData,
   DiceRandomEventBalanceData,
   DiceWorldBossData,
   IntroPostsV1Data,
@@ -19,6 +20,7 @@ import {
   parseDiceBalance,
   parseDiceContractsData,
   parseDicePvpData,
+  parseRaidsData,
   parseDiceItems,
   parseWorldBossData,
   parseIntroPostsV1Data,
@@ -35,6 +37,7 @@ const diceBalanceFileName = "dice-balance.json";
 const introPostsV1FileName = "intro-posts.v1.json";
 const itemsV1FileName = "items.v1.json";
 const pvpFileName = "pvp.json";
+const raidsFileName = "raids.json";
 const worldBossFileName = "world-boss.v1.json";
 const randomEventBalanceFileName = "random-events-balance.json";
 const randomEventsV1FileName = "random-events.v1.json";
@@ -116,6 +119,7 @@ const loadRollyData = (): LoadedRollyData => {
     itemsV1,
     pvp: parseDicePvpData(readJsonFile(source, pvpFileName)),
     randomEventBalance: parseRandomEventBalance(readJsonFile(source, randomEventBalanceFileName)),
+    raids: parseRaidsData(readJsonFile(source, raidsFileName)),
     worldBoss: parseWorldBossData(readJsonFile(source, worldBossFileName)),
     randomEventsV1,
   };
@@ -144,6 +148,10 @@ export const getDicePvpData = (): DicePvpData => {
 
 export const getRandomEventBalanceData = (): DiceRandomEventBalanceData => {
   return getRollyData().randomEventBalance;
+};
+
+export const getDiceRaidsData = (): DiceRaidsData => {
+  return getRollyData().raids;
 };
 
 export const getWorldBossData = (): DiceWorldBossData => {

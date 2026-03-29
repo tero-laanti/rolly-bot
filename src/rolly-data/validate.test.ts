@@ -5,6 +5,7 @@ import {
   parseDiceBalance,
   parseDiceContractsData,
   parseDiceItems,
+  parseRaidsData,
   parseWorldBossData,
   parseIntroPostsV1Data,
   parseRandomEventBalance,
@@ -230,6 +231,108 @@ const createContractsInput = (): ContractsInput => ({
   },
   daily: createCadenceInput("Daily", 12, 20, 32),
   weekly: createCadenceInput("Weekly", 30, 45, 70),
+});
+
+const createRaidsInput = () => ({
+  tiers: [
+    {
+      tierId: "bronze",
+      name: "Bronze Raids",
+      order: 1,
+      summary: "Entry raids for small parties.",
+      bossIds: ["bone-drake", "iron-mimic"],
+    },
+    {
+      tierId: "silver",
+      name: "Silver Raids",
+      order: 2,
+      summary: "Harder raids for stronger parties.",
+      bossIds: ["storm-warden"],
+    },
+  ],
+  bosses: [
+    {
+      bossId: "bone-drake",
+      tierId: "bronze",
+      name: "Bone Drake",
+      level: 8,
+      maxHp: 160,
+      reward: {
+        pips: 6,
+        rollPassBuff: {
+          multiplierPerBossLevel: 1,
+          minimumMultiplier: 2,
+          maximumMultiplier: 10,
+          rollsPerBossLevelDivisor: 5,
+          minimumRolls: 1,
+          maximumRolls: 3,
+        },
+      },
+      copy: {
+        recruitmentSummary: "A brittle drake circles the ruined tower.",
+        encounterTitle: "Bone Drake",
+        successSummary: "The Bone Drake collapses into splinters.",
+        failureSummary: "The Bone Drake escapes the tower ruins.",
+      },
+    },
+    {
+      bossId: "iron-mimic",
+      tierId: "bronze",
+      name: "Iron Mimic",
+      level: 10,
+      maxHp: 190,
+      reward: {
+        pips: 7,
+        rollPassBuff: {
+          multiplierPerBossLevel: 1,
+          minimumMultiplier: 2,
+          maximumMultiplier: 10,
+          rollsPerBossLevelDivisor: 5,
+          minimumRolls: 1,
+          maximumRolls: 3,
+        },
+      },
+      copy: {
+        recruitmentSummary: "A plated mimic guards the vault door.",
+        encounterTitle: "Iron Mimic",
+        successSummary: "The Iron Mimic falls apart around the loot.",
+        failureSummary: "The Iron Mimic seals the vault and withdraws.",
+      },
+    },
+    {
+      bossId: "storm-warden",
+      tierId: "silver",
+      name: "Storm Warden",
+      level: 18,
+      maxHp: 320,
+      reward: {
+        pips: 11,
+        rollPassBuff: {
+          multiplierPerBossLevel: 1,
+          minimumMultiplier: 3,
+          maximumMultiplier: 14,
+          rollsPerBossLevelDivisor: 6,
+          minimumRolls: 1,
+          maximumRolls: 4,
+        },
+      },
+      copy: {
+        recruitmentSummary: "A storm-forged sentinel blocks the summit path.",
+        encounterTitle: "Storm Warden",
+        successSummary: "The Storm Warden shatters under the party's assault.",
+        failureSummary: "The Storm Warden drives the party from the summit.",
+      },
+    },
+  ],
+  copy: {
+    panelTitle: "Rolly Raids",
+    panelDescription: "Pick a tier, recruit a party, and challenge a static raid boss.",
+    startRaidButtonLabel: "Start Raid",
+    joinRaidButtonLabel: "Join Raid",
+    leaveRaidButtonLabel: "Leave Raid",
+    startEncounterButtonLabel: "Start Encounter",
+    cancelRaidButtonLabel: "Cancel Raid",
+  },
 });
 
 test("parseDiceBalance preserves firstDailyRollPipReward when provided", () => {
@@ -617,6 +720,32 @@ test("parseWorldBossData rejects boss names that overflow World Boss titles", ()
         },
       }),
     /active World Boss title must be <= 256 characters/i,
+  );
+});
+
+test("parseRaidsData accepts ordered tiers and static bosses", () => {
+  const parsed = parseRaidsData(createRaidsInput());
+
+  assert.equal(parsed.tiers[0]?.tierId, "bronze");
+  assert.equal(parsed.tiers[1]?.tierId, "silver");
+  assert.equal(parsed.bosses[0]?.reward.pips, 6);
+  assert.equal(parsed.copy.startRaidButtonLabel, "Start Raid");
+});
+
+test("parseRaidsData rejects duplicate tier orders", () => {
+  const input = createRaidsInput();
+  input.tiers[1].order = input.tiers[0].order;
+
+  assert.throws(() => parseRaidsData(input), /Duplicate raids tier order/i);
+});
+
+test("parseRaidsData rejects tiers that reference bosses from another tier", () => {
+  const input = createRaidsInput();
+  input.tiers[0].bossIds = ["storm-warden"];
+
+  assert.throws(
+    () => parseRaidsData(input),
+    /raids tier bronze references bossId storm-warden owned by tier silver/i,
   );
 });
 

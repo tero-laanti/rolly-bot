@@ -142,6 +142,54 @@ export type DiceWorldBossParticipantStrengthData = {
   prestigeMultiplier: number;
 };
 
+export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardData;
+
+export type DiceRaidRewardData = {
+  pips: number;
+  rollPassBuff: DiceRaidRollPassRewardData;
+};
+
+export type DiceRaidBossCopyData = {
+  recruitmentSummary: string;
+  encounterTitle: string;
+  successSummary: string;
+  failureSummary: string;
+};
+
+export type DiceRaidBossData = {
+  bossId: string;
+  tierId: string;
+  name: string;
+  level: number;
+  maxHp: number;
+  reward: DiceRaidRewardData;
+  copy: DiceRaidBossCopyData;
+};
+
+export type DiceRaidTierData = {
+  tierId: string;
+  name: string;
+  order: number;
+  summary: string;
+  bossIds: string[];
+};
+
+export type DiceRaidsCopyData = {
+  panelTitle: string;
+  panelDescription: string;
+  startRaidButtonLabel: string;
+  joinRaidButtonLabel: string;
+  leaveRaidButtonLabel: string;
+  startEncounterButtonLabel: string;
+  cancelRaidButtonLabel: string;
+};
+
+export type DiceRaidsData = {
+  tiers: DiceRaidTierData[];
+  bosses: DiceRaidBossData[];
+  copy: DiceRaidsCopyData;
+};
+
 export type DiceContractObjectiveType =
   | "roll_count"
   | "pvp_win_count"
@@ -365,6 +413,7 @@ export type LoadedRollyData = {
   introPostsV1: IntroPostsV1Data;
   pvp: DicePvpData;
   randomEventBalance: DiceRandomEventBalanceData;
+  raids: DiceRaidsData;
   worldBoss: DiceWorldBossData;
   itemsV1: DiceItemData[];
   randomEventsV1: RandomEventScenario[];
