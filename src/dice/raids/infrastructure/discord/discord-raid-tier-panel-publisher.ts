@@ -56,7 +56,9 @@ const resolveSendableMessageChannel = async (
 ): Promise<SendableMessageChannel> => {
   const channel = await client.channels.fetch(channelId);
   if (!channel || !channel.isTextBased() || !isSendableMessageChannel(channel)) {
-    throw new Error(`RAIDS panel channel must reference a sendable text channel. Received ${channelId}.`);
+    throw new Error(
+      `RAIDS panel channel must reference a sendable text channel. Received ${channelId}.`,
+    );
   }
 
   return channel;
@@ -84,9 +86,7 @@ const isRaidTierPanelMessage = (message: Message, botUserId: string): boolean =>
   });
 };
 
-export const createDiscordRaidTierPanelPublisher = (
-  client: Client,
-): RaidTierPanelPublisher => {
+export const createDiscordRaidTierPanelPublisher = (client: Client): RaidTierPanelPublisher => {
   return {
     assertSendableChannel: async (channelId) => {
       await resolveSendableMessageChannel(client, channelId);

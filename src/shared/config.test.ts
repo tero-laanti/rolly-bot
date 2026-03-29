@@ -150,3 +150,44 @@ test("raids config rejects invalid tier binding json", () => {
     },
   );
 });
+
+test("raids config rejects reused panel channel ids", () => {
+  withEnv(
+    {
+      RAIDS_INSTANCE_CATEGORY_ID: "category-1",
+      RAIDS_TIER_BINDINGS_JSON: JSON.stringify({
+        bronze: {
+          panelChannelId: "shared-channel",
+          accessRoleId: "role-1",
+        },
+        silver: {
+          panelChannelId: "shared-channel",
+          accessRoleId: "role-2",
+        },
+      }),
+    },
+    () => {
+      assert.throws(() => loadConfig(), /reuses panelChannelId shared-channel/i);
+    },
+  );
+});
+
+test("raids config rejects blank binding ids", () => {
+  withEnv(
+    {
+      RAIDS_INSTANCE_CATEGORY_ID: "category-1",
+      RAIDS_TIER_BINDINGS_JSON: JSON.stringify({
+        bronze: {
+          panelChannelId: "   ",
+          accessRoleId: "role-1",
+        },
+      }),
+    },
+    () => {
+      assert.throws(
+        () => loadConfig(),
+        /RAIDS_TIER_BINDINGS_JSON\.bronze\.panelChannelId must not be empty/i,
+      );
+    },
+  );
+});

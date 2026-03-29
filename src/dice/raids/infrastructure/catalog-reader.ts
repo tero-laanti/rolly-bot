@@ -78,9 +78,7 @@ export const assertConfiguredRaidTierBindings = (
 
   for (const [tierId, binding] of Object.entries(tierBindings)) {
     if (!knownTierIds.has(tierId)) {
-      throw new Error(
-        `RAIDS_TIER_BINDINGS_JSON references unknown raids.json tierId "${tierId}".`,
-      );
+      throw new Error(`RAIDS_TIER_BINDINGS_JSON references unknown raids.json tierId "${tierId}".`);
     }
 
     const existingTierId = panelChannelIds.get(binding.panelChannelId);

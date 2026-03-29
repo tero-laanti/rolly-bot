@@ -57,10 +57,8 @@ type CreateSyncRaidTierPanelsUseCaseDependencies = {
   publisher: RaidTierPanelPublisher;
 };
 
-const byNewestFirst = (
-  left: RaidTierPanelSyncMessage,
-  right: RaidTierPanelSyncMessage,
-): number => right.createdTimestamp - left.createdTimestamp;
+const byNewestFirst = (left: RaidTierPanelSyncMessage, right: RaidTierPanelSyncMessage): number =>
+  right.createdTimestamp - left.createdTimestamp;
 
 export const createSyncRaidTierPanelsUseCase = ({
   config,
@@ -90,7 +88,9 @@ export const createSyncRaidTierPanelsUseCase = ({
     for (const panel of panelPayloads) {
       await publisher.assertSendableChannel(panel.channelId);
 
-      const existingPanels = (await publisher.listPanelMessages(panel.channelId)).sort(byNewestFirst);
+      const existingPanels = (await publisher.listPanelMessages(panel.channelId)).sort(
+        byNewestFirst,
+      );
       const currentPanel = existingPanels[0] ?? null;
       const stalePanels = currentPanel ? existingPanels.slice(1) : existingPanels;
 

@@ -13,6 +13,7 @@ import {
 import {
   contractMasterConfig,
   introPostsConfig,
+  raidsConfig,
   randomEventsFoundationConfig,
   worldBossConfig,
 } from "../../shared/config";
@@ -42,6 +43,9 @@ import { createWorldBossState } from "../../dice/world-boss/infrastructure/state
 import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastructure/challenge-expiration-runtime";
 import { syncContractMasterPanelOnStartup } from "../../dice/contracts/infrastructure/contract-master-panel-sync";
 import { syncIntroPostsOnStartup } from "../../system/intro-posts/infrastructure/startup-sync";
+import { createRaidsLiveRuntime } from "../../dice/raids/infrastructure/live-runtime";
+import { raidButtonPrefix } from "../../dice/raids/interfaces/discord/buttons/raid-buttons";
+import { syncRaidTierPanelsOnStartup } from "../../dice/raids/infrastructure/tier-panel-sync";
 
 const token = requireEnv("DISCORD_TOKEN");
 
@@ -66,6 +70,7 @@ let stopRandomEventsScheduler: (() => void) | null = null;
 let worldBossLiveRuntime: ReturnType<typeof createWorldBossLiveRuntime> | null = null;
 let stopWorldBossScheduler: (() => void) | null = null;
 let stopDicePvpChallengeExpirationRuntime: (() => void) | null = null;
+let raidsLiveRuntime: ReturnType<typeof createRaidsLiveRuntime> | null = null;
 
 const handleRandomEventButton = async (interaction: ButtonInteraction): Promise<void> => {
   if (!randomEventsLiveRuntime) {
@@ -91,6 +96,18 @@ const handleWorldBossButton = async (interaction: ButtonInteraction): Promise<vo
   await worldBossLiveRuntime.handleButtonInteraction(interaction);
 };
 
+const handleRaidButton = async (interaction: ButtonInteraction): Promise<void> => {
+  if (!raidsLiveRuntime) {
+    await interaction.reply({
+      content: "Raids are currently unavailable.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await raidsLiveRuntime.handleButtonInteraction(interaction);
+};
+
 const registerDiscordButtonHandlers = (): void => {
   for (const handler of discordButtonHandlers) {
     registerButtonHandler(handler.prefix, handler.handle);
@@ -99,6 +116,7 @@ const registerDiscordButtonHandlers = (): void => {
   registerButtonHandler(randomEventButtonPrefix, handleRandomEventButton);
   registerButtonHandler(worldBossJoinButtonPrefix, handleWorldBossButton);
   registerButtonHandler(worldBossLeaveButtonPrefix, handleWorldBossButton);
+  registerButtonHandler(raidButtonPrefix, handleRaidButton);
 };
 
 const registerDiscordStringSelectMenuHandlers = (): void => {
@@ -208,6 +226,36 @@ const startDicePvpChallengeExpiration = (): void => {
   console.log("[pvp] Challenge expiration runtime started.");
 };
 
+const startRaidsRuntime = async (): Promise<void> => {
+  if (!raidsConfig.enabled) {
+    console.log(
+      `[raids] Runtime inactive. ${raidsConfig.inactiveReason ?? "No activation reason provided."}`,
+    );
+    return;
+  }
+
+  if (raidsLiveRuntime) {
+    return;
+  }
+
+  const runtime = createRaidsLiveRuntime({
+    client,
+    config: raidsConfig,
+    logger: console,
+  });
+
+  await syncRaidTierPanelsOnStartup({
+    client,
+    config: raidsConfig,
+    db: getDatabase(),
+    logger: console,
+  });
+  await runtime.recoverRunsOnStartup();
+
+  raidsLiveRuntime = runtime;
+  console.log("[raids] Runtime, recovery, and tier panel sync started.");
+};
+
 const stopBackgroundSchedulers = async (): Promise<void> => {
   clearRandomEventsAdminController();
   clearWorldBossAdminController();
@@ -235,6 +283,11 @@ const stopBackgroundSchedulers = async (): Promise<void> => {
   if (worldBossLiveRuntime) {
     await worldBossLiveRuntime.stop();
     worldBossLiveRuntime = null;
+  }
+
+  if (raidsLiveRuntime) {
+    await raidsLiveRuntime.stop();
+    raidsLiveRuntime = null;
   }
 };
 
@@ -279,6 +332,9 @@ client.once(Events.ClientReady, (readyClient) => {
     logger: console,
   }).catch((error) => {
     console.error("[contract-master] Startup sync failed:", error);
+  });
+  void startRaidsRuntime().catch((error) => {
+    console.error("[raids] Startup runtime failed:", error);
   });
   startRandomEventsFoundation();
   startWorldBossFoundation();
