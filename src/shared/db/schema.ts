@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 6;
+const currentSchemaVersion = 7;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -256,6 +256,31 @@ const currentSchemaColumns = new Map<string, string[]>([
   [
     "dice_contract_master_reroll_usage",
     ["user_id", "cadence", "reset_window", "difficulty", "used_at", "updated_at"],
+  ],
+  [
+    "dice_raid_runs",
+    [
+      "run_id",
+      "tier_id",
+      "boss_id",
+      "leader_user_id",
+      "status",
+      "is_open",
+      "public_channel_id",
+      "public_message_id",
+      "private_channel_id",
+      "participant_role_id",
+      "recruitment_expires_at",
+      "encounter_starts_at",
+      "encounter_expires_at",
+      "version",
+      "created_at",
+      "updated_at",
+    ],
+  ],
+  [
+    "dice_raid_run_members",
+    ["run_id", "user_id", "is_leader", "active", "joined_at", "updated_at"],
   ],
 ]);
 
@@ -773,6 +798,61 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (user_id, cadence, reset_window, difficulty)
     );
+
+    CREATE TABLE IF NOT EXISTS dice_raid_runs (
+      run_id TEXT PRIMARY KEY,
+      tier_id TEXT NOT NULL,
+      boss_id TEXT NOT NULL,
+      leader_user_id TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (
+        status IN (
+          'recruiting',
+          'provisioning',
+          'provisioned',
+          'active',
+          'resolved',
+          'cancelled',
+          'expired',
+          'interrupted',
+          'provision-failed'
+        )
+      ),
+      is_open INTEGER NOT NULL CHECK (is_open IN (0, 1)),
+      public_channel_id TEXT NOT NULL,
+      public_message_id TEXT,
+      private_channel_id TEXT,
+      participant_role_id TEXT,
+      recruitment_expires_at TEXT NOT NULL,
+      encounter_starts_at TEXT,
+      encounter_expires_at TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dice_raid_runs_status_created_at
+      ON dice_raid_runs (status, created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_dice_raid_runs_is_open_created_at
+      ON dice_raid_runs (is_open, created_at);
+
+    CREATE TABLE IF NOT EXISTS dice_raid_run_members (
+      run_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      is_leader INTEGER NOT NULL CHECK (is_leader IN (0, 1)),
+      active INTEGER NOT NULL CHECK (active IN (0, 1)),
+      joined_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (run_id, user_id),
+      FOREIGN KEY (run_id) REFERENCES dice_raid_runs(run_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dice_raid_run_members_run_id
+      ON dice_raid_run_members (run_id, active, joined_at);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_raid_run_members_active_user_id
+      ON dice_raid_run_members (user_id)
+      WHERE active = 1;
   `);
 
   if (!hasColumn(db, "dice_contract_master_runs", "contract_title")) {
