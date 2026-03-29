@@ -434,6 +434,50 @@ test("updateRaidRunStoredReferences can close an open run as interrupted for cle
   assert.ok(updated.raidRun.members.every((member) => member.active === false));
 });
 
+test("updateRaidRunStoredReferences does not interrupt non-recruiting open runs", () => {
+  const repository = createTestRepository();
+  const now = new Date("2026-03-29T10:00:00.000Z");
+
+  const created = repository.createRecruitingRaidRun({
+    runId: "raid-run-1",
+    tierId: "bronze",
+    bossId: "bone-dragon",
+    leaderUserId: "leader-1",
+    publicChannelId: "channel-1",
+    recruitmentExpiresAt: new Date(now.getTime() + raidRecruitmentDurationMs),
+    now,
+  });
+  assert.equal(created.ok, true);
+
+  const provisioning = repository.updateRaidRun({
+    runId: "raid-run-1",
+    expectedVersion: 1,
+    now: new Date("2026-03-29T10:01:00.000Z"),
+    status: "provisioning",
+    versionDelta: 1,
+  });
+  assert.equal(provisioning.ok, true);
+  if (!provisioning.ok) {
+    throw new Error("expected provisioning update to succeed");
+  }
+
+  const updated = repository.updateRaidRunStoredReferences({
+    runId: "raid-run-1",
+    now: new Date("2026-03-29T10:02:00.000Z"),
+    publicMessageId: "message-1",
+    closeOpenRunAsInterrupted: true,
+  });
+  assert.equal(updated.ok, true);
+  if (!updated.ok) {
+    throw new Error("expected reference update to succeed");
+  }
+
+  assert.equal(updated.raidRun.run.status, "provisioning");
+  assert.equal(updated.raidRun.run.isOpen, true);
+  assert.equal(updated.raidRun.run.publicMessageId, "message-1");
+  assert.ok(updated.raidRun.members.every((member) => member.active === true));
+});
+
 test("listRaidRunsByStatuses returns only matching runs in creation order", () => {
   const repository = createTestRepository();
   const now = new Date("2026-03-29T10:00:00.000Z");

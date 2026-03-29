@@ -907,7 +907,9 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             ? input.participantRoleId
             : raidRunRecord.run.participantRoleId;
         const shouldCloseOpenRun =
-          input.closeOpenRunAsInterrupted === true && raidRunRecord.run.isOpen;
+          input.closeOpenRunAsInterrupted === true &&
+          raidRunRecord.run.isOpen &&
+          raidRunRecord.run.status === "recruiting";
         const nextStatus = shouldCloseOpenRun ? "interrupted" : raidRunRecord.run.status;
         const nextIsOpen = shouldCloseOpenRun ? 0 : raidRunRecord.run.isOpen ? 1 : 0;
 
