@@ -56,12 +56,16 @@ export type RaidTierBindingConfig = {
   accessRoleId: string;
 };
 
+export type RaidTierBinding = RaidTierBindingConfig;
+
 export type RaidsConfig = {
   enabled: boolean;
   inactiveReason: string | null;
   instanceCategoryId: string | null;
   tierBindings: Record<string, RaidTierBindingConfig>;
 };
+
+export type RaidsRuntimeConfig = RaidsConfig;
 
 const parseNumberWithFallback = (
   rawValue: string | undefined,
@@ -150,6 +154,7 @@ const parseRaidTierBindings = (
   }
 
   const bindings: Record<string, RaidTierBindingConfig> = {};
+  const panelChannelIds = new Set<string>();
 
   for (const [tierId, value] of Object.entries(parsed)) {
     const normalizedTierId = tierId.trim();
@@ -163,15 +168,25 @@ const parseRaidTierBindings = (
       );
     }
 
+    const panelChannelId = parseRequiredConfigString(
+      (value as { panelChannelId?: unknown }).panelChannelId,
+      `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId}.panelChannelId`,
+    );
+    const accessRoleId = parseRequiredConfigString(
+      (value as { accessRoleId?: unknown }).accessRoleId,
+      `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId}.accessRoleId`,
+    );
+
+    if (panelChannelIds.has(panelChannelId)) {
+      throw new Error(
+        `RAIDS_TIER_BINDINGS_JSON reuses panelChannelId ${panelChannelId}. Each tier panel channel must be unique.`,
+      );
+    }
+
+    panelChannelIds.add(panelChannelId);
     bindings[normalizedTierId] = {
-      panelChannelId: parseRequiredConfigString(
-        (value as { panelChannelId?: unknown }).panelChannelId,
-        `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId}.panelChannelId`,
-      ),
-      accessRoleId: parseRequiredConfigString(
-        (value as { accessRoleId?: unknown }).accessRoleId,
-        `RAIDS_TIER_BINDINGS_JSON.${normalizedTierId}.accessRoleId`,
-      ),
+      panelChannelId,
+      accessRoleId,
     };
   }
 
@@ -340,7 +355,9 @@ const raidsActivation = (() => {
   if (raidsTierBindingCount < 1) {
     return {
       enabled: false,
-      inactiveReason: "RAIDS_TIER_BINDINGS_JSON is not set.",
+      inactiveReason: process.env.RAIDS_TIER_BINDINGS_JSON
+        ? "RAIDS_TIER_BINDINGS_JSON does not contain any tier bindings."
+        : "RAIDS_TIER_BINDINGS_JSON is not set.",
     };
   }
 
