@@ -161,6 +161,10 @@ bd close <id>         # Complete work
 - Keep leaf issues actionable and independently completable; avoid extra nesting unless it improves execution or handoff clarity
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+- Beads runs on Dolt server mode. Treat concurrency and lock incidents as server/recovery problems first, not as a reason to delete lockfiles by hand.
+- For Beads/Dolt recovery, prefer the supported sequence: `bd dolt killall`, `bd bootstrap` or `bd backup restore`, then `bd doctor`.
+- If `bd backup export-git --force` is needed for off-machine recovery, use it. The repo hook skips normal app validation on the `beads-backup` branch so backup pushes can succeed from the temporary worktree.
+- If repeated per-repo Dolt startup churn causes problems, consider `bd init --shared-server` for future setups instead of inventing custom lockfile cleanup.
 
 ### Hierarchy Pattern
 
