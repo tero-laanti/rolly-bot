@@ -154,6 +154,12 @@ export type PublishRaidStatusMessage = (input: {
   deletePublishedMessage: () => Promise<void>;
 }>;
 
+export type UpdateRaidStatusMessage = (input: {
+  channelId: string;
+  messageId: string;
+  view: ActionView<RaidButtonAction>;
+}) => Promise<void>;
+
 export type ProvisionRaidInstanceResult =
   | {
       ok: true;

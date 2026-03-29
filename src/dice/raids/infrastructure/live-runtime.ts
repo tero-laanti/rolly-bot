@@ -3,6 +3,7 @@ import { applyRenderedButtonResult } from "../../../app/discord/interaction-resp
 import { renderActionResult } from "../../../app/discord/render-action-result";
 import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
+import { minuteMs } from "../../../shared/time";
 import type { RecoverRaidRunsSummary } from "../application/recover-runs/use-case";
 import {
   encodeRaidButtonAction,
@@ -18,12 +19,14 @@ import { createDiscordRaidStatusPublisher } from "./discord/discord-raid-status-
 import { getActiveRaidRunMembers } from "../domain/raid-run";
 import { createSqliteRaidRunRepository } from "./sqlite/raid-run-repository";
 import {
+  createSqliteExpireRecruitingRaidRunsUseCase,
   createSqliteManageRaidLobbyUseCase,
   createSqliteRecoverRaidRunsUseCase,
 } from "./sqlite/services";
 
 type RaidsLiveRuntimeLogger = {
   log: (...args: unknown[]) => void;
+  error?: (...args: unknown[]) => void;
 };
 
 export type RaidsLiveRuntime = {
@@ -105,7 +108,60 @@ export const createRaidsLiveRuntime = ({
     catalogReader,
     inspector,
     publishStatusMessage: statusPublisher.publishStatusMessage,
+    updateStatusMessage: statusPublisher.updateStatusMessage,
   });
+  const expireRecruitingRuns = createSqliteExpireRecruitingRaidRunsUseCase({
+    db,
+    catalogReader,
+    updateStatusMessage: statusPublisher.updateStatusMessage,
+  });
+
+  let stopped = false;
+  let expirySweepTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearExpirySweepTimer = (): void => {
+    if (!expirySweepTimer) {
+      return;
+    }
+
+    clearTimeout(expirySweepTimer);
+    expirySweepTimer = null;
+  };
+
+  const scheduleExpirySweep = (): void => {
+    if (stopped) {
+      clearExpirySweepTimer();
+      return;
+    }
+
+    if (expirySweepTimer) {
+      return;
+    }
+
+    expirySweepTimer = setTimeout(() => {
+      expirySweepTimer = null;
+      void runExpirySweep();
+    }, minuteMs);
+  };
+
+  const runExpirySweep = async (): Promise<void> => {
+    if (stopped) {
+      return;
+    }
+
+    try {
+      const summary = await expireRecruitingRuns();
+      if (summary.expiredCount > 0 || summary.updatedMessageCount > 0) {
+        logger.log(
+          `[raids] Recruitment expiry sweep finished. expired=${summary.expiredCount} updated=${summary.updatedMessageCount} updateFailures=${summary.updateFailureCount}`,
+        );
+      }
+    } catch (error) {
+      logger.error?.("[raids] Recruitment expiry sweep failed:", error);
+    } finally {
+      scheduleExpirySweep();
+    }
+  };
 
   const requireTierAccess = async ({
     interaction,
@@ -253,14 +309,19 @@ export const createRaidsLiveRuntime = ({
         interaction,
         renderActionResult(result, encodeRaidButtonAction),
       );
+      scheduleExpirySweep();
     },
     recoverRunsOnStartup: async ({ now = new Date() }: { now?: Date } = {}) => {
       const summary = await recoverRaidRuns({ now });
       logger.log(
         `[raids] Startup recovery finished. resumed=${summary.resumedCount} republished=${summary.republishedCount} expired=${summary.expiredCount} interrupted=${summary.interruptedCount}`,
       );
+      scheduleExpirySweep();
       return summary;
     },
-    stop: async () => {},
+    stop: async () => {
+      stopped = true;
+      clearExpirySweepTimer();
+    },
   };
 };

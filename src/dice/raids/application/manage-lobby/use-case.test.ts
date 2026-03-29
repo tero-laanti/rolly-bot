@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ActionView } from "../../../../shared-kernel/application/action-view";
 import type { RaidButtonAction } from "./actions";
-import { createManageRaidLobbyUseCase } from "./use-case";
+import { buildRaidRecruitmentView, createManageRaidLobbyUseCase } from "./use-case";
 import type {
   CreateRecruitingRaidRunInput,
   PublishRaidRecruitment,
@@ -50,7 +50,7 @@ const buildCatalogReader = (): RaidCatalogReader => {
       tiers.flatMap((tier) => tier.bosses).find((boss) => boss.bossId === bossId) ?? null,
     getRaidCopy: () => ({
       panelTitle: "Rolly Raids",
-      panelDescription: "Pick a tier, recruit a party, and challenge a static raid boss.",
+      panelDescription: "Pick a tier, gather a party, and take down a raid boss.",
       startRaidButtonLabel: "Start Raid",
       joinRaidButtonLabel: "Join Raid",
       leaveRaidButtonLabel: "Leave Raid",
@@ -364,7 +364,7 @@ test("panel-open-boss-chooser replies with the tier boss picker", async () => {
 
   assert.equal(result.kind, "reply");
   assert.equal(result.payload.type, "view");
-  assert.match(result.payload.view.content, /Choose the boss/);
+  assert.match(result.payload.view.content, /Pick the boss/);
 });
 
 test("choose-boss publishes recruitment and persists the run", async () => {
@@ -596,6 +596,115 @@ test("join-run updates the recruitment view and rejects stale versions", async (
   assert.match(staleResult.payload.content, /stale/i);
 });
 
+test("recruitment view labels leader controls and disables start until the party reaches two players", async () => {
+  const repository = createInMemoryRaidRunRepository();
+  const catalogReader = buildCatalogReader();
+  const useCase = createManageRaidLobbyUseCase({
+    catalogReader,
+    repository,
+    provisioner: {
+      provisionRaidInstance: async () => ({
+        ok: false,
+        reason: "not used",
+      }),
+      cleanupRaidInstance: async () => {},
+    },
+    randomId: () => "raid-run-1",
+  });
+
+  await useCase.handleRaidAction({
+    actorId: "leader-1",
+    action: {
+      kind: "choose-boss",
+      tierId: "bronze",
+      bossId: "bone-dragon",
+    },
+    channelId: "channel-1",
+    publishRecruitment: async () => ({
+      messageId: "message-1",
+      url: "https://example.test/recruitment/1",
+      deletePublishedMessage: async () => {},
+    }),
+  });
+
+  const recruitingRun = repository.getRaidRun("raid-run-1");
+  assert.ok(recruitingRun);
+
+  const initialView = buildRaidRecruitmentView(catalogReader, recruitingRun);
+  assert.match(initialView.content, /Need 2-4 players/i);
+  assert.equal(initialView.components.length, 2);
+  assert.equal(initialView.components[1]?.[0]?.label, "Leader: Start Encounter");
+  assert.equal(initialView.components[1]?.[0]?.disabled, true);
+  assert.equal(initialView.components[1]?.[1]?.label, "Leader: Cancel Raid");
+
+  await useCase.handleRaidAction({
+    actorId: "user-2",
+    action: {
+      kind: "join-run",
+      runId: "raid-run-1",
+      version: 1,
+    },
+    channelId: "channel-1",
+    messageId: "message-1",
+  });
+
+  const readyRun = repository.getRaidRun("raid-run-1");
+  assert.ok(readyRun);
+
+  const readyView = buildRaidRecruitmentView(catalogReader, readyRun);
+  assert.equal(readyView.components[1]?.[0]?.disabled, false);
+});
+
+test("start-run requires at least two players", async () => {
+  const repository = createInMemoryRaidRunRepository();
+  const useCase = createManageRaidLobbyUseCase({
+    catalogReader: buildCatalogReader(),
+    repository,
+    provisioner: {
+      provisionRaidInstance: async () => ({
+        ok: false,
+        reason: "not used",
+      }),
+      cleanupRaidInstance: async () => {},
+    },
+    randomId: () => "raid-run-1",
+  });
+
+  await useCase.handleRaidAction({
+    actorId: "leader-1",
+    action: {
+      kind: "choose-boss",
+      tierId: "bronze",
+      bossId: "bone-dragon",
+    },
+    channelId: "channel-1",
+    publishRecruitment: async () => ({
+      messageId: "message-1",
+      url: "https://example.test/recruitment/1",
+      deletePublishedMessage: async () => {
+        throw new Error("not used");
+      },
+    }),
+  });
+
+  const result = await useCase.handleRaidAction({
+    actorId: "leader-1",
+    action: {
+      kind: "start-run",
+      runId: "raid-run-1",
+      version: 1,
+    },
+    channelId: "channel-1",
+    messageId: "message-1",
+    now: new Date("2026-03-29T10:05:00.000Z"),
+  });
+
+  assert.equal(result.kind, "reply");
+  assert.equal(result.payload.type, "message");
+  assert.match(result.payload.content, /at least 2 players/i);
+  assert.equal(repository.getRaidRun("raid-run-1")?.run.status, "recruiting");
+});
+
 test("start-run provisions the private instance and locks the public recruitment", async () => {
   const repository = createInMemoryRaidRunRepository();
   const provisioner: RaidInstanceProvisioner = {
@@ -661,7 +770,8 @@ test("start-run provisions the private instance and locks the public recruitment
 
   assert.equal(result.kind, "update");
   assert.equal(result.payload.type, "view");
-  assert.match(result.payload.view.content, /private raid channel is ready/i);
+  assert.match(result.payload.view.content, /<#private-channel-1>/i);
+  assert.match(result.payload.view.content, /\/roll/i);
   assert.equal(result.payload.view.components.length, 0);
 
   const updated = repository.getRaidRun("raid-run-1");
@@ -716,12 +826,23 @@ test("start-run cleans up provisioned resources if the final run update fails", 
     }),
   });
 
+  await useCase.handleRaidAction({
+    actorId: "user-2",
+    action: {
+      kind: "join-run",
+      runId: "raid-run-1",
+      version: 1,
+    },
+    channelId: "channel-1",
+    messageId: "message-1",
+  });
+
   const result = await useCase.handleRaidAction({
     actorId: "leader-1",
     action: {
       kind: "start-run",
       runId: "raid-run-1",
-      version: 1,
+      version: 2,
     },
     channelId: "channel-1",
     messageId: "message-1",

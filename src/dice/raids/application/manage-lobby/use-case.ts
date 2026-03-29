@@ -21,6 +21,8 @@ import {
   raidRecruitmentDurationMs,
 } from "../defaults";
 
+const raidPartySizeMinimum = 2;
+
 export type ManageRaidLobbyDependencies = {
   catalogReader: RaidCatalogReader;
   repository: RaidRunRepository;
@@ -131,7 +133,7 @@ export const buildRaidBossChooserView = (
       `**${copy.panelTitle}**`,
       `**${tier.name}**`,
       tier.summary,
-      "Choose the boss for this run.",
+      "Pick the boss for this run.",
     ].join("\n\n"),
     components: chunkActionButtons(
       tier.bosses.map((boss) => ({
@@ -168,9 +170,14 @@ export const buildRaidRecruitmentView = (
     ? `Boss: **${boss.name}** Lv.${boss.level} | ${boss.maxHp} HP`
     : `Boss: ${raidRun.run.bossId}`;
   const summaryLine = boss?.copy.recruitmentSummary ?? null;
+  const partySize = getRaidRunPartySize(raidRun);
   const expiresLine =
     raidRun.run.status === "recruiting"
       ? `Expires ${formatDiscordRelativeTime(raidRun.run.recruitmentExpiresAt.getTime())}.`
+      : null;
+  const recruitingHelpLine =
+    raidRun.run.status === "recruiting"
+      ? `Need ${raidPartySizeMinimum}-${raidPartySizeLimit} players. Eligible players can join or leave; the leader starts or cancels the raid.`
       : null;
 
   const lines = [
@@ -180,14 +187,23 @@ export const buildRaidRecruitmentView = (
     `Leader: <@${raidRun.run.leaderUserId}>`,
     buildPartyLine(raidRun),
     expiresLine,
+    recruitingHelpLine,
   ].filter((line): line is string => Boolean(line));
 
   if (raidRun.run.status === "provisioned") {
-    lines.push("Raid party locked. Your private raid channel is ready.");
+    if (raidRun.run.privateChannelId) {
+      lines.push(
+        `Party locked. Head to <#${raidRun.run.privateChannelId}> and attack with \`/roll\`.`,
+      );
+    } else {
+      lines.push("Party locked. Your private raid channel is ready.");
+    }
   } else if (raidRun.run.status === "cancelled") {
     lines.push("Recruitment was cancelled.");
   } else if (raidRun.run.status === "expired") {
-    lines.push("Recruitment expired before the party locked in.");
+    lines.push(
+      "Recruitment expired before the party locked in. Start a new raid from the tier panel.",
+    );
   } else if (raidRun.run.status === "provision-failed") {
     lines.push("Raid instance creation failed before combat started.");
   } else if (raidRun.run.status === "interrupted") {
@@ -219,14 +235,17 @@ export const buildRaidRecruitmentView = (
               label: copy.leaveRaidButtonLabel,
               style: "secondary",
             },
+          ],
+          [
             {
               action: {
                 kind: "start-run",
                 runId: raidRun.run.runId,
                 version: raidRun.run.version,
               },
-              label: copy.startEncounterButtonLabel,
+              label: `Leader: ${copy.startEncounterButtonLabel}`,
               style: "primary",
+              disabled: partySize < raidPartySizeMinimum,
             },
             {
               action: {
@@ -234,7 +253,7 @@ export const buildRaidRecruitmentView = (
                 runId: raidRun.run.runId,
                 version: raidRun.run.version,
               },
-              label: copy.cancelRaidButtonLabel,
+              label: `Leader: ${copy.cancelRaidButtonLabel}`,
               style: "danger",
             },
           ],
@@ -472,7 +491,14 @@ export const createManageRaidLobbyUseCase = ({
     }
 
     const partySize = getRaidRunPartySize(raidRun);
-    if (partySize < 1 || partySize > raidPartySizeLimit) {
+    if (partySize < raidPartySizeMinimum) {
+      return replyMessage(
+        `You need at least ${raidPartySizeMinimum} players to start a raid.`,
+        true,
+      );
+    }
+
+    if (partySize > raidPartySizeLimit) {
       return replyMessage("This raid party is in an invalid state.", true);
     }
 

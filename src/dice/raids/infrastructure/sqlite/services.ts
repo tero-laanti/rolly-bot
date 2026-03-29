@@ -1,4 +1,5 @@
 import type { SqliteDatabase } from "../../../../shared/db";
+import { createExpireRecruitingRaidRunsUseCase } from "../../application/expire-recruiting-runs/use-case";
 import {
   buildRaidRecruitmentView,
   createManageRaidLobbyUseCase,
@@ -9,6 +10,7 @@ import type {
   RaidCatalogReader,
   RaidInstanceProvisioner,
   RaidRecoveryInspector,
+  UpdateRaidStatusMessage,
 } from "../../application/ports";
 import { createSqliteRaidRunRepository } from "./raid-run-repository";
 
@@ -33,17 +35,36 @@ export const createSqliteRecoverRaidRunsUseCase = ({
   catalogReader,
   inspector,
   publishStatusMessage,
+  updateStatusMessage,
 }: {
   db: SqliteDatabase;
   catalogReader: RaidCatalogReader;
   inspector: RaidRecoveryInspector;
   publishStatusMessage: PublishRaidStatusMessage;
+  updateStatusMessage: UpdateRaidStatusMessage;
 }) => {
   return createRecoverRaidRunsUseCase({
     catalogReader,
     repository: createSqliteRaidRunRepository(db),
     inspector,
     publishStatusMessage,
+    updateStatusMessage,
+    buildRecruitmentView: (raidRun) => buildRaidRecruitmentView(catalogReader, raidRun),
+  });
+};
+
+export const createSqliteExpireRecruitingRaidRunsUseCase = ({
+  db,
+  catalogReader,
+  updateStatusMessage,
+}: {
+  db: SqliteDatabase;
+  catalogReader: RaidCatalogReader;
+  updateStatusMessage: UpdateRaidStatusMessage;
+}) => {
+  return createExpireRecruitingRaidRunsUseCase({
+    repository: createSqliteRaidRunRepository(db),
+    updateStatusMessage,
     buildRecruitmentView: (raidRun) => buildRaidRecruitmentView(catalogReader, raidRun),
   });
 };

@@ -326,6 +326,9 @@ test("recovery expires recruiting runs past their timeout and interrupts broken 
     }),
   ]);
 
+  let updatedExpiredMessage: { channelId: string; messageId: string; content: string } | null =
+    null;
+
   const useCase = createRecoverRaidRunsUseCase({
     catalogReader: buildCatalogReader(),
     repository,
@@ -346,8 +349,15 @@ test("recovery expires recruiting runs past their timeout and interrupts broken 
     publishStatusMessage: async () => {
       throw new Error("not used");
     },
-    buildRecruitmentView: () => ({
-      content: "Recruitment",
+    updateStatusMessage: async ({ channelId, messageId, view }) => {
+      updatedExpiredMessage = {
+        channelId,
+        messageId,
+        content: view.content,
+      };
+    },
+    buildRecruitmentView: (raidRun) => ({
+      content: `Status: ${raidRun.run.status}`,
       components: [],
     }),
   });
@@ -360,6 +370,57 @@ test("recovery expires recruiting runs past their timeout and interrupts broken 
   assert.equal(summary.interruptedCount, 1);
   assert.equal(repository.getRaidRun("raid-run-1")?.run.status, "expired");
   assert.equal(repository.getRaidRun("raid-run-2")?.run.status, "interrupted");
+  assert.deepEqual(updatedExpiredMessage, {
+    channelId: "channel-1",
+    messageId: "message-1",
+    content: "Status: expired",
+  });
+});
+
+test("recovery preserves public status messages for expired runs", async () => {
+  const repository = createRecoveryRepository([
+    createRaidRun({
+      runId: "raid-run-1",
+      status: "expired",
+      recruitmentExpiresAt: new Date("2026-03-29T09:30:00.000Z"),
+      publicMessageId: "message-1",
+    }),
+  ]);
+
+  let deletedPublicMessage = false;
+  const useCase = createRecoverRaidRunsUseCase({
+    catalogReader: buildCatalogReader(),
+    repository,
+    inspector: {
+      hasPublicStatusMessage: async () => true,
+      deletePublicStatusMessage: async () => {
+        deletedPublicMessage = true;
+      },
+      inspectProvisionedRunResources: async () => ({
+        privateChannelExists: true,
+        participantRoleExists: true,
+        participantAssignmentsValid: true,
+      }),
+      cleanupProvisionedRunResources: async () => {
+        throw new Error("not used");
+      },
+    },
+    publishStatusMessage: async () => {
+      throw new Error("not used");
+    },
+    buildRecruitmentView: () => ({
+      content: "Recruitment",
+      components: [],
+    }),
+  });
+
+  const summary = await useCase({
+    now: new Date("2026-03-29T10:00:00.000Z"),
+  });
+
+  assert.equal(summary.resumedCount, 1);
+  assert.equal(deletedPublicMessage, false);
+  assert.equal(repository.getRaidRun("raid-run-1")?.run.publicMessageId, "message-1");
 });
 
 test("recovery inspects active runs for missing provisioned resources", async () => {

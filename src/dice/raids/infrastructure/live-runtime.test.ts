@@ -90,6 +90,8 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
   const servicesModule = moduleRequire("./sqlite/services") as typeof import("./sqlite/services");
   const originalCreateManageLobby = servicesModule.createSqliteManageRaidLobbyUseCase;
   const originalCreateRecoverRuns = servicesModule.createSqliteRecoverRaidRunsUseCase;
+  const originalCreateExpireRecruitingRuns =
+    servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
   const repositoryModule = moduleRequire(
     "./sqlite/raid-run-repository",
   ) as typeof import("./sqlite/raid-run-repository");
@@ -128,6 +130,7 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
       servicesModule as {
         createSqliteManageRaidLobbyUseCase: typeof servicesModule.createSqliteManageRaidLobbyUseCase;
         createSqliteRecoverRaidRunsUseCase: typeof servicesModule.createSqliteRecoverRaidRunsUseCase;
+        createSqliteExpireRecruitingRaidRunsUseCase: typeof servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
       }
     ).createSqliteManageRaidLobbyUseCase = () =>
       ({
@@ -151,6 +154,7 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
       servicesModule as {
         createSqliteManageRaidLobbyUseCase: typeof servicesModule.createSqliteManageRaidLobbyUseCase;
         createSqliteRecoverRaidRunsUseCase: typeof servicesModule.createSqliteRecoverRaidRunsUseCase;
+        createSqliteExpireRecruitingRaidRunsUseCase: typeof servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
       }
     ).createSqliteRecoverRaidRunsUseCase = () =>
       (async () => ({
@@ -158,6 +162,18 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
         republishedCount: 0,
         expiredCount: 0,
         interruptedCount: 0,
+      })) as never;
+    (
+      servicesModule as {
+        createSqliteManageRaidLobbyUseCase: typeof servicesModule.createSqliteManageRaidLobbyUseCase;
+        createSqliteRecoverRaidRunsUseCase: typeof servicesModule.createSqliteRecoverRaidRunsUseCase;
+        createSqliteExpireRecruitingRaidRunsUseCase: typeof servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
+      }
+    ).createSqliteExpireRecruitingRaidRunsUseCase = () =>
+      (async () => ({
+        expiredCount: 0,
+        updatedMessageCount: 0,
+        updateFailureCount: 0,
       })) as never;
     (
       repositoryModule as {
@@ -182,6 +198,7 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
           messageId: "message-1",
           deletePublishedMessage: async () => {},
         }),
+        updateStatusMessage: async () => {},
       }) as never;
     (
       provisionerModule as {
@@ -277,14 +294,23 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
       servicesModule as {
         createSqliteManageRaidLobbyUseCase: typeof servicesModule.createSqliteManageRaidLobbyUseCase;
         createSqliteRecoverRaidRunsUseCase: typeof servicesModule.createSqliteRecoverRaidRunsUseCase;
+        createSqliteExpireRecruitingRaidRunsUseCase: typeof servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
       }
     ).createSqliteManageRaidLobbyUseCase = originalCreateManageLobby;
     (
       servicesModule as {
         createSqliteManageRaidLobbyUseCase: typeof servicesModule.createSqliteManageRaidLobbyUseCase;
         createSqliteRecoverRaidRunsUseCase: typeof servicesModule.createSqliteRecoverRaidRunsUseCase;
+        createSqliteExpireRecruitingRaidRunsUseCase: typeof servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
       }
     ).createSqliteRecoverRaidRunsUseCase = originalCreateRecoverRuns;
+    (
+      servicesModule as {
+        createSqliteManageRaidLobbyUseCase: typeof servicesModule.createSqliteManageRaidLobbyUseCase;
+        createSqliteRecoverRaidRunsUseCase: typeof servicesModule.createSqliteRecoverRaidRunsUseCase;
+        createSqliteExpireRecruitingRaidRunsUseCase: typeof servicesModule.createSqliteExpireRecruitingRaidRunsUseCase;
+      }
+    ).createSqliteExpireRecruitingRaidRunsUseCase = originalCreateExpireRecruitingRuns;
     (
       repositoryModule as {
         createSqliteRaidRunRepository: typeof repositoryModule.createSqliteRaidRunRepository;

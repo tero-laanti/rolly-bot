@@ -118,5 +118,22 @@ export const createDiscordRaidStatusPublisher = (client: Client) => {
         deletePublishedMessage: published.deletePublishedMessage,
       };
     },
+    updateStatusMessage: async ({
+      channelId,
+      messageId,
+      view,
+    }: {
+      channelId: string;
+      messageId: string;
+      view: ActionView<RaidButtonAction>;
+    }) => {
+      const channel = await resolveSendableMessageChannel(client, channelId);
+      const message = await channel.messages.fetch(messageId);
+      const rendered = renderActionView(view, encodeRaidButtonAction);
+      await message.edit({
+        content: rendered.content ?? "",
+        components: rendered.components as ActionRowBuilder<MessageActionRowComponentBuilder>[],
+      });
+    },
   };
 };

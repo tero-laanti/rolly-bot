@@ -5,6 +5,7 @@ import type {
   RaidCatalogReader,
   RaidRecoveryInspector,
   RaidRunRepository,
+  UpdateRaidStatusMessage,
 } from "../ports";
 import { hasRaidRunExpired, type RaidRunAggregate } from "../../domain/raid-run";
 
@@ -13,6 +14,7 @@ export type RecoverRaidRunsDependencies = {
   repository: RaidRunRepository;
   inspector: RaidRecoveryInspector;
   publishStatusMessage: PublishRaidStatusMessage;
+  updateStatusMessage?: UpdateRaidStatusMessage;
   buildRecruitmentView: (raidRun: RaidRunAggregate) => ActionView<RaidButtonAction>;
 };
 
@@ -27,6 +29,7 @@ export const createRecoverRaidRunsUseCase = ({
   repository,
   inspector,
   publishStatusMessage,
+  updateStatusMessage = async () => {},
   buildRecruitmentView,
 }: RecoverRaidRunsDependencies) => {
   return async ({ now = new Date() }: { now?: Date } = {}): Promise<RecoverRaidRunsSummary> => {
@@ -57,6 +60,17 @@ export const createRecoverRaidRunsUseCase = ({
           now,
         });
         if (expired.ok) {
+          if (expired.raidRun.run.publicMessageId) {
+            try {
+              await updateStatusMessage({
+                channelId: expired.raidRun.run.publicChannelId,
+                messageId: expired.raidRun.run.publicMessageId,
+                view: buildRecruitmentView(expired.raidRun),
+              });
+            } catch {
+              // Recovery should keep expiring overdue runs even if the public update fails.
+            }
+          }
           summary.expiredCount += 1;
         }
         continue;
@@ -128,6 +142,22 @@ export const createRecoverRaidRunsUseCase = ({
           currentRun.run.privateChannelId ||
           currentRun.run.participantRoleId)
       ) {
+        if (currentRun.run.status === "expired") {
+          if (currentRun.run.publicMessageId) {
+            try {
+              await updateStatusMessage({
+                channelId: currentRun.run.publicChannelId,
+                messageId: currentRun.run.publicMessageId,
+                view: buildRecruitmentView(currentRun),
+              });
+            } catch {
+              // Expired public posts should be retried on later recovery runs if Discord editing fails.
+            }
+          }
+          summary.resumedCount += 1;
+          continue;
+        }
+
         let clearedPublicMessageId = false;
         if (currentRun.run.publicMessageId) {
           try {

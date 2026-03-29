@@ -69,7 +69,7 @@ Shared copy shape:
 ```json
 {
   "panelTitle": "Rolly Raids",
-  "panelDescription": "Pick a tier, recruit a party, and challenge a static raid boss.",
+  "panelDescription": "Pick a tier, gather a party, and take down a raid boss.",
   "startRaidButtonLabel": "Start Raid",
   "joinRaidButtonLabel": "Join Raid",
   "leaveRaidButtonLabel": "Leave Raid",
