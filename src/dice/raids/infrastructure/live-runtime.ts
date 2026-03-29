@@ -137,6 +137,7 @@ export const createRaidsLiveRuntime = ({
   ): Promise<{ tierId: string; accessRoleId: string } | null> => {
     const raidRun = repository.getRaidRun(runId);
     if (!raidRun) {
+      await replyEphemeral(interaction, "This raid run is no longer available.");
       return null;
     }
 
@@ -215,23 +216,21 @@ export const createRaidsLiveRuntime = ({
 
       if (action.kind === "join-run" || action.kind === "start-run") {
         const runAccess = await requireRunAccess(interaction, action.runId);
-        if (runAccess) {
-          const member = await loadMemberForInteraction(interaction);
-          if (!hasAccessRole(member, runAccess.accessRoleId)) {
-            await replyEphemeral(interaction, "You do not have access to this raid tier.");
-            return;
-          }
+        if (!runAccess) {
+          return;
+        }
 
-          if (
-            action.kind === "start-run" &&
-            !(await ensurePartyStillHasTierAccess(
-              interaction,
-              action.runId,
-              runAccess.accessRoleId,
-            ))
-          ) {
-            return;
-          }
+        const member = await loadMemberForInteraction(interaction);
+        if (!hasAccessRole(member, runAccess.accessRoleId)) {
+          await replyEphemeral(interaction, "You do not have access to this raid tier.");
+          return;
+        }
+
+        if (
+          action.kind === "start-run" &&
+          !(await ensurePartyStillHasTierAccess(interaction, action.runId, runAccess.accessRoleId))
+        ) {
+          return;
         }
       }
 
