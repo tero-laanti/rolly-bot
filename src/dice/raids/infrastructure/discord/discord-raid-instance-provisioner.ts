@@ -81,6 +81,14 @@ export const createDiscordRaidInstanceProvisioner = ({
         };
       }
 
+      const botUserId = client.user?.id;
+      if (!botUserId) {
+        return {
+          ok: false,
+          reason: "Discord client user is unavailable.",
+        };
+      }
+
       let participantRoleId: string | null = null;
       let privateChannelId: string | null = null;
 
@@ -106,6 +114,15 @@ export const createDiscordRaidInstanceProvisioner = ({
                 PermissionFlagsBits.ViewChannel,
                 PermissionFlagsBits.SendMessages,
                 PermissionFlagsBits.ReadMessageHistory,
+              ],
+            },
+            {
+              id: botUserId,
+              allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory,
+                PermissionFlagsBits.ManageChannels,
               ],
             },
           ],
