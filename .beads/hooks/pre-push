@@ -2,8 +2,14 @@
 
 set -eu
 
-echo "Running pre-push validation"
-npm run validate
+current_branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+
+if [ "$current_branch" = "beads-backup" ]; then
+  echo "Skipping repo validation for beads-backup push"
+else
+  echo "Running pre-push validation"
+  npm run validate
+fi
 
 # --- BEGIN BEADS INTEGRATION v0.62.0 ---
 # This section is managed by beads. Do not remove these markers.
