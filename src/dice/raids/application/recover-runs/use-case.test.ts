@@ -15,6 +15,15 @@ const buildCatalogReader = (): RaidCatalogReader => ({
   listRaidTiers: () => [],
   getRaidTier: () => null,
   getRaidBoss: () => null,
+  getRaidCopy: () => ({
+    panelTitle: "Rolly Raids",
+    panelDescription: "Pick a tier, recruit a party, and challenge a static raid boss.",
+    startRaidButtonLabel: "Start Raid",
+    joinRaidButtonLabel: "Join Raid",
+    leaveRaidButtonLabel: "Leave Raid",
+    startEncounterButtonLabel: "Start Encounter",
+    cancelRaidButtonLabel: "Cancel Raid",
+  }),
 });
 
 const cloneRun = (run: RaidRunRecord): RaidRunRecord => ({

@@ -83,6 +83,7 @@ export const buildRaidTierPanelView = (
   tierId: string,
 ): ActionView<RaidButtonAction> => {
   const tier = findTierOrThrow(catalogReader, tierId);
+  const copy = catalogReader.getRaidCopy();
   if (!tier) {
     return {
       content: `Unknown raid tier: ${tierId}.`,
@@ -91,7 +92,12 @@ export const buildRaidTierPanelView = (
   }
 
   return {
-    content: [`**${tier.name}**`, tier.summary].join("\n"),
+    content: [
+      `**${copy.panelTitle}**`,
+      `**${tier.name}**`,
+      copy.panelDescription,
+      tier.summary,
+    ].join("\n\n"),
     components: [
       [
         {
@@ -99,7 +105,7 @@ export const buildRaidTierPanelView = (
             kind: "panel-open-boss-chooser",
             tierId,
           },
-          label: "Start Recruitment",
+          label: copy.startRaidButtonLabel,
           style: "primary",
         },
       ],
@@ -112,6 +118,7 @@ export const buildRaidBossChooserView = (
   tierId: string,
 ): ActionView<RaidButtonAction> => {
   const tier = findTierOrThrow(catalogReader, tierId);
+  const copy = catalogReader.getRaidCopy();
   if (!tier) {
     return {
       content: `Unknown raid tier: ${tierId}.`,
@@ -121,7 +128,8 @@ export const buildRaidBossChooserView = (
 
   return {
     content: [
-      `**${tier.name} Raid Recruitment**`,
+      `**${copy.panelTitle}**`,
+      `**${tier.name}**`,
       tier.summary,
       "Choose the boss for this run.",
     ].join("\n\n"),
@@ -154,10 +162,12 @@ export const buildRaidRecruitmentView = (
 ): ActionView<RaidButtonAction> => {
   const tier = catalogReader.getRaidTier(raidRun.run.tierId);
   const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
-  const titlePrefix = tier ? `**${tier.name} Raid Recruitment**` : "**Raid Recruitment**";
+  const copy = catalogReader.getRaidCopy();
+  const titlePrefix = tier ? `**${tier.name}**` : `**${copy.panelTitle}**`;
   const bossLine = boss
     ? `Boss: **${boss.name}** Lv.${boss.level} | ${boss.maxHp} HP`
     : `Boss: ${raidRun.run.bossId}`;
+  const summaryLine = boss?.copy.recruitmentSummary ?? null;
   const expiresLine =
     raidRun.run.status === "recruiting"
       ? `Expires ${formatDiscordRelativeTime(raidRun.run.recruitmentExpiresAt.getTime())}.`
@@ -165,6 +175,7 @@ export const buildRaidRecruitmentView = (
 
   const lines = [
     titlePrefix,
+    summaryLine,
     bossLine,
     `Leader: <@${raidRun.run.leaderUserId}>`,
     buildPartyLine(raidRun),
@@ -172,7 +183,7 @@ export const buildRaidRecruitmentView = (
   ].filter((line): line is string => Boolean(line));
 
   if (raidRun.run.status === "provisioned") {
-    lines.push("Raid party locked. Private raid instance is ready for combat wiring.");
+    lines.push("Raid party locked. Your private raid channel is ready.");
   } else if (raidRun.run.status === "cancelled") {
     lines.push("Recruitment was cancelled.");
   } else if (raidRun.run.status === "expired") {
@@ -196,7 +207,7 @@ export const buildRaidRecruitmentView = (
                 runId: raidRun.run.runId,
                 version: raidRun.run.version,
               },
-              label: "Join",
+              label: copy.joinRaidButtonLabel,
               style: "success",
             },
             {
@@ -205,7 +216,7 @@ export const buildRaidRecruitmentView = (
                 runId: raidRun.run.runId,
                 version: raidRun.run.version,
               },
-              label: "Leave",
+              label: copy.leaveRaidButtonLabel,
               style: "secondary",
             },
             {
@@ -214,7 +225,7 @@ export const buildRaidRecruitmentView = (
                 runId: raidRun.run.runId,
                 version: raidRun.run.version,
               },
-              label: "Start",
+              label: copy.startEncounterButtonLabel,
               style: "primary",
             },
             {
@@ -223,7 +234,7 @@ export const buildRaidRecruitmentView = (
                 runId: raidRun.run.runId,
                 version: raidRun.run.version,
               },
-              label: "Cancel",
+              label: copy.cancelRaidButtonLabel,
               style: "danger",
             },
           ],

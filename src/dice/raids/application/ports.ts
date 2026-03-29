@@ -1,12 +1,17 @@
 import type { ActionView } from "../../../shared-kernel/application/action-view";
 import type { RaidButtonAction } from "./manage-lobby/actions";
-import type { RaidBossDefinition, RaidTierDefinition } from "../domain/catalog";
+import type {
+  RaidBossDefinition,
+  RaidCatalogCopyDefinition,
+  RaidTierDefinition,
+} from "../domain/catalog";
 import type { RaidRunAggregate, RaidRunStatus } from "../domain/raid-run";
 
 export type RaidCatalogReader = {
   listRaidTiers: () => readonly RaidTierDefinition[];
   getRaidTier: (tierId: string) => RaidTierDefinition | null;
   getRaidBoss: (bossId: string) => RaidBossDefinition | null;
+  getRaidCopy: () => RaidCatalogCopyDefinition;
 };
 
 export type CreateRecruitingRaidRunInput = {

@@ -32,6 +32,12 @@ const buildCatalogReader = (): RaidCatalogReader => {
             rollPassMultiplier: 2,
             rollPassRolls: 1,
           },
+          copy: {
+            recruitmentSummary: "A brittle drake circles the ruined tower.",
+            encounterTitle: "Bone Dragon",
+            successSummary: "The Bone Dragon collapses into splinters.",
+            failureSummary: "The Bone Dragon escapes the tower ruins.",
+          },
         },
       ],
     },
@@ -42,6 +48,15 @@ const buildCatalogReader = (): RaidCatalogReader => {
     getRaidTier: (tierId) => tiers.find((tier) => tier.tierId === tierId) ?? null,
     getRaidBoss: (bossId) =>
       tiers.flatMap((tier) => tier.bosses).find((boss) => boss.bossId === bossId) ?? null,
+    getRaidCopy: () => ({
+      panelTitle: "Rolly Raids",
+      panelDescription: "Pick a tier, recruit a party, and challenge a static raid boss.",
+      startRaidButtonLabel: "Start Raid",
+      joinRaidButtonLabel: "Join Raid",
+      leaveRaidButtonLabel: "Leave Raid",
+      startEncounterButtonLabel: "Start Encounter",
+      cancelRaidButtonLabel: "Cancel Raid",
+    }),
   };
 };
 
@@ -646,7 +661,7 @@ test("start-run provisions the private instance and locks the public recruitment
 
   assert.equal(result.kind, "update");
   assert.equal(result.payload.type, "view");
-  assert.match(result.payload.view.content, /instance is ready/i);
+  assert.match(result.payload.view.content, /private raid channel is ready/i);
   assert.equal(result.payload.view.components.length, 0);
 
   const updated = repository.getRaidRun("raid-run-1");
