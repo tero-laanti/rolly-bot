@@ -36,7 +36,7 @@
     "start": "node --env-file=.env dist/index.js",
     "test": "node scripts/run-tests.mjs dist-test",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run format:check && npm run lint && npm run typecheck && npm test"
+    "validate": "npm run format:check && npm run lint && npm run build && npm test"
   },
   "repository": {
     "type": "git",

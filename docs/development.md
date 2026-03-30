@@ -94,7 +94,7 @@ npm run dev
 Useful variants:
 
 - `npm run start`: run the already-built bot without TypeScript watch mode
-- `npm run build`: compile `src/` into `dist/`
+- `npm run build`: compile the runtime bot into `dist/`
 
 When command names, descriptions, or options change, run `npm run deploy:commands` again. The registry is explicit, so changes are only live after the deploy step succeeds.
 
@@ -133,6 +133,8 @@ npm run validate
 Notes:
 
 - `npm run validate` is the local equivalent of the main CI checks.
+- `npm test` compiles the full source tree into `dist-test/` before running the compiled Node test suite.
+- `npm run typecheck` checks the full source tree without emitting JS.
 - `npm run hooks:install` installs the repo-managed git hook if you want checks before pushes.
 - For code changes, the default verification bar is `npm run build`, `npm run typecheck`, and `npm run format:check`.
 - Run `npm run lint` when you touch broader TypeScript structure or config.
