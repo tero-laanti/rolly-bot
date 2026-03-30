@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "discord.js";
-import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
+import { publishAchievementEffects } from "../../../app/discord/achievement-effects";
 import { publishContractCompletionAnnouncements } from "../../../app/discord/contract-completion-announcements";
 import type { SqliteDatabase } from "../../../shared/db";
 import { formatClockDuration } from "../../../shared/text";
@@ -146,7 +146,7 @@ const runAutoRollTick = async (session: AutoRollSession): Promise<void> => {
     userMention: session.userMention,
     source: "auto",
   });
-  await publishAchievementAnnouncements({
+  await publishAchievementEffects({
     client: session.message.client,
     announcements: result.achievementAnnouncements ?? [],
   });

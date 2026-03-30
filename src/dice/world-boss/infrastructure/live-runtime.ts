@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "discord.js";
-import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
+import { publishAchievementEffects } from "../../../app/discord/achievement-effects";
 import { publishContractCompletionAnnouncements } from "../../../app/discord/contract-completion-announcements";
 import type { WorldBossConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
@@ -683,7 +683,7 @@ export const createWorldBossLiveRuntime = ({
         logFailureMessage:
           "[world-boss] Failed to update failed-resolution World Boss announcement.",
       });
-      await publishAchievementAnnouncements({
+      await publishAchievementEffects({
         client,
         announcements: context.worldBoss.achievementAnnouncements,
         logger,
@@ -708,7 +708,7 @@ export const createWorldBossLiveRuntime = ({
         logFailureMessage:
           "[world-boss] Failed to update failed-resolution World Boss announcement.",
       });
-      await publishAchievementAnnouncements({
+      await publishAchievementEffects({
         client,
         announcements: context.worldBoss.achievementAnnouncements,
         logger,
@@ -722,7 +722,7 @@ export const createWorldBossLiveRuntime = ({
       allowedStatuses: ["resolved"],
       logFailureMessage: "[world-boss] Failed to update resolved World Boss announcement.",
     });
-    await publishAchievementAnnouncements({
+    await publishAchievementEffects({
       client,
       announcements: context.worldBoss.achievementAnnouncements,
       logger,
@@ -1153,7 +1153,7 @@ export const createWorldBossLiveRuntime = ({
       allowedStatuses: ["joining"],
       logFailureMessage: "[world-boss] Failed to refresh World Boss announcement prompt.",
     });
-    await publishAchievementAnnouncements({
+    await publishAchievementEffects({
       client,
       announcements: achievementAnnouncements,
       logger,

@@ -1,9 +1,9 @@
 import type { ButtonInteraction } from "discord.js";
+import { publishAchievementEffects } from "../../../../../app/discord/achievement-effects";
 import {
   applyButtonResult,
   createRenderedInteractionResult,
 } from "../../../../../app/discord/interaction-response";
-import { publishAchievementAnnouncements } from "../../../../../app/discord/achievement-announcements";
 import type { SqliteDatabase } from "../../../../../shared/db";
 import {
   buildAutoRollSessionStartingContent,
@@ -102,7 +102,7 @@ export const handleAutoRollSessionStart = async ({
       announcements,
     ).interactionResult,
   );
-  await publishAchievementAnnouncements({
+  await publishAchievementEffects({
     client: interaction.client,
     announcements,
   });

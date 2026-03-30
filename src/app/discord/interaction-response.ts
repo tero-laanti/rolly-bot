@@ -8,7 +8,7 @@ import type {
   MessageActionRowComponentBuilder,
   StringSelectMenuInteraction,
 } from "discord.js";
-import { publishAchievementAnnouncements } from "./achievement-announcements";
+import { publishAchievementEffects } from "./achievement-effects";
 import { publishContractCompletionAnnouncements } from "./contract-completion-announcements";
 import type { ContractCompletionAnnouncement } from "../../dice/contracts/application/completion-announcements";
 import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
@@ -70,7 +70,7 @@ export const applyRenderedChatInputResult = async (
   result: RenderedInteractionResult,
 ): Promise<void> => {
   await applyChatInputResult(interaction, result.interactionResult);
-  await publishAchievementAnnouncements({
+  await publishAchievementEffects({
     client: interaction.client,
     announcements: result.achievementAnnouncements ?? [],
   });
@@ -92,7 +92,7 @@ export const applyRenderedButtonResult = async (
   result: RenderedInteractionResult,
 ): Promise<void> => {
   await applyButtonResult(interaction, result.interactionResult);
-  await publishAchievementAnnouncements({
+  await publishAchievementEffects({
     client: interaction.client,
     announcements: result.achievementAnnouncements ?? [],
   });
@@ -114,7 +114,7 @@ export const applyRenderedStringSelectMenuResult = async (
   result: RenderedInteractionResult,
 ): Promise<void> => {
   await applyStringSelectMenuResult(interaction, result.interactionResult);
-  await publishAchievementAnnouncements({
+  await publishAchievementEffects({
     client: interaction.client,
     announcements: result.achievementAnnouncements ?? [],
   });

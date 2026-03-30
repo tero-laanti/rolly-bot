@@ -5,6 +5,7 @@ import {
 } from "../../../../shared/discord";
 import { formatDurationWords, truncateWithSuffix } from "../../../../shared/text";
 import type { DiceAnalyticsRepository } from "../../../analytics/application/ports";
+import type { DiceAnalytics } from "../../../analytics/domain/analytics";
 import type { ContractCompletionAnnouncement } from "../../../contracts/application/completion-announcements";
 import type { ContractsGameplayProgressPort } from "../../../contracts/application/ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
@@ -23,6 +24,7 @@ import {
 } from "../achievement-announcements";
 import {
   getAchievementPipRewardTotal,
+  getDiceAchievementsForAnalytics,
   getDiceAchievementsForRoll,
 } from "../../../progression/domain/achievements-store";
 import {
@@ -75,7 +77,9 @@ type RunRollDiceDependencies = {
   analytics: Pick<
     DiceAnalyticsRepository,
     "recordDiceRollAnalytics" | "resetDiceCountAnalyticsProgress"
-  >;
+  > & {
+    getDiceAnalytics?: (userId: string) => DiceAnalytics;
+  };
   economy: Pick<DiceEconomyRepository, "applyFameDelta" | "getFame" | "grantDailyPipsIfEligible">;
   itemEffects: Pick<DiceItemEffectsService, "consumeOneDoubleRollUse" | "getItemDoubleRollStatus">;
   permanentBonuses: Pick<DicePermanentBonusesPort, "getPermanentBonuses">;
@@ -128,6 +132,14 @@ const recordRollContractProgressSafely = (
     console.warn("[contracts] Failed to record roll progress.", error);
     return null;
   }
+};
+
+const toAnalyticsAchievementContext = (analytics: DiceAnalytics) => {
+  return {
+    totalDiceRolled: analytics.totalDiceRolled,
+    totalDiceSetsRolled: analytics.totalDiceSetsRolled,
+    totalRollCommandsCalled: analytics.totalRollCommandsCalled,
+  };
 };
 
 export const createRunRollDiceUseCase = ({
@@ -237,19 +249,37 @@ export const createRunRollDiceUseCase = ({
         rollPassCount,
         diceCountIncreasesGained: diceCountIncrease,
       });
-      const newlyEarned = progression.awardAchievements(userId, [
+      const newlyEarnedFromRoll = progression.awardAchievements(userId, [
         ...earnedAchievements,
         ...getManualProgressionAchievementIds(progressionAchievementStats),
       ]);
-      const baseAchievementPipReward = getAchievementPipRewardTotal(newlyEarned);
-      const achievementPipReward =
-        baseAchievementPipReward +
-        Math.floor((baseAchievementPipReward * permanentBonusSnapshot.pipRewardBonusPercent) / 100);
       const diceCountAfter = diceCount + diceCountIncrease;
       if (hasDiceCountIncrease) {
         progression.setDiceCount({ userId, diceCount: diceCountAfter });
       }
 
+      analytics.recordDiceRollAnalytics({
+        userId,
+        rollSetCount: rollPassCount,
+        nearDiceCountIncreaseRollCount,
+        diceRolledCount,
+        rollCommandCount: source === "manual" ? 1 : 0,
+      });
+      const analyticsAchievementIds =
+        analytics.getDiceAnalytics === undefined
+          ? []
+          : getDiceAchievementsForAnalytics(
+              toAnalyticsAchievementContext(analytics.getDiceAnalytics(userId)),
+            );
+      const newlyEarnedFromAnalytics =
+        analyticsAchievementIds.length < 1
+          ? []
+          : progression.awardAchievements(userId, analyticsAchievementIds);
+      const newlyEarned = [...newlyEarnedFromRoll, ...newlyEarnedFromAnalytics];
+      const baseAchievementPipReward = getAchievementPipRewardTotal(newlyEarned);
+      const achievementPipReward =
+        baseAchievementPipReward +
+        Math.floor((baseAchievementPipReward * permanentBonusSnapshot.pipRewardBonusPercent) / 100);
       const fameReward = newlyEarned.length + diceCountIncrease * getDiceCountIncreaseReward();
       const fameAfter =
         fameReward > 0 ? economy.applyFameDelta({ userId, amount: fameReward }) : fameBefore;
@@ -268,14 +298,6 @@ export const createRunRollDiceUseCase = ({
             };
       const dailyPipReward = dailyPipGrant.awardedAmount;
       const pipReward = achievementPipReward + dailyPipReward;
-
-      analytics.recordDiceRollAnalytics({
-        userId,
-        rollSetCount: rollPassCount,
-        nearDiceCountIncreaseRollCount,
-        diceRolledCount,
-        rollCommandCount: source === "manual" ? 1 : 0,
-      });
       if (hasDiceCountIncrease) {
         analytics.resetDiceCountAnalyticsProgress(userId);
       }

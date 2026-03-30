@@ -358,6 +358,87 @@ test("parseDiceAchievements defaults hidden to false when omitted", () => {
   assert.equal(parsed[0]?.hidden, false);
 });
 
+test("parseDiceAchievements accepts analytics milestones and role rewards", () => {
+  const parsed = parseDiceAchievements([
+    {
+      id: "example-beginner-roller",
+      name: "Beginner Roller",
+      description: "Earned after a few starter /roll calls.",
+      category: "progression",
+      rule: {
+        type: "analytics-at-least",
+        metric: "total-roll-commands-called",
+        count: 5,
+      },
+      roleRewardId: "example-beginner-role",
+    },
+  ]);
+
+  assert.deepEqual(parsed[0]?.rule, {
+    type: "analytics-at-least",
+    metric: "total-roll-commands-called",
+    count: 5,
+  });
+  assert.equal(parsed[0]?.roleRewardId, "example-beginner-role");
+});
+
+test("parseDiceAchievements rejects invalid analytics milestone metrics", () => {
+  assert.throws(
+    () =>
+      parseDiceAchievements([
+        {
+          id: "example-invalid-analytics",
+          name: "Example Invalid Analytics",
+          description: "Example description.",
+          category: "progression",
+          rule: {
+            type: "analytics-at-least",
+            metric: "total-potions-drunk",
+            count: 1,
+          },
+        },
+      ]),
+    /achievements\[0\]\.rule\.metric must be one of/i,
+  );
+});
+
+test("parseDiceAchievements rejects non-positive analytics milestone counts", () => {
+  assert.throws(
+    () =>
+      parseDiceAchievements([
+        {
+          id: "example-invalid-analytics-count",
+          name: "Example Invalid Analytics Count",
+          description: "Example description.",
+          category: "progression",
+          rule: {
+            type: "analytics-at-least",
+            metric: "total-dice-rolled",
+            count: 0,
+          },
+        },
+      ]),
+    /achievements\[0\]\.rule\.count must be an integer >= 1/i,
+  );
+});
+
+test("parseDiceAchievements accepts roleRewardId when provided", () => {
+  const parsed = parseDiceAchievements([
+    {
+      id: "example-role-reward",
+      name: "Example Role Reward",
+      description: "Example description.",
+      category: "progression",
+      rule: {
+        type: "manual",
+      },
+      roleRewardId: "example-role-123",
+    },
+  ]);
+
+  assert.equal(parsed[0]?.roleRewardId, "example-role-123");
+});
+
 test("parseRandomEventBalance rejects non-positive claim window multipliers", () => {
   assert.throws(
     () =>

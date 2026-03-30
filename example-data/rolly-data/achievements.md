@@ -28,6 +28,7 @@ Rule semantics:
 - `ordered-full-house`: a contiguous `A, A, A, B, B` window where `A != B`.
 - `contains-value`: the rolled set contains `value`.
 - `exact-time`: compares the roll timestamp against `hour`, `minute`, and `timezone`.
+- `analytics-at-least`: compares a lifetime analytics counter against `metric` and `count`.
 - `all-of`: all nested rules must pass.
 - `manual`: never triggers from a roll. It must be granted by application logic.
 
@@ -57,6 +58,12 @@ This accepts any roll containing `1`, `2`, and `3` in any order.
 - `timezone` should be an IANA timezone name such as `Europe/Helsinki`.
 - The runtime checks the time of the roll itself.
 
+`analytics-at-least` notes:
+
+- `metric` can be `total-roll-commands-called`, `total-dice-rolled`, or `total-dice-sets-rolled`.
+- `count` must be a positive integer.
+- The counters follow the same lifetime semantics shown in `/stats`.
+
 Metadata:
 
 - `category` groups the achievement for the in-app browser.
@@ -64,6 +71,7 @@ Metadata:
 - `hidden` is optional and defaults to `false`. Hidden achievements still exist in the browser, but achievements-channel posts only show the title instead of the unlock-reason and pip detail.
 - `pipReward` is optional. When present, the user earns that many pips the first time the achievement unlocks.
 - `unlockReasonText` is optional. It appears in achievements-channel posts for non-hidden achievements, not in the browser.
+- `roleRewardId` is optional. When present in private `rolly-data`, the achievement can be used to grant a Discord role after unlock. Public examples should keep this as a safe placeholder id.
 
 Manual prestige awards:
 

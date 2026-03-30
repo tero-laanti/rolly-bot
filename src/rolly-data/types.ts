@@ -21,6 +21,11 @@ export type DiceAchievementManualAward = {
   prestige: number;
 };
 
+export type DiceAchievementAnalyticsMetric =
+  | "total-roll-commands-called"
+  | "total-dice-rolled"
+  | "total-dice-sets-rolled";
+
 export type DiceAchievementRule =
   | {
       type: "ordered-sequence";
@@ -61,6 +66,11 @@ export type DiceAchievementRule =
       timezone: string;
     }
   | {
+      type: "analytics-at-least";
+      metric: DiceAchievementAnalyticsMetric;
+      count: number;
+    }
+  | {
       type: "all-of";
       rules: DiceAchievementRule[];
     }
@@ -78,6 +88,7 @@ export type DiceAchievementData = {
   pipReward?: number;
   manualAward?: DiceAchievementManualAward;
   unlockReasonText?: string;
+  roleRewardId?: string;
 };
 
 export type DiceBalanceVarietyConfig = {

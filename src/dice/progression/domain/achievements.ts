@@ -10,7 +10,7 @@ type DiceAchievementDefinition = {
   pipReward: number;
   unlockReasonText?: string;
   rule: DiceAchievementRule;
-  evaluate: (context: RollContext) => boolean;
+  roleRewardId?: string;
 };
 
 export type DiceAchievementId = string;
@@ -20,6 +20,12 @@ export type RollContext = {
   counts: Map<number, number>;
   unique: Set<number>;
   rolledAtMs: number;
+};
+
+export type DiceAchievementAnalyticsContext = {
+  totalDiceRolled: number;
+  totalDiceSetsRolled: number;
+  totalRollCommandsCalled: number;
 };
 
 const timeFormatterByTimezone = new Map<string, Intl.DateTimeFormat>();
@@ -41,32 +47,69 @@ const getTimeFormatter = (timezone: string): Intl.DateTimeFormat => {
   return formatter;
 };
 
-const evaluateAchievementRule = (rule: DiceAchievementRule, context: RollContext): boolean => {
-  switch (rule.type) {
+const evaluateRollAchievementRule = (rule: DiceAchievementRule, context: RollContext): boolean => {
+  const ruleType = (rule as { type: string }).type;
+
+  switch (ruleType) {
     case "ordered-sequence":
-      return hasOrderedSequence(context.rolls, rule.pattern);
+      return hasOrderedSequence(context.rolls, (rule as { pattern: number[] }).pattern);
     case "contains-all-values":
-      return hasStraight(context.unique, rule.values);
+      return hasStraight(context.unique, (rule as { values: number[] }).values);
     case "at-least-of-a-kind":
-      return hasAtLeastOfAKind(context.counts, rule.count);
+      return hasAtLeastOfAKind(context.counts, (rule as { count: number }).count);
     case "count-at-least-of-a-kind":
-      return countAtLeastOfAKind(context.counts, rule.count) >= rule.groups;
+      return (
+        countAtLeastOfAKind(context.counts, (rule as { count: number }).count) >=
+        (rule as { groups: number }).groups
+      );
     case "count-exact-of-a-kind":
-      return countExactOfAKind(context.counts, rule.count) >= rule.groups;
+      return (
+        countExactOfAKind(context.counts, (rule as { count: number }).count) >=
+        (rule as { groups: number }).groups
+      );
     case "ordered-two-pairs":
       return hasOrderedTwoPairs(context.rolls);
     case "ordered-full-house":
       return hasOrderedFullHouse(context.rolls);
     case "contains-value":
-      return context.counts.has(rule.value);
+      return context.counts.has((rule as { value: number }).value);
     case "exact-time": {
-      const { hour, minute } = getHourMinuteForTimezone(context.rolledAtMs, rule.timezone);
-      return hour === rule.hour && minute === rule.minute;
+      const exactTimeRule = rule as { hour: number; minute: number; timezone: string };
+      const { hour, minute } = getHourMinuteForTimezone(context.rolledAtMs, exactTimeRule.timezone);
+      return hour === exactTimeRule.hour && minute === exactTimeRule.minute;
     }
     case "all-of":
-      return rule.rules.every((nestedRule) => evaluateAchievementRule(nestedRule, context));
+      return (rule as { rules: DiceAchievementRule[] }).rules.every((nestedRule) =>
+        evaluateRollAchievementRule(nestedRule, context),
+      );
+    case "analytics-at-least":
     case "manual":
       return false;
+    default:
+      return false;
+  }
+};
+
+const evaluateAnalyticsAchievementRule = (
+  rule: DiceAchievementRule,
+  context: DiceAchievementAnalyticsContext,
+): boolean => {
+  const ruleType = (rule as { type: string }).type;
+  if (ruleType !== "analytics-at-least") {
+    return false;
+  }
+
+  const analyticsRule = rule as {
+    metric: "total-roll-commands-called" | "total-dice-rolled" | "total-dice-sets-rolled";
+    count: number;
+  };
+  switch (analyticsRule.metric) {
+    case "total-roll-commands-called":
+      return context.totalRollCommandsCalled >= analyticsRule.count;
+    case "total-dice-rolled":
+      return context.totalDiceRolled >= analyticsRule.count;
+    case "total-dice-sets-rolled":
+      return context.totalDiceSetsRolled >= analyticsRule.count;
   }
 };
 
@@ -80,7 +123,7 @@ export const diceAchievements: DiceAchievementDefinition[] = getDiceAchievements
     pipReward: achievement.pipReward ?? 0,
     unlockReasonText: achievement.unlockReasonText,
     rule: achievement.rule,
-    evaluate: (context) => evaluateAchievementRule(achievement.rule, context),
+    roleRewardId: (achievement as { roleRewardId?: string }).roleRewardId,
   }),
 );
 
@@ -108,6 +151,10 @@ export const getDiceAchievementPipReward = (id: DiceAchievementId): number => {
   return getDiceAchievement(id)?.pipReward ?? 0;
 };
 
+export const getDiceAchievementRoleRewardId = (id: DiceAchievementId): string | undefined => {
+  return getDiceAchievement(id)?.roleRewardId;
+};
+
 export const getPrestigeAchievementId = (prestige: number): DiceAchievementId | undefined => {
   return prestigeAchievementIdByPrestige.get(Math.max(0, Math.floor(prestige)));
 };
@@ -124,6 +171,30 @@ export const createRollContext = (
   }
 
   return { rolls, counts, unique, rolledAtMs };
+};
+
+export const matchesRollAchievement = (
+  achievementId: DiceAchievementId,
+  context: RollContext,
+): boolean => {
+  const achievement = getDiceAchievement(achievementId);
+  if (!achievement) {
+    return false;
+  }
+
+  return evaluateRollAchievementRule(achievement.rule, context);
+};
+
+export const matchesAnalyticsAchievement = (
+  achievementId: DiceAchievementId,
+  context: DiceAchievementAnalyticsContext,
+): boolean => {
+  const achievement = getDiceAchievement(achievementId);
+  if (!achievement) {
+    return false;
+  }
+
+  return evaluateAnalyticsAchievementRule(achievement.rule, context);
 };
 
 const getHourMinuteForTimezone = (

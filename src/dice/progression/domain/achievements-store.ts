@@ -2,6 +2,9 @@ import {
   createRollContext,
   diceAchievements,
   getDiceAchievementPipReward,
+  matchesAnalyticsAchievement,
+  matchesRollAchievement,
+  type DiceAchievementAnalyticsContext,
   type DiceAchievementId,
 } from "./achievements";
 
@@ -15,7 +18,15 @@ export const getDiceAchievementsForRoll = (
 
   const context = createRollContext(rolls, rolledAtMs);
   return diceAchievements
-    .filter((achievement) => achievement.evaluate(context))
+    .filter((achievement) => matchesRollAchievement(achievement.id, context))
+    .map((achievement) => achievement.id);
+};
+
+export const getDiceAchievementsForAnalytics = (
+  context: DiceAchievementAnalyticsContext,
+): DiceAchievementId[] => {
+  return diceAchievements
+    .filter((achievement) => matchesAnalyticsAchievement(achievement.id, context))
     .map((achievement) => achievement.id);
 };
 

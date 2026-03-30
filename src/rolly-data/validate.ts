@@ -1,4 +1,5 @@
 import type {
+  DiceAchievementAnalyticsMetric,
   DiceAchievementData,
   DiceAchievementCategory,
   DiceAchievementManualAward,
@@ -107,8 +108,14 @@ const achievementRuleTypes = [
   "ordered-full-house",
   "contains-value",
   "exact-time",
+  "analytics-at-least",
   "all-of",
   "manual",
+] as const;
+const achievementAnalyticsMetrics = [
+  "total-roll-commands-called",
+  "total-dice-rolled",
+  "total-dice-sets-rolled",
 ] as const;
 const contractObjectiveTypes = [
   "roll_count",
@@ -856,6 +863,20 @@ const readManualAward = (value: unknown, label: string): DiceAchievementManualAw
   };
 };
 
+const readAchievementAnalyticsMetric = (
+  value: unknown,
+  label: string,
+): DiceAchievementAnalyticsMetric => {
+  const metric = readNonEmptyString(value, label);
+  if (
+    !achievementAnalyticsMetrics.includes(metric as (typeof achievementAnalyticsMetrics)[number])
+  ) {
+    throw new Error(`${label} must be one of ${achievementAnalyticsMetrics.join(", ")}.`);
+  }
+
+  return metric as DiceAchievementAnalyticsMetric;
+};
+
 const readAchievementRule = (value: unknown, label: string): DiceAchievementRule => {
   const record = assertRecord(value, label);
   const type = readNonEmptyString(record.type, `${label}.type`);
@@ -909,6 +930,14 @@ const readAchievementRule = (value: unknown, label: string): DiceAchievementRule
       hour: readInteger(record.hour, `${label}.hour`, 0),
       minute: readInteger(record.minute, `${label}.minute`, 0),
       timezone: readNonEmptyString(record.timezone, `${label}.timezone`),
+    };
+  }
+
+  if (type === "analytics-at-least") {
+    return {
+      type,
+      metric: readAchievementAnalyticsMetric(record.metric, `${label}.metric`),
+      count: readInteger(record.count, `${label}.count`, 1),
     };
   }
 
@@ -1633,6 +1662,10 @@ export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => 
       unlockReasonText: readOptionalNonEmptyString(
         record.unlockReasonText,
         `achievements[${index}].unlockReasonText`,
+      ),
+      roleRewardId: readOptionalNonEmptyString(
+        record.roleRewardId,
+        `achievements[${index}].roleRewardId`,
       ),
     };
   });

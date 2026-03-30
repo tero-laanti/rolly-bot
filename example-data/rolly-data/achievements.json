@@ -21,6 +21,18 @@
     }
   },
   {
+    "id": "example-beginner-roller",
+    "name": "Example Beginner Roller",
+    "description": "Example achievement: make 5 manual /roll calls.",
+    "category": "progression",
+    "roleRewardId": "example-beginner-role",
+    "rule": {
+      "type": "analytics-at-least",
+      "metric": "total-roll-commands-called",
+      "count": 5
+    }
+  },
+  {
     "id": "example-contains-all-values",
     "name": "Example Contains All Values",
     "description": "Example achievement: roll 1 through 5 in any order.",
@@ -56,6 +68,7 @@
       "type": "prestige",
       "prestige": 1
     },
+    "roleRewardId": "example-prestige-role",
     "unlockReasonText": "reached Prestige 1"
   }
 ]

@@ -1,5 +1,5 @@
 import type { ButtonInteraction, Client } from "discord.js";
-import { publishAchievementAnnouncements } from "../../../app/discord/achievement-announcements";
+import { publishAchievementEffects } from "../../../app/discord/achievement-effects";
 import type { RandomEventsFoundationConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import {
@@ -381,7 +381,7 @@ export const createRandomEventsLiveRuntime = ({
       return;
     }
 
-    await publishAchievementAnnouncements({
+    await publishAchievementEffects({
       client,
       announcements,
       logger,
@@ -878,7 +878,7 @@ export const createRandomEventsLiveRuntime = ({
       attemptResolutionsByUserId,
       onAttemptResolved: (input) => recordAttemptAchievements(context, input),
     });
-    await publishAchievementAnnouncements({
+    await publishAchievementEffects({
       client,
       announcements: achievementAnnouncements,
       logger,
@@ -995,14 +995,14 @@ export const createRandomEventsLiveRuntime = ({
           eventId,
           participants: [],
         });
-        await publishAchievementAnnouncements({
+        await publishAchievementEffects({
           client,
           announcements: achievementAnnouncements,
           logger,
         });
         return;
       }
-      await publishAchievementAnnouncements({
+      await publishAchievementEffects({
         client,
         announcements: achievementAnnouncements,
         logger,

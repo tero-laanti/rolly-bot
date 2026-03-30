@@ -5,7 +5,7 @@ All data files are plain JSON.
 
 Use the file-specific guides when authoring or reviewing private `rolly-data`:
 
-- [achievements.md](achievements.md): achievement rules, ordered vs unordered matching, manual prestige awards.
+- [achievements.md](achievements.md): achievement rules, ordered vs unordered matching, analytics milestones, manual prestige awards, and optional role reward ids.
 - [dice-balance.md](dice-balance.md): prestige, bans, charge, and core `/roll` progression tuning.
 - [casino.v1.md](casino.v1.md): payout math, bet settings, and game-specific tuning rules.
 - [contracts.v2.md](contracts.v2.md): Contract Master panel metadata, daily/weekly difficulty pools, and Pip rewards.
