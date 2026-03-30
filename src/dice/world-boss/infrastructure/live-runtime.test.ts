@@ -184,6 +184,7 @@ test("World Boss join publishes achievement announcements even if the signup pro
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
+      "../../../app/discord/achievement-effects",
       "../../../app/discord/achievement-announcements",
       "../../../app/discord/contract-completion-announcements",
       "../../../shared/db",
@@ -679,6 +680,7 @@ test("players can leave during signup and rejoining the same World Boss does not
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
+      "../../../app/discord/achievement-effects",
       "../../../app/discord/achievement-announcements",
       "../../../app/discord/contract-completion-announcements",
       "../../../shared/db",
@@ -914,6 +916,7 @@ test("resolved World Boss fights publish achievement announcements even if the a
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
       "../../../shared/config",
+      "../../../app/discord/achievement-effects",
       "../../../app/discord/achievement-announcements",
       "../../../shared/db",
       "../../progression/application/achievement-awards",

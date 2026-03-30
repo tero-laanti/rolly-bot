@@ -98,6 +98,7 @@ const withPatchedRuntime = async (
 ): Promise<void> => {
   const modulePaths = [
     "../../../shared/db",
+    "../../../app/discord/achievement-effects",
     "../../../app/discord/achievement-announcements",
     "../../progression/application/achievement-awards",
     "./live-runtime-trigger",
@@ -110,11 +111,10 @@ const withPatchedRuntime = async (
 
   const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
   const originalGetDatabase = sharedDb.getDatabase;
-  const announcementsModule = moduleRequire(
-    "../../../app/discord/achievement-announcements",
-  ) as typeof import("../../../app/discord/achievement-announcements");
-  const originalPublishAchievementAnnouncements =
-    announcementsModule.publishAchievementAnnouncements;
+  const achievementEffectsModule = moduleRequire(
+    "../../../app/discord/achievement-effects",
+  ) as typeof import("../../../app/discord/achievement-effects");
+  const originalPublishAchievementEffects = achievementEffectsModule.publishAchievementEffects;
   const achievementAwardsModule = moduleRequire(
     "../../progression/application/achievement-awards",
   ) as typeof import("../../progression/application/achievement-awards");
@@ -132,10 +132,10 @@ const withPatchedRuntime = async (
   try {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
     (
-      announcementsModule as {
-        publishAchievementAnnouncements: typeof announcementsModule.publishAchievementAnnouncements;
+      achievementEffectsModule as {
+        publishAchievementEffects: typeof achievementEffectsModule.publishAchievementEffects;
       }
-    ).publishAchievementAnnouncements = async ({ announcements }) => {
+    ).publishAchievementEffects = async ({ announcements }) => {
       publishedAnnouncements.push(
         ...announcements.map((announcement) => ({
           userId: announcement.userId,
@@ -211,10 +211,10 @@ const withPatchedRuntime = async (
       }
     ).getDatabase = originalGetDatabase;
     (
-      announcementsModule as {
-        publishAchievementAnnouncements: typeof announcementsModule.publishAchievementAnnouncements;
+      achievementEffectsModule as {
+        publishAchievementEffects: typeof achievementEffectsModule.publishAchievementEffects;
       }
-    ).publishAchievementAnnouncements = originalPublishAchievementAnnouncements;
+    ).publishAchievementEffects = originalPublishAchievementEffects;
     (
       achievementAwardsModule as {
         awardManualDiceAchievements: typeof achievementAwardsModule.awardManualDiceAchievements;
