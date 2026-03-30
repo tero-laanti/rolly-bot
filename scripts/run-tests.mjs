@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(scriptDir, "..");
-const distRoot = join(projectRoot, "dist");
+const compiledRootArg = process.argv[2];
+const distRoot = compiledRootArg ? join(projectRoot, compiledRootArg) : join(projectRoot, "dist");
 const exampleRollyDataRoot = join(projectRoot, "example-data", "rolly-data");
 const privateRollyDataRoot = join(projectRoot, "rolly-data");
 const privateRandomEventsPack = join(privateRollyDataRoot, "random-events.v1.json");
@@ -31,14 +32,14 @@ const collectCompiledTestFiles = (directory) => {
 };
 
 if (!existsSync(distRoot)) {
-  console.error("Compiled test directory dist/ does not exist. Run npm run build first.");
+  console.error(`Compiled test directory ${distRoot} does not exist. Run npm test again.`);
   process.exit(1);
 }
 
 const testFiles = collectCompiledTestFiles(distRoot).sort();
 
 if (testFiles.length < 1) {
-  console.error("No compiled test files were found under dist/.");
+  console.error(`No compiled test files were found under ${distRoot}.`);
   process.exit(1);
 }
 
