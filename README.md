@@ -48,12 +48,7 @@ npm run dev
 
 If you have a private `rolly-data` checkout, place it in `./rolly-data` or point `ROLLY_DATA_DIR` at it. Otherwise Rolly falls back to the public examples in [example-data/rolly-data/](example-data/rolly-data/). See [docs/development.md](docs/development.md) for more information.
 
-Private `rolly-data` is validated against the Discord transport limits used by the live bot surfaces at startup, so authored text that would overflow shop, raids, random-event, or World Boss payloads is rejected before the bot comes online.
-`achievements.json` can also define analytics-based milestones and optional role reward ids so private server setups can unlock channels gradually through progression.
-`contracts.v2.json` defines the Contract Master panel copy plus Daily and Weekly difficulty pools, and the authored contract data is validated against the Discord limits used by the contracts surfaces.
-`raids.json` defines authored raid tiers, static raid bosses, and the copy used by the player-started raids lobby surfaces.
-Player-started raids use startup-synced tier panels instead of a `/raids` slash command. To enable them on a server, set both `RAIDS_INSTANCE_CATEGORY_ID` and `RAIDS_TIER_BINDINGS_JSON` so each authored raid tier points at one public panel channel plus its access role.
-If you change slash command names, descriptions, or options, run `npm run deploy:commands`. Raid panel copy, `raids.json`, or `RAIDS_TIER_BINDINGS_JSON` changes take effect after the bot restarts and re-syncs the tier panels.
+Gameplay content, panel wiring, and validation details live in [docs/development.md](docs/development.md) and [example-data/rolly-data/](example-data/rolly-data/).
 
 ## Further Reading
 
