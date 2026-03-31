@@ -213,7 +213,7 @@ export const getOutcomeFromPayout = (bet: number, payout: number): "win" | "loss
 };
 
 export const grantCasinoPayout = (
-  economy: Pick<DiceEconomyRepository, "applyPipsDelta" | "grantRewardPips">,
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">,
   userId: string,
   payout: number,
   refundedBet: number,
@@ -232,29 +232,27 @@ export const grantCasinoPayout = (
     };
   }
 
-  let nextPips = currentPips;
-  if (normalizedRefund > 0) {
-    nextPips = economy.applyPipsDelta({
-      userId,
-      amount: normalizedRefund,
-    });
-  }
-
-  const rewardBaseAmount = normalizedPayout - normalizedRefund;
-  if (rewardBaseAmount < 1) {
+  if (normalizedPayout === normalizedRefund) {
+    const nextPips =
+      normalizedRefund > 0
+        ? economy.applyPipsDelta({
+            userId,
+            amount: normalizedRefund,
+          })
+        : currentPips;
     return {
       awardedPayout: normalizedRefund,
       pips: nextPips,
     };
   }
 
-  const reward = economy.grantRewardPips({
+  const nextPips = economy.applyPipsDelta({
     userId,
-    baseAmount: rewardBaseAmount,
+    amount: normalizedPayout,
   });
   return {
-    awardedPayout: normalizedRefund + reward.awardedAmount,
-    pips: reward.pips,
+    awardedPayout: normalizedPayout,
+    pips: nextPips,
   };
 };
 

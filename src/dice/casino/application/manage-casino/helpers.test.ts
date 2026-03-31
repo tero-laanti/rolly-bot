@@ -11,13 +11,6 @@ test("grantCasinoPayout preserves current balance for zero payouts", () => {
         called = true;
         return 999;
       },
-      grantRewardPips: () => {
-        called = true;
-        return {
-          awardedAmount: 999,
-          pips: 999,
-        };
-      },
     },
     "user-1",
     0,
@@ -33,21 +26,12 @@ test("grantCasinoPayout preserves current balance for zero payouts", () => {
 });
 
 test("grantCasinoPayout returns refunded stakes without applying reward bonuses", () => {
-  let rewardCalled = false;
-
   const result = grantCasinoPayout(
     {
       applyPipsDelta: ({ userId, amount }) => {
         assert.equal(userId, "user-1");
         assert.equal(amount, 10);
         return 110;
-      },
-      grantRewardPips: () => {
-        rewardCalled = true;
-        return {
-          awardedAmount: 999,
-          pips: 999,
-        };
       },
     },
     "user-1",
@@ -56,28 +40,19 @@ test("grantCasinoPayout returns refunded stakes without applying reward bonuses"
     100,
   );
 
-  assert.equal(rewardCalled, false);
   assert.deepEqual(result, {
     awardedPayout: 10,
     pips: 110,
   });
 });
 
-test("grantCasinoPayout applies reward bonuses only to winnings beyond the refunded stake", () => {
+test("grantCasinoPayout applies the full payout directly without reward bonuses", () => {
   const result = grantCasinoPayout(
     {
       applyPipsDelta: ({ userId, amount }) => {
         assert.equal(userId, "user-1");
-        assert.equal(amount, 10);
-        return 110;
-      },
-      grantRewardPips: ({ userId, baseAmount }) => {
-        assert.equal(userId, "user-1");
-        assert.equal(baseAmount, 20);
-        return {
-          awardedAmount: 24,
-          pips: 134,
-        };
+        assert.equal(amount, 30);
+        return 130;
       },
     },
     "user-1",
@@ -87,7 +62,7 @@ test("grantCasinoPayout applies reward bonuses only to winnings beyond the refun
   );
 
   assert.deepEqual(result, {
-    awardedPayout: 34,
-    pips: 134,
+    awardedPayout: 30,
+    pips: 130,
   });
 });

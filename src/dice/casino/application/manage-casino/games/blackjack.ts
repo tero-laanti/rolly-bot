@@ -112,7 +112,6 @@ const startBlackjackRound = ({
 
   const openingRound = createBlackjackRound(session.bet);
   const resolution = resolveBlackjackOpening(openingRound);
-  let awardedPayout = 0;
   if (resolution.kind === "resolved") {
     if (resolution.payout > 0) {
       const reward = grantCasinoPayout(
@@ -122,7 +121,6 @@ const startBlackjackRound = ({
         session.bet,
         nextPips,
       );
-      awardedPayout = reward.awardedPayout;
       nextPips = reward.pips;
     }
 
@@ -162,14 +160,10 @@ const startBlackjackRound = ({
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}${
-              awardedPayout > 0 && awardedPayout !== resolution.payout
-                ? `\nPaid ${awardedPayout} pips after permanent bonuses.`
-                : ""
-            }\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
-              resolution.playerHand,
+            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(
+              resolution.dealerHand,
               false,
-            )}.`,
+            )}.\nYou: ${formatBlackjackDice(resolution.playerHand, false)}.`,
           },
         },
         nextPips,
@@ -263,14 +257,10 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}${
-              reward.awardedPayout > 0 && reward.awardedPayout !== resolution.payout
-                ? `\nPaid ${reward.awardedPayout} pips after permanent bonuses.`
-                : ""
-            }\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
-              resolution.playerHand,
+            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(
+              resolution.dealerHand,
               false,
-            )}.`,
+            )}.\nYou: ${formatBlackjackDice(resolution.playerHand, false)}.`,
           },
         },
         nextPips,
@@ -327,14 +317,10 @@ const handleBlackjackAction = (
             ...session.state,
             currentScreen: "result",
             activeRound: null,
-            lastOutcome: `${resolution.summary}${
-              reward.awardedPayout > 0 && reward.awardedPayout !== resolution.payout
-                ? `\nPaid ${reward.awardedPayout} pips after permanent bonuses.`
-                : ""
-            }\nDealer: ${formatBlackjackDice(resolution.dealerHand, false)}.\nYou: ${formatBlackjackDice(
-              resolution.playerHand,
+            lastOutcome: `${resolution.summary}\nDealer: ${formatBlackjackDice(
+              resolution.dealerHand,
               false,
-            )}.`,
+            )}.\nYou: ${formatBlackjackDice(resolution.playerHand, false)}.`,
           },
         },
         nextPips,

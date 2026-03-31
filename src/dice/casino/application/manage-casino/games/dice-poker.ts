@@ -212,11 +212,7 @@ const handleDicePokerAction = (
             activeRound: null,
             lastOutcome: `Final hand: ${formatDice(rerollResult.finalRoll)}.\n${describePokerResult(
               rerollResult.result,
-            )}${
-              reward.awardedPayout > 0 && reward.awardedPayout !== rerollResult.result.payout
-                ? `\nPaid ${reward.awardedPayout} pips after permanent bonuses.`
-                : ""
-            }`,
+            )}`,
           },
         },
         nextPips,
