@@ -4,10 +4,14 @@ import { renderActionResult } from "../../../app/discord/render-action-result";
 import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
 import { formatDiscordRelativeTime } from "../../../shared/discord";
+import { createSqliteUnitOfWork } from "../../../shared/infrastructure/sqlite/unit-of-work";
 import { minuteMs } from "../../../shared/time";
+import { createSqliteEconomyRepository } from "../../economy/infrastructure/sqlite/balance-repository";
+import { createSqliteProgressionRepository } from "../../progression/infrastructure/sqlite/progression-repository";
 import type { RecoverRaidRunsSummary } from "../application/recover-runs/use-case";
 import type { ApplyRaidDiceRollInput, ApplyRaidDiceRollResult } from "../application/ports";
 import { buildRaidRecruitmentView } from "../application/manage-lobby/use-case";
+import type { RaidBossDefinition } from "../domain/catalog";
 import {
   encodeRaidButtonAction,
   parseRaidButtonAction,
@@ -21,7 +25,8 @@ import { createDiscordRaidEncounterPublisher } from "./discord/discord-raid-enco
 import { createDiscordRaidInstanceProvisioner } from "./discord/discord-raid-instance-provisioner";
 import { createDiscordRaidRecoveryInspector } from "./discord/discord-raid-recovery-inspector";
 import { createDiscordRaidStatusPublisher } from "./discord/discord-raid-status-publisher";
-import { getActiveRaidRunMembers } from "../domain/raid-run";
+import { getActiveRaidRunMembers, type RaidRunAggregate } from "../domain/raid-run";
+import { describeAppliedRaidReward, describeRaidReward } from "../domain/reward";
 import { createSqliteRaidRunRepository } from "./sqlite/raid-run-repository";
 import {
   createSqliteExpireRecruitingRaidRunsUseCase,
@@ -110,6 +115,7 @@ const buildRaidHitSummary = ({
   defeated,
   currentHp,
   maxHp,
+  rewardSummary,
 }: {
   damage: number;
   bossName: string;
@@ -117,9 +123,11 @@ const buildRaidHitSummary = ({
   defeated: boolean;
   currentHp?: number;
   maxHp?: number;
+  rewardSummary?: string | null;
 }): string => {
   if (defeated) {
-    return `Raid hit: **${damage}** damage to **${bossName}**. The boss is down.${formatBestRollSet(bestRollSet)}`;
+    const rewardLine = rewardSummary ? ` Rewards granted: **${rewardSummary}**.` : "";
+    return `Raid hit: **${damage}** damage to **${bossName}**. The boss is down.${rewardLine}${formatBestRollSet(bestRollSet)}`;
   }
 
   return `Raid hit: **${damage}** damage to **${bossName}**. HP: **${currentHp}/${maxHp}**.${formatBestRollSet(bestRollSet)}`;
@@ -139,6 +147,8 @@ export const createRaidsLiveRuntime = ({
   assertConfiguredRaidTierBindings(catalogReader, config.tierBindings);
 
   const repository = createSqliteRaidRunRepository(db);
+  const economy = createSqliteEconomyRepository(db);
+  const progression = createSqliteProgressionRepository(db);
   const statusPublisher = createDiscordRaidStatusPublisher(client);
   const encounterPublisher = createDiscordRaidEncounterPublisher(client);
   const inspector = createDiscordRaidRecoveryInspector(client);
@@ -146,6 +156,7 @@ export const createRaidsLiveRuntime = ({
     client,
     config,
   });
+  const unitOfWork = createSqliteUnitOfWork(db);
 
   const manageLobby = createSqliteManageRaidLobbyUseCase({
     db,
@@ -191,6 +202,7 @@ export const createRaidsLiveRuntime = ({
           currentHp: raidRun.run.bossCurrentHp,
           maxHp: boss.maxHp,
           participantIds,
+          rewardSummary: raidRun.run.bossCurrentHp === 0 ? describeRaidReward(boss.reward) : null,
           summary,
           resolvedAtMs: raidRun.run.updatedAt.getTime(),
           closeScheduledAtMs:
@@ -212,11 +224,40 @@ export const createRaidsLiveRuntime = ({
         encounterTitle: boss.copy.encounterTitle,
         currentHp: raidRun.run.bossCurrentHp,
         maxHp: boss.maxHp,
+        rewardSummary: describeRaidReward(boss.reward),
         participantIds,
         startsAtMs: raidRun.run.encounterStartsAt?.getTime() ?? raidRun.run.updatedAt.getTime(),
         endsAtMs: raidRun.run.encounterExpiresAt?.getTime() ?? raidRun.run.updatedAt.getTime(),
       }),
     };
+  };
+
+  const applyRaidRewards = (raidRun: RaidRunAggregate, boss: RaidBossDefinition): string => {
+    const awardedPipAmounts: number[] = [];
+    const participantIds = getActiveRaidRunMembers(raidRun).map((member) => member.userId);
+
+    unitOfWork.runInTransaction(() => {
+      for (const participantId of participantIds) {
+        const grantedReward = economy.grantRewardPips({
+          userId: participantId,
+          baseAmount: boss.reward.pips,
+        });
+        awardedPipAmounts.push(grantedReward.awardedAmount);
+        progression.applyDiceTemporaryEffect({
+          userId: participantId,
+          effectCode: "roll-pass-multiplier",
+          kind: "positive",
+          source: `raid:${raidRun.run.runId}`,
+          magnitude: boss.reward.rollPassMultiplier,
+          remainingRolls: boss.reward.rollPassRolls,
+          consumeOnCommand: "dice",
+          stackGroup: "raid-reward-roll-pass-multiplier",
+          stackMode: "refresh",
+        });
+      }
+    });
+
+    return describeAppliedRaidReward(boss.reward, awardedPipAmounts);
   };
 
   const refreshPublicRaidStatus = async (runId: string): Promise<void> => {
@@ -355,6 +396,14 @@ export const createRaidsLiveRuntime = ({
     const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
     if (!boss) {
       return false;
+    }
+
+    if (outcome === "success") {
+      try {
+        applyRaidRewards(raidRun, boss);
+      } catch (error) {
+        logger.error?.("[raids] Failed to grant raid rewards:", error);
+      }
     }
 
     const closeScheduledAt = new Date(now.getTime() + closeDelayMs);
@@ -712,6 +761,7 @@ export const createRaidsLiveRuntime = ({
         }
 
         if (nextHp <= 0) {
+          const rewardSummary = describeRaidReward(boss.reward);
           void resolveRaidRun(updated.raidRun.run.runId, "success", now);
           scheduleExpirySweep();
           return {
@@ -722,6 +772,7 @@ export const createRaidsLiveRuntime = ({
               bossName: boss.name,
               bestRollSet,
               defeated: true,
+              rewardSummary,
             }),
           };
         }

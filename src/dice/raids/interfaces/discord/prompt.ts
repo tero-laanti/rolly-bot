@@ -42,6 +42,7 @@ export const buildRaidEncounterPrompt = ({
   encounterTitle,
   currentHp,
   maxHp,
+  rewardSummary,
   participantIds,
   startsAtMs,
   endsAtMs,
@@ -51,6 +52,7 @@ export const buildRaidEncounterPrompt = ({
   encounterTitle: string;
   currentHp: number;
   maxHp: number;
+  rewardSummary: string;
   participantIds: readonly string[];
   startsAtMs: number;
   endsAtMs: number;
@@ -66,6 +68,7 @@ export const buildRaidEncounterPrompt = ({
         `**${encounterTitle}**`,
         `Raid opened ${formatDiscordRelativeTime(startsAtMs)} and closes ${formatDiscordRelativeTime(endsAtMs)}.`,
         "Use /roll in this channel to damage the boss.",
+        `Clear reward: **${rewardSummary}**.`,
         "",
         `HP: **${currentHp}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
         `Party (${participantIds.length}): ${formatParty(participantIds)}`,
@@ -85,6 +88,7 @@ export const buildRaidResolvedPrompt = ({
   currentHp,
   maxHp,
   participantIds,
+  rewardSummary,
   summary,
   resolvedAtMs,
   closeScheduledAtMs,
@@ -94,6 +98,7 @@ export const buildRaidResolvedPrompt = ({
   currentHp: number;
   maxHp: number;
   participantIds: readonly string[];
+  rewardSummary?: string | null;
   summary: string;
   resolvedAtMs: number;
   closeScheduledAtMs: number;
@@ -110,6 +115,7 @@ export const buildRaidResolvedPrompt = ({
     .setDescription(
       buildDescription([
         summary,
+        success && rewardSummary ? `Rewards granted: **${rewardSummary}**.` : "",
         `Raid ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
         `Final HP: **${Math.max(0, currentHp)}/${maxHp}** ${formatHpBar(currentHp, maxHp)}`,
         `Party (${participantIds.length}): ${formatParty(participantIds)}`,
