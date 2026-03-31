@@ -89,6 +89,7 @@ export type DiceAchievementData = {
   manualAward?: DiceAchievementManualAward;
   unlockReasonText?: string;
   roleRewardId?: string;
+  roleRewardUnlockText?: string;
 };
 
 export type DiceBalanceVarietyConfig = {

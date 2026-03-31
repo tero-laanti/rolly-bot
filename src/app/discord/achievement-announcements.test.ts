@@ -44,6 +44,32 @@ test("formatter hides detail for hidden achievements and keeps visible detail fo
   assert.match(content, /Example Pair, \+3 pips/);
 });
 
+test("formatter includes role unlock details when a new role reward is granted", () => {
+  const content = withExampleRollyData(() => {
+    const { formatAchievementAnnouncementContent } = loadModule<
+      typeof import("./achievement-announcements")
+    >("./achievement-announcements");
+    return formatAchievementAnnouncementContent(
+      {
+        userId: "user-1",
+        achievementIds: ["example-beginner-roller"],
+      },
+      [
+        {
+          userId: "user-1",
+          roleId: "example-beginner-role",
+          roleName: "Beginner",
+          unlockText: "TODO: This role will unlock channels in the future.",
+        },
+      ],
+    );
+  });
+
+  assert.match(content, /New role unlocked: Beginner\./);
+  assert.match(content, /Role-gated channels or access may now be available\./);
+  assert.match(content, /TODO: This role will unlock channels in the future\./);
+});
+
 test("publisher skips channel lookup cleanly when disabled", async () => {
   let fetchCalled = false;
   const { publishAchievementAnnouncements } = loadModule<

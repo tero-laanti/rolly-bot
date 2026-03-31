@@ -26,6 +26,7 @@
     "description": "Example achievement: make 5 manual /roll calls.",
     "category": "progression",
     "roleRewardId": "example-beginner-role",
+    "roleRewardUnlockText": "TODO: This role will unlock channels in the future.",
     "rule": {
       "type": "analytics-at-least",
       "metric": "total-roll-commands-called",
@@ -69,6 +70,7 @@
       "prestige": 1
     },
     "roleRewardId": "example-prestige-role",
+    "roleRewardUnlockText": "TODO: This role will unlock channels in the future.",
     "unlockReasonText": "reached Prestige 1"
   }
 ]

@@ -30,7 +30,7 @@ const withExampleRollyData = async <T>(run: () => Promise<T>): Promise<T> => {
 test("publisher grants each role reward once per user", async () => {
   await withExampleRollyData(async () => {
     let addCalls = 0;
-    const role = { id: "example-beginner-role" } as const;
+    const role = { id: "example-beginner-role", name: "Beginner" } as const;
     const member = {
       roles: {
         cache: new Map<string, { id: string }>(),
@@ -61,7 +61,7 @@ test("publisher grants each role reward once per user", async () => {
       },
     } as never;
 
-    await publishAchievementRoleRewards({
+    const firstPublish = await publishAchievementRoleRewards({
       client,
       announcements: [
         {
@@ -70,7 +70,7 @@ test("publisher grants each role reward once per user", async () => {
         },
       ],
     });
-    await publishAchievementRoleRewards({
+    const secondPublish = await publishAchievementRoleRewards({
       client,
       announcements: [
         {
@@ -82,6 +82,15 @@ test("publisher grants each role reward once per user", async () => {
 
     assert.equal(addCalls, 1);
     assert.equal(member.roles.cache.has(role.id), true);
+    assert.deepEqual(firstPublish, [
+      {
+        userId: "user-1",
+        roleId: "example-beginner-role",
+        roleName: "Beginner",
+        unlockText: "TODO: This role will unlock channels in the future.",
+      },
+    ]);
+    assert.deepEqual(secondPublish, []);
   });
 });
 

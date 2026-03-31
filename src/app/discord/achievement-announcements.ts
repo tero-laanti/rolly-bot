@@ -4,6 +4,7 @@ import { achievementsChannelConfig } from "../../shared/config";
 import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
 import { mergeAchievementAnnouncements } from "../../dice/progression/application/achievement-announcements";
 import { getDiceAchievement } from "../../dice/progression/domain/achievements";
+import type { AchievementRoleRewardGrant } from "./achievement-role-rewards";
 
 type SendableMessageChannel = {
   send: (options: { content: string; allowedMentions: MessageMentionOptions }) => Promise<Message>;
@@ -61,20 +62,37 @@ const resolveAchievementsChannel = async (
 
 export const formatAchievementAnnouncementContent = (
   announcement: AchievementAnnouncement,
+  roleRewardGrants: readonly AchievementRoleRewardGrant[] = [],
 ): string => {
   const entries = announcement.achievementIds.map(formatAchievementAnnouncementEntry);
   const label = entries.length === 1 ? "Achievement" : "Achievements";
-  return `<@${announcement.userId}> ${label} unlocked: ${entries.join(", ")}.`;
+  const grantedRoleRewards = roleRewardGrants.filter(
+    (grant) => grant.userId === announcement.userId,
+  );
+  if (grantedRoleRewards.length < 1) {
+    return `<@${announcement.userId}> ${label} unlocked: ${entries.join(", ")}.`;
+  }
+
+  const roleLabel = grantedRoleRewards.length === 1 ? "New role unlocked" : "New roles unlocked";
+  const roleNames = grantedRoleRewards.map((grant) => grant.roleName).join(", ");
+  const unlockTexts = [
+    ...new Set(grantedRoleRewards.flatMap((grant) => (grant.unlockText ? [grant.unlockText] : []))),
+  ];
+  const unlockTextSuffix = unlockTexts.length > 0 ? ` ${unlockTexts.join(" ")}` : "";
+
+  return `<@${announcement.userId}> ${label} unlocked: ${entries.join(", ")}. ${roleLabel}: ${roleNames}. Role-gated channels or access may now be available.${unlockTextSuffix}`;
 };
 
 export const publishAchievementAnnouncements = async ({
   client,
   announcements,
+  roleRewardGrants = [],
   config = achievementsChannelConfig,
   logger = console,
 }: {
   client: Client;
   announcements: readonly AchievementAnnouncement[];
+  roleRewardGrants?: readonly AchievementRoleRewardGrant[];
   config?: AchievementsChannelConfig;
   logger?: AchievementAnnouncementsLogger;
 }): Promise<void> => {
@@ -93,7 +111,7 @@ export const publishAchievementAnnouncements = async ({
   for (const announcement of mergeAchievementAnnouncements(announcements)) {
     try {
       await channel.send({
-        content: formatAchievementAnnouncementContent(announcement),
+        content: formatAchievementAnnouncementContent(announcement, roleRewardGrants ?? []),
         allowedMentions: {
           parse: [],
           users: [announcement.userId],

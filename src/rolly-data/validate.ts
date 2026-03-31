@@ -1667,6 +1667,10 @@ export const parseDiceAchievements = (value: unknown): DiceAchievementData[] => 
         record.roleRewardId,
         `achievements[${index}].roleRewardId`,
       ),
+      roleRewardUnlockText: readOptionalNonEmptyString(
+        record.roleRewardUnlockText,
+        `achievements[${index}].roleRewardUnlockText`,
+      ),
     };
   });
 

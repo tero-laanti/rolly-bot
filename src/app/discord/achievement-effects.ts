@@ -16,14 +16,15 @@ export const publishAchievementEffects = async ({
   announcements: readonly AchievementAnnouncement[];
   logger?: AchievementEffectsLogger;
 }): Promise<void> => {
-  await publishAchievementAnnouncements({
+  const roleRewardGrants = await publishAchievementRoleRewards({
     client,
     announcements,
     logger,
   });
-  await publishAchievementRoleRewards({
+  await publishAchievementAnnouncements({
     client,
     announcements,
+    roleRewardGrants,
     logger,
   });
 };

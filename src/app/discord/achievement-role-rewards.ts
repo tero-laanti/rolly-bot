@@ -1,10 +1,25 @@
 import type { Client, Guild, GuildMember, Role } from "discord.js";
 import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
 import { mergeAchievementAnnouncements } from "../../dice/progression/application/achievement-announcements";
-import { getDiceAchievementRoleRewardId } from "../../dice/progression/domain/achievements";
+import {
+  getDiceAchievementRoleRewardId,
+  getDiceAchievementRoleRewardUnlockText,
+} from "../../dice/progression/domain/achievements";
 
 type AchievementRoleRewardsLogger = {
   warn: (...args: unknown[]) => void;
+};
+
+export type AchievementRoleRewardGrant = {
+  userId: string;
+  roleId: string;
+  roleName: string;
+  unlockText?: string;
+};
+
+type AchievementRoleRewardDefinition = {
+  roleRewardId: string;
+  unlockText?: string;
 };
 
 const unknownRoleErrorCode = 10011;
@@ -49,13 +64,24 @@ const resolveMember = async (guild: Guild, userId: string): Promise<GuildMember 
   }
 };
 
-const collectRoleRewardIds = (announcement: AchievementAnnouncement): string[] => {
-  const roleRewardIds = announcement.achievementIds.flatMap((achievementId) => {
-    const roleRewardId = getDiceAchievementRoleRewardId(achievementId);
-    return roleRewardId ? [roleRewardId] : [];
-  });
+const collectRoleRewardDefinitions = (
+  announcement: AchievementAnnouncement,
+): AchievementRoleRewardDefinition[] => {
+  const rewardDefinitionsByRoleId = new Map<string, AchievementRoleRewardDefinition>();
 
-  return [...new Set(roleRewardIds)];
+  for (const achievementId of announcement.achievementIds) {
+    const roleRewardId = getDiceAchievementRoleRewardId(achievementId);
+    if (!roleRewardId || rewardDefinitionsByRoleId.has(roleRewardId)) {
+      continue;
+    }
+
+    rewardDefinitionsByRoleId.set(roleRewardId, {
+      roleRewardId,
+      unlockText: getDiceAchievementRoleRewardUnlockText(achievementId),
+    });
+  }
+
+  return [...rewardDefinitionsByRoleId.values()];
 };
 
 export const publishAchievementRoleRewards = async ({
@@ -66,14 +92,16 @@ export const publishAchievementRoleRewards = async ({
   client: Client;
   announcements: readonly AchievementAnnouncement[];
   logger?: AchievementRoleRewardsLogger;
-}): Promise<void> => {
+}): Promise<AchievementRoleRewardGrant[]> => {
+  const grantedRewards: AchievementRoleRewardGrant[] = [];
+
   for (const announcement of mergeAchievementAnnouncements(announcements)) {
-    const roleRewardIds = collectRoleRewardIds(announcement);
-    if (roleRewardIds.length < 1) {
+    const roleRewardDefinitions = collectRoleRewardDefinitions(announcement);
+    if (roleRewardDefinitions.length < 1) {
       continue;
     }
 
-    for (const roleRewardId of roleRewardIds) {
+    for (const { roleRewardId, unlockText } of roleRewardDefinitions) {
       try {
         const role = await findRole(client, roleRewardId);
         if (!role) {
@@ -96,9 +124,17 @@ export const publishAchievementRoleRewards = async ({
         }
 
         await member.roles.add(role);
+        grantedRewards.push({
+          userId: announcement.userId,
+          roleId: role.id,
+          roleName: role.name,
+          unlockText,
+        });
       } catch (error) {
         logger.warn("[achievements] Failed to publish achievement role reward.", error);
       }
     }
   }
+
+  return grantedRewards;
 };

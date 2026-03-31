@@ -11,6 +11,7 @@ type DiceAchievementDefinition = {
   unlockReasonText?: string;
   rule: DiceAchievementRule;
   roleRewardId?: string;
+  roleRewardUnlockText?: string;
 };
 
 export type DiceAchievementId = string;
@@ -124,6 +125,7 @@ export const diceAchievements: DiceAchievementDefinition[] = getDiceAchievements
     unlockReasonText: achievement.unlockReasonText,
     rule: achievement.rule,
     roleRewardId: (achievement as { roleRewardId?: string }).roleRewardId,
+    roleRewardUnlockText: (achievement as { roleRewardUnlockText?: string }).roleRewardUnlockText,
   }),
 );
 
@@ -153,6 +155,12 @@ export const getDiceAchievementPipReward = (id: DiceAchievementId): number => {
 
 export const getDiceAchievementRoleRewardId = (id: DiceAchievementId): string | undefined => {
   return getDiceAchievement(id)?.roleRewardId;
+};
+
+export const getDiceAchievementRoleRewardUnlockText = (
+  id: DiceAchievementId,
+): string | undefined => {
+  return getDiceAchievement(id)?.roleRewardUnlockText;
 };
 
 export const getPrestigeAchievementId = (prestige: number): DiceAchievementId | undefined => {

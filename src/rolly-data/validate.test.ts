@@ -371,6 +371,7 @@ test("parseDiceAchievements accepts analytics milestones and role rewards", () =
         count: 5,
       },
       roleRewardId: "example-beginner-role",
+      roleRewardUnlockText: "TODO: This role will unlock channels in the future.",
     },
   ]);
 
@@ -380,6 +381,10 @@ test("parseDiceAchievements accepts analytics milestones and role rewards", () =
     count: 5,
   });
   assert.equal(parsed[0]?.roleRewardId, "example-beginner-role");
+  assert.equal(
+    parsed[0]?.roleRewardUnlockText,
+    "TODO: This role will unlock channels in the future.",
+  );
 });
 
 test("parseDiceAchievements rejects invalid analytics milestone metrics", () => {
@@ -437,6 +442,26 @@ test("parseDiceAchievements accepts roleRewardId when provided", () => {
   ]);
 
   assert.equal(parsed[0]?.roleRewardId, "example-role-123");
+});
+
+test("parseDiceAchievements accepts roleRewardUnlockText when provided", () => {
+  const parsed = parseDiceAchievements([
+    {
+      id: "example-role-reward-unlock-text",
+      name: "Example Role Reward Unlock Text",
+      description: "Example description.",
+      category: "progression",
+      rule: {
+        type: "manual",
+      },
+      roleRewardUnlockText: "TODO: This role will unlock channels in the future.",
+    },
+  ]);
+
+  assert.equal(
+    parsed[0]?.roleRewardUnlockText,
+    "TODO: This role will unlock channels in the future.",
+  );
 });
 
 test("parseRandomEventBalance rejects non-positive claim window multipliers", () => {

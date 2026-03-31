@@ -72,6 +72,7 @@ Metadata:
 - `pipReward` is optional. When present, the user earns that many pips the first time the achievement unlocks.
 - `unlockReasonText` is optional. It appears in achievements-channel posts for non-hidden achievements, not in the browser.
 - `roleRewardId` is optional. When present in private `rolly-data`, the achievement can be used to grant a Discord role after unlock. Public examples should keep this as a safe placeholder id.
+- `roleRewardUnlockText` is optional. When present alongside `roleRewardId`, it provides the user-facing copy that should be shown only when the role is newly granted.
 
 Manual prestige awards:
 
