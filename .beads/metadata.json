@@ -1,7 +1,8 @@
 {
   "database": "dolt",
   "backend": "dolt",
-  "dolt_mode": "server",
+  "dolt_mode": "embedded",
+  "dolt_server_port": 51313,
   "dolt_database": "rolly",
   "project_id": "2332edfe-0aee-40a3-89d2-b8f098ac7e76"
 }
