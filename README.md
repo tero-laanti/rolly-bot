@@ -25,6 +25,7 @@ Random events arrive as live interaction prompts inside the server:
 
 - Player commands: `/roll`, `/balance`, `/leaderboards`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, `/contracts`, and `/stats`
 - Owner/admin commands: `/admin` and `/self-update`
+- Startup-synced panel surfaces: Contract Master and the player-started raid tier panels. Raids do not use a `/raids` slash command.
 
 ## Quick Start
 
@@ -52,6 +53,7 @@ Private `rolly-data` is validated against the Discord transport limits used by t
 `contracts.v2.json` defines the Contract Master panel copy plus Daily and Weekly difficulty pools, and the authored contract data is validated against the Discord limits used by the contracts surfaces.
 `raids.json` defines authored raid tiers, static raid bosses, and the copy used by the player-started raids lobby surfaces.
 Player-started raids use startup-synced tier panels instead of a `/raids` slash command. To enable them on a server, set both `RAIDS_INSTANCE_CATEGORY_ID` and `RAIDS_TIER_BINDINGS_JSON` so each authored raid tier points at one public panel channel plus its access role.
+If you change slash command names, descriptions, or options, run `npm run deploy:commands`. Raid panel copy, `raids.json`, or `RAIDS_TIER_BINDINGS_JSON` changes take effect after the bot restarts and re-syncs the tier panels.
 
 ## Further Reading
 

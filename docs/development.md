@@ -98,6 +98,7 @@ Useful variants:
 - `npm run build`: compile the runtime bot into `dist/`
 
 When command names, descriptions, or options change, run `npm run deploy:commands` again. The registry is explicit, so changes are only live after the deploy step succeeds.
+Raid tier panels are not part of the slash-command registry. `raids.json`, `RAIDS_TIER_BINDINGS_JSON`, and raid panel copy changes go live after the bot restarts and the startup sync runs again.
 
 ## Data and Runtime Notes
 
@@ -117,6 +118,22 @@ When command names, descriptions, or options change, run `npm run deploy:command
 - `dist/` is generated output. Do not edit it directly.
 
 If `./rolly-data` or `ROLLY_DATA_DIR` points to a git checkout, `/self-update` refreshes that repo before rebuilding and redeploying commands.
+
+## Raid Setup And Validation
+
+Use this checklist when shipping or validating player-started raid changes:
+
+1. Set `RAIDS_INSTANCE_CATEGORY_ID`.
+2. Set `RAIDS_TIER_BINDINGS_JSON` so every authored `raids.json` tier id has a public panel channel and access role.
+3. Start the bot and confirm the startup logs report the raids runtime and tier panel sync instead of an inactive reason.
+4. Check each configured raid panel channel in Discord and confirm the synced panel copy matches the authored tier and shared `raids.json` copy.
+5. Start a raid from a public panel, choose a boss, and confirm the bot creates the private raid instance channel in the configured category.
+6. Join and leave with a second eligible member to verify the recruitment prompt, party updates, and readiness gating.
+7. Start the encounter and verify the fight prompt, resolution copy, and reward payout match the authored boss definition.
+8. Restart the bot with an active recruiting run or encounter and confirm recovery republishes or resolves the raid cleanly.
+
+Manual Discord validation is the expected bar for raid behavior changes because the shipped flow depends on Discord channels, buttons, roles, and restart recovery.
+Run `npm run deploy:commands` only when slash command names, descriptions, or options change. Raid panel-only changes do not require command redeployment.
 
 ## Day-to-Day Commands
 
@@ -147,3 +164,4 @@ Notes:
 - If you change the `rolly-data` contract or loader behavior, update [src/rolly-data/](../src/rolly-data/), [example-data/rolly-data/](../example-data/rolly-data/), [README.md](../README.md), this guide, and [.env.example](../.env.example) together.
 - If command names, descriptions, or options change, remind maintainers to run `npm run deploy:commands`.
 - `/contracts` is part of the slash-command surface. After adding or changing it, run `npm run deploy:commands`.
+- Player-started raids use startup-synced tier panels instead of a slash command. Update the raid setup and validation notes here when the panel flow, runtime wiring, or recovery expectations change.

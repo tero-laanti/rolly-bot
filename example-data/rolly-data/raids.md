@@ -82,3 +82,9 @@ Discord text safety:
 
 - Panel titles, button labels, tier names, tier summaries, and authored boss copy are validated against the Discord limits used by the current raids surfaces.
 - If startup rejects the file, trim the authored strings instead of relying on Discord to accept them.
+
+Operational notes:
+
+- Player-started raids use startup-synced tier panels rather than a `/raids` slash command.
+- Every authored `tierId` that should be live in Discord must have a matching `RAIDS_TIER_BINDINGS_JSON` entry with a panel channel id and access role id.
+- Changes to `raids.json` take effect after the bot restarts and re-syncs the raid tier panels. They do not require `npm run deploy:commands` unless you also changed slash command metadata elsewhere.
