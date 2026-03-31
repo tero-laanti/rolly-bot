@@ -121,6 +121,8 @@ export type RaidRunRepository = {
     encounterStartsAt?: Date | null;
     encounterExpiresAt?: Date | null;
     bossCurrentHp?: number | null;
+    rewardGrantedAt?: Date | null;
+    rewardSummary?: string | null;
     closeScheduledAt?: Date | null;
     versionDelta?: number;
   }) => UpdateRaidRunResult;
@@ -137,6 +139,8 @@ export type RaidRunRepository = {
     participantRoleId?: string | null;
     encounterMessageId?: string | null;
     bossCurrentHp?: number | null;
+    rewardGrantedAt?: Date | null;
+    rewardSummary?: string | null;
     closeScheduledAt?: Date | null;
   }) => CloseRaidRunResult;
   updateRaidRunStoredReferences: (input: {

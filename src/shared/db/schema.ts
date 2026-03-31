@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 8;
+const currentSchemaVersion = 9;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -275,6 +275,8 @@ const currentSchemaColumns = new Map<string, string[]>([
       "encounter_starts_at",
       "encounter_expires_at",
       "boss_current_hp",
+      "reward_granted_at",
+      "reward_summary",
       "close_scheduled_at",
       "version",
       "created_at",
@@ -830,6 +832,8 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       encounter_starts_at TEXT,
       encounter_expires_at TEXT,
       boss_current_hp INTEGER,
+      reward_granted_at TEXT,
+      reward_summary TEXT,
       close_scheduled_at TEXT,
       version INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
@@ -893,6 +897,20 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
     db.exec(`
       ALTER TABLE dice_raid_runs
       ADD COLUMN close_scheduled_at TEXT;
+    `);
+  }
+
+  if (!hasColumn(db, "dice_raid_runs", "reward_granted_at")) {
+    db.exec(`
+      ALTER TABLE dice_raid_runs
+      ADD COLUMN reward_granted_at TEXT;
+    `);
+  }
+
+  if (!hasColumn(db, "dice_raid_runs", "reward_summary")) {
+    db.exec(`
+      ALTER TABLE dice_raid_runs
+      ADD COLUMN reward_summary TEXT;
     `);
   }
 };

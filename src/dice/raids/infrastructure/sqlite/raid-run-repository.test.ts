@@ -44,6 +44,8 @@ test("createRecruitingRaidRun stores the raid run and leader membership", () => 
   assert.equal(result.raidRun.run.isOpen, true);
   assert.equal(result.raidRun.run.encounterMessageId, null);
   assert.equal(result.raidRun.run.bossCurrentHp, null);
+  assert.equal(result.raidRun.run.rewardGrantedAt, null);
+  assert.equal(result.raidRun.run.rewardSummary, null);
   assert.equal(result.raidRun.run.closeScheduledAt, null);
   assert.equal(result.raidRun.run.version, 1);
   assert.equal(
@@ -304,6 +306,7 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
   const createdAt = new Date("2026-03-29T10:00:00.000Z");
   const updateAt = new Date("2026-03-29T10:05:00.000Z");
   const closeAt = new Date("2026-03-29T10:10:00.000Z");
+  const rewardGrantedAt = new Date("2026-03-29T10:09:00.000Z");
 
   const created = repository.createRecruitingRaidRun({
     runId: "raid-run-1",
@@ -328,6 +331,7 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
     encounterStartsAt: updateAt,
     encounterExpiresAt: new Date(updateAt.getTime() + raidEncounterDurationMs),
     bossCurrentHp: 77,
+    rewardSummary: "6 pips and x2 Roll Pass for 1 roll each",
     closeScheduledAt: new Date(closeAt.getTime()),
     versionDelta: 1,
   });
@@ -349,6 +353,8 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
     updateAt.getTime() + raidEncounterDurationMs,
   );
   assert.equal(updated.raidRun.run.bossCurrentHp, 77);
+  assert.equal(updated.raidRun.run.rewardGrantedAt, null);
+  assert.equal(updated.raidRun.run.rewardSummary, "6 pips and x2 Roll Pass for 1 roll each");
   assert.equal(updated.raidRun.run.closeScheduledAt?.getTime(), closeAt.getTime());
 
   const closed = repository.closeRaidRun({
@@ -356,6 +362,8 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
     expectedVersion: 2,
     status: "cancelled",
     now: closeAt,
+    rewardGrantedAt,
+    rewardSummary: "awarded before shutdown",
   });
   assert.equal(closed.ok, true);
   if (!closed.ok) {
@@ -365,6 +373,8 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
   assert.equal(closed.raidRun.run.status, "cancelled");
   assert.equal(closed.raidRun.run.isOpen, false);
   assert.equal(closed.raidRun.run.version, 3);
+  assert.equal(closed.raidRun.run.rewardGrantedAt?.getTime(), rewardGrantedAt.getTime());
+  assert.equal(closed.raidRun.run.rewardSummary, "awarded before shutdown");
   assert.ok(closed.raidRun.members.every((member) => member.active === false));
   assert.equal(repository.getOpenRaidRunForUser("leader-1"), null);
 

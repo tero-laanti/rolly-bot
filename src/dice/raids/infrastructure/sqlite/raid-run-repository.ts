@@ -24,6 +24,8 @@ type RaidRunRow = {
   encounter_starts_at: string | null;
   encounter_expires_at: string | null;
   boss_current_hp: number | null;
+  reward_granted_at: string | null;
+  reward_summary: string | null;
   close_scheduled_at: string | null;
   version: number;
   created_at: string;
@@ -128,6 +130,8 @@ const mapRaidRunRow = (row: RaidRunRow): RaidRunRecord => {
     encounterStartsAt: toDateOrNull(row.encounter_starts_at),
     encounterExpiresAt: toDateOrNull(row.encounter_expires_at),
     bossCurrentHp: row.boss_current_hp,
+    rewardGrantedAt: toDateOrNull(row.reward_granted_at),
+    rewardSummary: row.reward_summary,
     closeScheduledAt: toDateOrNull(row.close_scheduled_at),
     version: row.version,
     createdAt: toDate(row.created_at),
@@ -166,6 +170,8 @@ const loadRaidRunAggregate = (db: SqliteDatabase, runId: string): RaidRunAggrega
         encounter_starts_at,
         encounter_expires_at,
         boss_current_hp,
+        reward_granted_at,
+        reward_summary,
         close_scheduled_at,
         version,
         created_at,
@@ -232,6 +238,8 @@ const loadRaidRunsByStatuses = (
         encounter_starts_at,
         encounter_expires_at,
         boss_current_hp,
+        reward_granted_at,
+        reward_summary,
         close_scheduled_at,
         version,
         created_at,
@@ -334,6 +342,8 @@ const writeRaidRunRow = (
     encounterStartsAt: Date | null;
     encounterExpiresAt: Date | null;
     bossCurrentHp: number | null;
+    rewardGrantedAt: Date | null;
+    rewardSummary: string | null;
     closeScheduledAt: Date | null;
     version: number;
     createdAt: Date;
@@ -358,6 +368,8 @@ const writeRaidRunRow = (
       encounter_starts_at,
       encounter_expires_at,
       boss_current_hp,
+      reward_granted_at,
+      reward_summary,
       close_scheduled_at,
       version,
       created_at,
@@ -379,6 +391,8 @@ const writeRaidRunRow = (
       @encounterStartsAt,
       @encounterExpiresAt,
       @bossCurrentHp,
+      @rewardGrantedAt,
+      @rewardSummary,
       @closeScheduledAt,
       @version,
       @createdAt,
@@ -401,6 +415,8 @@ const writeRaidRunRow = (
     encounterStartsAt: input.encounterStartsAt ? input.encounterStartsAt.toISOString() : null,
     encounterExpiresAt: input.encounterExpiresAt ? input.encounterExpiresAt.toISOString() : null,
     bossCurrentHp: input.bossCurrentHp,
+    rewardGrantedAt: input.rewardGrantedAt ? input.rewardGrantedAt.toISOString() : null,
+    rewardSummary: input.rewardSummary,
     closeScheduledAt: input.closeScheduledAt ? input.closeScheduledAt.toISOString() : null,
     version: input.version,
     createdAt: input.createdAt.toISOString(),
@@ -492,6 +508,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           encounterStartsAt: null,
           encounterExpiresAt: null,
           bossCurrentHp: null,
+          rewardGrantedAt: null,
+          rewardSummary: null,
           closeScheduledAt: null,
           version: 1,
           createdAt: input.now,
@@ -739,6 +757,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
     encounterStartsAt?: Date | null;
     encounterExpiresAt?: Date | null;
     bossCurrentHp?: number | null;
+    rewardGrantedAt?: Date | null;
+    rewardSummary?: string | null;
     closeScheduledAt?: Date | null;
     versionDelta?: number;
   }) => {
@@ -785,6 +805,12 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             : (raidRunRecord.run.encounterExpiresAt?.toISOString() ?? null);
         const nextBossCurrentHp =
           input.bossCurrentHp !== undefined ? input.bossCurrentHp : raidRunRecord.run.bossCurrentHp;
+        const nextRewardGrantedAt =
+          input.rewardGrantedAt !== undefined
+            ? (input.rewardGrantedAt?.toISOString() ?? null)
+            : (raidRunRecord.run.rewardGrantedAt?.toISOString() ?? null);
+        const nextRewardSummary =
+          input.rewardSummary !== undefined ? input.rewardSummary : raidRunRecord.run.rewardSummary;
         const nextCloseScheduledAt =
           input.closeScheduledAt !== undefined
             ? (input.closeScheduledAt?.toISOString() ?? null)
@@ -804,6 +830,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
               encounter_starts_at = ?,
               encounter_expires_at = ?,
               boss_current_hp = ?,
+              reward_granted_at = ?,
+              reward_summary = ?,
               close_scheduled_at = ?,
               version = ?,
               updated_at = ?
@@ -820,6 +848,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             nextEncounterStartsAt,
             nextEncounterExpiresAt,
             nextBossCurrentHp,
+            nextRewardGrantedAt,
+            nextRewardSummary,
             nextCloseScheduledAt,
             nextVersion,
             updatedAt,
@@ -868,6 +898,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
     participantRoleId?: string | null;
     encounterMessageId?: string | null;
     bossCurrentHp?: number | null;
+    rewardGrantedAt?: Date | null;
+    rewardSummary?: string | null;
     closeScheduledAt?: Date | null;
   }) => {
     try {
@@ -902,6 +934,12 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             : raidRunRecord.run.encounterMessageId;
         const nextBossCurrentHp =
           input.bossCurrentHp !== undefined ? input.bossCurrentHp : raidRunRecord.run.bossCurrentHp;
+        const nextRewardGrantedAt =
+          input.rewardGrantedAt !== undefined
+            ? (input.rewardGrantedAt?.toISOString() ?? null)
+            : (raidRunRecord.run.rewardGrantedAt?.toISOString() ?? null);
+        const nextRewardSummary =
+          input.rewardSummary !== undefined ? input.rewardSummary : raidRunRecord.run.rewardSummary;
         const nextCloseScheduledAt =
           input.closeScheduledAt !== undefined
             ? (input.closeScheduledAt?.toISOString() ?? null)
@@ -919,6 +957,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
               participant_role_id = ?,
               encounter_message_id = ?,
               boss_current_hp = ?,
+              reward_granted_at = ?,
+              reward_summary = ?,
               close_scheduled_at = ?,
               version = version + 1,
               updated_at = ?
@@ -932,6 +972,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             nextParticipantRoleId,
             nextEncounterMessageId,
             nextBossCurrentHp,
+            nextRewardGrantedAt,
+            nextRewardSummary,
             nextCloseScheduledAt,
             updatedAt,
             input.runId,

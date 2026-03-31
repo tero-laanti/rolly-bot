@@ -202,7 +202,10 @@ export const createRaidsLiveRuntime = ({
           currentHp: raidRun.run.bossCurrentHp,
           maxHp: boss.maxHp,
           participantIds,
-          rewardSummary: raidRun.run.bossCurrentHp === 0 ? describeRaidReward(boss.reward) : null,
+          rewardSummary:
+            raidRun.run.bossCurrentHp === 0
+              ? (raidRun.run.rewardSummary ?? describeRaidReward(boss.reward))
+              : null,
           summary,
           resolvedAtMs: raidRun.run.updatedAt.getTime(),
           closeScheduledAtMs:
@@ -236,28 +239,86 @@ export const createRaidsLiveRuntime = ({
     const awardedPipAmounts: number[] = [];
     const participantIds = getActiveRaidRunMembers(raidRun).map((member) => member.userId);
 
-    unitOfWork.runInTransaction(() => {
-      for (const participantId of participantIds) {
-        const grantedReward = economy.grantRewardPips({
-          userId: participantId,
-          baseAmount: boss.reward.pips,
-        });
-        awardedPipAmounts.push(grantedReward.awardedAmount);
-        progression.applyDiceTemporaryEffect({
-          userId: participantId,
-          effectCode: "roll-pass-multiplier",
-          kind: "positive",
-          source: `raid:${raidRun.run.runId}`,
-          magnitude: boss.reward.rollPassMultiplier,
-          remainingRolls: boss.reward.rollPassRolls,
-          consumeOnCommand: "dice",
-          stackGroup: "raid-reward-roll-pass-multiplier",
-          stackMode: "refresh",
-        });
-      }
-    });
+    for (const participantId of participantIds) {
+      const grantedReward = economy.grantRewardPips({
+        userId: participantId,
+        baseAmount: boss.reward.pips,
+      });
+      awardedPipAmounts.push(grantedReward.awardedAmount);
+      progression.applyDiceTemporaryEffect({
+        userId: participantId,
+        effectCode: "roll-pass-multiplier",
+        kind: "positive",
+        source: `raid:${raidRun.run.runId}`,
+        magnitude: boss.reward.rollPassMultiplier,
+        remainingRolls: boss.reward.rollPassRolls,
+        consumeOnCommand: "dice",
+        stackGroup: "raid-reward-roll-pass-multiplier",
+        stackMode: "refresh",
+      });
+    }
 
     return describeAppliedRaidReward(boss.reward, awardedPipAmounts);
+  };
+
+  const settleRaidRun = (
+    runId: string,
+    outcome: "success" | "failure",
+    now = new Date(),
+  ): {
+    raidRun: RaidRunAggregate;
+    closeScheduledAt: Date;
+    rewardSummary: string | null;
+  } | null => {
+    try {
+      return unitOfWork.runInTransaction(() => {
+        const raidRun = repository.getRaidRun(runId);
+        if (!raidRun || !raidRun.run.isOpen) {
+          return null;
+        }
+
+        const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
+        if (!boss) {
+          return null;
+        }
+
+        const closeScheduledAt = new Date(now.getTime() + closeDelayMs);
+        let rewardGrantedAt = raidRun.run.rewardGrantedAt;
+        let rewardSummary = raidRun.run.rewardSummary;
+
+        if (outcome === "success" && !rewardGrantedAt) {
+          rewardSummary = applyRaidRewards(raidRun, boss);
+          rewardGrantedAt = now;
+        }
+
+        const resolved = repository.closeRaidRun({
+          runId: raidRun.run.runId,
+          expectedVersion: raidRun.run.version,
+          status: "resolved",
+          now,
+          bossCurrentHp: outcome === "success" ? 0 : (raidRun.run.bossCurrentHp ?? boss.maxHp),
+          rewardGrantedAt: outcome === "success" ? rewardGrantedAt : null,
+          rewardSummary: outcome === "success" ? rewardSummary : null,
+          closeScheduledAt,
+        });
+        if (!resolved.ok) {
+          return null;
+        }
+
+        return {
+          raidRun: resolved.raidRun,
+          closeScheduledAt,
+          rewardSummary: outcome === "success" ? rewardSummary : null,
+        };
+      });
+    } catch (error) {
+      if (outcome === "success") {
+        logger.error?.("[raids] Failed to durably settle raid rewards:", error);
+      } else {
+        logger.error?.("[raids] Failed to resolve raid run:", error);
+      }
+      return null;
+    }
   };
 
   const refreshPublicRaidStatus = async (runId: string): Promise<void> => {
@@ -383,64 +444,48 @@ export const createRaidsLiveRuntime = ({
     });
   };
 
-  const resolveRaidRun = async (
-    runId: string,
-    outcome: "success" | "failure",
+  const finalizeResolvedRaidSideEffects = async (
+    settled: {
+      raidRun: RaidRunAggregate;
+      closeScheduledAt: Date;
+    },
     now = new Date(),
-  ): Promise<boolean> => {
-    const raidRun = repository.getRaidRun(runId);
-    if (!raidRun || !raidRun.run.isOpen) {
-      return false;
-    }
-
-    const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
-    if (!boss) {
-      return false;
-    }
-
-    if (outcome === "success") {
-      try {
-        applyRaidRewards(raidRun, boss);
-      } catch (error) {
-        logger.error?.("[raids] Failed to grant raid rewards:", error);
-      }
-    }
-
-    const closeScheduledAt = new Date(now.getTime() + closeDelayMs);
-    const resolved = repository.closeRaidRun({
-      runId: raidRun.run.runId,
-      expectedVersion: raidRun.run.version,
-      status: "resolved",
-      now,
-      bossCurrentHp: outcome === "success" ? 0 : (raidRun.run.bossCurrentHp ?? boss.maxHp),
-      closeScheduledAt,
-    });
-    if (!resolved.ok) {
-      return false;
-    }
-
+  ): Promise<void> => {
     try {
-      await refreshPublicRaidStatus(runId);
+      await refreshPublicRaidStatus(settled.raidRun.run.runId);
     } catch (error) {
       logger.error?.("[raids] Failed to refresh resolved public raid status:", error);
     }
 
     try {
-      await ensureEncounterPrompt(runId, now);
+      await ensureEncounterPrompt(settled.raidRun.run.runId, now);
     } catch (error) {
       logger.error?.("[raids] Failed to render resolved raid prompt:", error);
     }
 
-    if (resolved.raidRun.run.privateChannelId) {
+    if (settled.raidRun.run.privateChannelId) {
       try {
         await encounterPublisher.sendChannelMessage({
-          channelId: resolved.raidRun.run.privateChannelId,
-          content: `Raid instance closing in 5 minutes. It closes ${formatDiscordRelativeTime(closeScheduledAt.getTime())}.`,
+          channelId: settled.raidRun.run.privateChannelId,
+          content: `Raid instance closing in 5 minutes. It closes ${formatDiscordRelativeTime(settled.closeScheduledAt.getTime())}.`,
         });
       } catch (error) {
         logger.error?.("[raids] Failed to send raid closing notice:", error);
       }
     }
+  };
+
+  const resolveRaidRun = async (
+    runId: string,
+    outcome: "success" | "failure",
+    now = new Date(),
+  ): Promise<boolean> => {
+    const settled = settleRaidRun(runId, outcome, now);
+    if (!settled) {
+      return false;
+    }
+
+    await finalizeResolvedRaidSideEffects(settled, now);
 
     return true;
   };
@@ -485,6 +530,11 @@ export const createRaidsLiveRuntime = ({
 
       const now = new Date();
       for (const raidRun of repository.listRaidRunsByStatuses(["provisioned", "active"])) {
+        if (raidRun.run.bossCurrentHp !== null && raidRun.run.bossCurrentHp <= 0) {
+          await resolveRaidRun(raidRun.run.runId, "success", now);
+          continue;
+        }
+
         if (
           raidRun.run.encounterExpiresAt &&
           raidRun.run.encounterExpiresAt.getTime() <= now.getTime()
@@ -719,6 +769,15 @@ export const createRaidsLiveRuntime = ({
           };
         }
 
+        if (raidRun.run.bossCurrentHp <= 0) {
+          void resolveRaidRun(raidRun.run.runId, "success", now);
+          return {
+            kind: "ignored",
+            reason: "inactive",
+            summary: "Too late - this raid is already resolving.",
+          };
+        }
+
         if (raidRun.run.encounterExpiresAt && raidRun.run.encounterExpiresAt.getTime() <= nowMs) {
           void resolveRaidRun(raidRun.run.runId, "failure", now);
           return {
@@ -761,8 +820,19 @@ export const createRaidsLiveRuntime = ({
         }
 
         if (nextHp <= 0) {
-          const rewardSummary = describeRaidReward(boss.reward);
-          void resolveRaidRun(updated.raidRun.run.runId, "success", now);
+          const settled = settleRaidRun(updated.raidRun.run.runId, "success", now);
+          if (!settled) {
+            return {
+              kind: "ignored",
+              reason: "inactive",
+              summary: "Too late - this raid is no longer active.",
+            };
+          }
+
+          const rewardSummary = settled.rewardSummary ?? describeRaidReward(boss.reward);
+          void finalizeResolvedRaidSideEffects(settled, now).catch((error) => {
+            logger.error?.("[raids] Failed to finalize resolved raid after defeating hit:", error);
+          });
           scheduleExpirySweep();
           return {
             kind: "applied",
@@ -809,6 +879,15 @@ export const createRaidsLiveRuntime = ({
         "resolved",
       ])) {
         try {
+          if (
+            (raidRun.run.status === "provisioned" || raidRun.run.status === "active") &&
+            raidRun.run.bossCurrentHp !== null &&
+            raidRun.run.bossCurrentHp <= 0
+          ) {
+            await resolveRaidRun(raidRun.run.runId, "success", now);
+            continue;
+          }
+
           if (
             raidRun.run.status === "resolved" &&
             raidRun.run.closeScheduledAt &&

@@ -25,6 +25,8 @@ export type RaidRunRecord = {
   encounterStartsAt: Date | null;
   encounterExpiresAt: Date | null;
   bossCurrentHp: number | null;
+  rewardGrantedAt: Date | null;
+  rewardSummary: string | null;
   closeScheduledAt: Date | null;
   version: number;
   createdAt: Date;
