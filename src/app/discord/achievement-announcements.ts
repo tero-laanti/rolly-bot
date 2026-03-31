@@ -1,4 +1,4 @@
-import type { Client, Message, MessageMentionOptions } from "discord.js";
+import type { Client } from "discord.js";
 import type { AchievementsChannelConfig } from "../../shared/config";
 import { achievementsChannelConfig } from "../../shared/config";
 import type { AchievementAnnouncement } from "../../dice/progression/application/achievement-announcements";
