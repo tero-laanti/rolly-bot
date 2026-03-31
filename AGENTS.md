@@ -163,6 +163,9 @@ bd close <id>         # Complete work
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 - Beads runs on Dolt server mode. Treat concurrency and lock incidents as server/recovery problems first.
 - For Beads/Dolt recovery, prefer the supported sequence: `bd dolt killall`, `bd bootstrap` or `bd backup restore`, then `bd doctor`.
+- If `bd` still fails after that and no live `dolt` process is holding `.beads/dolt`, removing stale Dolt lock files under `.beads/dolt/**/LOCK` is an acceptable fallback before retrying startup.
+- If the local Dolt working copy is still broken after lock cleanup, move `.beads/dolt` aside into a timestamped `dolt-corrupt-*` directory and rerun `bd bootstrap` to rebuild from the configured remote or backup.
+- If sandboxed `bd` commands cannot reach the local Dolt server on `127.0.0.1`, rerun the needed `bd` command with escalation instead of assuming the server is actually down.
 - If `bd backup export-git --force` is needed for off-machine recovery, use it. The repo hook skips normal app validation on the `beads-backup` branch so backup pushes can succeed from the temporary worktree.
 - If repeated per-repo Dolt startup churn causes problems, consider `bd init --shared-server` for future setups instead of inventing custom lockfile cleanup.
 
