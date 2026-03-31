@@ -19,9 +19,12 @@ type RaidRunRow = {
   public_message_id: string | null;
   private_channel_id: string | null;
   participant_role_id: string | null;
+  encounter_message_id: string | null;
   recruitment_expires_at: string;
   encounter_starts_at: string | null;
   encounter_expires_at: string | null;
+  boss_current_hp: number | null;
+  close_scheduled_at: string | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -120,9 +123,12 @@ const mapRaidRunRow = (row: RaidRunRow): RaidRunRecord => {
     publicMessageId: row.public_message_id,
     privateChannelId: row.private_channel_id,
     participantRoleId: row.participant_role_id,
+    encounterMessageId: row.encounter_message_id,
     recruitmentExpiresAt: toDate(row.recruitment_expires_at),
     encounterStartsAt: toDateOrNull(row.encounter_starts_at),
     encounterExpiresAt: toDateOrNull(row.encounter_expires_at),
+    bossCurrentHp: row.boss_current_hp,
+    closeScheduledAt: toDateOrNull(row.close_scheduled_at),
     version: row.version,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
@@ -155,9 +161,12 @@ const loadRaidRunAggregate = (db: SqliteDatabase, runId: string): RaidRunAggrega
         public_message_id,
         private_channel_id,
         participant_role_id,
+        encounter_message_id,
         recruitment_expires_at,
         encounter_starts_at,
         encounter_expires_at,
+        boss_current_hp,
+        close_scheduled_at,
         version,
         created_at,
         updated_at
@@ -218,9 +227,12 @@ const loadRaidRunsByStatuses = (
         public_message_id,
         private_channel_id,
         participant_role_id,
+        encounter_message_id,
         recruitment_expires_at,
         encounter_starts_at,
         encounter_expires_at,
+        boss_current_hp,
+        close_scheduled_at,
         version,
         created_at,
         updated_at
@@ -252,6 +264,26 @@ const loadOpenRaidRunForUser = (db: SqliteDatabase, userId: string): RaidRunAggr
     `,
     )
     .get(userId) as { run_id: string } | undefined;
+
+  return row ? loadRaidRunAggregate(db, row.run_id) : null;
+};
+
+const loadOpenRaidRunByPrivateChannelId = (
+  db: SqliteDatabase,
+  channelId: string,
+): RaidRunAggregate | null => {
+  const row = db
+    .prepare(
+      `
+      SELECT run_id
+      FROM dice_raid_runs
+      WHERE is_open = 1
+        AND private_channel_id = ?
+      ORDER BY created_at DESC, run_id DESC
+      LIMIT 1
+    `,
+    )
+    .get(channelId) as { run_id: string } | undefined;
 
   return row ? loadRaidRunAggregate(db, row.run_id) : null;
 };
@@ -297,9 +329,12 @@ const writeRaidRunRow = (
     publicMessageId: string | null;
     privateChannelId: string | null;
     participantRoleId: string | null;
+    encounterMessageId: string | null;
     recruitmentExpiresAt: Date;
     encounterStartsAt: Date | null;
     encounterExpiresAt: Date | null;
+    bossCurrentHp: number | null;
+    closeScheduledAt: Date | null;
     version: number;
     createdAt: Date;
     updatedAt: Date;
@@ -318,9 +353,12 @@ const writeRaidRunRow = (
       public_message_id,
       private_channel_id,
       participant_role_id,
+      encounter_message_id,
       recruitment_expires_at,
       encounter_starts_at,
       encounter_expires_at,
+      boss_current_hp,
+      close_scheduled_at,
       version,
       created_at,
       updated_at
@@ -336,9 +374,12 @@ const writeRaidRunRow = (
       @publicMessageId,
       @privateChannelId,
       @participantRoleId,
+      @encounterMessageId,
       @recruitmentExpiresAt,
       @encounterStartsAt,
       @encounterExpiresAt,
+      @bossCurrentHp,
+      @closeScheduledAt,
       @version,
       @createdAt,
       @updatedAt
@@ -355,9 +396,12 @@ const writeRaidRunRow = (
     publicMessageId: input.publicMessageId,
     privateChannelId: input.privateChannelId,
     participantRoleId: input.participantRoleId,
+    encounterMessageId: input.encounterMessageId,
     recruitmentExpiresAt: input.recruitmentExpiresAt.toISOString(),
     encounterStartsAt: input.encounterStartsAt ? input.encounterStartsAt.toISOString() : null,
     encounterExpiresAt: input.encounterExpiresAt ? input.encounterExpiresAt.toISOString() : null,
+    bossCurrentHp: input.bossCurrentHp,
+    closeScheduledAt: input.closeScheduledAt ? input.closeScheduledAt.toISOString() : null,
     version: input.version,
     createdAt: input.createdAt.toISOString(),
     updatedAt: input.updatedAt.toISOString(),
@@ -413,6 +457,10 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
     return loadOpenRaidRunForUser(db, userId);
   };
 
+  const getOpenRaidRunByPrivateChannelId = (channelId: string): RaidRunAggregate | null => {
+    return loadOpenRaidRunByPrivateChannelId(db, channelId);
+  };
+
   const createRecruitingRaidRun = (input: {
     runId: string;
     tierId: string;
@@ -439,9 +487,12 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           publicMessageId: null,
           privateChannelId: null,
           participantRoleId: null,
+          encounterMessageId: null,
           recruitmentExpiresAt: input.recruitmentExpiresAt,
           encounterStartsAt: null,
           encounterExpiresAt: null,
+          bossCurrentHp: null,
+          closeScheduledAt: null,
           version: 1,
           createdAt: input.now,
           updatedAt: input.now,
@@ -684,8 +735,11 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    encounterMessageId?: string | null;
     encounterStartsAt?: Date | null;
     encounterExpiresAt?: Date | null;
+    bossCurrentHp?: number | null;
+    closeScheduledAt?: Date | null;
     versionDelta?: number;
   }) => {
     try {
@@ -717,6 +771,10 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           input.participantRoleId !== undefined
             ? input.participantRoleId
             : raidRunRecord.run.participantRoleId;
+        const nextEncounterMessageId =
+          input.encounterMessageId !== undefined
+            ? input.encounterMessageId
+            : raidRunRecord.run.encounterMessageId;
         const nextEncounterStartsAt =
           input.encounterStartsAt !== undefined
             ? (input.encounterStartsAt?.toISOString() ?? null)
@@ -725,6 +783,12 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           input.encounterExpiresAt !== undefined
             ? (input.encounterExpiresAt?.toISOString() ?? null)
             : (raidRunRecord.run.encounterExpiresAt?.toISOString() ?? null);
+        const nextBossCurrentHp =
+          input.bossCurrentHp !== undefined ? input.bossCurrentHp : raidRunRecord.run.bossCurrentHp;
+        const nextCloseScheduledAt =
+          input.closeScheduledAt !== undefined
+            ? (input.closeScheduledAt?.toISOString() ?? null)
+            : (raidRunRecord.run.closeScheduledAt?.toISOString() ?? null);
 
         const result = db
           .prepare(
@@ -736,8 +800,11 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
               public_message_id = ?,
               private_channel_id = ?,
               participant_role_id = ?,
+              encounter_message_id = ?,
               encounter_starts_at = ?,
               encounter_expires_at = ?,
+              boss_current_hp = ?,
+              close_scheduled_at = ?,
               version = ?,
               updated_at = ?
             WHERE run_id = ? AND version = ? AND is_open = 1
@@ -749,8 +816,11 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             nextPublicMessageId,
             nextPrivateChannelId,
             nextParticipantRoleId,
+            nextEncounterMessageId,
             nextEncounterStartsAt,
             nextEncounterExpiresAt,
+            nextBossCurrentHp,
+            nextCloseScheduledAt,
             nextVersion,
             updatedAt,
             input.runId,
@@ -788,11 +858,17 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
   const closeRaidRun = (input: {
     runId: string;
     expectedVersion: number;
-    status: Extract<RaidRunStatus, "cancelled" | "expired" | "interrupted" | "provision-failed">;
+    status: Extract<
+      RaidRunStatus,
+      "resolved" | "cancelled" | "expired" | "interrupted" | "provision-failed"
+    >;
     now: Date;
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    encounterMessageId?: string | null;
+    bossCurrentHp?: number | null;
+    closeScheduledAt?: Date | null;
   }) => {
     try {
       const raidRun = runInTransaction(db, () => {
@@ -820,6 +896,16 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           input.participantRoleId !== undefined
             ? input.participantRoleId
             : raidRunRecord.run.participantRoleId;
+        const nextEncounterMessageId =
+          input.encounterMessageId !== undefined
+            ? input.encounterMessageId
+            : raidRunRecord.run.encounterMessageId;
+        const nextBossCurrentHp =
+          input.bossCurrentHp !== undefined ? input.bossCurrentHp : raidRunRecord.run.bossCurrentHp;
+        const nextCloseScheduledAt =
+          input.closeScheduledAt !== undefined
+            ? (input.closeScheduledAt?.toISOString() ?? null)
+            : (raidRunRecord.run.closeScheduledAt?.toISOString() ?? null);
 
         const result = db
           .prepare(
@@ -831,6 +917,9 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
               public_message_id = ?,
               private_channel_id = ?,
               participant_role_id = ?,
+              encounter_message_id = ?,
+              boss_current_hp = ?,
+              close_scheduled_at = ?,
               version = version + 1,
               updated_at = ?
             WHERE run_id = ? AND version = ? AND is_open = 1
@@ -841,6 +930,9 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
             nextPublicMessageId,
             nextPrivateChannelId,
             nextParticipantRoleId,
+            nextEncounterMessageId,
+            nextBossCurrentHp,
+            nextCloseScheduledAt,
             updatedAt,
             input.runId,
             input.expectedVersion,
@@ -886,6 +978,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    encounterMessageId?: string | null;
+    closeScheduledAt?: Date | null;
     closeOpenRunAsInterrupted?: boolean;
   }) => {
     try {
@@ -906,6 +1000,14 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           input.participantRoleId !== undefined
             ? input.participantRoleId
             : raidRunRecord.run.participantRoleId;
+        const nextEncounterMessageId =
+          input.encounterMessageId !== undefined
+            ? input.encounterMessageId
+            : raidRunRecord.run.encounterMessageId;
+        const nextCloseScheduledAt =
+          input.closeScheduledAt !== undefined
+            ? (input.closeScheduledAt?.toISOString() ?? null)
+            : (raidRunRecord.run.closeScheduledAt?.toISOString() ?? null);
         const shouldCloseOpenRun =
           input.closeOpenRunAsInterrupted === true &&
           raidRunRecord.run.isOpen &&
@@ -922,6 +1024,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
               public_message_id = ?,
               private_channel_id = ?,
               participant_role_id = ?,
+              encounter_message_id = ?,
+              close_scheduled_at = ?,
               version = version + 1,
               updated_at = ?
             WHERE run_id = ?
@@ -932,6 +1036,8 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
           nextPublicMessageId,
           nextPrivateChannelId,
           nextParticipantRoleId,
+          nextEncounterMessageId,
+          nextCloseScheduledAt,
           updatedAt,
           input.runId,
         );
@@ -966,6 +1072,7 @@ export const createSqliteRaidRunRepository = (db: SqliteDatabase): RaidRunReposi
   return {
     getRaidRun,
     getOpenRaidRunForUser,
+    getOpenRaidRunByPrivateChannelId,
     createRecruitingRaidRun,
     addRaidRunMember,
     removeRaidRunMember,

@@ -139,6 +139,7 @@ export const createRecoverRaidRunsUseCase = ({
       if (
         !currentRun.run.isOpen &&
         (currentRun.run.publicMessageId ||
+          currentRun.run.encounterMessageId ||
           currentRun.run.privateChannelId ||
           currentRun.run.participantRoleId)
       ) {
@@ -154,6 +155,11 @@ export const createRecoverRaidRunsUseCase = ({
               // Expired public posts should be retried on later recovery runs if Discord editing fails.
             }
           }
+          summary.resumedCount += 1;
+          continue;
+        }
+
+        if (currentRun.run.status === "resolved") {
           summary.resumedCount += 1;
           continue;
         }

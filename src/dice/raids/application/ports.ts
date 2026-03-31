@@ -93,6 +93,7 @@ export type UpdateRaidRunStoredReferencesResult =
 export type RaidRunRepository = {
   getRaidRun: (runId: string) => RaidRunAggregate | null;
   getOpenRaidRunForUser: (userId: string) => RaidRunAggregate | null;
+  getOpenRaidRunByPrivateChannelId: (channelId: string) => RaidRunAggregate | null;
   createRecruitingRaidRun: (input: CreateRecruitingRaidRunInput) => CreateRecruitingRaidRunResult;
   addRaidRunMember: (input: {
     runId: string;
@@ -116,18 +117,27 @@ export type RaidRunRepository = {
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    encounterMessageId?: string | null;
     encounterStartsAt?: Date | null;
     encounterExpiresAt?: Date | null;
+    bossCurrentHp?: number | null;
+    closeScheduledAt?: Date | null;
     versionDelta?: number;
   }) => UpdateRaidRunResult;
   closeRaidRun: (input: {
     runId: string;
     expectedVersion: number;
-    status: Extract<RaidRunStatus, "cancelled" | "expired" | "interrupted" | "provision-failed">;
+    status: Extract<
+      RaidRunStatus,
+      "resolved" | "cancelled" | "expired" | "interrupted" | "provision-failed"
+    >;
     now: Date;
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    encounterMessageId?: string | null;
+    bossCurrentHp?: number | null;
+    closeScheduledAt?: Date | null;
   }) => CloseRaidRunResult;
   updateRaidRunStoredReferences: (input: {
     runId: string;
@@ -135,6 +145,8 @@ export type RaidRunRepository = {
     publicMessageId?: string | null;
     privateChannelId?: string | null;
     participantRoleId?: string | null;
+    encounterMessageId?: string | null;
+    closeScheduledAt?: Date | null;
     closeOpenRunAsInterrupted?: boolean;
   }) => UpdateRaidRunStoredReferencesResult;
   listRaidRunsByStatuses: (statuses: readonly RaidRunStatus[]) => RaidRunAggregate[];
@@ -205,4 +217,32 @@ export type RaidRecoveryInspector = {
     privateChannelId: string | null;
     participantRoleId: string | null;
   }) => Promise<void>;
+};
+
+export type ApplyRaidDiceRollInput = {
+  channelId: string | null;
+  userId: string;
+  userMention: string;
+  damage: number;
+  bestRollSet?: readonly number[] | null;
+  nowMs?: number;
+};
+
+export type ApplyRaidDiceRollResult =
+  | {
+      kind: "no-raid";
+    }
+  | {
+      kind: "ignored";
+      reason: "inactive" | "not-member";
+      summary: string;
+    }
+  | {
+      kind: "applied";
+      defeated: boolean;
+      summary: string;
+    };
+
+export type RaidDiceRollPort = {
+  applyDiceRoll: (input: ApplyRaidDiceRollInput) => ApplyRaidDiceRollResult;
 };

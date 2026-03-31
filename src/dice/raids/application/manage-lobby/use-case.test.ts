@@ -65,6 +65,7 @@ const cloneRun = (run: RaidRunRecord): RaidRunRecord => ({
   recruitmentExpiresAt: new Date(run.recruitmentExpiresAt.getTime()),
   encounterStartsAt: run.encounterStartsAt ? new Date(run.encounterStartsAt.getTime()) : null,
   encounterExpiresAt: run.encounterExpiresAt ? new Date(run.encounterExpiresAt.getTime()) : null,
+  closeScheduledAt: run.closeScheduledAt ? new Date(run.closeScheduledAt.getTime()) : null,
   createdAt: new Date(run.createdAt.getTime()),
   updatedAt: new Date(run.updatedAt.getTime()),
 });
@@ -105,6 +106,15 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       return raidRun ? cloneAggregate(raidRun) : null;
     },
     getOpenRaidRunForUser: (userId) => getOpenRunForUser(userId),
+    getOpenRaidRunByPrivateChannelId: (channelId) => {
+      for (const raidRun of runs.values()) {
+        if (raidRun.run.isOpen && raidRun.run.privateChannelId === channelId) {
+          return cloneAggregate(raidRun);
+        }
+      }
+
+      return null;
+    },
     createRecruitingRaidRun: (input: CreateRecruitingRaidRunInput) => {
       if (getOpenRunForUser(input.leaderUserId)) {
         return { ok: false as const, reason: "user-active-run" as const };
@@ -122,9 +132,12 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
           publicMessageId: null,
           privateChannelId: null,
           participantRoleId: null,
+          encounterMessageId: null,
           recruitmentExpiresAt: new Date(input.recruitmentExpiresAt.getTime()),
           encounterStartsAt: null,
           encounterExpiresAt: null,
+          bossCurrentHp: null,
+          closeScheduledAt: null,
           version: 1,
           createdAt: new Date(input.now.getTime()),
           updatedAt: new Date(input.now.getTime()),
@@ -223,8 +236,11 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       publicMessageId,
       privateChannelId,
       participantRoleId,
+      encounterMessageId,
       encounterStartsAt,
       encounterExpiresAt,
+      bossCurrentHp,
+      closeScheduledAt,
       versionDelta = 0,
     }) => {
       const current = runs.get(runId);
@@ -249,11 +265,20 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       if (participantRoleId !== undefined) {
         current.run.participantRoleId = participantRoleId;
       }
+      if (encounterMessageId !== undefined) {
+        current.run.encounterMessageId = encounterMessageId;
+      }
       if (encounterStartsAt !== undefined) {
         current.run.encounterStartsAt = encounterStartsAt;
       }
       if (encounterExpiresAt !== undefined) {
         current.run.encounterExpiresAt = encounterExpiresAt;
+      }
+      if (bossCurrentHp !== undefined) {
+        current.run.bossCurrentHp = bossCurrentHp;
+      }
+      if (closeScheduledAt !== undefined) {
+        current.run.closeScheduledAt = closeScheduledAt;
       }
       current.run.version += versionDelta;
       current.run.updatedAt = new Date(now.getTime());
@@ -268,6 +293,9 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       publicMessageId,
       privateChannelId,
       participantRoleId,
+      encounterMessageId,
+      bossCurrentHp,
+      closeScheduledAt,
     }) => {
       const current = runs.get(runId);
       if (!current) {
@@ -285,6 +313,12 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
         privateChannelId !== undefined ? privateChannelId : current.run.privateChannelId;
       current.run.participantRoleId =
         participantRoleId !== undefined ? participantRoleId : current.run.participantRoleId;
+      current.run.encounterMessageId =
+        encounterMessageId !== undefined ? encounterMessageId : current.run.encounterMessageId;
+      current.run.bossCurrentHp =
+        bossCurrentHp !== undefined ? bossCurrentHp : current.run.bossCurrentHp;
+      current.run.closeScheduledAt =
+        closeScheduledAt !== undefined ? closeScheduledAt : current.run.closeScheduledAt;
       current.run.updatedAt = new Date(now.getTime());
       current.members = current.members.map((member) => ({
         ...member,
@@ -300,6 +334,8 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       publicMessageId,
       privateChannelId,
       participantRoleId,
+      encounterMessageId,
+      closeScheduledAt,
       closeOpenRunAsInterrupted,
     }) => {
       const current = runs.get(runId);
@@ -315,6 +351,12 @@ const createInMemoryRaidRunRepository = (): RaidRunRepository & {
       }
       if (participantRoleId !== undefined) {
         current.run.participantRoleId = participantRoleId;
+      }
+      if (encounterMessageId !== undefined) {
+        current.run.encounterMessageId = encounterMessageId;
+      }
+      if (closeScheduledAt !== undefined) {
+        current.run.closeScheduledAt = closeScheduledAt;
       }
       if (closeOpenRunAsInterrupted && current.run.isOpen) {
         current.run.status = "interrupted";

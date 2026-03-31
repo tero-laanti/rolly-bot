@@ -20,9 +20,12 @@ export type RaidRunRecord = {
   publicMessageId: string | null;
   privateChannelId: string | null;
   participantRoleId: string | null;
+  encounterMessageId: string | null;
   recruitmentExpiresAt: Date;
   encounterStartsAt: Date | null;
   encounterExpiresAt: Date | null;
+  bossCurrentHp: number | null;
+  closeScheduledAt: Date | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;

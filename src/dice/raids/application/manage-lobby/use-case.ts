@@ -204,6 +204,20 @@ export const buildRaidRecruitmentView = (
     lines.push(
       "Recruitment expired before the party locked in. Start a new raid from the tier panel.",
     );
+  } else if (raidRun.run.status === "resolved") {
+    if (boss) {
+      const resolvedSummary =
+        raidRun.run.bossCurrentHp === 0 ? boss.copy.successSummary : boss.copy.failureSummary;
+      lines.push(resolvedSummary);
+    } else {
+      lines.push("The raid encounter ended.");
+    }
+
+    if (raidRun.run.closeScheduledAt && raidRun.run.privateChannelId) {
+      lines.push(
+        `Instance closes ${formatDiscordRelativeTime(raidRun.run.closeScheduledAt.getTime())} in <#${raidRun.run.privateChannelId}>.`,
+      );
+    }
   } else if (raidRun.run.status === "provision-failed") {
     lines.push("Raid instance creation failed before combat started.");
   } else if (raidRun.run.status === "interrupted") {
@@ -578,8 +592,11 @@ export const createManageRaidLobbyUseCase = ({
       status: "provisioned",
       privateChannelId: provisioned.privateChannelId,
       participantRoleId: provisioned.participantRoleId,
+      encounterMessageId: null,
       encounterStartsAt,
       encounterExpiresAt,
+      bossCurrentHp: boss.maxHp,
+      closeScheduledAt: null,
       versionDelta: 1,
     });
     if (!ready.ok) {

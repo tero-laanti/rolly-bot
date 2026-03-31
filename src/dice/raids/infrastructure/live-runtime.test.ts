@@ -182,6 +182,7 @@ test("raids live runtime rejects protected actions when the actor lacks the tier
     ).createSqliteRaidRunRepository = () =>
       ({
         getRaidRun: () => null,
+        getOpenRaidRunByPrivateChannelId: () => null,
       }) as never;
     (
       statusPublisherModule as {

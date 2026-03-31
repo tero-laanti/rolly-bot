@@ -718,13 +718,118 @@ test("world boss damage uses the highest roll set total instead of summing all r
     const result = useCase({
       userId: "user-6",
       userMention: "<@user-6>",
-      worldBossThreadId: "world-boss-thread-1",
+      channelId: "world-boss-thread-1",
       nowMs: 1_710_000_000_000,
     });
 
     assert.equal(appliedWorldBossDamage, 8);
     assert.deepEqual(appliedBestRollSet, [4, 4]);
     assert.match(result.content, /World Boss damage: 8/);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test("raid damage uses the highest roll set total when no World Boss is active", () => {
+  const originalRandom = Math.random;
+  const randomValues = [0, 0.8, 0.5, 0.5];
+  let randomIndex = 0;
+  let appliedRaidDamage = 0;
+  let appliedBestRollSet: readonly number[] | null | undefined;
+  Math.random = () => {
+    const value = randomValues[randomIndex] ?? 0;
+    randomIndex += 1;
+    return value;
+  };
+
+  try {
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          awardedAmount: 0,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      permanentBonuses: zeroPermanentBonuses,
+      progression: {
+        ...createProgressionStub(),
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 2,
+          diceCountIncreasesTotal: 0,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 2,
+        getDicePrestige: () => 1,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      worldBoss: {
+        applyDiceRoll: () => ({
+          kind: "no-world-boss",
+        }),
+      },
+      raid: {
+        applyDiceRoll: ({
+          damage,
+          bestRollSet,
+        }: {
+          damage: number;
+          bestRollSet?: readonly number[] | null;
+        }) => {
+          appliedRaidDamage = damage;
+          appliedBestRollSet = bestRollSet;
+          return {
+            kind: "applied",
+            summary: `Raid damage: ${damage}`,
+            defeated: false,
+          };
+        },
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = useCase({
+      userId: "user-7",
+      userMention: "<@user-7>",
+      channelId: "raid-channel-1",
+      nowMs: 1_710_000_000_000,
+    });
+
+    assert.equal(appliedRaidDamage, 8);
+    assert.deepEqual(appliedBestRollSet, [4, 4]);
+    assert.match(result.content, /Raid damage: 8/);
   } finally {
     Math.random = originalRandom;
   }

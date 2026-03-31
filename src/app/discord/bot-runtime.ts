@@ -44,6 +44,10 @@ import { startDicePvpChallengeExpirationRuntime } from "../../dice/pvp/infrastru
 import { syncContractMasterPanelOnStartup } from "../../dice/contracts/infrastructure/contract-master-panel-sync";
 import { syncIntroPostsOnStartup } from "../../system/intro-posts/infrastructure/startup-sync";
 import { createRaidsLiveRuntime } from "../../dice/raids/infrastructure/live-runtime";
+import {
+  clearRaidsController,
+  registerRaidsController,
+} from "../../dice/raids/infrastructure/admin-controller";
 import { raidButtonPrefix } from "../../dice/raids/interfaces/discord/buttons/raid-buttons";
 import { syncRaidTierPanelsOnStartup } from "../../dice/raids/infrastructure/tier-panel-sync";
 
@@ -253,12 +257,16 @@ const startRaidsRuntime = async (): Promise<void> => {
   await runtime.recoverRunsOnStartup();
 
   raidsLiveRuntime = runtime;
+  registerRaidsController({
+    runtime,
+  });
   console.log("[raids] Runtime, recovery, and tier panel sync started.");
 };
 
 const stopBackgroundSchedulers = async (): Promise<void> => {
   clearRandomEventsAdminController();
   clearWorldBossAdminController();
+  clearRaidsController();
 
   if (stopRandomEventsScheduler) {
     stopRandomEventsScheduler();

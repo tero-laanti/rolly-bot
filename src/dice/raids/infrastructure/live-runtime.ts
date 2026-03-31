@@ -3,16 +3,21 @@ import { applyRenderedButtonResult } from "../../../app/discord/interaction-resp
 import { renderActionResult } from "../../../app/discord/render-action-result";
 import type { RaidsConfig } from "../../../shared/config";
 import { getDatabase } from "../../../shared/db";
+import { formatDiscordRelativeTime } from "../../../shared/discord";
 import { minuteMs } from "../../../shared/time";
 import type { RecoverRaidRunsSummary } from "../application/recover-runs/use-case";
+import type { ApplyRaidDiceRollInput, ApplyRaidDiceRollResult } from "../application/ports";
+import { buildRaidRecruitmentView } from "../application/manage-lobby/use-case";
 import {
   encodeRaidButtonAction,
   parseRaidButtonAction,
 } from "../interfaces/discord/buttons/raid-buttons";
+import { buildRaidEncounterPrompt, buildRaidResolvedPrompt } from "../interfaces/discord/prompt";
 import {
   assertConfiguredRaidTierBindings,
   createRollyDataRaidCatalogReader,
 } from "./catalog-reader";
+import { createDiscordRaidEncounterPublisher } from "./discord/discord-raid-encounter-publisher";
 import { createDiscordRaidInstanceProvisioner } from "./discord/discord-raid-instance-provisioner";
 import { createDiscordRaidRecoveryInspector } from "./discord/discord-raid-recovery-inspector";
 import { createDiscordRaidStatusPublisher } from "./discord/discord-raid-status-publisher";
@@ -31,9 +36,13 @@ type RaidsLiveRuntimeLogger = {
 
 export type RaidsLiveRuntime = {
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
+  applyDiceRoll: (input: ApplyRaidDiceRollInput) => ApplyRaidDiceRollResult;
   recoverRunsOnStartup: (input?: { now?: Date }) => Promise<RecoverRaidRunsSummary>;
   stop: () => Promise<void>;
 };
+
+const closeDelayMs = 5 * minuteMs;
+const unknownMessageErrorCode = 10008;
 
 const isGuildMemberWithRoles = (value: unknown): value is GuildMember => {
   if (typeof value !== "object" || value === null || !("roles" in value)) {
@@ -77,6 +86,45 @@ const replyEphemeral = async (interaction: ButtonInteraction, content: string): 
   });
 };
 
+const isUnknownMessageError = (error: unknown): boolean => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === unknownMessageErrorCode
+  );
+};
+
+const formatBestRollSet = (bestRollSet: readonly number[] | null): string => {
+  if (!bestRollSet || bestRollSet.length < 1) {
+    return "";
+  }
+
+  return ` Best set: **${bestRollSet.join(", ")}**.`;
+};
+
+const buildRaidHitSummary = ({
+  damage,
+  bossName,
+  bestRollSet,
+  defeated,
+  currentHp,
+  maxHp,
+}: {
+  damage: number;
+  bossName: string;
+  bestRollSet: readonly number[] | null;
+  defeated: boolean;
+  currentHp?: number;
+  maxHp?: number;
+}): string => {
+  if (defeated) {
+    return `Raid hit: **${damage}** damage to **${bossName}**. The boss is down.${formatBestRollSet(bestRollSet)}`;
+  }
+
+  return `Raid hit: **${damage}** damage to **${bossName}**. HP: **${currentHp}/${maxHp}**.${formatBestRollSet(bestRollSet)}`;
+};
+
 export const createRaidsLiveRuntime = ({
   client,
   config,
@@ -92,6 +140,7 @@ export const createRaidsLiveRuntime = ({
 
   const repository = createSqliteRaidRunRepository(db);
   const statusPublisher = createDiscordRaidStatusPublisher(client);
+  const encounterPublisher = createDiscordRaidEncounterPublisher(client);
   const inspector = createDiscordRaidRecoveryInspector(client);
   const provisioner = createDiscordRaidInstanceProvisioner({
     client,
@@ -118,6 +167,234 @@ export const createRaidsLiveRuntime = ({
 
   let stopped = false;
   let expirySweepTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const buildEncounterPromptForRun = (runId: string) => {
+    const raidRun = repository.getRaidRun(runId);
+    if (!raidRun || !raidRun.run.privateChannelId) {
+      return null;
+    }
+
+    const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
+    if (!boss || raidRun.run.bossCurrentHp === null) {
+      return null;
+    }
+
+    const participantIds = getActiveRaidRunMembers(raidRun).map((member) => member.userId);
+    if (raidRun.run.status === "resolved") {
+      const summary =
+        raidRun.run.bossCurrentHp === 0 ? boss.copy.successSummary : boss.copy.failureSummary;
+      return {
+        raidRun,
+        prompt: buildRaidResolvedPrompt({
+          bossName: boss.name,
+          bossLevel: boss.level,
+          currentHp: raidRun.run.bossCurrentHp,
+          maxHp: boss.maxHp,
+          participantIds,
+          summary,
+          resolvedAtMs: raidRun.run.updatedAt.getTime(),
+          closeScheduledAtMs:
+            raidRun.run.closeScheduledAt?.getTime() ??
+            raidRun.run.updatedAt.getTime() + closeDelayMs,
+        }),
+      };
+    }
+
+    if (raidRun.run.status !== "provisioned" && raidRun.run.status !== "active") {
+      return null;
+    }
+
+    return {
+      raidRun,
+      prompt: buildRaidEncounterPrompt({
+        bossName: boss.name,
+        bossLevel: boss.level,
+        encounterTitle: boss.copy.encounterTitle,
+        currentHp: raidRun.run.bossCurrentHp,
+        maxHp: boss.maxHp,
+        participantIds,
+        startsAtMs: raidRun.run.encounterStartsAt?.getTime() ?? raidRun.run.updatedAt.getTime(),
+        endsAtMs: raidRun.run.encounterExpiresAt?.getTime() ?? raidRun.run.updatedAt.getTime(),
+      }),
+    };
+  };
+
+  const refreshPublicRaidStatus = async (runId: string): Promise<void> => {
+    const raidRun = repository.getRaidRun(runId);
+    if (!raidRun?.run.publicMessageId) {
+      return;
+    }
+
+    await statusPublisher.updateStatusMessage({
+      channelId: raidRun.run.publicChannelId,
+      messageId: raidRun.run.publicMessageId,
+      view: buildRaidRecruitmentView(catalogReader, raidRun),
+    });
+  };
+
+  const ensureEncounterPrompt = async (runId: string, now = new Date()): Promise<void> => {
+    const rendered = buildEncounterPromptForRun(runId);
+    if (!rendered || !rendered.raidRun.run.privateChannelId) {
+      return;
+    }
+
+    const { raidRun, prompt } = rendered;
+    const publishPrompt = async (): Promise<void> => {
+      const published = await encounterPublisher.publishEncounterMessage({
+        channelId: raidRun.run.privateChannelId!,
+        prompt,
+      });
+
+      if (raidRun.run.isOpen) {
+        repository.updateRaidRun({
+          runId: raidRun.run.runId,
+          expectedVersion: raidRun.run.version,
+          now,
+          status: raidRun.run.status === "provisioned" ? "active" : raidRun.run.status,
+          encounterMessageId: published.messageId,
+          versionDelta: 1,
+        });
+        return;
+      }
+
+      repository.updateRaidRunStoredReferences({
+        runId: raidRun.run.runId,
+        now,
+        encounterMessageId: published.messageId,
+      });
+    };
+
+    if (!raidRun.run.encounterMessageId) {
+      await publishPrompt();
+      return;
+    }
+
+    try {
+      await encounterPublisher.updateEncounterMessage({
+        channelId: raidRun.run.privateChannelId!,
+        messageId: raidRun.run.encounterMessageId,
+        prompt,
+      });
+      if (raidRun.run.isOpen && raidRun.run.status === "provisioned") {
+        repository.updateRaidRun({
+          runId: raidRun.run.runId,
+          expectedVersion: raidRun.run.version,
+          now,
+          status: "active",
+          versionDelta: 1,
+        });
+      }
+    } catch (error) {
+      if (!isUnknownMessageError(error)) {
+        throw error;
+      }
+
+      if (raidRun.run.isOpen) {
+        const cleared = repository.updateRaidRun({
+          runId: raidRun.run.runId,
+          expectedVersion: raidRun.run.version,
+          now,
+          encounterMessageId: null,
+          versionDelta: 1,
+        });
+        if (cleared.ok) {
+          await ensureEncounterPrompt(runId, now);
+        }
+        return;
+      }
+
+      repository.updateRaidRunStoredReferences({
+        runId: raidRun.run.runId,
+        now,
+        encounterMessageId: null,
+      });
+      await ensureEncounterPrompt(runId, now);
+    }
+  };
+
+  const cleanupResolvedRaid = async (runId: string, now = new Date()): Promise<void> => {
+    const raidRun = repository.getRaidRun(runId);
+    if (!raidRun || raidRun.run.status !== "resolved") {
+      return;
+    }
+
+    if (raidRun.run.publicMessageId) {
+      await inspector.deletePublicStatusMessage({
+        channelId: raidRun.run.publicChannelId,
+        messageId: raidRun.run.publicMessageId,
+      });
+    }
+
+    await provisioner.cleanupRaidInstance({
+      runId: raidRun.run.runId,
+      privateChannelId: raidRun.run.privateChannelId,
+      participantRoleId: raidRun.run.participantRoleId,
+    });
+
+    repository.updateRaidRunStoredReferences({
+      runId: raidRun.run.runId,
+      now,
+      publicMessageId: null,
+      privateChannelId: null,
+      participantRoleId: null,
+      encounterMessageId: null,
+      closeScheduledAt: null,
+    });
+  };
+
+  const resolveRaidRun = async (
+    runId: string,
+    outcome: "success" | "failure",
+    now = new Date(),
+  ): Promise<boolean> => {
+    const raidRun = repository.getRaidRun(runId);
+    if (!raidRun || !raidRun.run.isOpen) {
+      return false;
+    }
+
+    const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
+    if (!boss) {
+      return false;
+    }
+
+    const closeScheduledAt = new Date(now.getTime() + closeDelayMs);
+    const resolved = repository.closeRaidRun({
+      runId: raidRun.run.runId,
+      expectedVersion: raidRun.run.version,
+      status: "resolved",
+      now,
+      bossCurrentHp: outcome === "success" ? 0 : (raidRun.run.bossCurrentHp ?? boss.maxHp),
+      closeScheduledAt,
+    });
+    if (!resolved.ok) {
+      return false;
+    }
+
+    try {
+      await refreshPublicRaidStatus(runId);
+    } catch (error) {
+      logger.error?.("[raids] Failed to refresh resolved public raid status:", error);
+    }
+
+    try {
+      await ensureEncounterPrompt(runId, now);
+    } catch (error) {
+      logger.error?.("[raids] Failed to render resolved raid prompt:", error);
+    }
+
+    if (resolved.raidRun.run.privateChannelId) {
+      try {
+        await encounterPublisher.sendChannelMessage({
+          channelId: resolved.raidRun.run.privateChannelId,
+          content: `Raid instance closing in 5 minutes. It closes ${formatDiscordRelativeTime(closeScheduledAt.getTime())}.`,
+        });
+      } catch (error) {
+        logger.error?.("[raids] Failed to send raid closing notice:", error);
+      }
+    }
+
+    return true;
+  };
 
   const clearExpirySweepTimer = (): void => {
     if (!expirySweepTimer) {
@@ -155,6 +432,42 @@ export const createRaidsLiveRuntime = ({
         logger.log(
           `[raids] Recruitment expiry sweep finished. expired=${summary.expiredCount} updated=${summary.updatedMessageCount} updateFailures=${summary.updateFailureCount}`,
         );
+      }
+
+      const now = new Date();
+      for (const raidRun of repository.listRaidRunsByStatuses(["provisioned", "active"])) {
+        if (
+          raidRun.run.encounterExpiresAt &&
+          raidRun.run.encounterExpiresAt.getTime() <= now.getTime()
+        ) {
+          await resolveRaidRun(raidRun.run.runId, "failure", now);
+          continue;
+        }
+
+        if (raidRun.run.status === "provisioned" || !raidRun.run.encounterMessageId) {
+          await ensureEncounterPrompt(raidRun.run.runId, now);
+        }
+      }
+
+      for (const raidRun of repository.listRaidRunsByStatuses(["resolved"])) {
+        if (
+          raidRun.run.closeScheduledAt &&
+          raidRun.run.closeScheduledAt.getTime() <= now.getTime() &&
+          (raidRun.run.privateChannelId ||
+            raidRun.run.participantRoleId ||
+            raidRun.run.publicMessageId)
+        ) {
+          await cleanupResolvedRaid(raidRun.run.runId, now);
+          continue;
+        }
+
+        if (
+          raidRun.run.closeScheduledAt &&
+          raidRun.run.closeScheduledAt.getTime() > now.getTime() &&
+          !raidRun.run.encounterMessageId
+        ) {
+          await ensureEncounterPrompt(raidRun.run.runId, now);
+        }
       }
     } catch (error) {
       logger.error?.("[raids] Recruitment expiry sweep failed:", error);
@@ -309,10 +622,156 @@ export const createRaidsLiveRuntime = ({
         interaction,
         renderActionResult(result, encodeRaidButtonAction),
       );
+
+      if (action.kind === "start-run") {
+        try {
+          await ensureEncounterPrompt(action.runId, new Date());
+        } catch (error) {
+          logger.error?.("[raids] Failed to publish raid encounter prompt:", error);
+        }
+      }
+
       scheduleExpirySweep();
+    },
+    applyDiceRoll: ({
+      channelId,
+      userId,
+      userMention,
+      damage,
+      bestRollSet = null,
+      nowMs = Date.now(),
+    }) => {
+      if (!channelId || damage <= 0) {
+        return {
+          kind: "no-raid",
+        };
+      }
+
+      const now = new Date(nowMs);
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const raidRun = repository.getOpenRaidRunByPrivateChannelId(channelId);
+        if (!raidRun) {
+          return {
+            kind: "no-raid",
+          };
+        }
+
+        const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
+        if (
+          !boss ||
+          raidRun.run.bossCurrentHp === null ||
+          (raidRun.run.status !== "provisioned" && raidRun.run.status !== "active")
+        ) {
+          return {
+            kind: "ignored",
+            reason: "inactive",
+            summary: "Too late - this raid is no longer active.",
+          };
+        }
+
+        if (raidRun.run.encounterExpiresAt && raidRun.run.encounterExpiresAt.getTime() <= nowMs) {
+          void resolveRaidRun(raidRun.run.runId, "failure", now);
+          return {
+            kind: "ignored",
+            reason: "inactive",
+            summary: "Too late - the raid timer already ended.",
+          };
+        }
+
+        const isMember = raidRun.members.some(
+          (member) => member.active && member.userId === userId,
+        );
+        if (!isMember) {
+          return {
+            kind: "ignored",
+            reason: "not-member",
+            summary: `${userMention}, this roll did not hit the raid boss because you're not part of this raid party.`,
+          };
+        }
+
+        const nextHp = Math.max(0, raidRun.run.bossCurrentHp - damage);
+        const updated = repository.updateRaidRun({
+          runId: raidRun.run.runId,
+          expectedVersion: raidRun.run.version,
+          now,
+          status: "active",
+          bossCurrentHp: nextHp,
+          versionDelta: 1,
+        });
+        if (!updated.ok) {
+          if (updated.reason === "stale") {
+            continue;
+          }
+
+          return {
+            kind: "ignored",
+            reason: "inactive",
+            summary: "Too late - this raid is no longer active.",
+          };
+        }
+
+        if (nextHp <= 0) {
+          void resolveRaidRun(updated.raidRun.run.runId, "success", now);
+          scheduleExpirySweep();
+          return {
+            kind: "applied",
+            defeated: true,
+            summary: buildRaidHitSummary({
+              damage,
+              bossName: boss.name,
+              bestRollSet,
+              defeated: true,
+            }),
+          };
+        }
+
+        void ensureEncounterPrompt(updated.raidRun.run.runId, now).catch((error) => {
+          logger.error?.("[raids] Failed to refresh raid encounter prompt:", error);
+        });
+        scheduleExpirySweep();
+        return {
+          kind: "applied",
+          defeated: false,
+          summary: buildRaidHitSummary({
+            damage,
+            bossName: boss.name,
+            bestRollSet,
+            defeated: false,
+            currentHp: nextHp,
+            maxHp: boss.maxHp,
+          }),
+        };
+      }
+
+      return {
+        kind: "ignored",
+        reason: "inactive",
+        summary: "Too late - this raid is no longer active.",
+      };
     },
     recoverRunsOnStartup: async ({ now = new Date() }: { now?: Date } = {}) => {
       const summary = await recoverRaidRuns({ now });
+      for (const raidRun of repository.listRaidRunsByStatuses([
+        "provisioned",
+        "active",
+        "resolved",
+      ])) {
+        try {
+          if (
+            raidRun.run.status === "resolved" &&
+            raidRun.run.closeScheduledAt &&
+            raidRun.run.closeScheduledAt.getTime() <= now.getTime()
+          ) {
+            await cleanupResolvedRaid(raidRun.run.runId, now);
+            continue;
+          }
+
+          await ensureEncounterPrompt(raidRun.run.runId, now);
+        } catch (error) {
+          logger.error?.("[raids] Failed to recover raid encounter prompt:", error);
+        }
+      }
       logger.log(
         `[raids] Startup recovery finished. resumed=${summary.resumedCount} republished=${summary.republishedCount} expired=${summary.expiredCount} interrupted=${summary.interruptedCount}`,
       );

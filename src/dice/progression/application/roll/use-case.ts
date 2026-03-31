@@ -37,6 +37,7 @@ import { rollDieWithBans } from "../../../progression/domain/bans";
 import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { WorldBossDiceRollPort } from "../../../world-boss/application/ports";
+import type { RaidDiceRollPort } from "../../../raids/application/ports";
 import {
   buildDiceRollReplyContent,
   formatMatchingRollSummary,
@@ -68,7 +69,7 @@ export type DiceRollResult = {
 type RunRollDiceUseCaseInput = {
   userId: string;
   userMention: string;
-  worldBossThreadId?: string | null;
+  channelId?: string | null;
   source?: "manual" | "auto";
   nowMs?: number;
 };
@@ -102,6 +103,7 @@ type RunRollDiceDependencies = {
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
   worldBoss?: Pick<WorldBossDiceRollPort, "applyDiceRoll">;
+  raid?: Pick<RaidDiceRollPort, "applyDiceRoll">;
   contracts?: Pick<ContractsGameplayProgressPort, "recordRoll">;
   unitOfWork: UnitOfWork;
 };
@@ -150,13 +152,14 @@ export const createRunRollDiceUseCase = ({
   progression,
   pvp,
   worldBoss,
+  raid,
   contracts,
   unitOfWork,
 }: RunRollDiceDependencies) => {
   return ({
     userId,
     userMention,
-    worldBossThreadId = null,
+    channelId = null,
     source = "manual",
     nowMs = Date.now(),
   }: RunRollDiceUseCaseInput): DiceRollResult => {
@@ -392,7 +395,7 @@ export const createRunRollDiceUseCase = ({
     const worldBossResult =
       worldBossDamage > 0
         ? (worldBoss?.applyDiceRoll({
-            channelId: worldBossThreadId,
+            channelId,
             userId,
             userMention,
             damage: worldBossDamage,
@@ -400,10 +403,26 @@ export const createRunRollDiceUseCase = ({
             nowMs,
           }) ?? null)
         : null;
-    const content =
+    const raidResult =
+      worldBossDamage > 0 && (!worldBossResult || worldBossResult.kind === "no-world-boss")
+        ? (raid?.applyDiceRoll({
+            channelId,
+            userId,
+            userMention,
+            damage: worldBossDamage,
+            bestRollSet: rollPasses.length > 1 ? bestWorldBossRollSet : null,
+            nowMs,
+          }) ?? null)
+        : null;
+    const encounterSummary =
       worldBossResult && worldBossResult.kind !== "no-world-boss"
-        ? appendWorldBossSummaryWithinLimit(baseContent, worldBossResult.summary)
-        : baseContent;
+        ? worldBossResult.summary
+        : raidResult && raidResult.kind !== "no-raid"
+          ? raidResult.summary
+          : null;
+    const content = encounterSummary
+      ? appendEncounterSummaryWithinLimit(baseContent, encounterSummary)
+      : baseContent;
     const achievementAnnouncements = mergeAchievementAnnouncements(
       [
         createAchievementAnnouncement(userId, result.newlyEarned),
@@ -569,18 +588,18 @@ const getRollSetTotal = (rolls: readonly number[]): number => {
   return rolls.reduce((rollTotal, roll) => rollTotal + roll, 0);
 };
 
-const appendWorldBossSummaryWithinLimit = (
+const appendEncounterSummaryWithinLimit = (
   baseContent: string,
-  worldBossSummary: string,
+  encounterSummary: string,
 ): string => {
   const separator = "\n\n";
-  const combined = `${baseContent}${separator}${worldBossSummary}`;
+  const combined = `${baseContent}${separator}${encounterSummary}`;
   if (combined.length <= discordMessageCharacterLimit) {
     return combined;
   }
 
   const normalizedSummary = truncateWithSuffix(
-    worldBossSummary,
+    encounterSummary,
     discordMessageCharacterLimit,
     "...",
   );

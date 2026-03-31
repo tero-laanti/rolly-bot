@@ -15,7 +15,7 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
       runRollDiceUseCase({
         userId: interaction.user.id,
         userMention: interaction.user.toString(),
-        worldBossThreadId: interaction.channelId,
+        channelId: interaction.channelId,
       }),
     ),
   );

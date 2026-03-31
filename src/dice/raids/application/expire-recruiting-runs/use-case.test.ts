@@ -9,6 +9,7 @@ const cloneRun = (run: RaidRunRecord): RaidRunRecord => ({
   recruitmentExpiresAt: new Date(run.recruitmentExpiresAt.getTime()),
   encounterStartsAt: run.encounterStartsAt ? new Date(run.encounterStartsAt.getTime()) : null,
   encounterExpiresAt: run.encounterExpiresAt ? new Date(run.encounterExpiresAt.getTime()) : null,
+  closeScheduledAt: run.closeScheduledAt ? new Date(run.closeScheduledAt.getTime()) : null,
   createdAt: new Date(run.createdAt.getTime()),
   updatedAt: new Date(run.updatedAt.getTime()),
 });
@@ -38,6 +39,7 @@ const createRepository = (runs: RaidRunAggregate[]): RaidRunRepository => {
       return raidRun ? cloneAggregate(raidRun) : null;
     },
     getOpenRaidRunForUser: () => null,
+    getOpenRaidRunByPrivateChannelId: () => null,
     createRecruitingRaidRun: () => {
       throw new Error("not used");
     },
@@ -103,9 +105,12 @@ const createRaidRun = ({
     publicMessageId,
     privateChannelId: null,
     participantRoleId: null,
+    encounterMessageId: null,
     recruitmentExpiresAt,
     encounterStartsAt: null,
     encounterExpiresAt: null,
+    bossCurrentHp: null,
+    closeScheduledAt: null,
     version: 1,
     createdAt: new Date("2026-03-29T09:00:00.000Z"),
     updatedAt: new Date("2026-03-29T09:00:00.000Z"),

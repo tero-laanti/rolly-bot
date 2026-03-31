@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 7;
+const currentSchemaVersion = 8;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -270,9 +270,12 @@ const currentSchemaColumns = new Map<string, string[]>([
       "public_message_id",
       "private_channel_id",
       "participant_role_id",
+      "encounter_message_id",
       "recruitment_expires_at",
       "encounter_starts_at",
       "encounter_expires_at",
+      "boss_current_hp",
+      "close_scheduled_at",
       "version",
       "created_at",
       "updated_at",
@@ -822,9 +825,12 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       public_message_id TEXT,
       private_channel_id TEXT,
       participant_role_id TEXT,
+      encounter_message_id TEXT,
       recruitment_expires_at TEXT NOT NULL,
       encounter_starts_at TEXT,
       encounter_expires_at TEXT,
+      boss_current_hp INTEGER,
+      close_scheduled_at TEXT,
       version INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -866,6 +872,27 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
     db.exec(`
       ALTER TABLE dice_contract_master_runs
       ADD COLUMN contract_description TEXT NOT NULL DEFAULT '';
+    `);
+  }
+
+  if (!hasColumn(db, "dice_raid_runs", "encounter_message_id")) {
+    db.exec(`
+      ALTER TABLE dice_raid_runs
+      ADD COLUMN encounter_message_id TEXT;
+    `);
+  }
+
+  if (!hasColumn(db, "dice_raid_runs", "boss_current_hp")) {
+    db.exec(`
+      ALTER TABLE dice_raid_runs
+      ADD COLUMN boss_current_hp INTEGER;
+    `);
+  }
+
+  if (!hasColumn(db, "dice_raid_runs", "close_scheduled_at")) {
+    db.exec(`
+      ALTER TABLE dice_raid_runs
+      ADD COLUMN close_scheduled_at TEXT;
     `);
   }
 };

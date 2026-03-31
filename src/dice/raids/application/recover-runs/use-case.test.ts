@@ -31,6 +31,7 @@ const cloneRun = (run: RaidRunRecord): RaidRunRecord => ({
   recruitmentExpiresAt: new Date(run.recruitmentExpiresAt.getTime()),
   encounterStartsAt: run.encounterStartsAt ? new Date(run.encounterStartsAt.getTime()) : null,
   encounterExpiresAt: run.encounterExpiresAt ? new Date(run.encounterExpiresAt.getTime()) : null,
+  closeScheduledAt: run.closeScheduledAt ? new Date(run.closeScheduledAt.getTime()) : null,
   createdAt: new Date(run.createdAt.getTime()),
   updatedAt: new Date(run.updatedAt.getTime()),
 });
@@ -60,6 +61,7 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       return raidRun ? cloneAggregate(raidRun) : null;
     },
     getOpenRaidRunForUser: () => null,
+    getOpenRaidRunByPrivateChannelId: () => null,
     createRecruitingRaidRun: () => {
       throw new Error("not used");
     },
@@ -83,7 +85,15 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       store.set(runId, cloneAggregate(current));
       return { ok: true as const, raidRun: cloneAggregate(current) };
     },
-    closeRaidRun: ({ runId, expectedVersion, status, now }) => {
+    closeRaidRun: ({
+      runId,
+      expectedVersion,
+      status,
+      now,
+      encounterMessageId,
+      bossCurrentHp,
+      closeScheduledAt,
+    }) => {
       const current = store.get(runId);
       if (!current) {
         return { ok: false as const, reason: "not-found" as const };
@@ -93,6 +103,12 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       }
       current.run.status = status;
       current.run.isOpen = false;
+      current.run.encounterMessageId =
+        encounterMessageId !== undefined ? encounterMessageId : current.run.encounterMessageId;
+      current.run.bossCurrentHp =
+        bossCurrentHp !== undefined ? bossCurrentHp : current.run.bossCurrentHp;
+      current.run.closeScheduledAt =
+        closeScheduledAt !== undefined ? closeScheduledAt : current.run.closeScheduledAt;
       current.run.updatedAt = new Date(now.getTime());
       current.members = current.members.map((member) => ({
         ...member,
@@ -108,6 +124,8 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       publicMessageId,
       privateChannelId,
       participantRoleId,
+      encounterMessageId,
+      closeScheduledAt,
       closeOpenRunAsInterrupted,
     }) => {
       const current = store.get(runId);
@@ -123,6 +141,12 @@ const createRecoveryRepository = (runs: RaidRunAggregate[]): RaidRunRepository =
       }
       if (participantRoleId !== undefined) {
         current.run.participantRoleId = participantRoleId;
+      }
+      if (encounterMessageId !== undefined) {
+        current.run.encounterMessageId = encounterMessageId;
+      }
+      if (closeScheduledAt !== undefined) {
+        current.run.closeScheduledAt = closeScheduledAt;
       }
       if (closeOpenRunAsInterrupted && current.run.isOpen) {
         current.run.status = "interrupted";
@@ -154,6 +178,9 @@ const createRaidRun = ({
   publicMessageId,
   privateChannelId = null,
   participantRoleId = null,
+  encounterMessageId = null,
+  bossCurrentHp = null,
+  closeScheduledAt = null,
 }: {
   runId: string;
   status: RaidRunRecord["status"];
@@ -161,6 +188,9 @@ const createRaidRun = ({
   publicMessageId: string | null;
   privateChannelId?: string | null;
   participantRoleId?: string | null;
+  encounterMessageId?: string | null;
+  bossCurrentHp?: number | null;
+  closeScheduledAt?: Date | null;
 }): RaidRunAggregate => ({
   run: {
     runId,
@@ -177,9 +207,12 @@ const createRaidRun = ({
     publicMessageId,
     privateChannelId,
     participantRoleId,
+    encounterMessageId,
     recruitmentExpiresAt,
     encounterStartsAt: null,
     encounterExpiresAt: null,
+    bossCurrentHp,
+    closeScheduledAt,
     version: 1,
     createdAt: new Date("2026-03-29T09:00:00.000Z"),
     updatedAt: new Date("2026-03-29T09:00:00.000Z"),

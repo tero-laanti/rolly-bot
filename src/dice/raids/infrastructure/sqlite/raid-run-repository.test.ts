@@ -42,6 +42,9 @@ test("createRecruitingRaidRun stores the raid run and leader membership", () => 
   assert.equal(result.raidRun.run.leaderUserId, "leader-1");
   assert.equal(result.raidRun.run.status, "recruiting");
   assert.equal(result.raidRun.run.isOpen, true);
+  assert.equal(result.raidRun.run.encounterMessageId, null);
+  assert.equal(result.raidRun.run.bossCurrentHp, null);
+  assert.equal(result.raidRun.run.closeScheduledAt, null);
   assert.equal(result.raidRun.run.version, 1);
   assert.equal(
     result.raidRun.run.recruitmentExpiresAt.getTime(),
@@ -321,8 +324,11 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
     publicMessageId: "message-1",
     privateChannelId: "private-channel-1",
     participantRoleId: "role-1",
+    encounterMessageId: "encounter-message-1",
     encounterStartsAt: updateAt,
     encounterExpiresAt: new Date(updateAt.getTime() + raidEncounterDurationMs),
+    bossCurrentHp: 77,
+    closeScheduledAt: new Date(closeAt.getTime()),
     versionDelta: 1,
   });
   assert.equal(updated.ok, true);
@@ -336,11 +342,14 @@ test("updateRaidRun and closeRaidRun persist lifecycle fields and release active
   assert.equal(updated.raidRun.run.publicMessageId, "message-1");
   assert.equal(updated.raidRun.run.privateChannelId, "private-channel-1");
   assert.equal(updated.raidRun.run.participantRoleId, "role-1");
+  assert.equal(updated.raidRun.run.encounterMessageId, "encounter-message-1");
   assert.equal(updated.raidRun.run.encounterStartsAt?.getTime(), updateAt.getTime());
   assert.equal(
     updated.raidRun.run.encounterExpiresAt?.getTime(),
     updateAt.getTime() + raidEncounterDurationMs,
   );
+  assert.equal(updated.raidRun.run.bossCurrentHp, 77);
+  assert.equal(updated.raidRun.run.closeScheduledAt?.getTime(), closeAt.getTime());
 
   const closed = repository.closeRaidRun({
     runId: "raid-run-1",
@@ -400,6 +409,37 @@ test("updateRaidRunStoredReferences can persist cleanup pointers without an opti
   assert.equal(updated.raidRun.run.isOpen, true);
   assert.equal(updated.raidRun.run.publicMessageId, "message-1");
   assert.ok(updated.raidRun.members.every((member) => member.active === true));
+});
+
+test("getOpenRaidRunByPrivateChannelId returns the active instance for a raid channel", () => {
+  const repository = createTestRepository();
+  const now = new Date("2026-03-29T10:00:00.000Z");
+
+  const created = repository.createRecruitingRaidRun({
+    runId: "raid-run-1",
+    tierId: "bronze",
+    bossId: "bone-dragon",
+    leaderUserId: "leader-1",
+    publicChannelId: "channel-1",
+    recruitmentExpiresAt: new Date(now.getTime() + raidRecruitmentDurationMs),
+    now,
+  });
+  assert.equal(created.ok, true);
+
+  const updated = repository.updateRaidRun({
+    runId: "raid-run-1",
+    expectedVersion: 1,
+    now: new Date("2026-03-29T10:01:00.000Z"),
+    status: "active",
+    privateChannelId: "private-channel-1",
+    bossCurrentHp: 120,
+    versionDelta: 1,
+  });
+  assert.equal(updated.ok, true);
+
+  const found = repository.getOpenRaidRunByPrivateChannelId("private-channel-1");
+  assert.equal(found?.run.runId, "raid-run-1");
+  assert.equal(repository.getOpenRaidRunByPrivateChannelId("missing-channel"), null);
 });
 
 test("updateRaidRunStoredReferences can close an open run as interrupted for cleanup", () => {

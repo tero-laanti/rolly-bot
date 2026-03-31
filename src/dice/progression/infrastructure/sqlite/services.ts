@@ -4,6 +4,7 @@ import { createSqliteAnalyticsRepository } from "../../../analytics/infrastructu
 import { createSqliteContractsGameplayProgressPort } from "../../../contracts/infrastructure/sqlite/services";
 import { createSqliteEconomyRepository } from "../../../economy/infrastructure/sqlite/balance-repository";
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
+import { raidDiceRollPort } from "../../../raids/infrastructure/admin-controller";
 import { worldBossDiceRollPort } from "../../../world-boss/infrastructure/admin-controller";
 import { createSqliteDiceItemEffectsService } from "../../../inventory/infrastructure/sqlite/item-effects-service";
 import { createSqlitePermanentBonusesPort } from "../../../inventory/infrastructure/sqlite/permanent-bonuses-service";
@@ -61,6 +62,7 @@ export const createSqliteRollDiceUseCase = (db: SqliteDatabase) => {
     permanentBonuses,
     progression,
     pvp,
+    raid: raidDiceRollPort,
     worldBoss: worldBossDiceRollPort,
     contracts,
     unitOfWork,
