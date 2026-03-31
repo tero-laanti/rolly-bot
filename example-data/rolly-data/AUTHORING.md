@@ -12,7 +12,7 @@ Use the file-specific guides when authoring or reviewing private `rolly-data`:
 - [intro-posts.v1.md](intro-posts.v1.md): startup-synced channel intro messages managed by the bot.
 - [items.v1.md](items.v1.md): item effect behavior and time-based units.
 - [pvp.md](pvp.md): duel timing and base PvP effect durations.
-- [raids.md](raids.md): ordered raid tiers, static raid bosses, and raids panel copy.
+- [raids.md](raids.md): ordered raid tiers, static raid bosses, raids panel copy, and optional tier role rewards.
 - [world-boss.v1.md](world-boss.v1.md): World Boss rewards, boss naming, and boss-balance tuning.
 - [random-events-balance.md](random-events-balance.md): claim-window scaling and event variety tuning.
 - [random-events.v1.md](random-events.v1.md): scenario structure, weighting, challenges, text variables, and effect stacking.

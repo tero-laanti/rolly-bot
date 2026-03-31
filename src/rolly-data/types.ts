@@ -184,6 +184,10 @@ export type DiceRaidTierData = {
   order: number;
   summary: string;
   bossIds: string[];
+  roleReward?: {
+    roleRewardId: string;
+    unlockAnnouncementText: string;
+  };
 };
 
 export type DiceRaidsCopyData = {

@@ -49,7 +49,7 @@ npm run dev
 If you have a private `rolly-data` checkout, place it in `./rolly-data` or point `ROLLY_DATA_DIR` at it. Otherwise Rolly falls back to the public examples in [example-data/rolly-data/](example-data/rolly-data/). See [docs/development.md](docs/development.md) for more information.
 
 Gameplay content, panel wiring, and validation details live in [docs/development.md](docs/development.md) and [example-data/rolly-data/](example-data/rolly-data/).
-Achievement data can also carry optional Discord role reward metadata, including user-facing unlock copy for newly granted role access.
+Achievement data can also carry optional Discord role reward metadata, and raid tiers can optionally grant Discord roles plus authored unlock copy on first clears.
 
 ## Further Reading
 

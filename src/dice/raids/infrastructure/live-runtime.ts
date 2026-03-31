@@ -11,7 +11,7 @@ import { createSqliteProgressionRepository } from "../../progression/infrastruct
 import type { RecoverRaidRunsSummary } from "../application/recover-runs/use-case";
 import type { ApplyRaidDiceRollInput, ApplyRaidDiceRollResult } from "../application/ports";
 import { buildRaidRecruitmentView } from "../application/manage-lobby/use-case";
-import type { RaidBossDefinition } from "../domain/catalog";
+import type { RaidBossDefinition, RaidTierDefinition } from "../domain/catalog";
 import {
   encodeRaidButtonAction,
   parseRaidButtonAction,
@@ -28,6 +28,7 @@ import { createDiscordRaidStatusPublisher } from "./discord/discord-raid-status-
 import { getActiveRaidRunMembers, type RaidRunAggregate } from "../domain/raid-run";
 import { describeAppliedRaidReward, describeRaidReward } from "../domain/reward";
 import { createSqliteRaidRunRepository } from "./sqlite/raid-run-repository";
+import { grantRaidTierRoleRewards } from "./tier-role-rewards";
 import {
   createSqliteExpireRecruitingRaidRunsUseCase,
   createSqliteManageRaidLobbyUseCase,
@@ -36,6 +37,7 @@ import {
 
 type RaidsLiveRuntimeLogger = {
   log: (...args: unknown[]) => void;
+  warn?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
 };
 
@@ -269,6 +271,7 @@ export const createRaidsLiveRuntime = ({
     raidRun: RaidRunAggregate;
     closeScheduledAt: Date;
     rewardSummary: string | null;
+    tier: RaidTierDefinition | null;
   } | null => {
     try {
       return unitOfWork.runInTransaction(() => {
@@ -279,6 +282,10 @@ export const createRaidsLiveRuntime = ({
 
         const boss = catalogReader.getRaidBoss(raidRun.run.bossId);
         if (!boss) {
+          return null;
+        }
+        const tier = catalogReader.getRaidTier(raidRun.run.tierId);
+        if (!tier) {
           return null;
         }
 
@@ -309,6 +316,7 @@ export const createRaidsLiveRuntime = ({
           raidRun: resolved.raidRun,
           closeScheduledAt,
           rewardSummary: outcome === "success" ? rewardSummary : null,
+          tier: outcome === "success" ? tier : null,
         };
       });
     } catch (error) {
@@ -448,9 +456,23 @@ export const createRaidsLiveRuntime = ({
     settled: {
       raidRun: RaidRunAggregate;
       closeScheduledAt: Date;
+      tier: RaidTierDefinition | null;
     },
     now = new Date(),
   ): Promise<void> => {
+    if (settled.tier) {
+      try {
+        await grantRaidTierRoleRewards({
+          client,
+          raidRun: settled.raidRun,
+          tier: settled.tier,
+          logger,
+        });
+      } catch (error) {
+        logger.error?.("[raids] Failed to grant raid tier role rewards:", error);
+      }
+    }
+
     try {
       await refreshPublicRaidStatus(settled.raidRun.run.runId);
     } catch (error) {

@@ -45,7 +45,7 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 - `achievements.json` can include analytics-based milestones and optional role reward ids in private data. Those ids are safe placeholders in public examples and are useful when a server wants achievements to unlock roles or channels progressively.
 - `achievements.json` can also include optional role reward unlock copy so the achievement announcement flow can tell players when newly granted roles may have opened gated channels or access.
 - `contracts.v2.json` defines the Contract Master panel metadata plus Daily and Weekly difficulty pools. If it is missing from local `./rolly-data`, gameplay contracts hooks are disabled and `/contracts` shows an unavailable message instead of crashing the rest of the bot.
-- `raids.json` defines authored raid tiers, static raid bosses, and shared player-facing copy for the player-started raids flow.
+- `raids.json` defines authored raid tiers, static raid bosses, shared player-facing copy for the player-started raids flow, and optional per-tier Discord role rewards plus achievements-channel unlock text.
 
 ### Intro posts
 

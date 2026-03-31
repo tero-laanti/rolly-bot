@@ -5,10 +5,7 @@ import type { AchievementAnnouncement } from "../../dice/progression/application
 import { mergeAchievementAnnouncements } from "../../dice/progression/application/achievement-announcements";
 import { getDiceAchievement } from "../../dice/progression/domain/achievements";
 import type { AchievementRoleRewardGrant } from "./achievement-role-rewards";
-
-type SendableMessageChannel = {
-  send: (options: { content: string; allowedMentions: MessageMentionOptions }) => Promise<Message>;
-};
+import { publishAchievementsChannelMessages } from "./achievements-channel";
 
 type AchievementAnnouncementsLogger = {
   warn: (...args: unknown[]) => void;
@@ -33,31 +30,6 @@ const formatAchievementAnnouncementEntry = (achievementId: string): string => {
   }
 
   return `${achievement.name} (${achievement.unlockReasonText}${rewardText})`;
-};
-
-const isSendableMessageChannel = (value: unknown): value is SendableMessageChannel => {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const channel = value as {
-    send?: unknown;
-  };
-  return typeof channel.send === "function";
-};
-
-const resolveAchievementsChannel = async (
-  client: Client,
-  channelId: string,
-): Promise<SendableMessageChannel> => {
-  const channel = await client.channels.fetch(channelId);
-  if (!channel || !channel.isTextBased() || !isSendableMessageChannel(channel)) {
-    throw new Error(
-      `ACHIEVEMENTS_CHANNEL_ID must reference a sendable text channel. Received ${channelId}.`,
-    );
-  }
-
-  return channel;
 };
 
 export const formatAchievementAnnouncementContent = (
@@ -96,29 +68,17 @@ export const publishAchievementAnnouncements = async ({
   config?: AchievementsChannelConfig;
   logger?: AchievementAnnouncementsLogger;
 }): Promise<void> => {
-  if (!config.enabled || !config.channelId || announcements.length < 1) {
+  if (announcements.length < 1) {
     return;
   }
 
-  let channel: SendableMessageChannel;
-  try {
-    channel = await resolveAchievementsChannel(client, config.channelId);
-  } catch (error) {
-    logger.warn("[achievements] Failed to resolve achievements channel.", error);
-    return;
-  }
-
-  for (const announcement of mergeAchievementAnnouncements(announcements)) {
-    try {
-      await channel.send({
-        content: formatAchievementAnnouncementContent(announcement, roleRewardGrants ?? []),
-        allowedMentions: {
-          parse: [],
-          users: [announcement.userId],
-        },
-      });
-    } catch (error) {
-      logger.warn("[achievements] Failed to publish achievement announcement.", error);
-    }
-  }
+  await publishAchievementsChannelMessages({
+    client,
+    messages: mergeAchievementAnnouncements(announcements).map((announcement) => ({
+      content: formatAchievementAnnouncementContent(announcement, roleRewardGrants ?? []),
+      mentionedUserIds: [announcement.userId],
+    })),
+    config,
+    logger,
+  });
 };

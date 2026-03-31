@@ -26,6 +26,10 @@ export type RaidTierDefinition = {
   name: string;
   summary: string;
   bosses: readonly RaidBossDefinition[];
+  roleReward?: {
+    roleRewardId: string;
+    unlockAnnouncementText: string;
+  };
 };
 
 export type RaidCatalogCopyDefinition = {

@@ -5,14 +5,33 @@
       "name": "Bronze Raids",
       "order": 1,
       "summary": "Entry raids for small parties learning the flow.",
-      "bossIds": ["bone-drake", "iron-mimic"]
+      "bossIds": ["bone-drake", "iron-mimic"],
+      "roleReward": {
+        "roleRewardId": "example-bronze-raider-role",
+        "unlockAnnouncementText": "Congratulations on clearing your first Bronze raid. You have now unlocked the next raid tier!"
+      }
     },
     {
       "tierId": "silver",
       "name": "Silver Raids",
       "order": 2,
       "summary": "Harder static bosses for parties with stronger rolls.",
-      "bossIds": ["storm-warden"]
+      "bossIds": ["storm-warden"],
+      "roleReward": {
+        "roleRewardId": "example-silver-raider-role",
+        "unlockAnnouncementText": "Congratulations on clearing your first Silver raid. You have now unlocked the next raid tier!"
+      }
+    },
+    {
+      "tierId": "gold",
+      "name": "Gold Raids",
+      "order": 3,
+      "summary": "Endgame siege bosses for fully built parties chasing the top raid clear.",
+      "bossIds": ["sun-eater-king"],
+      "roleReward": {
+        "roleRewardId": "example-gold-raider-role",
+        "unlockAnnouncementText": "Congratulations on clearing your first Gold raid. You have conquered the highest raid tier now available!"
+      }
     }
   ],
   "bosses": [
@@ -86,6 +105,30 @@
         "encounterTitle": "Storm Warden",
         "successSummary": "The Storm Warden shatters under the party's assault.",
         "failureSummary": "The Storm Warden drives the party from the summit."
+      }
+    },
+    {
+      "bossId": "sun-eater-king",
+      "tierId": "gold",
+      "name": "Sun-Eater King",
+      "level": 28,
+      "maxHp": 600,
+      "reward": {
+        "pips": 18,
+        "rollPassBuff": {
+          "multiplierPerBossLevel": 1,
+          "minimumMultiplier": 4,
+          "maximumMultiplier": 18,
+          "rollsPerBossLevelDivisor": 6,
+          "minimumRolls": 2,
+          "maximumRolls": 5
+        }
+      },
+      "copy": {
+        "recruitmentSummary": "A tyrant of molten gold rises above the eclipse gate, devouring the light around the arena.",
+        "encounterTitle": "Sun-Eater King",
+        "successSummary": "The Sun-Eater King breaks apart in a rain of burning gold and the eclipse finally lifts.",
+        "failureSummary": "The Sun-Eater King devours the last light and leaves the arena in ruin."
       }
     }
   ],

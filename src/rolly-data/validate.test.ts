@@ -241,6 +241,11 @@ const createRaidsInput = () => ({
       order: 1,
       summary: "Entry raids for small parties.",
       bossIds: ["bone-drake", "iron-mimic"],
+      roleReward: {
+        roleRewardId: "example-bronze-raider-role",
+        unlockAnnouncementText:
+          "Congratulations on clearing your first Bronze raid. You have now unlocked the next raid tier!",
+      },
     },
     {
       tierId: "silver",
@@ -836,6 +841,11 @@ test("parseRaidsData accepts ordered tiers and static bosses", () => {
   assert.equal(parsed.tiers[1]?.tierId, "silver");
   assert.equal(parsed.bosses[0]?.reward.pips, 6);
   assert.equal(parsed.copy.startRaidButtonLabel, "Start Raid");
+  assert.equal(parsed.tiers[0]?.roleReward?.roleRewardId, "example-bronze-raider-role");
+  assert.match(
+    parsed.tiers[0]?.roleReward?.unlockAnnouncementText ?? "",
+    /clearing your first Bronze raid/i,
+  );
 });
 
 test("parseRaidsData rejects duplicate tier orders", () => {

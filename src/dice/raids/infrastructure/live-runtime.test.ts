@@ -41,6 +41,11 @@ const stubCatalogReader = {
       tierId: "bronze",
       name: "Bronze Raids",
       summary: "Entry raids.",
+      roleReward: {
+        roleRewardId: "example-bronze-raider-role",
+        unlockAnnouncementText:
+          "Congratulations on clearing your first Bronze raid. You have now unlocked the next raid tier!",
+      },
       bosses: [stubBoss],
     },
   ],
@@ -48,6 +53,11 @@ const stubCatalogReader = {
     tierId: "bronze",
     name: "Bronze Raids",
     summary: "Entry raids.",
+    roleReward: {
+      roleRewardId: "example-bronze-raider-role",
+      unlockAnnouncementText:
+        "Congratulations on clearing your first Bronze raid. You have now unlocked the next raid tier!",
+    },
     bosses: [stubBoss],
   }),
   getRaidBoss: (bossId: string) => (bossId === stubBoss.bossId ? stubBoss : null),
@@ -435,7 +445,6 @@ test("successful raid clears grant rewards to all active raiders and update the 
 
   const encounterDescriptions: string[] = [];
   const channelMessages: string[] = [];
-
   try {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
     (

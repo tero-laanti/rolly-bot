@@ -20,7 +20,11 @@ Tier shape:
   "name": "Bronze Raids",
   "order": 1,
   "summary": "Entry raids for small parties learning the flow.",
-  "bossIds": ["bone-drake", "iron-mimic"]
+  "bossIds": ["bone-drake", "iron-mimic"],
+  "roleReward": {
+    "roleRewardId": "example-bronze-raider-role",
+    "unlockAnnouncementText": "Congratulations on clearing your first Bronze raid. You have now unlocked the next raid tier!"
+  }
 }
 ```
 
@@ -28,6 +32,8 @@ Tier shape:
 - `order` must be unique and controls display order.
 - `bossIds` must contain at least one boss id.
 - Every boss id in `bossIds` must exist and belong to the same tier.
+- `roleReward` is optional. When present, successful active raiders who do not already have the role are granted it on a successful clear.
+- `roleReward.unlockAnnouncementText` is posted to the achievements channel for newly granted raid-tier roles.
 
 Boss shape:
 

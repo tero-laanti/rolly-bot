@@ -24,6 +24,6 @@ These example values are safe to expose and do not need to match the private gam
 
 `achievements.json` can include roll-based achievements, analytics milestones, and optional role reward ids for private server setup.
 `contracts.v2.json` defines the Contract Master panel metadata plus Daily and Weekly difficulty pools for contracts gameplay.
-`raids.json` defines ordered raid tiers, static raid bosses, and shared player-facing copy for raids gameplay.
+`raids.json` defines ordered raid tiers, static raid bosses, shared player-facing copy for raids gameplay, and optional per-tier Discord role rewards for first clears.
 
 For the `rolly-data` authoring docs, start at [AUTHORING.md](AUTHORING.md).

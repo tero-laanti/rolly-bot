@@ -45,6 +45,12 @@ export const createRollyDataRaidCatalogReader = (): RaidCatalogReader => {
     tierId: tier.tierId,
     name: tier.name,
     summary: tier.summary,
+    roleReward: tier.roleReward
+      ? {
+          roleRewardId: tier.roleReward.roleRewardId,
+          unlockAnnouncementText: tier.roleReward.unlockAnnouncementText,
+        }
+      : undefined,
     bosses: tier.bossIds.flatMap((bossId) => {
       const boss = bossesById.get(bossId);
       return boss ? [boss] : [];

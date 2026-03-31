@@ -1355,6 +1355,13 @@ const validateRaidsDiscordText = (raids: DiceRaidsData): void => {
       `raids.tiers.${tier.tierId}.summary`,
       discordMessageCharacterLimit,
     );
+    if (tier.roleReward?.unlockAnnouncementText) {
+      assertDiscordTextLength(
+        tier.roleReward.unlockAnnouncementText,
+        `raids.tiers.${tier.tierId}.roleReward.unlockAnnouncementText`,
+        discordMessageCharacterLimit,
+      );
+    }
   }
 
   for (const boss of raids.bosses) {
@@ -1962,6 +1969,10 @@ const readRaidTiers = (value: unknown, label: string): DiceRaidTierData[] => {
 
   return value.map((entry, index) => {
     const record = assertRecord(entry, `${label}[${index}]`);
+    const roleRewardRecord =
+      record.roleReward === undefined
+        ? undefined
+        : assertRecord(record.roleReward, `${label}[${index}].roleReward`);
 
     return {
       tierId: readNonEmptyString(record.tierId, `${label}[${index}].tierId`),
@@ -1969,6 +1980,19 @@ const readRaidTiers = (value: unknown, label: string): DiceRaidTierData[] => {
       order: readInteger(record.order, `${label}[${index}].order`, 1),
       summary: readNonEmptyString(record.summary, `${label}[${index}].summary`),
       bossIds: readStringArray(record.bossIds, `${label}[${index}].bossIds`),
+      roleReward:
+        roleRewardRecord === undefined
+          ? undefined
+          : {
+              roleRewardId: readNonEmptyString(
+                roleRewardRecord.roleRewardId,
+                `${label}[${index}].roleReward.roleRewardId`,
+              ),
+              unlockAnnouncementText: readNonEmptyString(
+                roleRewardRecord.unlockAnnouncementText,
+                `${label}[${index}].roleReward.unlockAnnouncementText`,
+              ),
+            },
     };
   });
 };
