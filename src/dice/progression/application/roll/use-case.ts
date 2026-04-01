@@ -36,7 +36,10 @@ import {
 import { rollDieWithBans } from "../../../progression/domain/bans";
 import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
-import type { WorldBossDiceRollPort } from "../../../world-boss/application/ports";
+import type {
+  WorldBossDiceRollPort,
+  WorldBossDoubleRollRushLookupPort,
+} from "../../../world-boss/application/ports";
 import type { RaidDiceRollPort } from "../../../raids/application/ports";
 import {
   buildDiceRollReplyContent,
@@ -103,6 +106,10 @@ type RunRollDiceDependencies = {
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "getActiveDoubleRoll">;
   worldBoss?: Pick<WorldBossDiceRollPort, "applyDiceRoll">;
+  worldBossDoubleRollRush?: Pick<
+    WorldBossDoubleRollRushLookupPort,
+    "getActiveDoubleRollRushStatus"
+  >;
   raid?: Pick<RaidDiceRollPort, "applyDiceRoll">;
   contracts?: Pick<ContractsGameplayProgressPort, "recordRoll">;
   unitOfWork: UnitOfWork;
@@ -152,6 +159,7 @@ export const createRunRollDiceUseCase = ({
   progression,
   pvp,
   worldBoss,
+  worldBossDoubleRollRush,
   raid,
   contracts,
   unitOfWork,
@@ -196,6 +204,13 @@ export const createRunRollDiceUseCase = ({
     const baseDiceCount = Math.max(1, diceCount);
     const pvpDoubleRollUntil = pvp.getActiveDoubleRoll(userId, nowMs);
     const itemDoubleRollStatus = itemEffects.getItemDoubleRollStatus(userId, nowMs);
+    const doubleRollRushStatus = worldBossDoubleRollRush?.getActiveDoubleRollRushStatus({
+      channelId,
+      nowMs,
+    }) ?? {
+      isActive: false,
+      expiresAtMs: null,
+    };
     const permanentBonusSnapshot = permanentBonuses.getPermanentBonuses(userId);
     const lastDiceRollAt = progression.getLastDiceRollAt();
     const lastPersonalDiceRollAt = progression.getLastPersonalDiceRollAt(userId);
@@ -206,6 +221,7 @@ export const createRunRollDiceUseCase = ({
       personalChargeBonus: permanentBonusSnapshot.personalCharge,
       pvpDoubleRollUntil,
       itemDoubleRollStatus,
+      hasActiveDoubleRollRush: doubleRollRushStatus.isActive,
       temporaryEffects: progression.getActiveDiceTemporaryEffects({
         userId,
         nowMs,
@@ -366,6 +382,11 @@ export const createRunRollDiceUseCase = ({
         `Item double buff remaining: ${formatRemainingTime(itemDoubleRollStatus.expiresAtMs - nowMs)}.`,
       );
     }
+    if (doubleRollRushStatus.expiresAtMs && doubleRollRushStatus.expiresAtMs > nowMs) {
+      doubleRollFooterParts.push(
+        `Double Roll Rush is active in this thread for ${formatRemainingTime(doubleRollRushStatus.expiresAtMs - nowMs)}.`,
+      );
+    }
     if (remainingItemDoubleRollUses > 0) {
       doubleRollFooterParts.push(`Item double rolls remaining: ${remainingItemDoubleRollUses}.`);
     }
@@ -390,27 +411,27 @@ export const createRunRollDiceUseCase = ({
       matchCount: allSameCount,
       rewardText,
     });
-    const bestWorldBossRollSet = getHighestRollSet(rollPasses);
-    const worldBossDamage = getRollSetTotal(bestWorldBossRollSet);
+    const bestEncounterRollSet = getHighestRollSet(rollPasses);
+    const encounterDamage = getRollSetTotal(bestEncounterRollSet);
     const worldBossResult =
-      worldBossDamage > 0
+      encounterDamage > 0
         ? (worldBoss?.applyDiceRoll({
             channelId,
             userId,
             userMention,
-            damage: worldBossDamage,
-            bestRollSet: rollPasses.length > 1 ? bestWorldBossRollSet : null,
+            damage: encounterDamage,
+            bestRollSet: rollPasses.length > 1 ? bestEncounterRollSet : null,
             nowMs,
           }) ?? null)
         : null;
     const raidResult =
-      worldBossDamage > 0 && (!worldBossResult || worldBossResult.kind === "no-world-boss")
+      encounterDamage > 0 && (!worldBossResult || worldBossResult.kind === "no-world-boss")
         ? (raid?.applyDiceRoll({
             channelId,
             userId,
             userMention,
-            damage: worldBossDamage,
-            bestRollSet: rollPasses.length > 1 ? bestWorldBossRollSet : null,
+            damage: encounterDamage,
+            bestRollSet: rollPasses.length > 1 ? bestEncounterRollSet : null,
             nowMs,
           }) ?? null)
         : null;
@@ -504,6 +525,7 @@ const resolveRollPassState = ({
   personalChargeBonus,
   pvpDoubleRollUntil,
   itemDoubleRollStatus,
+  hasActiveDoubleRollRush,
   temporaryEffects,
   nowMs,
 }: {
@@ -513,6 +535,7 @@ const resolveRollPassState = ({
   personalChargeBonus: DicePersonalChargeBonus;
   pvpDoubleRollUntil: number | null;
   itemDoubleRollStatus: DiceItemDoubleRollStatus;
+  hasActiveDoubleRollRush: boolean;
   temporaryEffects: ReturnType<DiceProgressionRepository["getActiveDiceTemporaryEffects"]>;
   nowMs: number;
 }): ReturnType<typeof createDiceRollModifierState> => {
@@ -523,6 +546,7 @@ const resolveRollPassState = ({
     personalChargeBonus,
     pvpDoubleRollUntilMs: pvpDoubleRollUntil,
     itemDoubleRollStatus,
+    hasActiveDoubleRollRush,
     temporaryEffects,
     nowMs,
   });

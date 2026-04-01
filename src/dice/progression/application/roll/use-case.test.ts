@@ -835,6 +835,95 @@ test("raid damage uses the highest roll set total when no World Boss is active",
   }
 });
 
+test("Double Roll Rush reuses the normal double-roll modifier inside the active thread", () => {
+  const originalRandom = Math.random;
+  const randomValues = [0, 0.8];
+  let randomIndex = 0;
+  Math.random = () => {
+    const value = randomValues[randomIndex] ?? 0;
+    randomIndex += 1;
+    return value;
+  };
+
+  try {
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          awardedAmount: 0,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      permanentBonuses: zeroPermanentBonuses,
+      progression: {
+        ...createProgressionStub(),
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 2,
+          diceCountIncreasesTotal: 0,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 1,
+        getDicePrestige: () => 0,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      worldBossDoubleRollRush: {
+        getActiveDoubleRollRushStatus: () => ({
+          isActive: true,
+          expiresAtMs: 1_710_000_900_000,
+        }),
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = useCase({
+      userId: "rush-user",
+      userMention: "<@rush-user>",
+      channelId: "double-roll-rush-thread",
+      nowMs: 1_710_000_000_000,
+    });
+
+    assert.match(result.content, /Roll modifiers: Rush double ×2 → effective ×2\./);
+    assert.match(
+      result.content,
+      /Double Roll Rush is active in this thread for 15 minutes 0 seconds\./,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test("manual rolls increment total /roll call analytics", () => {
   const originalRandom = Math.random;
   let recordedRollCommandCount = -1;

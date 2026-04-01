@@ -21,6 +21,7 @@ export type DiceRollModifierState = {
   effectiveFactor: number;
   hasActivePvpDoubleRoll: boolean;
   hasActiveItemDoubleRoll: boolean;
+  hasActiveDoubleRollRush: boolean;
   globalChargeMultiplier: number;
   personalChargeMultiplier: number;
   combinedChargeMultiplier: number;
@@ -72,6 +73,7 @@ export const createDiceRollModifierState = ({
   personalChargeBonus,
   pvpDoubleRollUntilMs,
   itemDoubleRollStatus,
+  hasActiveDoubleRollRush,
   temporaryEffects,
   nowMs = Date.now(),
 }: {
@@ -81,6 +83,7 @@ export const createDiceRollModifierState = ({
   personalChargeBonus: DicePersonalChargeBonus;
   pvpDoubleRollUntilMs: number | null;
   itemDoubleRollStatus: DiceItemDoubleRollStatus;
+  hasActiveDoubleRollRush: boolean;
   temporaryEffects: DiceTemporaryEffect[];
   nowMs?: number;
 }): DiceRollModifierState => {
@@ -97,7 +100,8 @@ export const createDiceRollModifierState = ({
     pvpDoubleRollUntilMs !== null && pvpDoubleRollUntilMs > nowMs,
   );
   const hasActiveItemDoubleRoll = itemDoubleRollStatus.isActive;
-  const hasActiveDoubleRoll = hasActivePvpDoubleRoll || hasActiveItemDoubleRoll;
+  const hasActiveDoubleRoll =
+    hasActivePvpDoubleRoll || hasActiveItemDoubleRoll || hasActiveDoubleRollRush;
   const doubleBuffRollPassCount = hasActiveDoubleRoll
     ? getDoubleBuffRollPassCount(prestige)
     : baseRollPassCount;
@@ -118,6 +122,7 @@ export const createDiceRollModifierState = ({
     effectiveFactor: rollPassCount / baseRollPassCount,
     hasActivePvpDoubleRoll,
     hasActiveItemDoubleRoll,
+    hasActiveDoubleRollRush,
     globalChargeMultiplier,
     personalChargeMultiplier,
     combinedChargeMultiplier,
@@ -129,19 +134,23 @@ export const createDiceRollModifierState = ({
 export const buildDiceRollModifierFooter = ({
   hasActivePvpDoubleRoll,
   hasActiveItemDoubleRoll,
+  hasActiveDoubleRollRush,
   temporaryEffectsRollSummary,
   didUseChargeRoll,
   effectiveFactor,
 }: DiceRollModifierState): string => {
   const modifierParts: string[] = [];
 
-  if (hasActivePvpDoubleRoll || hasActiveItemDoubleRoll) {
+  if (hasActivePvpDoubleRoll || hasActiveItemDoubleRoll || hasActiveDoubleRollRush) {
     const doubleRollSources: string[] = [];
     if (hasActivePvpDoubleRoll) {
       doubleRollSources.push("PvP");
     }
     if (hasActiveItemDoubleRoll) {
       doubleRollSources.push("item");
+    }
+    if (hasActiveDoubleRollRush) {
+      doubleRollSources.push("Rush");
     }
 
     modifierParts.push(

@@ -18,12 +18,18 @@ import { createSqliteProgressionRepository } from "../../progression/infrastruct
 import type {
   ApplyWorldBossDiceRollInput,
   ApplyWorldBossDiceRollResult,
+  GetWorldBossDoubleRollRushStatusInput,
+  WorldBossDoubleRollRushStatus,
   WorldBossAdminLiveSnapshot,
   WorldBossBossSnapshot,
   WorldBossOutcome,
   WorldBossStatus,
   TriggerWorldBossNowOutcome,
 } from "../application/ports";
+import {
+  worldBossDoubleRollRushDurationMs,
+  worldBossDoubleRollRushThreadNameSuffix,
+} from "../domain/double-roll-rush";
 import { getDiceWorldBossAchievementIds } from "../application/achievement-rules";
 import {
   calculateWorldBossParticipantStrength,
@@ -39,6 +45,7 @@ import {
   buildWorldBossActivePrompt,
   buildWorldBossAnnouncementPrompt,
   buildWorldBossCancelledPrompt,
+  buildWorldBossDoubleRollRushKickoffPrompt,
   buildWorldBossInterruptedPrompt,
   buildWorldBossResolveFailedPrompt,
   buildWorldBossResolvedPrompt,
@@ -56,6 +63,10 @@ import {
   recordWorldBossSuccessResolution,
 } from "./achievement-stats-repository";
 import { buildWorldBossHitSummary } from "./raid-hit-summary";
+import {
+  createSqliteWorldBossDoubleRollRushZoneRepository,
+  type WorldBossDoubleRollRushZoneRecord,
+} from "./sqlite/double-roll-rush-zone-repository";
 
 type CreateWorldBossLiveRuntimeInput = {
   client: Client;
@@ -73,7 +84,15 @@ export type WorldBossLiveRuntime = {
   triggerWorldBossNow: () => Promise<TriggerWorldBossNowOutcome>;
   handleButtonInteraction: (interaction: ButtonInteraction) => Promise<void>;
   applyDiceRoll: (input: ApplyWorldBossDiceRollInput) => ApplyWorldBossDiceRollResult;
+  getActiveDoubleRollRushStatus: (
+    input: GetWorldBossDoubleRollRushStatusInput,
+  ) => WorldBossDoubleRollRushStatus;
   getLiveWorldBossesSnapshot: () => WorldBossAdminLiveSnapshot[];
+  recoverDoubleRollRushesOnStartup: (input?: { now?: Date }) => Promise<{
+    resumedCount: number;
+    expiredCount: number;
+    invalidCount: number;
+  }>;
   hasBlockingWorldBoss: () => boolean;
   stop: () => Promise<void>;
 };
@@ -82,8 +101,17 @@ const worldBossTitle = "World Boss";
 const worldBossProgressRenderThrottleMs = 1_500;
 const maxContributionLines = 5;
 const threadNameCharacterLimit = 100;
+const doubleRollRushInactiveStatus: WorldBossDoubleRollRushStatus = {
+  isActive: false,
+  expiresAtMs: null,
+};
 
 const blockingWorldBossStatuses = new Set<WorldBossStatus>(["joining", "starting", "active"]);
+
+type ActiveDoubleRollRushContext = {
+  zone: WorldBossDoubleRollRushZoneRecord;
+  expiryTimer: ReturnType<typeof setTimeout> | null;
+};
 
 const isBlockingWorldBossStatus = (status: WorldBossStatus): boolean => {
   return blockingWorldBossStatuses.has(status);
@@ -157,10 +185,12 @@ export const createWorldBossLiveRuntime = ({
 }: CreateWorldBossLiveRuntimeInput): WorldBossLiveRuntime => {
   const liveWorldBossesById = new Map<string, ActiveWorldBossContext>();
   const liveWorldBossIdsByThreadId = new Map<string, string>();
+  const activeDoubleRollRushesById = new Map<string, ActiveDoubleRollRushContext>();
   const db = getDatabase();
   const contracts = createSqliteContractsGameplayProgressPort(db);
   const economy = createSqliteEconomyRepository(db);
   const progression = createSqliteProgressionRepository(db);
+  const doubleRollRushZones = createSqliteWorldBossDoubleRollRushZoneRepository(db);
   const unitOfWork = createSqliteUnitOfWork(db);
   let stopping = false;
   let triggerChain: Promise<void> = Promise.resolve();
@@ -184,6 +214,98 @@ export const createWorldBossLiveRuntime = ({
       clearTimeout(context.handles.activeRenderTimer);
       context.handles.activeRenderTimer = null;
     }
+  };
+
+  const clearDoubleRollRushTimer = (context: ActiveDoubleRollRushContext): void => {
+    if (context.expiryTimer) {
+      clearTimeout(context.expiryTimer);
+      context.expiryTimer = null;
+    }
+  };
+
+  const finalizeDoubleRollRush = (context: ActiveDoubleRollRushContext): void => {
+    clearDoubleRollRushTimer(context);
+    activeDoubleRollRushesById.delete(context.zone.rushId);
+  };
+
+  const cleanupDoubleRollRushChannel = async (
+    zone: WorldBossDoubleRollRushZoneRecord,
+  ): Promise<void> => {
+    const channel = await client.channels.fetch(zone.rushChannelId).catch((error) => {
+      logger.warn("[world-boss] Failed to fetch Double Roll Rush channel for cleanup.", error);
+      return null;
+    });
+
+    if (!channel) {
+      return;
+    }
+
+    if ("setArchived" in channel && typeof channel.setArchived === "function") {
+      await channel.setArchived(true).catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to archive Double Roll Rush thread.", error);
+      });
+    }
+
+    if ("setLocked" in channel && typeof channel.setLocked === "function") {
+      await channel.setLocked(true).catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to lock Double Roll Rush thread.", error);
+      });
+    }
+  };
+
+  const closeDoubleRollRush = async ({
+    rushId,
+    closeReason,
+    now = new Date(),
+    cleanupChannel = true,
+  }: {
+    rushId: string;
+    closeReason: string;
+    now?: Date;
+    cleanupChannel?: boolean;
+  }): Promise<void> => {
+    const closedZone = doubleRollRushZones.closeZone({
+      rushId,
+      closeReason,
+      now,
+    });
+    const activeContext = activeDoubleRollRushesById.get(rushId);
+    if (activeContext) {
+      finalizeDoubleRollRush(activeContext);
+    }
+
+    if (!closedZone || !cleanupChannel) {
+      return;
+    }
+
+    await cleanupDoubleRollRushChannel(closedZone);
+  };
+
+  const scheduleDoubleRollRushExpiry = (context: ActiveDoubleRollRushContext): void => {
+    clearDoubleRollRushTimer(context);
+    const delayMs = Math.max(0, context.zone.expiresAt.getTime() - Date.now());
+    context.expiryTimer = setTimeout(() => {
+      void closeDoubleRollRush({
+        rushId: context.zone.rushId,
+        closeReason: "expired",
+      });
+    }, delayMs);
+  };
+
+  const registerDoubleRollRush = (zone: WorldBossDoubleRollRushZoneRecord): void => {
+    const existing = activeDoubleRollRushesById.get(zone.rushId);
+    if (existing) {
+      existing.zone = zone;
+      scheduleDoubleRollRushExpiry(existing);
+      return;
+    }
+
+    const context: ActiveDoubleRollRushContext = {
+      zone,
+      expiryTimer: null,
+    };
+    activeDoubleRollRushesById.set(zone.rushId, context);
+    scheduleDoubleRollRushExpiry(context);
   };
 
   const finalizeWorldBoss = (context: ActiveWorldBossContext): void => {
@@ -269,6 +391,9 @@ export const createWorldBossLiveRuntime = ({
             rewardSummary:
               context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward),
             contributionLines: buildContributionLines(context),
+            doubleRollRushThreadId: context.worldBoss.doubleRollRushThreadId,
+            doubleRollRushEndsAtMs: context.worldBoss.doubleRollRushExpiresAtMs,
+            doubleRollRushFailed: context.worldBoss.doubleRollRushFailed,
           });
         }
 
@@ -328,6 +453,9 @@ export const createWorldBossLiveRuntime = ({
             rewardSummary:
               context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward),
             contributionLines: buildContributionLines(context),
+            doubleRollRushThreadId: context.worldBoss.doubleRollRushThreadId,
+            doubleRollRushEndsAtMs: context.worldBoss.doubleRollRushExpiresAtMs,
+            doubleRollRushFailed: context.worldBoss.doubleRollRushFailed,
           });
         }
 
@@ -505,6 +633,9 @@ export const createWorldBossLiveRuntime = ({
     context.worldBoss.activeThreadId = null;
     context.worldBoss.rewardEligibleUserIds.clear();
     context.worldBoss.resolvedRewardSummary = null;
+    context.worldBoss.doubleRollRushThreadId = null;
+    context.worldBoss.doubleRollRushExpiresAtMs = null;
+    context.worldBoss.doubleRollRushFailed = false;
     context.worldBoss.boss = null;
   };
 
@@ -530,6 +661,9 @@ export const createWorldBossLiveRuntime = ({
     context.worldBoss.activeThreadId = activeThreadId;
     context.worldBoss.rewardEligibleUserIds.clear();
     context.worldBoss.resolvedRewardSummary = null;
+    context.worldBoss.doubleRollRushThreadId = null;
+    context.worldBoss.doubleRollRushExpiresAtMs = null;
+    context.worldBoss.doubleRollRushFailed = false;
     context.worldBoss.boss = boss;
     liveWorldBossIdsByThreadId.set(activeThreadId, context.worldBoss.worldBossId);
   };
@@ -667,9 +801,98 @@ export const createWorldBossLiveRuntime = ({
     });
   };
 
+  const createDoubleRollRushForWorldBoss = async (
+    context: ActiveWorldBossContext,
+  ): Promise<void> => {
+    if (
+      !isCurrentContext(context) ||
+      context.worldBoss.outcome !== "success" ||
+      !context.worldBoss.boss
+    ) {
+      return;
+    }
+
+    const announcementMessage = context.handles.announcementMessage;
+    if (
+      !("startThread" in announcementMessage) ||
+      typeof announcementMessage.startThread !== "function"
+    ) {
+      context.worldBoss.doubleRollRushFailed = true;
+      return;
+    }
+
+    const expiresAt = new Date(
+      (context.worldBoss.closedAtMs ?? Date.now()) + worldBossDoubleRollRushDurationMs,
+    );
+    const rushThread = await announcementMessage
+      .startThread({
+        name: truncateDiscordText(
+          `${context.worldBoss.boss.name} ${worldBossDoubleRollRushThreadNameSuffix}`,
+          threadNameCharacterLimit,
+        ),
+        autoArchiveDuration: 60,
+      })
+      .catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to open Double Roll Rush thread.", error);
+        return null;
+      });
+
+    if (!rushThread) {
+      context.worldBoss.doubleRollRushFailed = true;
+      return;
+    }
+
+    const kickoffMessage = await rushThread
+      .send(
+        buildWorldBossDoubleRollRushKickoffPrompt({
+          endsAtMs: expiresAt.getTime(),
+        }),
+      )
+      .catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to post Double Roll Rush kickoff message.", error);
+        return null;
+      });
+
+    if (!kickoffMessage) {
+      context.worldBoss.doubleRollRushFailed = true;
+      await cleanupDoubleRollRushChannel({
+        rushId: `cleanup:${randomUUID()}`,
+        sourceWorldBossId: context.worldBoss.worldBossId,
+        parentChannelId: announcementMessage.channelId,
+        rushChannelId: rushThread.id,
+        kickoffMessageId: "missing",
+        activatedAt: new Date(),
+        expiresAt,
+        closedAt: new Date(),
+        closeReason: "kickoff-failed",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      return;
+    }
+
+    const zone = doubleRollRushZones.createZone({
+      rushId: `double-roll-rush:${randomUUID()}`,
+      sourceWorldBossId: context.worldBoss.worldBossId,
+      parentChannelId: announcementMessage.channelId,
+      rushChannelId: rushThread.id,
+      kickoffMessageId: kickoffMessage.id,
+      activatedAt: new Date(context.worldBoss.closedAtMs ?? Date.now()),
+      expiresAt,
+    });
+    registerDoubleRollRush(zone);
+    context.worldBoss.doubleRollRushThreadId = zone.rushChannelId;
+    context.worldBoss.doubleRollRushExpiresAtMs = zone.expiresAt.getTime();
+    context.worldBoss.doubleRollRushFailed = false;
+  };
+
   const finalizeResolvedWorldBoss = async (context: ActiveWorldBossContext): Promise<void> => {
     if (!isCurrentContext(context)) {
       return;
+    }
+
+    if (context.worldBoss.outcome === "success") {
+      await createDoubleRollRushForWorldBoss(context);
     }
 
     if (!context.handles.activeMessage) {
@@ -1032,6 +1255,9 @@ export const createWorldBossLiveRuntime = ({
         resolvedRewardSummary: null,
         achievementAnnouncements: [],
         activeThreadId: null,
+        doubleRollRushThreadId: null,
+        doubleRollRushExpiresAtMs: null,
+        doubleRollRushFailed: false,
         boss: null,
       },
       handles: {
@@ -1283,6 +1509,66 @@ export const createWorldBossLiveRuntime = ({
       .sort((left, right) => left.scheduledStartAt.getTime() - right.scheduledStartAt.getTime());
   };
 
+  const getActiveDoubleRollRushStatus = ({
+    channelId,
+    nowMs = Date.now(),
+  }: GetWorldBossDoubleRollRushStatusInput): WorldBossDoubleRollRushStatus => {
+    const zone = doubleRollRushZones.getActiveZoneByChannelId({
+      channelId,
+      now: new Date(nowMs),
+    });
+    if (!zone) {
+      return doubleRollRushInactiveStatus;
+    }
+
+    return {
+      isActive: true,
+      expiresAtMs: zone.expiresAt.getTime(),
+    };
+  };
+
+  const recoverDoubleRollRushesOnStartup = async ({
+    now = new Date(),
+  }: {
+    now?: Date;
+  } = {}): Promise<{
+    resumedCount: number;
+    expiredCount: number;
+    invalidCount: number;
+  }> => {
+    const summary = {
+      resumedCount: 0,
+      expiredCount: 0,
+      invalidCount: 0,
+    };
+
+    const expiredZones = doubleRollRushZones.closeExpiredZones(now);
+    summary.expiredCount = expiredZones.length;
+    await Promise.allSettled(expiredZones.map((zone) => cleanupDoubleRollRushChannel(zone)));
+
+    const openZones = doubleRollRushZones.listOpenZones({
+      now,
+    });
+    for (const zone of openZones) {
+      const channel = await client.channels.fetch(zone.rushChannelId).catch(() => null);
+      if (!channel) {
+        await closeDoubleRollRush({
+          rushId: zone.rushId,
+          closeReason: "missing-channel",
+          now,
+          cleanupChannel: false,
+        });
+        summary.invalidCount += 1;
+        continue;
+      }
+
+      registerDoubleRollRush(zone);
+      summary.resumedCount += 1;
+    }
+
+    return summary;
+  };
+
   const hasBlockingWorldBoss = (): boolean => {
     return Array.from(liveWorldBossesById.values()).some((context) =>
       isBlockingWorldBossStatus(context.worldBoss.status),
@@ -1301,6 +1587,9 @@ export const createWorldBossLiveRuntime = ({
     for (const context of liveWorldBosses) {
       clearWorldBossTimers(context);
     }
+    for (const rushContext of activeDoubleRollRushesById.values()) {
+      clearDoubleRollRushTimer(rushContext);
+    }
 
     await Promise.allSettled(
       liveWorldBosses.map((context) =>
@@ -1315,7 +1604,9 @@ export const createWorldBossLiveRuntime = ({
     triggerWorldBossNow,
     handleButtonInteraction,
     applyDiceRoll,
+    getActiveDoubleRollRushStatus,
     getLiveWorldBossesSnapshot,
+    recoverDoubleRollRushesOnStartup,
     hasBlockingWorldBoss,
     stop,
   };

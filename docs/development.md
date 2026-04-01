@@ -76,6 +76,7 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 
 - Player-facing copy uses `World Boss`, while internal identifiers remain `world-boss` (`WORLD_BOSS_*`, `world-boss.v1.json`, and runtime IDs).
 - `WORLD_BOSS_CHANNEL_ID`: Optional. Channel ID for World Boss announcements and active World Boss posts. The World Boss runtime stays inactive until this is set.
+- Successful World Boss clears also try to open a 15-minute Double Roll Rush thread from the resolved World Boss announcement. The bot needs permission to create public threads in `WORLD_BOSS_CHANNEL_ID`, send the kickoff message in that thread, and archive or lock it after expiry. If cleanup permissions are partial, the stored rush window still closes on time and stops granting gameplay effects.
 - `WORLD_BOSS_JOIN_LEAD_MINUTES`: Optional. Lead time between announcement and World Boss start. Units: minutes. Default: `30`.
 - `WORLD_BOSS_ACTIVE_DURATION_MINUTES`: Optional. Active World Boss duration after the boss arrives. Units: minutes. Default: `12`.
 - `WORLD_BOSS_TARGET_PER_DAY`: Optional. Target number of randomly scheduled World Boss fights per day. Set `0` to disable random scheduling while keeping owner-triggered World Boss runs available. Default: `0`.
@@ -107,6 +108,7 @@ Raid tier panels are not part of the slash-command registry. `raids.json`, `RAID
 - Gameplay data loads in this order: `ROLLY_DATA_DIR`, `./rolly-data`, then [example-data/rolly-data/](../example-data/rolly-data/).
 - The expected data files are `achievements.json`, `casino.v1.json`, `contracts.v2.json`, `dice-balance.json`, `intro-posts.v1.json`, `items.v1.json`, `pvp.json`, `raids.json`, `world-boss.v1.json`, `random-events-balance.json`, and `random-events.v1.json`.
 - World Boss balance is defined in `world-boss.v1.json` using a weighted random boss-level roll, per-level HP scaling, and a configurable prestige multiplier for joined-player strength locked at fight start. The public contract lives in [example-data/rolly-data/world-boss.v1.md](../example-data/rolly-data/world-boss.v1.md).
+- A successful World Boss clear grants the normal clear reward and opens a temporary Double Roll Rush thread in the same channel. `/roll` only gets the rush double-roll buff inside that thread, and the rush uses the existing normal double-roll semantics rather than stacking past `×2`.
 - Contracts are defined in `contracts.v2.json`. The authored contract includes Contract Master panel copy, cadence-specific difficulty pools, initial offers, refill offers, and Pip-only reward ladders. The public contract lives in [example-data/rolly-data/contracts.v2.md](../example-data/rolly-data/contracts.v2.md).
 - Raids are defined in `raids.json`. The authored contract includes ordered tiers, static bosses, raid rewards, and shared panel or recruitment copy. The public contract lives in [example-data/rolly-data/raids.md](../example-data/rolly-data/raids.md).
 - Public contract docs live in [example-data/rolly-data/README.md](../example-data/rolly-data/README.md) and [example-data/rolly-data/AUTHORING.md](../example-data/rolly-data/AUTHORING.md).
@@ -135,6 +137,17 @@ Use this checklist when shipping or validating player-started raid changes:
 
 Manual Discord validation is the expected bar for raid behavior changes because the shipped flow depends on Discord channels, buttons, roles, and restart recovery.
 Run `npm run deploy:commands` only when slash command names, descriptions, or options change. Raid panel-only changes do not require command redeployment.
+
+## World Boss Validation
+
+Use this checklist when shipping or validating World Boss lifecycle changes:
+
+1. Set `WORLD_BOSS_CHANNEL_ID` and confirm the bot can send messages plus create public threads in that channel.
+2. Trigger a World Boss, join it, clear it, and confirm the resolved prompt links to a new Double Roll Rush thread.
+3. Open the rush thread and confirm its kickoff message explains that `/roll` only gets the normal double-roll buff in that thread and shows when the rush ends.
+4. Use `/roll` inside and outside the rush thread to confirm the buff only applies inside the rush space.
+5. Restart the bot while the rush is still active and confirm the thread still grants the buff until expiry.
+6. Let the rush expire and confirm the stored reward window stops applying even if Discord thread cleanup is partial or missing permissions.
 
 ## Day-to-Day Commands
 

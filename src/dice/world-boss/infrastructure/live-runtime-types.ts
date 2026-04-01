@@ -36,6 +36,9 @@ export type ActiveWorldBossRecord = {
   resolvedRewardSummary: string | null;
   achievementAnnouncements: AchievementAnnouncement[];
   activeThreadId: string | null;
+  doubleRollRushThreadId: string | null;
+  doubleRollRushExpiresAtMs: number | null;
+  doubleRollRushFailed: boolean;
   boss: ActiveWorldBossBossRecord | null;
 };
 

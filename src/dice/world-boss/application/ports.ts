@@ -114,3 +114,19 @@ export type ApplyWorldBossDiceRollResult =
 export type WorldBossDiceRollPort = {
   applyDiceRoll: (input: ApplyWorldBossDiceRollInput) => ApplyWorldBossDiceRollResult;
 };
+
+export type GetWorldBossDoubleRollRushStatusInput = {
+  channelId: string | null;
+  nowMs?: number;
+};
+
+export type WorldBossDoubleRollRushStatus = {
+  isActive: boolean;
+  expiresAtMs: number | null;
+};
+
+export type WorldBossDoubleRollRushLookupPort = {
+  getActiveDoubleRollRushStatus: (
+    input: GetWorldBossDoubleRollRushStatusInput,
+  ) => WorldBossDoubleRollRushStatus;
+};

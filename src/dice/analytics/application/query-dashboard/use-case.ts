@@ -72,6 +72,7 @@ export const createQueryDiceStatsUseCase = ({
       personalChargeBonus: permanentBonusSnapshot.personalCharge,
       pvpDoubleRollUntilMs: pvpDoubleRollUntil,
       itemDoubleRollStatus,
+      hasActiveDoubleRollRush: false,
       temporaryEffects: progression.getActiveDiceTemporaryEffects({
         userId,
         nowMs,

@@ -1,6 +1,7 @@
 import type { WorldBossConfig } from "../../../shared/config";
 import type {
   WorldBossAdminStatus,
+  WorldBossDoubleRollRushLookupPort,
   WorldBossDiceRollPort,
   WorldBossAdminPort,
   TriggerWorldBossNowResult,
@@ -109,6 +110,19 @@ const applyDiceRoll = (input: Parameters<WorldBossLiveRuntime["applyDiceRoll"]>[
   return registeredController.runtime.applyDiceRoll(input);
 };
 
+const getActiveDoubleRollRushStatus = (
+  input: Parameters<WorldBossLiveRuntime["getActiveDoubleRollRushStatus"]>[0],
+) => {
+  if (!registeredController?.runtime) {
+    return {
+      isActive: false,
+      expiresAtMs: null,
+    } as const;
+  }
+
+  return registeredController.runtime.getActiveDoubleRollRushStatus(input);
+};
+
 export const worldBossAdminPort: WorldBossAdminPort = {
   getAdminStatus: getWorldBossAdminStatus,
   triggerWorldBossNow,
@@ -116,4 +130,8 @@ export const worldBossAdminPort: WorldBossAdminPort = {
 
 export const worldBossDiceRollPort: WorldBossDiceRollPort = {
   applyDiceRoll,
+};
+
+export const worldBossDoubleRollRushLookupPort: WorldBossDoubleRollRushLookupPort = {
+  getActiveDoubleRollRushStatus,
 };

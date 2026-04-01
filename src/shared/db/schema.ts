@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 9;
+const currentSchemaVersion = 10;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -286,6 +286,22 @@ const currentSchemaColumns = new Map<string, string[]>([
   [
     "dice_raid_run_members",
     ["run_id", "user_id", "is_leader", "active", "joined_at", "updated_at"],
+  ],
+  [
+    "dice_world_boss_double_roll_rush_zones",
+    [
+      "rush_id",
+      "source_world_boss_id",
+      "parent_channel_id",
+      "rush_channel_id",
+      "kickoff_message_id",
+      "activated_at",
+      "expires_at",
+      "closed_at",
+      "close_reason",
+      "created_at",
+      "updated_at",
+    ],
   ],
 ]);
 
@@ -863,6 +879,29 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_raid_run_members_active_user_id
       ON dice_raid_run_members (user_id)
       WHERE active = 1;
+
+    CREATE TABLE IF NOT EXISTS dice_world_boss_double_roll_rush_zones (
+      rush_id TEXT PRIMARY KEY,
+      source_world_boss_id TEXT NOT NULL,
+      parent_channel_id TEXT NOT NULL,
+      rush_channel_id TEXT NOT NULL,
+      kickoff_message_id TEXT NOT NULL,
+      activated_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      closed_at TEXT,
+      close_reason TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_source_world_boss_id
+      ON dice_world_boss_double_roll_rush_zones (source_world_boss_id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_channel_id
+      ON dice_world_boss_double_roll_rush_zones (rush_channel_id);
+
+    CREATE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_open_expires_at
+      ON dice_world_boss_double_roll_rush_zones (closed_at, expires_at, activated_at);
   `);
 
   if (!hasColumn(db, "dice_contract_master_runs", "contract_title")) {
@@ -913,6 +952,42 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       ADD COLUMN reward_summary TEXT;
     `);
   }
+
+  if (!hasTable(db, "dice_world_boss_double_roll_rush_zones")) {
+    db.exec(`
+      CREATE TABLE dice_world_boss_double_roll_rush_zones (
+        rush_id TEXT PRIMARY KEY,
+        source_world_boss_id TEXT NOT NULL,
+        parent_channel_id TEXT NOT NULL,
+        rush_channel_id TEXT NOT NULL,
+        kickoff_message_id TEXT NOT NULL,
+        activated_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        closed_at TEXT,
+        close_reason TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+  }
+
+  if (!hasColumn(db, "dice_world_boss_double_roll_rush_zones", "close_reason")) {
+    db.exec(`
+      ALTER TABLE dice_world_boss_double_roll_rush_zones
+      ADD COLUMN close_reason TEXT;
+    `);
+  }
+
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_source_world_boss_id
+      ON dice_world_boss_double_roll_rush_zones (source_world_boss_id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_channel_id
+      ON dice_world_boss_double_roll_rush_zones (rush_channel_id);
+
+    CREATE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_open_expires_at
+      ON dice_world_boss_double_roll_rush_zones (closed_at, expires_at, activated_at);
+  `);
 };
 
 const resetLegacyContractsStateForContractMaster = (

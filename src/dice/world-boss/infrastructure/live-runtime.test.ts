@@ -1105,3 +1105,239 @@ test("resolved World Boss fights publish achievement announcements even if the a
     }
   });
 });
+
+test("successful World Boss clears create a restart-safe Double Roll Rush thread", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let recoveredRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let expiryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const rushKickoffPayloads: unknown[] = [];
+      const rushArchivedCalls: boolean[] = [];
+      const announcementEdits: unknown[] = [];
+      const activeEdits: unknown[] = [];
+
+      const rushThread = {
+        id: "double-roll-rush-thread-1",
+        send: async (payload: unknown) => {
+          rushKickoffPayloads.push(payload);
+          return {
+            id: "double-roll-rush-kickoff-1",
+          };
+        },
+        setArchived: async (value: boolean) => {
+          rushArchivedCalls.push(value);
+          return rushThread;
+        },
+        setLocked: async () => rushThread,
+      };
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => {
+          activeEdits.push(payload);
+          return payload;
+        },
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+        }),
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => {
+          announcementEdits.push(payload);
+          return payload;
+        },
+        startThread: async () => rushThread,
+      };
+      const worldBossChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return worldBossChannel;
+            }
+
+            if (channelId === "double-roll-rush-thread-1") {
+              return rushThread;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      const runtimeConfig = {
+        enabled: true,
+        inactiveReason: null,
+        channelId: "world-boss-channel",
+        joinLeadMs: 10,
+        activeDurationMs: 60_000,
+        targetWorldBossesPerDay: 0,
+        minGapMs: 1,
+        retryDelayMs: 1,
+        jitterRatio: 0,
+        quietHours: {
+          start: "00:00",
+          end: "00:00",
+          timezone: "UTC",
+        },
+      };
+
+      runtime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const result = runtime.applyDiceRoll({
+        channelId: "world-boss-thread-1",
+        userId: "user-1",
+        userMention: "<@user-1>",
+        damage: 1_000_000,
+      });
+      assert.equal(result.kind, "applied");
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const activeStatus = runtime.getActiveDoubleRollRushStatus({
+        channelId: "double-roll-rush-thread-1",
+      });
+      assert.deepEqual(activeStatus, {
+        isActive: true,
+        expiresAtMs: activeStatus.expiresAtMs,
+      });
+      assert.equal(rushKickoffPayloads.length, 1);
+      assert.match(JSON.stringify(rushKickoffPayloads[0]), /Double Roll Rush/);
+      assert.match(JSON.stringify(announcementEdits), /Double Roll Rush is live/);
+      assert.match(JSON.stringify(activeEdits), /Double Roll Rush is live/);
+
+      await runtime.stop();
+      runtime = null;
+
+      recoveredRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const recoverySummary = await recoveredRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date((activeStatus.expiresAtMs ?? Date.now()) - 60_000),
+      });
+      assert.deepEqual(recoverySummary, {
+        resumedCount: 1,
+        expiredCount: 0,
+        invalidCount: 0,
+      });
+      assert.deepEqual(
+        recoveredRuntime.getActiveDoubleRollRushStatus({
+          channelId: "double-roll-rush-thread-1",
+          nowMs: (activeStatus.expiresAtMs ?? Date.now()) - 60_000,
+        }),
+        {
+          isActive: true,
+          expiresAtMs: activeStatus.expiresAtMs,
+        },
+      );
+
+      await recoveredRuntime.stop();
+      recoveredRuntime = null;
+
+      expiryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const expirySummary = await expiryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date((activeStatus.expiresAtMs ?? Date.now()) + 60_000),
+      });
+      assert.deepEqual(expirySummary, {
+        resumedCount: 0,
+        expiredCount: 1,
+        invalidCount: 0,
+      });
+      assert.deepEqual(
+        expiryRuntime.getActiveDoubleRollRushStatus({
+          channelId: "double-roll-rush-thread-1",
+          nowMs: (activeStatus.expiresAtMs ?? Date.now()) + 60_000,
+        }),
+        {
+          isActive: false,
+          expiresAtMs: null,
+        },
+      );
+      assert.deepEqual(rushArchivedCalls, [true]);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+      if (recoveredRuntime) {
+        await recoveredRuntime.stop();
+      }
+      if (expiryRuntime) {
+        await expiryRuntime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});

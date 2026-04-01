@@ -9,6 +9,7 @@ test("roll modifier footer labels item-only double rolls correctly", () => {
     effectiveFactor: 2,
     hasActivePvpDoubleRoll: false,
     hasActiveItemDoubleRoll: true,
+    hasActiveDoubleRollRush: false,
     globalChargeMultiplier: 1,
     personalChargeMultiplier: 1,
     combinedChargeMultiplier: 1,
@@ -37,6 +38,7 @@ test("roll modifier footer labels combined PvP and item double rolls correctly",
     effectiveFactor: 2,
     hasActivePvpDoubleRoll: true,
     hasActiveItemDoubleRoll: true,
+    hasActiveDoubleRollRush: false,
     globalChargeMultiplier: 1,
     personalChargeMultiplier: 1,
     combinedChargeMultiplier: 1,
@@ -65,6 +67,7 @@ test("roll modifier footer switches to 'other active' wording during charged rol
     effectiveFactor: 3,
     hasActivePvpDoubleRoll: false,
     hasActiveItemDoubleRoll: false,
+    hasActiveDoubleRollRush: false,
     globalChargeMultiplier: 2,
     personalChargeMultiplier: 1,
     combinedChargeMultiplier: 2,
@@ -84,4 +87,33 @@ test("roll modifier footer switches to 'other active' wording during charged rol
   });
 
   assert.equal(footer, "Other active roll modifiers: temporary buffs ×4 · temporary penalty ÷2.");
+});
+
+test("roll modifier footer includes Double Roll Rush as a double-roll source", () => {
+  const footer = buildDiceRollModifierFooter({
+    rollPassCount: 2,
+    didUseChargeRoll: false,
+    effectiveFactor: 2,
+    hasActivePvpDoubleRoll: false,
+    hasActiveItemDoubleRoll: false,
+    hasActiveDoubleRollRush: true,
+    globalChargeMultiplier: 1,
+    personalChargeMultiplier: 1,
+    combinedChargeMultiplier: 1,
+    itemDoubleRollStatus: {
+      isActive: false,
+      remainingUses: 0,
+      expiresAtMs: null,
+    },
+    temporaryEffectsRollSummary: {
+      multiplier: 1,
+      divisor: 1,
+      effectiveFactor: 1,
+      hasApplicableEffects: false,
+      hasPositiveRollEffects: false,
+      hasNegativeRollEffects: false,
+    },
+  });
+
+  assert.equal(footer, "Roll modifiers: Rush double ×2 → effective ×2.");
 });

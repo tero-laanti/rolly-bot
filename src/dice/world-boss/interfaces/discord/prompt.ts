@@ -304,6 +304,9 @@ export const buildWorldBossResolvedPrompt = ({
   maxHp,
   rewardSummary,
   contributionLines,
+  doubleRollRushThreadId = null,
+  doubleRollRushEndsAtMs = null,
+  doubleRollRushFailed = false,
 }: {
   participantIds: readonly string[];
   eligibleParticipantCount: number;
@@ -314,12 +317,21 @@ export const buildWorldBossResolvedPrompt = ({
   maxHp: number;
   rewardSummary: string;
   contributionLines: readonly string[];
+  doubleRollRushThreadId?: string | null;
+  doubleRollRushEndsAtMs?: number | null;
+  doubleRollRushFailed?: boolean;
 }): BaseMessageOptions => {
   const presentation = getOutcomePresentation(outcome);
   const rewardLine =
     outcome === "success"
       ? `Reward applied to ${eligibleParticipantCount} eligible player${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
       : "";
+  const doubleRollRushLine =
+    outcome === "success" && doubleRollRushThreadId && doubleRollRushEndsAtMs
+      ? `Double Roll Rush is live in <#${doubleRollRushThreadId}> until ${formatDiscordRelativeTime(doubleRollRushEndsAtMs)}. Use /roll there for the normal double-roll buff.`
+      : outcome === "success" && doubleRollRushFailed
+        ? "Double Roll Rush could not be opened automatically. The clear reward still applied."
+        : "";
   const title = `${presentation.title} - ${bossName} Lv.${bossLevel}`;
   assertDiscordTextLength(
     title,
@@ -336,11 +348,39 @@ export const buildWorldBossResolvedPrompt = ({
           `${presentation.summaryLine} The World Boss ended ${formatDiscordRelativeTime(resolvedAtMs)}.`,
           `Boss HP pool: **${maxHp}**.`,
           rewardLine,
+          doubleRollRushLine,
         ].filter((line) => line.length > 0),
         participantIds,
         contributionLines,
       }),
     );
+
+  return {
+    embeds: [embed],
+    components: [],
+  };
+};
+
+export const buildWorldBossDoubleRollRushKickoffPrompt = ({
+  endsAtMs,
+}: {
+  endsAtMs: number;
+}): BaseMessageOptions => {
+  const embed = new EmbedBuilder()
+    .setColor(successColor)
+    .setTitle("Double Roll Rush")
+    .setDescription(
+      truncateDiscordText(
+        [
+          `Use /roll in this thread until ${formatDiscordRelativeTime(endsAtMs)}.`,
+          "This thread grants the normal double-roll buff and only this thread grants it.",
+          "Other double-roll sources still cap at the normal ×2 boost.",
+        ].join("\n"),
+        discordEmbedDescriptionCharacterLimit,
+        "\n... (truncated)",
+      ),
+    )
+    .setFooter({ text: "When the rush expires, rolls here go back to normal." });
 
   return {
     embeds: [embed],

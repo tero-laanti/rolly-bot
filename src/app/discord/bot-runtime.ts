@@ -167,7 +167,7 @@ const startRandomEventsFoundation = (): void => {
   console.log("[random-events] Foundation scheduler started.");
 };
 
-const startWorldBossFoundation = (): void => {
+const startWorldBossFoundation = async (): Promise<void> => {
   if (!worldBossConfig.enabled) {
     registerWorldBossAdminController({
       config: worldBossConfig,
@@ -191,6 +191,8 @@ const startWorldBossFoundation = (): void => {
     config: worldBossConfig,
     logger: console,
   });
+  const doubleRollRushRecoverySummary =
+    await worldBossLiveRuntime.recoverDoubleRollRushesOnStartup();
 
   const worldBossScheduler = startWorldBossFoundationScheduler({
     config: worldBossConfig,
@@ -213,6 +215,9 @@ const startWorldBossFoundation = (): void => {
     worldBossConfig.targetWorldBossesPerDay > 0
       ? "[world-boss] Lifecycle runtime and scheduler started."
       : "[world-boss] Lifecycle runtime started. Random scheduling is off.",
+  );
+  console.log(
+    `[world-boss] Double Roll Rush recovery finished. resumed=${doubleRollRushRecoverySummary.resumedCount} expired=${doubleRollRushRecoverySummary.expiredCount} invalid=${doubleRollRushRecoverySummary.invalidCount}`,
   );
 };
 
@@ -345,7 +350,9 @@ client.once(Events.ClientReady, (readyClient) => {
     console.error("[raids] Startup runtime failed:", error);
   });
   startRandomEventsFoundation();
-  startWorldBossFoundation();
+  void startWorldBossFoundation().catch((error) => {
+    console.error("[world-boss] Startup runtime failed:", error);
+  });
   startDicePvpChallengeExpiration();
 });
 
