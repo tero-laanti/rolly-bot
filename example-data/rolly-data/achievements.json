@@ -23,14 +23,14 @@
   {
     "id": "example-beginner-roller",
     "name": "Example Beginner Roller",
-    "description": "Example achievement: make 5 manual /roll calls.",
+    "description": "Example achievement: make 10 manual /roll calls.",
     "category": "progression",
     "roleRewardId": "example-beginner-role",
     "roleRewardUnlockText": "TODO: This role will unlock channels in the future.",
     "rule": {
       "type": "analytics-at-least",
       "metric": "total-roll-commands-called",
-      "count": 5
+      "count": 10
     }
   },
   {

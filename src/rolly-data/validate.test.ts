@@ -373,7 +373,7 @@ test("parseDiceAchievements accepts analytics milestones and role rewards", () =
       rule: {
         type: "analytics-at-least",
         metric: "total-roll-commands-called",
-        count: 5,
+        count: 10,
       },
       roleRewardId: "example-beginner-role",
       roleRewardUnlockText: "TODO: This role will unlock channels in the future.",
@@ -383,7 +383,7 @@ test("parseDiceAchievements accepts analytics milestones and role rewards", () =
   assert.deepEqual(parsed[0]?.rule, {
     type: "analytics-at-least",
     metric: "total-roll-commands-called",
-    count: 5,
+    count: 10,
   });
   assert.equal(parsed[0]?.roleRewardId, "example-beginner-role");
   assert.equal(
