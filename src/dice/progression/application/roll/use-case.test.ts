@@ -1153,6 +1153,97 @@ test("roll suppresses charge before Beginner Roller is unlocked", () => {
   }
 });
 
+test("global charge rolls do not reset personal charge progress", () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  let personalChargeResetCount = 0;
+
+  try {
+    const nowMs = 1_710_000_000_000;
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          awardedAmount: 0,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      permanentBonuses: {
+        getPermanentBonuses: () => ({
+          extraBanSlots: 0,
+          pipRewardBonusPercent: 0,
+          personalCharge: {
+            unlocked: true,
+            minutesPerMultiplier: 10,
+            speedMultiplier: 1,
+            maxMultiplier: 5,
+          },
+        }),
+      },
+      progression: {
+        ...createProgressionStub(),
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 5,
+          highestRollPassCount: 5,
+          diceCountIncreasesTotal: 0,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 1,
+        getDicePrestige: () => 0,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => nowMs - (getDiceChargeStartMs() + 2 * minuteMs),
+        getLastPersonalDiceRollAt: () => nowMs - 30 * minuteMs,
+        getUserDiceAchievements: () => ["manual-rolls-5"],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+        setLastPersonalDiceRollAt: () => {
+          personalChargeResetCount += 1;
+        },
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = useCase({
+      userId: "user-global-charge",
+      userMention: "<@user-global-charge>",
+      nowMs,
+    });
+
+    assert.match(result.content, /^5x Dice charge!/m);
+    assert.equal(personalChargeResetCount, 0);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test("auto rolls do not increment total /roll call analytics", () => {
   const originalRandom = Math.random;
   let recordedRollCommandCount = -1;

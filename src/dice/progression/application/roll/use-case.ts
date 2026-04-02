@@ -338,7 +338,9 @@ export const createRunRollDiceUseCase = ({
         itemEffects.consumeOneDoubleRollUse(userId, nowMs);
       }
       progression.setLastDiceRollAt(nowMs);
-      progression.setLastPersonalDiceRollAt(userId, nowMs);
+      if (!didUseChargeRoll || resolvedRollPassState.globalChargeMultiplier === 1) {
+        progression.setLastPersonalDiceRollAt(userId, nowMs);
+      }
 
       return {
         newlyEarned,
