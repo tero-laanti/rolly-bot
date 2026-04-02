@@ -117,6 +117,7 @@ type RunRollDiceDependencies = {
 
 const spamWindowMs = 2_000;
 const diceSpamTracker = new Map<string, number>();
+const beginnerRollerAchievementId = "manual-rolls-5";
 
 const formatDailyFirstRollBanner = (pipReward: number): string => {
   const pipLabel = pipReward === 1 ? "Pip" : "Pips";
@@ -214,11 +215,13 @@ export const createRunRollDiceUseCase = ({
     const permanentBonusSnapshot = permanentBonuses.getPermanentBonuses(userId);
     const lastDiceRollAt = progression.getLastDiceRollAt();
     const lastPersonalDiceRollAt = progression.getLastPersonalDiceRollAt(userId);
+    const previouslyEarnedAchievementIds = new Set(progression.getUserDiceAchievements(userId));
     const resolvedRollPassState = resolveRollPassState({
       prestige: highestPrestige,
       lastDiceRollAt,
       lastPersonalDiceRollAt,
       personalChargeBonus: permanentBonusSnapshot.personalCharge,
+      chargeRollsEnabled: previouslyEarnedAchievementIds.has(beginnerRollerAchievementId),
       pvpDoubleRollUntil,
       itemDoubleRollStatus,
       hasActiveDoubleRollRush: doubleRollRushStatus.isActive,
@@ -248,7 +251,6 @@ export const createRunRollDiceUseCase = ({
     const rollPassAchievementIds = rollPasses.map((rolls) =>
       getDiceAchievementsForRoll(rolls, nowMs),
     );
-    const previouslyEarnedAchievementIds = new Set(progression.getUserDiceAchievements(userId));
     const allSameCount = rollPasses.filter((rolls) =>
       rolls.every((roll) => roll === rolls[0]),
     ).length;
@@ -523,6 +525,7 @@ const resolveRollPassState = ({
   lastDiceRollAt,
   lastPersonalDiceRollAt,
   personalChargeBonus,
+  chargeRollsEnabled,
   pvpDoubleRollUntil,
   itemDoubleRollStatus,
   hasActiveDoubleRollRush,
@@ -533,6 +536,7 @@ const resolveRollPassState = ({
   lastDiceRollAt: number | null;
   lastPersonalDiceRollAt: number | null;
   personalChargeBonus: DicePersonalChargeBonus;
+  chargeRollsEnabled: boolean;
   pvpDoubleRollUntil: number | null;
   itemDoubleRollStatus: DiceItemDoubleRollStatus;
   hasActiveDoubleRollRush: boolean;
@@ -544,6 +548,7 @@ const resolveRollPassState = ({
     lastGlobalRollAtMs: lastDiceRollAt,
     lastPersonalRollAtMs: lastPersonalDiceRollAt,
     personalChargeBonus,
+    chargeRollsEnabled,
     pvpDoubleRollUntilMs: pvpDoubleRollUntil,
     itemDoubleRollStatus,
     hasActiveDoubleRollRush,

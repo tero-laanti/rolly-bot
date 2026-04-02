@@ -71,6 +71,7 @@ export const createDiceRollModifierState = ({
   lastGlobalRollAtMs,
   lastPersonalRollAtMs,
   personalChargeBonus,
+  chargeRollsEnabled = true,
   pvpDoubleRollUntilMs,
   itemDoubleRollStatus,
   hasActiveDoubleRollRush,
@@ -81,6 +82,7 @@ export const createDiceRollModifierState = ({
   lastGlobalRollAtMs: number | null;
   lastPersonalRollAtMs: number | null;
   personalChargeBonus: DicePersonalChargeBonus;
+  chargeRollsEnabled?: boolean;
   pvpDoubleRollUntilMs: number | null;
   itemDoubleRollStatus: DiceItemDoubleRollStatus;
   hasActiveDoubleRollRush: boolean;
@@ -88,10 +90,13 @@ export const createDiceRollModifierState = ({
   nowMs?: number;
 }): DiceRollModifierState => {
   const baseRollPassCount = getBaseRollPassCount(prestige);
-  const globalChargeMultiplier = getDiceChargeMultiplier(lastGlobalRollAtMs, nowMs);
-  const personalChargeMultiplier = personalChargeBonus.unlocked
-    ? getPersonalDiceChargeMultiplier(lastPersonalRollAtMs, personalChargeBonus, nowMs)
+  const globalChargeMultiplier = chargeRollsEnabled
+    ? getDiceChargeMultiplier(lastGlobalRollAtMs, nowMs)
     : 1;
+  const personalChargeMultiplier =
+    chargeRollsEnabled && personalChargeBonus.unlocked
+      ? getPersonalDiceChargeMultiplier(lastPersonalRollAtMs, personalChargeBonus, nowMs)
+      : 1;
   const combinedChargeMultiplier = combineDiceChargeMultipliers(
     globalChargeMultiplier,
     personalChargeMultiplier,

@@ -1049,7 +1049,7 @@ test("roll uses the injected nowMs for charge and modifier labels", () => {
         getDiceSides: () => 6,
         getLastDiceRollAt: () => nowMs - (getDiceChargeStartMs() + 2 * minuteMs),
         getLastPersonalDiceRollAt: () => null,
-        getUserDiceAchievements: () => [],
+        getUserDiceAchievements: () => ["manual-rolls-5"],
         setDiceCount: () => {},
         setLastDiceRollAt: () => {},
         setLastPersonalDiceRollAt: () => {},
@@ -1072,6 +1072,82 @@ test("roll uses the injected nowMs for charge and modifier labels", () => {
     assert.match(result.content, /^2x Dice charge!/m);
     assert.match(result.content, /Other active roll modifiers: PvP double ×2\./);
     assert.doesNotMatch(result.content, /^100x Dice charge!/m);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test("roll suppresses charge before Beginner Roller is unlocked", () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  try {
+    const nowMs = 1_710_000_000_000;
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          awardedAmount: 0,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => false,
+        getItemDoubleRollStatus: () => ({
+          isActive: false,
+          remainingUses: 0,
+          expiresAtMs: null,
+        }),
+      },
+      permanentBonuses: zeroPermanentBonuses,
+      progression: {
+        ...createProgressionStub(),
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 2,
+          diceCountIncreasesTotal: 0,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 1,
+        getDicePrestige: () => 0,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => nowMs - (getDiceChargeStartMs() + 2 * minuteMs),
+        getLastPersonalDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+        setLastPersonalDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => nowMs + minuteMs,
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = useCase({
+      userId: "user-beginner-charge-lock",
+      userMention: "<@user-beginner-charge-lock>",
+      nowMs,
+    });
+
+    assert.doesNotMatch(result.content, /^2x Dice charge!/m);
+    assert.match(result.content, /Roll modifiers: PvP double ×2 → effective ×2\./);
   } finally {
     Math.random = originalRandom;
   }
