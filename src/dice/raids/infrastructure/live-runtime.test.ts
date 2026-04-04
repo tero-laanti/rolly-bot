@@ -172,6 +172,7 @@ test("raids live runtime allows bronze actions without any unlock role", async (
 
   let handleRaidActionCalled = false;
   let repliedPayload: { content: string; ephemeral: boolean } | null = null;
+  let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
 
   try {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => ({}) as never;
@@ -244,6 +245,7 @@ test("raids live runtime allows bronze actions without any unlock role", async (
       ({
         getRaidRun: () => null,
         getOpenRaidRunByPrivateChannelId: () => null,
+        listRaidRunsByStatuses: () => [],
       }) as never;
     (
       statusPublisherModule as {
@@ -325,7 +327,7 @@ test("raids live runtime allows bronze actions without any unlock role", async (
       },
     } as never;
 
-    const runtime = createRaidsLiveRuntime({
+    runtime = createRaidsLiveRuntime({
       client: {} as never,
       config: baseConfig,
       logger: console,
@@ -339,6 +341,7 @@ test("raids live runtime allows bronze actions without any unlock role", async (
       ephemeral: true,
     });
   } finally {
+    await runtime?.stop();
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = originalGetDatabase;
     (
       catalogModule as {
@@ -439,6 +442,7 @@ test("raids live runtime rejects silver actions when the actor lacks the bronze 
 
   let handleRaidActionCalled = false;
   let repliedPayload: { content: string; ephemeral: boolean } | null = null;
+  let runtime: import("./live-runtime").RaidsLiveRuntime | null = null;
 
   try {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => ({}) as never;
@@ -511,6 +515,7 @@ test("raids live runtime rejects silver actions when the actor lacks the bronze 
       ({
         getRaidRun: () => null,
         getOpenRaidRunByPrivateChannelId: () => null,
+        listRaidRunsByStatuses: () => [],
       }) as never;
     (
       statusPublisherModule as {
@@ -592,7 +597,7 @@ test("raids live runtime rejects silver actions when the actor lacks the bronze 
       },
     } as never;
 
-    const runtime = createRaidsLiveRuntime({
+    runtime = createRaidsLiveRuntime({
       client: {} as never,
       config: baseConfig,
       logger: console,
@@ -606,6 +611,7 @@ test("raids live runtime rejects silver actions when the actor lacks the bronze 
       ephemeral: true,
     });
   } finally {
+    await runtime?.stop();
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = originalGetDatabase;
     (
       catalogModule as {
