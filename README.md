@@ -5,7 +5,7 @@ Rolly is a Discord dice game bot built around a persistent loop: roll, grow your
 ## Why Rolly
 
 - `/roll` is the core loop: matching rolls drive progression, achievements, Fame, Pips, bans, and temporary effects.
-- The surrounding systems keep the server busy: PvP, casino games, World Boss fights, post-clear Double Roll Rush threads, random events, inventory, and progression systems all feed back into the next roll, including random-event payouts that can grant consumable items.
+- The surrounding systems keep the server busy: PvP, casino games, contracts, player-started raids, World Boss fights, post-clear Double Roll Rush threads, random events, inventory, and progression systems all feed back into the next roll, including random-event payouts that can grant consumable items.
 
 ## In Action
 
@@ -15,11 +15,23 @@ PvP duels can grant temporary roll buffs that feed back into the main `/roll` lo
 
 Players can inspect their current Rolly status with `/stats`:
 
-<img src="docs/images/analytics.png" alt="Player stats command output" width="360" />
+<img src="docs/images/stats.png" alt="Player stats command output" width="360" />
 
 Random events arrive as live interaction prompts inside the server:
 
 <img src="docs/images/event.png" alt="Random event prompt" width="480" />
+
+Contracts use a persistent Contract Master panel with Daily and Weekly offers:
+
+<img src="docs/images/contract-master.png" alt="Contract Master panel with Daily and Weekly contract buttons" width="480" />
+
+Player-started raids begin from synced tier panels instead of a slash command:
+
+<img src="docs/images/raids.png" alt="Raid tier panel with boss selection buttons" width="480" />
+
+Successful raids resolve in Discord with rewards, participants, and damage leaders:
+
+<img src="docs/images/world-boss.png" alt="Raid clear summary with rewards and damage leaders" width="480" />
 
 ## Command Surface
 
