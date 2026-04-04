@@ -13,6 +13,10 @@ PvP duels can grant temporary roll buffs that feed back into the main `/roll` lo
 
 <img src="docs/images/pvp.png" alt="PvP duel and follow-up dice roll" width="480" />
 
+Casino serves as a nice place to spend time:
+
+<img src="docs/images/casino.png" alt="Player stats command output" width="360" />
+
 Players can inspect their current Rolly status with `/stats`:
 
 <img src="docs/images/stats.png" alt="Player stats command output" width="360" />
