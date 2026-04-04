@@ -78,6 +78,37 @@ const hasAccessRole = (member: GuildMember | null, accessRoleId: string): boolea
   return Boolean(member?.roles.cache.has(accessRoleId));
 };
 
+const getTierUnlockRequirement = (
+  catalogReader: ReturnType<typeof createRollyDataRaidCatalogReader>,
+  tierId: string,
+): {
+  requiredRoleId: string | null;
+  prerequisiteTierName: string | null;
+} | null => {
+  const tiers = catalogReader.listRaidTiers();
+  const tierIndex = tiers.findIndex((tier) => tier.tierId === tierId);
+  if (tierIndex < 0) {
+    return null;
+  }
+
+  if (tierIndex === 0) {
+    return {
+      requiredRoleId: null,
+      prerequisiteTierName: null,
+    };
+  }
+
+  const prerequisiteTier = tiers[tierIndex - 1];
+  if (!prerequisiteTier) {
+    return null;
+  }
+
+  return {
+    requiredRoleId: prerequisiteTier.roleReward?.roleRewardId ?? null,
+    prerequisiteTierName: prerequisiteTier.name,
+  };
+};
+
 const replyEphemeral = async (interaction: ButtonInteraction, content: string): Promise<void> => {
   if (interaction.replied || interaction.deferred) {
     await interaction.followUp({
@@ -600,11 +631,9 @@ export const createRaidsLiveRuntime = ({
   const requireTierAccess = async ({
     interaction,
     tierId,
-    failureMessage,
   }: {
     interaction: ButtonInteraction;
     tierId: string;
-    failureMessage: string;
   }): Promise<boolean> => {
     const binding = config.tierBindings[tierId];
     if (!binding) {
@@ -612,9 +641,22 @@ export const createRaidsLiveRuntime = ({
       return false;
     }
 
+    const requirement = getTierUnlockRequirement(catalogReader, tierId);
+    if (!requirement) {
+      await replyEphemeral(interaction, "This raid tier is unavailable.");
+      return false;
+    }
+
+    if (!requirement.requiredRoleId) {
+      return true;
+    }
+
     const member = await loadMemberForInteraction(interaction);
-    if (!hasAccessRole(member, binding.accessRoleId)) {
-      await replyEphemeral(interaction, failureMessage);
+    if (!hasAccessRole(member, requirement.requiredRoleId)) {
+      await replyEphemeral(
+        interaction,
+        `You must unlock ${requirement.prerequisiteTierName ?? "the previous raid tier"} before accessing this raid tier.`,
+      );
       return false;
     }
 
@@ -624,7 +666,7 @@ export const createRaidsLiveRuntime = ({
   const requireRunAccess = async (
     interaction: ButtonInteraction,
     runId: string,
-  ): Promise<{ tierId: string; accessRoleId: string } | null> => {
+  ): Promise<{ tierId: string } | null> => {
     const raidRun = repository.getRaidRun(runId);
     if (!raidRun) {
       await replyEphemeral(interaction, "This raid run is no longer available.");
@@ -639,14 +681,12 @@ export const createRaidsLiveRuntime = ({
 
     return {
       tierId: raidRun.run.tierId,
-      accessRoleId: binding.accessRoleId,
     };
   };
 
   const ensurePartyStillHasTierAccess = async (
     interaction: ButtonInteraction,
     runId: string,
-    accessRoleId: string,
   ): Promise<boolean> => {
     const raidRun = repository.getRaidRun(runId);
     if (!raidRun) {
@@ -654,20 +694,30 @@ export const createRaidsLiveRuntime = ({
       return false;
     }
 
+    const requirement = getTierUnlockRequirement(catalogReader, raidRun.run.tierId);
+    if (!requirement) {
+      await replyEphemeral(interaction, "This raid tier is unavailable.");
+      return false;
+    }
+
+    if (!requirement.requiredRoleId) {
+      return true;
+    }
+
     for (const memberRecord of getActiveRaidRunMembers(raidRun)) {
       try {
         const member = await interaction.guild!.members.fetch(memberRecord.userId);
-        if (!member.roles.cache.has(accessRoleId)) {
+        if (!member.roles.cache.has(requirement.requiredRoleId)) {
           await replyEphemeral(
             interaction,
-            "Everyone in this raid party must still have access to this tier before the run can start.",
+            `Everyone in this raid party must still have ${requirement.prerequisiteTierName ?? "the previous tier"} unlocked before the run can start.`,
           );
           return false;
         }
       } catch {
         await replyEphemeral(
           interaction,
-          "Everyone in this raid party must still have access to this tier before the run can start.",
+          `Everyone in this raid party must still have ${requirement.prerequisiteTierName ?? "the previous tier"} unlocked before the run can start.`,
         );
         return false;
       }
@@ -697,7 +747,6 @@ export const createRaidsLiveRuntime = ({
         const hasTierAccess = await requireTierAccess({
           interaction,
           tierId: action.tierId,
-          failureMessage: "You do not have access to this raid tier.",
         });
         if (!hasTierAccess) {
           return;
@@ -711,14 +760,23 @@ export const createRaidsLiveRuntime = ({
         }
 
         const member = await loadMemberForInteraction(interaction);
-        if (!hasAccessRole(member, runAccess.accessRoleId)) {
-          await replyEphemeral(interaction, "You do not have access to this raid tier.");
+        const requirement = getTierUnlockRequirement(catalogReader, runAccess.tierId);
+        if (!requirement) {
+          await replyEphemeral(interaction, "This raid tier is unavailable.");
+          return;
+        }
+
+        if (requirement.requiredRoleId && !hasAccessRole(member, requirement.requiredRoleId)) {
+          await replyEphemeral(
+            interaction,
+            `You must unlock ${requirement.prerequisiteTierName ?? "the previous raid tier"} before accessing this raid tier.`,
+          );
           return;
         }
 
         if (
           action.kind === "start-run" &&
-          !(await ensurePartyStillHasTierAccess(interaction, action.runId, runAccess.accessRoleId))
+          !(await ensurePartyStillHasTierAccess(interaction, action.runId))
         ) {
           return;
         }
