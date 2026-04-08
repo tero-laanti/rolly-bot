@@ -388,7 +388,7 @@ export const createRunRollDiceUseCase = ({
     }
     if (doubleRollRushStatus.expiresAtMs && doubleRollRushStatus.expiresAtMs > nowMs) {
       doubleRollFooterParts.push(
-        `Double Roll Rush is active in this thread for ${formatRemainingTime(doubleRollRushStatus.expiresAtMs - nowMs)}.`,
+        `Roll Paradise is active in this channel for ${formatRemainingTime(doubleRollRushStatus.expiresAtMs - nowMs)}.`,
       );
     }
     if (remainingItemDoubleRollUses > 0) {

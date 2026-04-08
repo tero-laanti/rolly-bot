@@ -1106,7 +1106,7 @@ test("resolved World Boss fights publish achievement announcements even if the a
   });
 });
 
-test("successful World Boss clears create a restart-safe Double Roll Rush thread", async () => {
+test("successful World Boss clears create a restart-safe Roll Paradise channel", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
     const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
     clearModules(modulePaths);
@@ -1124,24 +1124,24 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
     try {
       (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
 
+      const createdRushChannels: unknown[] = [];
       const rushKickoffPayloads: unknown[] = [];
-      const rushArchivedCalls: boolean[] = [];
+      const rushDeleteCalls: number[] = [];
       const announcementEdits: unknown[] = [];
       const activeEdits: unknown[] = [];
 
-      const rushThread = {
-        id: "double-roll-rush-thread-1",
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
         send: async (payload: unknown) => {
           rushKickoffPayloads.push(payload);
           return {
-            id: "double-roll-rush-kickoff-1",
+            id: "roll-paradise-kickoff-1",
           };
         },
-        setArchived: async (value: boolean) => {
-          rushArchivedCalls.push(value);
-          return rushThread;
+        delete: async () => {
+          rushDeleteCalls.push(Date.now());
+          return rushChannel;
         },
-        setLocked: async () => rushThread,
       };
       const activeMessage = {
         id: "active-message-1",
@@ -1163,10 +1163,18 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
           announcementEdits.push(payload);
           return payload;
         },
-        startThread: async () => rushThread,
       };
       const worldBossChannel = {
         isTextBased: () => true,
+        parentId: "world-boss-category-1",
+        guild: {
+          channels: {
+            create: async (options: unknown) => {
+              createdRushChannels.push(options);
+              return rushChannel;
+            },
+          },
+        },
         send: async () => announcementMessage,
       };
       const client = {
@@ -1176,8 +1184,8 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
               return worldBossChannel;
             }
 
-            if (channelId === "double-roll-rush-thread-1") {
-              return rushThread;
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
             }
 
             return null;
@@ -1245,16 +1253,22 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
       await new Promise((resolve) => setTimeout(resolve, 30));
 
       const activeStatus = runtime.getActiveDoubleRollRushStatus({
-        channelId: "double-roll-rush-thread-1",
+        channelId: "roll-paradise-channel-1",
       });
       assert.deepEqual(activeStatus, {
         isActive: true,
         expiresAtMs: activeStatus.expiresAtMs,
       });
+      assert.equal(createdRushChannels.length, 1);
+      assert.match(JSON.stringify(createdRushChannels[0]), /roll-paradise/);
       assert.equal(rushKickoffPayloads.length, 1);
-      assert.match(JSON.stringify(rushKickoffPayloads[0]), /Double Roll Rush/);
-      assert.match(JSON.stringify(announcementEdits), /Double Roll Rush is live/);
-      assert.match(JSON.stringify(activeEdits), /Double Roll Rush is live/);
+      assert.match(
+        JSON.stringify(rushKickoffPayloads[0]),
+        /@here, the .* has fallen! The roll paradise is briefly open!/,
+      );
+      assert.match(JSON.stringify(rushKickoffPayloads[0]), /Roll Paradise/);
+      assert.match(JSON.stringify(announcementEdits), /Roll Paradise is live/);
+      assert.match(JSON.stringify(activeEdits), /Roll Paradise is live/);
 
       await runtime.stop();
       runtime = null;
@@ -1279,7 +1293,7 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
       });
       assert.deepEqual(
         recoveredRuntime.getActiveDoubleRollRushStatus({
-          channelId: "double-roll-rush-thread-1",
+          channelId: "roll-paradise-channel-1",
           nowMs: (activeStatus.expiresAtMs ?? Date.now()) - 60_000,
         }),
         {
@@ -1311,7 +1325,7 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
       });
       assert.deepEqual(
         expiryRuntime.getActiveDoubleRollRushStatus({
-          channelId: "double-roll-rush-thread-1",
+          channelId: "roll-paradise-channel-1",
           nowMs: (activeStatus.expiresAtMs ?? Date.now()) + 60_000,
         }),
         {
@@ -1319,7 +1333,7 @@ test("successful World Boss clears create a restart-safe Double Roll Rush thread
           expiresAtMs: null,
         },
       );
-      assert.deepEqual(rushArchivedCalls, [true]);
+      assert.equal(rushDeleteCalls.length, 1);
     } finally {
       if (runtime) {
         await runtime.stop();

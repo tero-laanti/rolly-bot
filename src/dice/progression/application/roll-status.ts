@@ -159,7 +159,7 @@ export const buildDiceRollModifierFooter = ({
       doubleRollSources.push("item");
     }
     if (hasActiveDoubleRollRush) {
-      doubleRollSources.push("Rush");
+      doubleRollSources.push("Roll Paradise");
     }
 
     const doubleRollMultiplier = 2 ** doubleRollSources.length;

@@ -89,7 +89,7 @@ test("roll modifier footer switches to 'other active' wording during charged rol
   assert.equal(footer, "Other active roll modifiers: temporary buffs ×4 · temporary penalty ÷2.");
 });
 
-test("roll modifier footer includes Double Roll Rush as a double-roll source", () => {
+test("roll modifier footer includes Roll Paradise as a double-roll source", () => {
   const footer = buildDiceRollModifierFooter({
     rollPassCount: 2,
     didUseChargeRoll: false,
@@ -115,7 +115,7 @@ test("roll modifier footer includes Double Roll Rush as a double-roll source", (
     },
   });
 
-  assert.equal(footer, "Roll modifiers: Rush double ×2 → effective ×2.");
+  assert.equal(footer, "Roll modifiers: Roll Paradise double ×2 → effective ×2.");
 });
 
 test("stacked double-roll sources increase effective roll power", () => {

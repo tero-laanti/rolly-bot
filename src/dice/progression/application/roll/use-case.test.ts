@@ -835,7 +835,7 @@ test("raid damage uses the highest roll set total when no World Boss is active",
   }
 });
 
-test("Double Roll Rush reuses the normal double-roll modifier inside the active thread", () => {
+test("Roll Paradise reuses the normal double-roll modifier inside the active channel", () => {
   const originalRandom = Math.random;
   const randomValues = [0, 0.8];
   let randomIndex = 0;
@@ -910,21 +910,21 @@ test("Double Roll Rush reuses the normal double-roll modifier inside the active 
     const result = useCase({
       userId: "rush-user",
       userMention: "<@rush-user>",
-      channelId: "double-roll-rush-thread",
+      channelId: "roll-paradise-channel",
       nowMs: 1_710_000_000_000,
     });
 
-    assert.match(result.content, /Roll modifiers: Rush double ×2 → effective ×2\./);
+    assert.match(result.content, /Roll modifiers: Roll Paradise double ×2 → effective ×2\./);
     assert.match(
       result.content,
-      /Double Roll Rush is active in this thread for 15 minutes 0 seconds\./,
+      /Roll Paradise is active in this channel for 15 minutes 0 seconds\./,
     );
   } finally {
     Math.random = originalRandom;
   }
 });
 
-test("Double Roll Rush stacks with item double-roll buffs to reach x4", () => {
+test("Roll Paradise stacks with item double-roll buffs to reach x4", () => {
   const originalRandom = Math.random;
   const randomValues = [0, 0.1, 0.2, 0.3];
   let randomIndex = 0;
@@ -999,13 +999,13 @@ test("Double Roll Rush stacks with item double-roll buffs to reach x4", () => {
     const result = useCase({
       userId: "rush-item-user",
       userMention: "<@rush-item-user>",
-      channelId: "double-roll-rush-thread",
+      channelId: "roll-paradise-channel",
       nowMs: 1_710_000_000_000,
     });
 
     assert.match(
       result.content,
-      /Roll modifiers: double-roll buffs ×4 \(item \+ Rush\) → effective ×4\./,
+      /Roll modifiers: double-roll buffs ×4 \(item \+ Roll Paradise\) → effective ×4\./,
     );
     assert.match(result.content, /Set 4:/);
   } finally {

@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { BaseMessageOptions, ButtonInteraction, Client, Message } from "discord.js";
+import {
+  ChannelType,
+  type BaseMessageOptions,
+  type ButtonInteraction,
+  type Client,
+  type Message,
+} from "discord.js";
 import { publishAchievementEffects } from "../../../app/discord/achievement-effects";
 import { publishContractCompletionAnnouncements } from "../../../app/discord/contract-completion-announcements";
 import type { WorldBossConfig } from "../../../shared/config";
@@ -28,7 +34,7 @@ import type {
 } from "../application/ports";
 import {
   worldBossDoubleRollRushDurationMs,
-  worldBossDoubleRollRushThreadNameSuffix,
+  worldBossDoubleRollRushChannelName,
 } from "../domain/double-roll-rush";
 import { getDiceWorldBossAchievementIds } from "../application/achievement-rules";
 import {
@@ -45,8 +51,8 @@ import {
   buildWorldBossActivePrompt,
   buildWorldBossAnnouncementPrompt,
   buildWorldBossCancelledPrompt,
-  buildWorldBossDoubleRollRushKickoffPrompt,
   buildWorldBossInterruptedPrompt,
+  buildWorldBossRollParadiseKickoffPrompt,
   buildWorldBossResolveFailedPrompt,
   buildWorldBossResolvedPrompt,
   buildWorldBossStartFailedPrompt,
@@ -232,7 +238,7 @@ export const createWorldBossLiveRuntime = ({
     zone: WorldBossDoubleRollRushZoneRecord,
   ): Promise<void> => {
     const channel = await client.channels.fetch(zone.rushChannelId).catch((error) => {
-      logger.warn("[world-boss] Failed to fetch Double Roll Rush channel for cleanup.", error);
+      logger.warn("[world-boss] Failed to fetch Roll Paradise channel for cleanup.", error);
       return null;
     });
 
@@ -240,15 +246,9 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    if ("setArchived" in channel && typeof channel.setArchived === "function") {
-      await channel.setArchived(true).catch((error: unknown) => {
-        logger.warn("[world-boss] Failed to archive Double Roll Rush thread.", error);
-      });
-    }
-
-    if ("setLocked" in channel && typeof channel.setLocked === "function") {
-      await channel.setLocked(true).catch((error: unknown) => {
-        logger.warn("[world-boss] Failed to lock Double Roll Rush thread.", error);
+    if ("delete" in channel && typeof channel.delete === "function") {
+      await channel.delete().catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to delete Roll Paradise channel.", error);
       });
     }
   };
@@ -391,7 +391,7 @@ export const createWorldBossLiveRuntime = ({
             rewardSummary:
               context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward),
             contributionLines: buildContributionLines(context),
-            doubleRollRushThreadId: context.worldBoss.doubleRollRushThreadId,
+            doubleRollRushChannelId: context.worldBoss.doubleRollRushChannelId,
             doubleRollRushEndsAtMs: context.worldBoss.doubleRollRushExpiresAtMs,
             doubleRollRushFailed: context.worldBoss.doubleRollRushFailed,
           });
@@ -453,7 +453,7 @@ export const createWorldBossLiveRuntime = ({
             rewardSummary:
               context.worldBoss.resolvedRewardSummary ?? describeWorldBossReward(boss.reward),
             contributionLines: buildContributionLines(context),
-            doubleRollRushThreadId: context.worldBoss.doubleRollRushThreadId,
+            doubleRollRushChannelId: context.worldBoss.doubleRollRushChannelId,
             doubleRollRushEndsAtMs: context.worldBoss.doubleRollRushExpiresAtMs,
             doubleRollRushFailed: context.worldBoss.doubleRollRushFailed,
           });
@@ -633,7 +633,7 @@ export const createWorldBossLiveRuntime = ({
     context.worldBoss.activeThreadId = null;
     context.worldBoss.rewardEligibleUserIds.clear();
     context.worldBoss.resolvedRewardSummary = null;
-    context.worldBoss.doubleRollRushThreadId = null;
+    context.worldBoss.doubleRollRushChannelId = null;
     context.worldBoss.doubleRollRushExpiresAtMs = null;
     context.worldBoss.doubleRollRushFailed = false;
     context.worldBoss.boss = null;
@@ -661,7 +661,7 @@ export const createWorldBossLiveRuntime = ({
     context.worldBoss.activeThreadId = activeThreadId;
     context.worldBoss.rewardEligibleUserIds.clear();
     context.worldBoss.resolvedRewardSummary = null;
-    context.worldBoss.doubleRollRushThreadId = null;
+    context.worldBoss.doubleRollRushChannelId = null;
     context.worldBoss.doubleRollRushExpiresAtMs = null;
     context.worldBoss.doubleRollRushFailed = false;
     context.worldBoss.boss = boss;
@@ -813,9 +813,18 @@ export const createWorldBossLiveRuntime = ({
     }
 
     const announcementMessage = context.handles.announcementMessage;
+    const parentChannel = await client.channels
+      .fetch(announcementMessage.channelId)
+      .catch((error) => {
+        logger.warn("[world-boss] Failed to fetch World Boss channel for Roll Paradise.", error);
+        return null;
+      });
+
     if (
-      !("startThread" in announcementMessage) ||
-      typeof announcementMessage.startThread !== "function"
+      !parentChannel ||
+      !("guild" in parentChannel) ||
+      !parentChannel.guild ||
+      typeof parentChannel.guild.channels.create !== "function"
     ) {
       context.worldBoss.doubleRollRushFailed = true;
       return;
@@ -824,32 +833,37 @@ export const createWorldBossLiveRuntime = ({
     const expiresAt = new Date(
       (context.worldBoss.closedAtMs ?? Date.now()) + worldBossDoubleRollRushDurationMs,
     );
-    const rushThread = await announcementMessage
-      .startThread({
-        name: truncateDiscordText(
-          `${context.worldBoss.boss.name} ${worldBossDoubleRollRushThreadNameSuffix}`,
-          threadNameCharacterLimit,
-        ),
-        autoArchiveDuration: 60,
+    const rushChannel = await parentChannel.guild.channels
+      .create({
+        name: worldBossDoubleRollRushChannelName,
+        type: ChannelType.GuildText,
+        parent:
+          "parentId" in parentChannel && typeof parentChannel.parentId === "string"
+            ? parentChannel.parentId
+            : undefined,
       })
       .catch((error: unknown) => {
-        logger.warn("[world-boss] Failed to open Double Roll Rush thread.", error);
+        logger.warn("[world-boss] Failed to create Roll Paradise channel.", error);
         return null;
       });
 
-    if (!rushThread) {
+    if (!rushChannel || !("send" in rushChannel) || typeof rushChannel.send !== "function") {
       context.worldBoss.doubleRollRushFailed = true;
       return;
     }
 
-    const kickoffMessage = await rushThread
-      .send(
-        buildWorldBossDoubleRollRushKickoffPrompt({
+    const kickoffMessage = await rushChannel
+      .send({
+        content: `@here, the ${context.worldBoss.boss.name} has fallen! The roll paradise is briefly open!`,
+        allowedMentions: {
+          parse: ["everyone"],
+        },
+        ...buildWorldBossRollParadiseKickoffPrompt({
           endsAtMs: expiresAt.getTime(),
         }),
-      )
+      })
       .catch((error: unknown) => {
-        logger.warn("[world-boss] Failed to post Double Roll Rush kickoff message.", error);
+        logger.warn("[world-boss] Failed to post Roll Paradise kickoff message.", error);
         return null;
       });
 
@@ -859,7 +873,7 @@ export const createWorldBossLiveRuntime = ({
         rushId: `cleanup:${randomUUID()}`,
         sourceWorldBossId: context.worldBoss.worldBossId,
         parentChannelId: announcementMessage.channelId,
-        rushChannelId: rushThread.id,
+        rushChannelId: rushChannel.id,
         kickoffMessageId: "missing",
         activatedAt: new Date(),
         expiresAt,
@@ -875,13 +889,13 @@ export const createWorldBossLiveRuntime = ({
       rushId: `double-roll-rush:${randomUUID()}`,
       sourceWorldBossId: context.worldBoss.worldBossId,
       parentChannelId: announcementMessage.channelId,
-      rushChannelId: rushThread.id,
+      rushChannelId: rushChannel.id,
       kickoffMessageId: kickoffMessage.id,
       activatedAt: new Date(context.worldBoss.closedAtMs ?? Date.now()),
       expiresAt,
     });
     registerDoubleRollRush(zone);
-    context.worldBoss.doubleRollRushThreadId = zone.rushChannelId;
+    context.worldBoss.doubleRollRushChannelId = zone.rushChannelId;
     context.worldBoss.doubleRollRushExpiresAtMs = zone.expiresAt.getTime();
     context.worldBoss.doubleRollRushFailed = false;
   };
@@ -1255,7 +1269,7 @@ export const createWorldBossLiveRuntime = ({
         resolvedRewardSummary: null,
         achievementAnnouncements: [],
         activeThreadId: null,
-        doubleRollRushThreadId: null,
+        doubleRollRushChannelId: null,
         doubleRollRushExpiresAtMs: null,
         doubleRollRushFailed: false,
         boss: null,

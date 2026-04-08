@@ -70,6 +70,8 @@ test("resolved World Boss prompt trims long leaderboards without dropping the ou
     bossLevel: 42,
     maxHp: 5678,
     rewardSummary: "20 pips and x8 roll buff for the next 5 /rolls per eligible player",
+    doubleRollRushChannelId: "roll-paradise-channel",
+    doubleRollRushEndsAtMs: 180_000,
     contributionLines: Array.from(
       { length: 80 },
       (_, index) => `${index + 1}. <@user-${index + 1}> dealt ${"Y".repeat(80)}`,
@@ -81,6 +83,7 @@ test("resolved World Boss prompt trims long leaderboards without dropping the ou
   assert.ok(description.length <= 4_096);
   assert.match(description, /The boss was defeated in time\./);
   assert.match(description, /Reward applied to 10 eligible players/);
+  assert.match(description, /Roll Paradise is live in <#roll-paradise-channel>/);
 });
 
 test("active World Boss prompt omits the damage leaders section when no damage has been logged yet", () => {

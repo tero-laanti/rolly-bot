@@ -304,7 +304,7 @@ export const buildWorldBossResolvedPrompt = ({
   maxHp,
   rewardSummary,
   contributionLines,
-  doubleRollRushThreadId = null,
+  doubleRollRushChannelId = null,
   doubleRollRushEndsAtMs = null,
   doubleRollRushFailed = false,
 }: {
@@ -317,7 +317,7 @@ export const buildWorldBossResolvedPrompt = ({
   maxHp: number;
   rewardSummary: string;
   contributionLines: readonly string[];
-  doubleRollRushThreadId?: string | null;
+  doubleRollRushChannelId?: string | null;
   doubleRollRushEndsAtMs?: number | null;
   doubleRollRushFailed?: boolean;
 }): BaseMessageOptions => {
@@ -327,10 +327,10 @@ export const buildWorldBossResolvedPrompt = ({
       ? `Reward applied to ${eligibleParticipantCount} eligible player${eligibleParticipantCount === 1 ? "" : "s"}: **${rewardSummary}**.`
       : "";
   const doubleRollRushLine =
-    outcome === "success" && doubleRollRushThreadId && doubleRollRushEndsAtMs
-      ? `Double Roll Rush is live in <#${doubleRollRushThreadId}> until ${formatDiscordRelativeTime(doubleRollRushEndsAtMs)}. Use /roll there for the normal double-roll buff.`
+    outcome === "success" && doubleRollRushChannelId && doubleRollRushEndsAtMs
+      ? `Roll Paradise is live in <#${doubleRollRushChannelId}> until ${formatDiscordRelativeTime(doubleRollRushEndsAtMs)}. Use /roll there for the normal double-roll buff.`
       : outcome === "success" && doubleRollRushFailed
-        ? "Double Roll Rush could not be opened automatically. The clear reward still applied."
+        ? "Roll Paradise could not be opened automatically. The clear reward still applied."
         : "";
   const title = `${presentation.title} - ${bossName} Lv.${bossLevel}`;
   assertDiscordTextLength(
@@ -361,26 +361,26 @@ export const buildWorldBossResolvedPrompt = ({
   };
 };
 
-export const buildWorldBossDoubleRollRushKickoffPrompt = ({
+export const buildWorldBossRollParadiseKickoffPrompt = ({
   endsAtMs,
 }: {
   endsAtMs: number;
 }): BaseMessageOptions => {
   const embed = new EmbedBuilder()
     .setColor(successColor)
-    .setTitle("Double Roll Rush")
+    .setTitle("Roll Paradise")
     .setDescription(
       truncateDiscordText(
         [
-          `Use /roll in this thread until ${formatDiscordRelativeTime(endsAtMs)}.`,
-          "This thread grants the normal double-roll buff and only this thread grants it.",
-          "Other double-roll sources stack with this thread's ×2 boost.",
+          `Use /roll in this channel until ${formatDiscordRelativeTime(endsAtMs)}.`,
+          "All /rolls in this channel gain the normal double-roll buff.",
+          "Other double-roll sources stack with this channel's ×2 boost.",
         ].join("\n"),
         discordEmbedDescriptionCharacterLimit,
         "\n... (truncated)",
       ),
     )
-    .setFooter({ text: "When the rush expires, rolls here go back to normal." });
+    .setFooter({ text: "When Roll Paradise closes, rolls here go back to normal." });
 
   return {
     embeds: [embed],
