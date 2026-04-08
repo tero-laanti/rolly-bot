@@ -1530,3 +1530,401 @@ test("Roll Paradise falls back to a non-pinging kickoff message when @here is no
     }
   });
 });
+
+test("Roll Paradise startup recovery retries cleanup-pending closed zones", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let firstRecoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let secondRecoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      let rushDeleteAttempts = 0;
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
+        send: async () => ({
+          id: "roll-paradise-kickoff-1",
+        }),
+        delete: async () => {
+          rushDeleteAttempts += 1;
+          if (rushDeleteAttempts === 1) {
+            throw new Error("temporary delete failure");
+          }
+
+          return rushChannel;
+        },
+      };
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => payload,
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+        }),
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const worldBossChannel = {
+        isTextBased: () => true,
+        guild: {
+          channels: {
+            create: async () => rushChannel,
+          },
+        },
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return worldBossChannel;
+            }
+
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      const runtimeConfig = {
+        enabled: true,
+        inactiveReason: null,
+        channelId: "world-boss-channel",
+        joinLeadMs: 10,
+        activeDurationMs: 60_000,
+        targetWorldBossesPerDay: 0,
+        minGapMs: 1,
+        retryDelayMs: 1,
+        jitterRatio: 0,
+        quietHours: {
+          start: "00:00",
+          end: "00:00",
+          timezone: "UTC",
+        },
+      };
+
+      runtime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const result = runtime.applyDiceRoll({
+        channelId: "world-boss-thread-1",
+        userId: "user-1",
+        userMention: "<@user-1>",
+        damage: 1_000_000,
+      });
+      assert.equal(result.kind, "applied");
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const activeStatus = runtime.getActiveDoubleRollRushStatus({
+        channelId: "roll-paradise-channel-1",
+      });
+      assert.equal(activeStatus.isActive, true);
+
+      await runtime.stop();
+      runtime = null;
+
+      firstRecoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const firstRecoverySummary = await firstRecoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date((activeStatus.expiresAtMs ?? Date.now()) + 60_000),
+      });
+      assert.deepEqual(firstRecoverySummary, {
+        resumedCount: 0,
+        expiredCount: 1,
+        invalidCount: 0,
+      });
+      assert.equal(rushDeleteAttempts, 1);
+
+      await firstRecoveryRuntime.stop();
+      firstRecoveryRuntime = null;
+
+      secondRecoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const secondRecoverySummary = await secondRecoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date((activeStatus.expiresAtMs ?? Date.now()) + 120_000),
+      });
+      assert.deepEqual(secondRecoverySummary, {
+        resumedCount: 0,
+        expiredCount: 0,
+        invalidCount: 0,
+      });
+      assert.equal(rushDeleteAttempts, 2);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+      if (firstRecoveryRuntime) {
+        await firstRecoveryRuntime.stop();
+      }
+      if (secondRecoveryRuntime) {
+        await secondRecoveryRuntime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
+test("Roll Paradise cleans up the created channel when zone persistence fails", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "./sqlite/double-roll-rush-zone-repository",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const zoneRepositoryModule = moduleRequire(
+      "./sqlite/double-roll-rush-zone-repository",
+    ) as typeof import("./sqlite/double-roll-rush-zone-repository");
+    const originalCreateRepository =
+      zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+      (
+        zoneRepositoryModule as {
+          createSqliteWorldBossDoubleRollRushZoneRepository: typeof zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository;
+        }
+      ).createSqliteWorldBossDoubleRollRushZoneRepository = (inputDb) => {
+        const repository = originalCreateRepository(inputDb);
+        return {
+          ...repository,
+          createZone: () => {
+            throw new Error("SQLITE_BUSY");
+          },
+        };
+      };
+
+      const rushKickoffPayloads: unknown[] = [];
+      const rushDeleteCalls: number[] = [];
+      const announcementEdits: unknown[] = [];
+      const activeEdits: unknown[] = [];
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
+        send: async (payload: unknown) => {
+          rushKickoffPayloads.push(payload);
+          return {
+            id: "roll-paradise-kickoff-1",
+          };
+        },
+        delete: async () => {
+          rushDeleteCalls.push(Date.now());
+          return rushChannel;
+        },
+      };
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => {
+          activeEdits.push(payload);
+          return payload;
+        },
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+        }),
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => {
+          announcementEdits.push(payload);
+          return payload;
+        },
+      };
+      const worldBossChannel = {
+        isTextBased: () => true,
+        guild: {
+          channels: {
+            create: async () => rushChannel,
+          },
+        },
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return worldBossChannel;
+            }
+
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      runtime = createWorldBossLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "world-boss-channel",
+          joinLeadMs: 10,
+          activeDurationMs: 60_000,
+          targetWorldBossesPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const result = runtime.applyDiceRoll({
+        channelId: "world-boss-thread-1",
+        userId: "user-1",
+        userMention: "<@user-1>",
+        damage: 1_000_000,
+      });
+      assert.equal(result.kind, "applied");
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      assert.equal(rushDeleteCalls.length, 1);
+      assert.equal(rushKickoffPayloads.length, 0);
+      assert.match(
+        JSON.stringify(announcementEdits),
+        /Roll Paradise could not be opened automatically/,
+      );
+      assert.match(JSON.stringify(activeEdits), /Roll Paradise could not be opened automatically/);
+      assert.deepEqual(
+        runtime.getActiveDoubleRollRushStatus({
+          channelId: "roll-paradise-channel-1",
+        }),
+        {
+          isActive: false,
+          expiresAtMs: null,
+        },
+      );
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        zoneRepositoryModule as {
+          createSqliteWorldBossDoubleRollRushZoneRepository: typeof zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository;
+        }
+      ).createSqliteWorldBossDoubleRollRushZoneRepository = originalCreateRepository;
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});

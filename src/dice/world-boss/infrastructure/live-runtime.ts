@@ -119,6 +119,8 @@ type ActiveDoubleRollRushContext = {
   expiryTimer: ReturnType<typeof setTimeout> | null;
 };
 
+type DoubleRollRushCleanupResult = "deleted" | "missing" | "retryable-failure";
+
 const isBlockingWorldBossStatus = (status: WorldBossStatus): boolean => {
   return blockingWorldBossStatuses.has(status);
 };
@@ -236,18 +238,30 @@ export const createWorldBossLiveRuntime = ({
 
   const cleanupDoubleRollRushChannel = async (
     zone: WorldBossDoubleRollRushZoneRecord,
-  ): Promise<boolean> => {
-    const channel = await client.channels.fetch(zone.rushChannelId).catch((error) => {
-      logger.warn("[world-boss] Failed to fetch Roll Paradise channel for cleanup.", error);
-      return null;
-    });
+  ): Promise<DoubleRollRushCleanupResult> => {
+    const fetchedChannel = await client.channels
+      .fetch(zone.rushChannelId)
+      .then((channel) => ({
+        kind: "resolved" as const,
+        channel,
+      }))
+      .catch((error) => {
+        logger.warn("[world-boss] Failed to fetch Roll Paradise channel for cleanup.", error);
+        return {
+          kind: "failed" as const,
+        };
+      });
 
-    if (!channel) {
-      return true;
+    if (fetchedChannel.kind === "failed") {
+      return "retryable-failure";
     }
 
-    if ("delete" in channel && typeof channel.delete === "function") {
-      const deleted = await channel
+    if (!fetchedChannel.channel) {
+      return "missing";
+    }
+
+    if ("delete" in fetchedChannel.channel && typeof fetchedChannel.channel.delete === "function") {
+      const deleted = await fetchedChannel.channel
         .delete()
         .then(() => true)
         .catch((error: unknown) => {
@@ -255,10 +269,30 @@ export const createWorldBossLiveRuntime = ({
           return false;
         });
 
-      return deleted;
+      return deleted ? "deleted" : "retryable-failure";
     }
 
-    return true;
+    logger.warn("[world-boss] Roll Paradise channel could not be deleted by this runtime.");
+    return "retryable-failure";
+  };
+
+  const reconcileClosedDoubleRollRushCleanup = async (
+    zone: WorldBossDoubleRollRushZoneRecord,
+    now: Date = new Date(),
+  ): Promise<void> => {
+    const cleanupResult = await cleanupDoubleRollRushChannel(zone);
+    if (cleanupResult === "retryable-failure") {
+      doubleRollRushZones.markCleanupPending({
+        rushId: zone.rushId,
+        now,
+      });
+      return;
+    }
+
+    doubleRollRushZones.clearCleanupPending({
+      rushId: zone.rushId,
+      now,
+    });
   };
 
   const sendRollParadiseKickoffMessage = async ({
@@ -342,7 +376,7 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    await cleanupDoubleRollRushChannel(closedZone);
+    await reconcileClosedDoubleRollRushCleanup(closedZone, now);
   };
 
   const scheduleDoubleRollRushExpiry = (context: ActiveDoubleRollRushContext): void => {
@@ -930,13 +964,19 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    const kickoffMessage = await sendRollParadiseKickoffMessage({
-      rushChannel,
-      bossName: context.worldBoss.boss.name,
-      endsAtMs: expiresAt.getTime(),
-    });
-
-    if (!kickoffMessage) {
+    let zone: WorldBossDoubleRollRushZoneRecord;
+    try {
+      zone = doubleRollRushZones.createZone({
+        rushId: `double-roll-rush:${randomUUID()}`,
+        sourceWorldBossId: context.worldBoss.worldBossId,
+        parentChannelId: announcementMessage.channelId,
+        rushChannelId: rushChannel.id,
+        kickoffMessageId: "pending",
+        activatedAt: new Date(context.worldBoss.closedAtMs ?? Date.now()),
+        expiresAt,
+      });
+    } catch (error) {
+      logger.warn("[world-boss] Failed to persist Roll Paradise zone.", error);
       context.worldBoss.doubleRollRushFailed = true;
       await cleanupDoubleRollRushChannel({
         rushId: `cleanup:${randomUUID()}`,
@@ -954,15 +994,29 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    const zone = doubleRollRushZones.createZone({
-      rushId: `double-roll-rush:${randomUUID()}`,
-      sourceWorldBossId: context.worldBoss.worldBossId,
-      parentChannelId: announcementMessage.channelId,
-      rushChannelId: rushChannel.id,
-      kickoffMessageId: kickoffMessage.id,
-      activatedAt: new Date(context.worldBoss.closedAtMs ?? Date.now()),
-      expiresAt,
+    const kickoffMessage = await sendRollParadiseKickoffMessage({
+      rushChannel,
+      bossName: context.worldBoss.boss.name,
+      endsAtMs: expiresAt.getTime(),
     });
+
+    if (!kickoffMessage) {
+      context.worldBoss.doubleRollRushFailed = true;
+      await closeDoubleRollRush({
+        rushId: zone.rushId,
+        closeReason: "kickoff-failed",
+      });
+      return;
+    }
+
+    try {
+      doubleRollRushZones.updateKickoffMessageId({
+        rushId: zone.rushId,
+        kickoffMessageId: kickoffMessage.id,
+      });
+    } catch (error) {
+      logger.warn("[world-boss] Failed to persist Roll Paradise kickoff message id.", error);
+    }
     registerDoubleRollRush(zone);
     context.worldBoss.doubleRollRushChannelId = zone.rushChannelId;
     context.worldBoss.doubleRollRushExpiresAtMs = zone.expiresAt.getTime();
@@ -1625,22 +1679,42 @@ export const createWorldBossLiveRuntime = ({
       invalidCount: 0,
     };
 
+    const pendingCleanupZones = doubleRollRushZones.listCleanupPendingZones();
     const expiredZones = doubleRollRushZones.closeExpiredZones(now);
     summary.expiredCount = expiredZones.length;
-    await Promise.allSettled(expiredZones.map((zone) => cleanupDoubleRollRushChannel(zone)));
-
+    await Promise.allSettled(
+      expiredZones.map((zone) => reconcileClosedDoubleRollRushCleanup(zone, now)),
+    );
     const expiredZoneIds = new Set(expiredZones.map((zone) => zone.rushId));
-    const closedZones = doubleRollRushZones
-      .listClosedZones()
-      .filter((zone) => !expiredZoneIds.has(zone.rushId));
-    await Promise.allSettled(closedZones.map((zone) => cleanupDoubleRollRushChannel(zone)));
+    await Promise.allSettled(
+      pendingCleanupZones
+        .filter((zone) => !expiredZoneIds.has(zone.rushId))
+        .map((zone) => reconcileClosedDoubleRollRushCleanup(zone, now)),
+    );
 
     const openZones = doubleRollRushZones.listOpenZones({
       now,
     });
     for (const zone of openZones) {
-      const channel = await client.channels.fetch(zone.rushChannelId).catch(() => null);
-      if (!channel) {
+      const fetchedChannel = await client.channels
+        .fetch(zone.rushChannelId)
+        .then((channel) => ({
+          kind: "resolved" as const,
+          channel,
+        }))
+        .catch((error) => {
+          logger.warn("[world-boss] Failed to fetch Roll Paradise channel during recovery.", error);
+          return {
+            kind: "failed" as const,
+          };
+        });
+      if (fetchedChannel.kind === "failed") {
+        registerDoubleRollRush(zone);
+        summary.resumedCount += 1;
+        continue;
+      }
+
+      if (!fetchedChannel.channel) {
         await closeDoubleRollRush({
           rushId: zone.rushId,
           closeReason: "missing-channel",

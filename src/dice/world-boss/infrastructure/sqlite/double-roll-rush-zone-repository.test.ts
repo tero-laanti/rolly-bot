@@ -112,7 +112,34 @@ test("Double Roll Rush repository lists only still-open zones", () => {
   }
 });
 
-test("Double Roll Rush repository can list closed zones for cleanup recovery", () => {
+test("Double Roll Rush repository returns the closed zone record when closing a zone", () => {
+  const { db, repository } = createRepository();
+
+  try {
+    repository.createZone({
+      rushId: "rush-1",
+      sourceWorldBossId: "world-boss-1",
+      parentChannelId: "world-boss-channel",
+      rushChannelId: "rush-thread-1",
+      kickoffMessageId: "kickoff-1",
+      activatedAt: new Date("2026-04-01T10:00:00.000Z"),
+      expiresAt: new Date("2026-04-01T10:15:00.000Z"),
+    });
+    const closedZone = repository.closeZone({
+      rushId: "rush-1",
+      closeReason: "expired",
+      now: new Date("2026-04-01T10:20:00.000Z"),
+    });
+
+    assert.equal(closedZone?.rushId, "rush-1");
+    assert.equal(closedZone?.closeReason, "expired");
+    assert.ok(closedZone?.closedAt instanceof Date);
+  } finally {
+    db.close();
+  }
+});
+
+test("Double Roll Rush repository tracks cleanup-pending closed zones without changing the public close reason", () => {
   const { db, repository } = createRepository();
 
   try {
@@ -131,10 +158,14 @@ test("Double Roll Rush repository can list closed zones for cleanup recovery", (
       now: new Date("2026-04-01T10:20:00.000Z"),
     });
 
-    const closedZones = repository.listClosedZones();
+    repository.markCleanupPending({
+      rushId: "rush-1",
+      now: new Date("2026-04-01T10:21:00.000Z"),
+    });
 
+    const pendingZones = repository.listCleanupPendingZones();
     assert.deepEqual(
-      closedZones.map((zone) => ({
+      pendingZones.map((zone) => ({
         rushId: zone.rushId,
         closeReason: zone.closeReason,
       })),
@@ -145,6 +176,13 @@ test("Double Roll Rush repository can list closed zones for cleanup recovery", (
         },
       ],
     );
+
+    const clearedZone = repository.clearCleanupPending({
+      rushId: "rush-1",
+      now: new Date("2026-04-01T10:22:00.000Z"),
+    });
+    assert.equal(clearedZone?.closeReason, "expired");
+    assert.deepEqual(repository.listCleanupPendingZones(), []);
   } finally {
     db.close();
   }
