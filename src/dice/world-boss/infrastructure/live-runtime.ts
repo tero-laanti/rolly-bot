@@ -289,7 +289,7 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    doubleRollRushZones.clearCleanupPending({
+    doubleRollRushZones.markCleanupComplete({
       rushId: zone.rushId,
       now,
     });
@@ -349,6 +349,56 @@ export const createWorldBossLiveRuntime = ({
         logger.warn("[world-boss] Failed to post Roll Paradise kickoff message.", error);
         return null;
       });
+  };
+
+  const persistCleanupPendingDoubleRollRushZone = ({
+    rushId,
+    sourceWorldBossId,
+    parentChannelId,
+    rushChannelId,
+    activatedAt,
+    expiresAt,
+    now = new Date(),
+  }: {
+    rushId: string;
+    sourceWorldBossId: string;
+    parentChannelId: string;
+    rushChannelId: string;
+    activatedAt: Date;
+    expiresAt: Date;
+    now?: Date;
+  }): void => {
+    try {
+      const existingClosedZone = doubleRollRushZones.closeZone({
+        rushId,
+        closeReason: "persistence-failed",
+        now,
+      });
+
+      if (!existingClosedZone) {
+        doubleRollRushZones.createZone({
+          rushId,
+          sourceWorldBossId,
+          parentChannelId,
+          rushChannelId,
+          kickoffMessageId: "missing",
+          activatedAt,
+          expiresAt,
+        });
+        doubleRollRushZones.closeZone({
+          rushId,
+          closeReason: "persistence-failed",
+          now,
+        });
+      }
+
+      doubleRollRushZones.markCleanupPending({
+        rushId,
+        now,
+      });
+    } catch (error) {
+      logger.warn("[world-boss] Failed to persist Roll Paradise cleanup retry.", error);
+    }
   };
 
   const closeDoubleRollRush = async ({
@@ -931,6 +981,8 @@ export const createWorldBossLiveRuntime = ({
     const expiresAt = new Date(
       (context.worldBoss.closedAtMs ?? Date.now()) + worldBossDoubleRollRushDurationMs,
     );
+    const activatedAt = new Date(context.worldBoss.closedAtMs ?? Date.now());
+    const rushId = `double-roll-rush:${randomUUID()}`;
     const permissionOverwrites =
       "permissionOverwrites" in parentChannel &&
       parentChannel.permissionOverwrites &&
@@ -967,30 +1019,40 @@ export const createWorldBossLiveRuntime = ({
     let zone: WorldBossDoubleRollRushZoneRecord;
     try {
       zone = doubleRollRushZones.createZone({
-        rushId: `double-roll-rush:${randomUUID()}`,
+        rushId,
         sourceWorldBossId: context.worldBoss.worldBossId,
         parentChannelId: announcementMessage.channelId,
         rushChannelId: rushChannel.id,
         kickoffMessageId: "pending",
-        activatedAt: new Date(context.worldBoss.closedAtMs ?? Date.now()),
+        activatedAt,
         expiresAt,
       });
     } catch (error) {
       logger.warn("[world-boss] Failed to persist Roll Paradise zone.", error);
       context.worldBoss.doubleRollRushFailed = true;
-      await cleanupDoubleRollRushChannel({
-        rushId: `cleanup:${randomUUID()}`,
+      const cleanupResult = await cleanupDoubleRollRushChannel({
+        rushId,
         sourceWorldBossId: context.worldBoss.worldBossId,
         parentChannelId: announcementMessage.channelId,
         rushChannelId: rushChannel.id,
         kickoffMessageId: "missing",
-        activatedAt: new Date(),
+        activatedAt,
         expiresAt,
-        closedAt: new Date(),
-        closeReason: "kickoff-failed",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        closedAt: activatedAt,
+        closeReason: "persistence-failed",
+        createdAt: activatedAt,
+        updatedAt: activatedAt,
       });
+      if (cleanupResult === "retryable-failure") {
+        persistCleanupPendingDoubleRollRushZone({
+          rushId,
+          sourceWorldBossId: context.worldBoss.worldBossId,
+          parentChannelId: announcementMessage.channelId,
+          rushChannelId: rushChannel.id,
+          activatedAt,
+          expiresAt,
+        });
+      }
       return;
     }
 
@@ -1679,16 +1741,27 @@ export const createWorldBossLiveRuntime = ({
       invalidCount: 0,
     };
 
-    const pendingCleanupZones = doubleRollRushZones.listCleanupPendingZones();
     const expiredZones = doubleRollRushZones.closeExpiredZones(now);
     summary.expiredCount = expiredZones.length;
     await Promise.allSettled(
       expiredZones.map((zone) => reconcileClosedDoubleRollRushCleanup(zone, now)),
     );
+
+    const pendingCleanupZones = doubleRollRushZones.listCleanupPendingZones();
+    const legacyCleanupZones = doubleRollRushZones.listCleanupUntrackedZones();
     const expiredZoneIds = new Set(expiredZones.map((zone) => zone.rushId));
     await Promise.allSettled(
       pendingCleanupZones
         .filter((zone) => !expiredZoneIds.has(zone.rushId))
+        .map((zone) => reconcileClosedDoubleRollRushCleanup(zone, now)),
+    );
+    const trackedCleanupZoneIds = new Set([
+      ...expiredZoneIds,
+      ...pendingCleanupZones.map((zone) => zone.rushId),
+    ]);
+    await Promise.allSettled(
+      legacyCleanupZones
+        .filter((zone) => !trackedCleanupZoneIds.has(zone.rushId))
         .map((zone) => reconcileClosedDoubleRollRushCleanup(zone, now)),
     );
 
@@ -1696,6 +1769,16 @@ export const createWorldBossLiveRuntime = ({
       now,
     });
     for (const zone of openZones) {
+      if (zone.kickoffMessageId === "missing") {
+        await closeDoubleRollRush({
+          rushId: zone.rushId,
+          closeReason: "persistence-failed",
+          now,
+        });
+        summary.invalidCount += 1;
+        continue;
+      }
+
       const fetchedChannel = await client.channels
         .fetch(zone.rushChannelId)
         .then((channel) => ({

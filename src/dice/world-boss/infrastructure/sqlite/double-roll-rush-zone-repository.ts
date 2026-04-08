@@ -29,6 +29,7 @@ type WorldBossDoubleRollRushZoneRow = {
 };
 
 const cleanupPendingCloseReasonSuffix = ":cleanup-pending";
+const cleanupCompleteCloseReasonSuffix = ":cleanup-complete";
 
 const selectZoneColumns = `
   rush_id,
@@ -45,11 +46,19 @@ const selectZoneColumns = `
 `;
 
 const stripCleanupPendingCloseReason = (closeReason: string | null): string | null => {
-  if (!closeReason || !closeReason.endsWith(cleanupPendingCloseReasonSuffix)) {
+  if (!closeReason) {
     return closeReason;
   }
 
-  return closeReason.slice(0, -cleanupPendingCloseReasonSuffix.length);
+  if (closeReason.endsWith(cleanupPendingCloseReasonSuffix)) {
+    return closeReason.slice(0, -cleanupPendingCloseReasonSuffix.length);
+  }
+
+  if (closeReason.endsWith(cleanupCompleteCloseReasonSuffix)) {
+    return closeReason.slice(0, -cleanupCompleteCloseReasonSuffix.length);
+  }
+
+  return closeReason;
 };
 
 const mapZoneRow = (row: WorldBossDoubleRollRushZoneRow): WorldBossDoubleRollRushZoneRecord => {
@@ -301,6 +310,23 @@ export const createSqliteWorldBossDoubleRollRushZoneRepository = (db: SqliteData
     return rows.map(mapZoneRow);
   };
 
+  const listCleanupUntrackedZones = (): WorldBossDoubleRollRushZoneRecord[] => {
+    const rows = db
+      .prepare<unknown[], WorldBossDoubleRollRushZoneRow>(
+        `
+        SELECT ${selectZoneColumns}
+        FROM dice_world_boss_double_roll_rush_zones
+        WHERE closed_at IS NOT NULL
+          AND close_reason NOT LIKE ?
+          AND close_reason NOT LIKE ?
+        ORDER BY updated_at DESC, rush_id ASC
+      `,
+      )
+      .all(`%${cleanupPendingCloseReasonSuffix}`, `%${cleanupCompleteCloseReasonSuffix}`);
+
+    return rows.map(mapZoneRow);
+  };
+
   const closeZone = ({
     rushId,
     closeReason,
@@ -376,7 +402,7 @@ export const createSqliteWorldBossDoubleRollRushZoneRepository = (db: SqliteData
     });
   };
 
-  const clearCleanupPending = ({
+  const markCleanupComplete = ({
     rushId,
     now = new Date(),
   }: {
@@ -388,10 +414,17 @@ export const createSqliteWorldBossDoubleRollRushZoneRepository = (db: SqliteData
       return row ? mapZoneRow(row) : null;
     }
 
+    const baseCloseReason = row.close_reason.endsWith(cleanupPendingCloseReasonSuffix)
+      ? row.close_reason.slice(0, -cleanupPendingCloseReasonSuffix.length)
+      : row.close_reason;
+    const closeReason = baseCloseReason.endsWith(cleanupCompleteCloseReasonSuffix)
+      ? baseCloseReason
+      : `${baseCloseReason}${cleanupCompleteCloseReasonSuffix}`;
+
     return updateZoneFields({
       db,
       rushId,
-      closeReason: stripCleanupPendingCloseReason(row.close_reason) ?? row.close_reason,
+      closeReason,
       now,
     });
   };
@@ -402,9 +435,10 @@ export const createSqliteWorldBossDoubleRollRushZoneRepository = (db: SqliteData
     getActiveZoneByChannelId,
     listOpenZones,
     listCleanupPendingZones,
+    listCleanupUntrackedZones,
     closeZone,
     updateKickoffMessageId,
     markCleanupPending,
-    clearCleanupPending,
+    markCleanupComplete,
   };
 };

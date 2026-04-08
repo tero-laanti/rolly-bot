@@ -1734,6 +1734,289 @@ test("Roll Paradise startup recovery retries cleanup-pending closed zones", asyn
   });
 });
 
+test("Roll Paradise startup recovery sweeps legacy closed zones once", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "./sqlite/double-roll-rush-zone-repository",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const zoneRepositoryModule = moduleRequire(
+      "./sqlite/double-roll-rush-zone-repository",
+    ) as typeof import("./sqlite/double-roll-rush-zone-repository");
+    let firstRecoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let secondRecoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const repository = zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository(
+        db as never,
+      );
+      repository.createZone({
+        rushId: "rush-1",
+        sourceWorldBossId: "world-boss-1",
+        parentChannelId: "world-boss-channel",
+        rushChannelId: "roll-paradise-channel-1",
+        kickoffMessageId: "kickoff-1",
+        activatedAt: new Date("2026-04-01T10:00:00.000Z"),
+        expiresAt: new Date("2026-04-01T10:15:00.000Z"),
+      });
+      repository.closeZone({
+        rushId: "rush-1",
+        closeReason: "expired",
+        now: new Date("2026-04-01T10:16:00.000Z"),
+      });
+
+      let rushDeleteAttempts = 0;
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
+        delete: async () => {
+          rushDeleteAttempts += 1;
+          return rushChannel;
+        },
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      const runtimeConfig = {
+        enabled: true,
+        inactiveReason: null,
+        channelId: "world-boss-channel",
+        joinLeadMs: 10,
+        activeDurationMs: 60_000,
+        targetWorldBossesPerDay: 0,
+        minGapMs: 1,
+        retryDelayMs: 1,
+        jitterRatio: 0,
+        quietHours: {
+          start: "00:00",
+          end: "00:00",
+          timezone: "UTC",
+        },
+      };
+
+      firstRecoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const firstRecoverySummary = await firstRecoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date("2026-04-01T10:20:00.000Z"),
+      });
+      assert.deepEqual(firstRecoverySummary, {
+        resumedCount: 0,
+        expiredCount: 0,
+        invalidCount: 0,
+      });
+      assert.equal(rushDeleteAttempts, 1);
+
+      await firstRecoveryRuntime.stop();
+      firstRecoveryRuntime = null;
+
+      secondRecoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const secondRecoverySummary = await secondRecoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date("2026-04-01T10:25:00.000Z"),
+      });
+      assert.deepEqual(secondRecoverySummary, {
+        resumedCount: 0,
+        expiredCount: 0,
+        invalidCount: 0,
+      });
+      assert.equal(rushDeleteAttempts, 1);
+    } finally {
+      if (firstRecoveryRuntime) {
+        await firstRecoveryRuntime.stop();
+      }
+      if (secondRecoveryRuntime) {
+        await secondRecoveryRuntime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
+test("Roll Paradise startup recovery cleans leaked cleanup-only zones instead of resuming them", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "./sqlite/double-roll-rush-zone-repository",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const zoneRepositoryModule = moduleRequire(
+      "./sqlite/double-roll-rush-zone-repository",
+    ) as typeof import("./sqlite/double-roll-rush-zone-repository");
+    let firstRecoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let secondRecoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const repository = zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository(
+        db as never,
+      );
+      repository.createZone({
+        rushId: "rush-1",
+        sourceWorldBossId: "world-boss-1",
+        parentChannelId: "world-boss-channel",
+        rushChannelId: "roll-paradise-channel-1",
+        kickoffMessageId: "missing",
+        activatedAt: new Date("2026-04-01T10:00:00.000Z"),
+        expiresAt: new Date("2026-04-01T10:30:00.000Z"),
+      });
+
+      let rushDeleteAttempts = 0;
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
+        delete: async () => {
+          rushDeleteAttempts += 1;
+          return rushChannel;
+        },
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      const runtimeConfig = {
+        enabled: true,
+        inactiveReason: null,
+        channelId: "world-boss-channel",
+        joinLeadMs: 10,
+        activeDurationMs: 60_000,
+        targetWorldBossesPerDay: 0,
+        minGapMs: 1,
+        retryDelayMs: 1,
+        jitterRatio: 0,
+        quietHours: {
+          start: "00:00",
+          end: "00:00",
+          timezone: "UTC",
+        },
+      };
+
+      firstRecoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const firstRecoverySummary = await firstRecoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date("2026-04-01T10:20:00.000Z"),
+      });
+      assert.deepEqual(firstRecoverySummary, {
+        resumedCount: 0,
+        expiredCount: 0,
+        invalidCount: 1,
+      });
+      assert.equal(rushDeleteAttempts, 1);
+
+      await firstRecoveryRuntime.stop();
+      firstRecoveryRuntime = null;
+
+      secondRecoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const secondRecoverySummary = await secondRecoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date("2026-04-01T10:25:00.000Z"),
+      });
+      assert.deepEqual(secondRecoverySummary, {
+        resumedCount: 0,
+        expiredCount: 0,
+        invalidCount: 0,
+      });
+      assert.equal(rushDeleteAttempts, 1);
+    } finally {
+      if (firstRecoveryRuntime) {
+        await firstRecoveryRuntime.stop();
+      }
+      if (secondRecoveryRuntime) {
+        await secondRecoveryRuntime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
 test("Roll Paradise cleans up the created channel when zone persistence fails", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
     const modulePaths = [
@@ -1911,6 +2194,218 @@ test("Roll Paradise cleans up the created channel when zone persistence fails", 
     } finally {
       if (runtime) {
         await runtime.stop();
+      }
+
+      (
+        zoneRepositoryModule as {
+          createSqliteWorldBossDoubleRollRushZoneRepository: typeof zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository;
+        }
+      ).createSqliteWorldBossDoubleRollRushZoneRepository = originalCreateRepository;
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
+test("Roll Paradise persists cleanup recovery when zone persistence and immediate delete both fail", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = [
+      "../../../shared/config",
+      "../../../shared/db",
+      "./sqlite/double-roll-rush-zone-repository",
+      "./live-runtime",
+    ] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    const zoneRepositoryModule = moduleRequire(
+      "./sqlite/double-roll-rush-zone-repository",
+    ) as typeof import("./sqlite/double-roll-rush-zone-repository");
+    const originalCreateRepository =
+      zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+    let recoveryRuntime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      (
+        zoneRepositoryModule as {
+          createSqliteWorldBossDoubleRollRushZoneRepository: typeof zoneRepositoryModule.createSqliteWorldBossDoubleRollRushZoneRepository;
+        }
+      ).createSqliteWorldBossDoubleRollRushZoneRepository = (inputDb) => {
+        const repository = originalCreateRepository(inputDb);
+        let createAttempts = 0;
+
+        return {
+          ...repository,
+          createZone: (input: Parameters<typeof repository.createZone>[0]) => {
+            createAttempts += 1;
+            if (createAttempts === 1) {
+              throw new Error("SQLITE_BUSY");
+            }
+
+            return repository.createZone(input);
+          },
+        };
+      };
+
+      let rushDeleteAttempts = 0;
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
+        send: async () => ({
+          id: "roll-paradise-kickoff-1",
+        }),
+        delete: async () => {
+          rushDeleteAttempts += 1;
+          if (rushDeleteAttempts === 1) {
+            throw new Error("temporary delete failure");
+          }
+
+          return rushChannel;
+        },
+      };
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => payload,
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+        }),
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const worldBossChannel = {
+        isTextBased: () => true,
+        guild: {
+          channels: {
+            create: async () => rushChannel,
+          },
+        },
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return worldBossChannel;
+            }
+
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      const runtimeConfig = {
+        enabled: true,
+        inactiveReason: null,
+        channelId: "world-boss-channel",
+        joinLeadMs: 10,
+        activeDurationMs: 60_000,
+        targetWorldBossesPerDay: 0,
+        minGapMs: 1,
+        retryDelayMs: 1,
+        jitterRatio: 0,
+        quietHours: {
+          start: "00:00",
+          end: "00:00",
+          timezone: "UTC",
+        },
+      };
+
+      runtime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const result = runtime.applyDiceRoll({
+        channelId: "world-boss-thread-1",
+        userId: "user-1",
+        userMention: "<@user-1>",
+        damage: 1_000_000,
+      });
+      assert.equal(result.kind, "applied");
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const repository = originalCreateRepository(db as never);
+      assert.equal(repository.listCleanupPendingZones().length, 1);
+      assert.equal(rushDeleteAttempts, 1);
+
+      await runtime.stop();
+      runtime = null;
+
+      recoveryRuntime = createWorldBossLiveRuntime({
+        client,
+        config: runtimeConfig,
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const recoverySummary = await recoveryRuntime.recoverDoubleRollRushesOnStartup({
+        now: new Date("2026-04-01T10:20:00.000Z"),
+      });
+      assert.deepEqual(recoverySummary, {
+        resumedCount: 0,
+        expiredCount: 0,
+        invalidCount: 0,
+      });
+      assert.equal(rushDeleteAttempts, 2);
+      assert.deepEqual(repository.listCleanupPendingZones(), []);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+      if (recoveryRuntime) {
+        await recoveryRuntime.stop();
       }
 
       (

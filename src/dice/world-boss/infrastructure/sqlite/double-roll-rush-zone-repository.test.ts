@@ -158,6 +158,19 @@ test("Double Roll Rush repository tracks cleanup-pending closed zones without ch
       now: new Date("2026-04-01T10:20:00.000Z"),
     });
 
+    assert.deepEqual(
+      repository.listCleanupUntrackedZones().map((zone) => ({
+        rushId: zone.rushId,
+        closeReason: zone.closeReason,
+      })),
+      [
+        {
+          rushId: "rush-1",
+          closeReason: "expired",
+        },
+      ],
+    );
+
     repository.markCleanupPending({
       rushId: "rush-1",
       now: new Date("2026-04-01T10:21:00.000Z"),
@@ -177,12 +190,15 @@ test("Double Roll Rush repository tracks cleanup-pending closed zones without ch
       ],
     );
 
-    const clearedZone = repository.clearCleanupPending({
+    assert.deepEqual(repository.listCleanupUntrackedZones(), []);
+
+    const clearedZone = repository.markCleanupComplete({
       rushId: "rush-1",
       now: new Date("2026-04-01T10:22:00.000Z"),
     });
     assert.equal(clearedZone?.closeReason, "expired");
     assert.deepEqual(repository.listCleanupPendingZones(), []);
+    assert.deepEqual(repository.listCleanupUntrackedZones(), []);
   } finally {
     db.close();
   }
