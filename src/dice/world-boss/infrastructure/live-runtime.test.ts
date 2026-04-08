@@ -1129,6 +1129,20 @@ test("successful World Boss clears create a restart-safe Roll Paradise channel",
       const rushDeleteCalls: number[] = [];
       const announcementEdits: unknown[] = [];
       const activeEdits: unknown[] = [];
+      const inheritedPermissionOverwrites = [
+        {
+          id: "everyone-role",
+          allow: { bitfield: 0n },
+          deny: { bitfield: 1024n },
+          type: 0,
+        },
+        {
+          id: "bot-user-1",
+          allow: { bitfield: 2048n },
+          deny: { bitfield: 0n },
+          type: 1,
+        },
+      ];
 
       const rushChannel = {
         id: "roll-paradise-channel-1",
@@ -1167,6 +1181,9 @@ test("successful World Boss clears create a restart-safe Roll Paradise channel",
       const worldBossChannel = {
         isTextBased: () => true,
         parentId: "world-boss-category-1",
+        permissionOverwrites: {
+          cache: inheritedPermissionOverwrites,
+        },
         guild: {
           channels: {
             create: async (options: unknown) => {
@@ -1260,7 +1277,17 @@ test("successful World Boss clears create a restart-safe Roll Paradise channel",
         expiresAtMs: activeStatus.expiresAtMs,
       });
       assert.equal(createdRushChannels.length, 1);
-      assert.match(JSON.stringify(createdRushChannels[0]), /roll-paradise/);
+      const createdRushChannel = createdRushChannels[0] as {
+        name?: string;
+        permissionOverwrites?: Array<{
+          id: string;
+        }>;
+      };
+      assert.equal(createdRushChannel.name, "roll-paradise");
+      assert.deepEqual(
+        createdRushChannel.permissionOverwrites?.map((overwrite) => overwrite.id),
+        ["everyone-role", "bot-user-1"],
+      );
       assert.equal(rushKickoffPayloads.length, 1);
       assert.match(
         JSON.stringify(rushKickoffPayloads[0]),

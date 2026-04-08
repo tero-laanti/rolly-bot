@@ -833,6 +833,19 @@ export const createWorldBossLiveRuntime = ({
     const expiresAt = new Date(
       (context.worldBoss.closedAtMs ?? Date.now()) + worldBossDoubleRollRushDurationMs,
     );
+    const permissionOverwrites =
+      "permissionOverwrites" in parentChannel &&
+      parentChannel.permissionOverwrites &&
+      "cache" in parentChannel.permissionOverwrites &&
+      "map" in parentChannel.permissionOverwrites.cache &&
+      typeof parentChannel.permissionOverwrites.cache.map === "function"
+        ? parentChannel.permissionOverwrites.cache.map((overwrite) => ({
+            id: overwrite.id,
+            allow: overwrite.allow.bitfield,
+            deny: overwrite.deny.bitfield,
+            type: overwrite.type,
+          }))
+        : undefined;
     const rushChannel = await parentChannel.guild.channels
       .create({
         name: worldBossDoubleRollRushChannelName,
@@ -841,6 +854,7 @@ export const createWorldBossLiveRuntime = ({
           "parentId" in parentChannel && typeof parentChannel.parentId === "string"
             ? parentChannel.parentId
             : undefined,
+        permissionOverwrites,
       })
       .catch((error: unknown) => {
         logger.warn("[world-boss] Failed to create Roll Paradise channel.", error);
