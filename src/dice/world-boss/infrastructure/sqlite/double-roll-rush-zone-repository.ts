@@ -226,6 +226,21 @@ export const createSqliteWorldBossDoubleRollRushZoneRepository = (db: SqliteData
     return rows.map(mapZoneRow);
   };
 
+  const listClosedZones = (): WorldBossDoubleRollRushZoneRecord[] => {
+    const rows = db
+      .prepare<unknown[], WorldBossDoubleRollRushZoneRow>(
+        `
+        SELECT ${selectZoneColumns}
+        FROM dice_world_boss_double_roll_rush_zones
+        WHERE closed_at IS NOT NULL
+        ORDER BY updated_at DESC, rush_id ASC
+      `,
+      )
+      .all();
+
+    return rows.map(mapZoneRow);
+  };
+
   const closeZone = ({
     rushId,
     closeReason,
@@ -265,6 +280,7 @@ export const createSqliteWorldBossDoubleRollRushZoneRepository = (db: SqliteData
     closeExpiredZones,
     getActiveZoneByChannelId,
     listOpenZones,
+    listClosedZones,
     closeZone,
   };
 };

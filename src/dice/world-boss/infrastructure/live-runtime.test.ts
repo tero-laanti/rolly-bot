@@ -1382,3 +1382,151 @@ test("successful World Boss clears create a restart-safe Roll Paradise channel",
     }
   });
 });
+
+test("Roll Paradise falls back to a non-pinging kickoff message when @here is not allowed", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const rushKickoffPayloads: unknown[] = [];
+      let kickoffAttempt = 0;
+      const rushChannel = {
+        id: "roll-paradise-channel-1",
+        send: async (payload: { allowedMentions?: { parse?: readonly string[] } }) => {
+          rushKickoffPayloads.push(payload);
+          kickoffAttempt += 1;
+          if (kickoffAttempt === 1) {
+            throw new Error("Missing MentionEveryone permission");
+          }
+
+          return {
+            id: "roll-paradise-kickoff-1",
+          };
+        },
+        delete: async () => rushChannel,
+      };
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => payload,
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+        }),
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => activeMessage,
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const worldBossChannel = {
+        isTextBased: () => true,
+        guild: {
+          channels: {
+            create: async () => rushChannel,
+          },
+        },
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return worldBossChannel;
+            }
+
+            if (channelId === "roll-paradise-channel-1") {
+              return rushChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+
+      runtime = createWorldBossLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "world-boss-channel",
+          joinLeadMs: 10,
+          activeDurationMs: 60_000,
+          targetWorldBossesPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+
+      const triggerResult = await runtime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await runtime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: {
+          id: "user-1",
+        },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const result = runtime.applyDiceRoll({
+        channelId: "world-boss-thread-1",
+        userId: "user-1",
+        userMention: "<@user-1>",
+        damage: 1_000_000,
+      });
+      assert.equal(result.kind, "applied");
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      assert.equal(rushKickoffPayloads.length, 2);
+      assert.match(JSON.stringify(rushKickoffPayloads[0]), /"parse":\["everyone"\]/);
+      assert.match(JSON.stringify(rushKickoffPayloads[1]), /"parse":\[\]/);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});

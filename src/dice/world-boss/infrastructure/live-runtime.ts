@@ -236,21 +236,85 @@ export const createWorldBossLiveRuntime = ({
 
   const cleanupDoubleRollRushChannel = async (
     zone: WorldBossDoubleRollRushZoneRecord,
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     const channel = await client.channels.fetch(zone.rushChannelId).catch((error) => {
       logger.warn("[world-boss] Failed to fetch Roll Paradise channel for cleanup.", error);
       return null;
     });
 
     if (!channel) {
-      return;
+      return true;
     }
 
     if ("delete" in channel && typeof channel.delete === "function") {
-      await channel.delete().catch((error: unknown) => {
-        logger.warn("[world-boss] Failed to delete Roll Paradise channel.", error);
-      });
+      const deleted = await channel
+        .delete()
+        .then(() => true)
+        .catch((error: unknown) => {
+          logger.warn("[world-boss] Failed to delete Roll Paradise channel.", error);
+          return false;
+        });
+
+      return deleted;
     }
+
+    return true;
+  };
+
+  const sendRollParadiseKickoffMessage = async ({
+    rushChannel,
+    bossName,
+    endsAtMs,
+  }: {
+    rushChannel: {
+      send: (
+        payload: BaseMessageOptions & { content: string; allowedMentions: object },
+      ) => Promise<{
+        id: string;
+      }>;
+    };
+    bossName: string;
+    endsAtMs: number;
+  }): Promise<{
+    id: string;
+  } | null> => {
+    const content = `@here, the ${bossName} has fallen! The roll paradise is briefly open!`;
+    const prompt = buildWorldBossRollParadiseKickoffPrompt({
+      endsAtMs,
+    });
+
+    const kickoffMessage = await rushChannel
+      .send({
+        content,
+        allowedMentions: {
+          parse: ["everyone"],
+        },
+        ...prompt,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          "[world-boss] Failed to post Roll Paradise kickoff message with @here mention.",
+          error,
+        );
+        return null;
+      });
+
+    if (kickoffMessage) {
+      return kickoffMessage;
+    }
+
+    return rushChannel
+      .send({
+        content,
+        allowedMentions: {
+          parse: [] as const,
+        },
+        ...prompt,
+      })
+      .catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to post Roll Paradise kickoff message.", error);
+        return null;
+      });
   };
 
   const closeDoubleRollRush = async ({
@@ -866,20 +930,11 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    const kickoffMessage = await rushChannel
-      .send({
-        content: `@here, the ${context.worldBoss.boss.name} has fallen! The roll paradise is briefly open!`,
-        allowedMentions: {
-          parse: ["everyone"],
-        },
-        ...buildWorldBossRollParadiseKickoffPrompt({
-          endsAtMs: expiresAt.getTime(),
-        }),
-      })
-      .catch((error: unknown) => {
-        logger.warn("[world-boss] Failed to post Roll Paradise kickoff message.", error);
-        return null;
-      });
+    const kickoffMessage = await sendRollParadiseKickoffMessage({
+      rushChannel,
+      bossName: context.worldBoss.boss.name,
+      endsAtMs: expiresAt.getTime(),
+    });
 
     if (!kickoffMessage) {
       context.worldBoss.doubleRollRushFailed = true;
@@ -1573,6 +1628,12 @@ export const createWorldBossLiveRuntime = ({
     const expiredZones = doubleRollRushZones.closeExpiredZones(now);
     summary.expiredCount = expiredZones.length;
     await Promise.allSettled(expiredZones.map((zone) => cleanupDoubleRollRushChannel(zone)));
+
+    const expiredZoneIds = new Set(expiredZones.map((zone) => zone.rushId));
+    const closedZones = doubleRollRushZones
+      .listClosedZones()
+      .filter((zone) => !expiredZoneIds.has(zone.rushId));
+    await Promise.allSettled(closedZones.map((zone) => cleanupDoubleRollRushChannel(zone)));
 
     const openZones = doubleRollRushZones.listOpenZones({
       now,

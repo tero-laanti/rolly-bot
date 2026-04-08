@@ -111,3 +111,41 @@ test("Double Roll Rush repository lists only still-open zones", () => {
     db.close();
   }
 });
+
+test("Double Roll Rush repository can list closed zones for cleanup recovery", () => {
+  const { db, repository } = createRepository();
+
+  try {
+    repository.createZone({
+      rushId: "rush-1",
+      sourceWorldBossId: "world-boss-1",
+      parentChannelId: "world-boss-channel",
+      rushChannelId: "rush-thread-1",
+      kickoffMessageId: "kickoff-1",
+      activatedAt: new Date("2026-04-01T10:00:00.000Z"),
+      expiresAt: new Date("2026-04-01T10:15:00.000Z"),
+    });
+    repository.closeZone({
+      rushId: "rush-1",
+      closeReason: "expired",
+      now: new Date("2026-04-01T10:20:00.000Z"),
+    });
+
+    const closedZones = repository.listClosedZones();
+
+    assert.deepEqual(
+      closedZones.map((zone) => ({
+        rushId: zone.rushId,
+        closeReason: zone.closeReason,
+      })),
+      [
+        {
+          rushId: "rush-1",
+          closeReason: "expired",
+        },
+      ],
+    );
+  } finally {
+    db.close();
+  }
+});
