@@ -105,11 +105,15 @@ export const createDiceRollModifierState = ({
     pvpDoubleRollUntilMs !== null && pvpDoubleRollUntilMs > nowMs,
   );
   const hasActiveItemDoubleRoll = itemDoubleRollStatus.isActive;
-  const hasActiveDoubleRoll =
-    hasActivePvpDoubleRoll || hasActiveItemDoubleRoll || hasActiveDoubleRollRush;
-  const doubleBuffRollPassCount = hasActiveDoubleRoll
-    ? getDoubleBuffRollPassCount(prestige)
-    : baseRollPassCount;
+  const activeDoubleRollSourceCount = [
+    hasActivePvpDoubleRoll,
+    hasActiveItemDoubleRoll,
+    hasActiveDoubleRollRush,
+  ].filter(Boolean).length;
+  const doubleBuffRollPassCount =
+    activeDoubleRollSourceCount > 0
+      ? getDoubleBuffRollPassCount(prestige, activeDoubleRollSourceCount)
+      : baseRollPassCount;
   const temporaryEffectsRollSummary = summarizeDiceTemporaryRollEffects(temporaryEffects);
   const nonChargeRollPassCount = Math.max(
     1,
@@ -158,10 +162,11 @@ export const buildDiceRollModifierFooter = ({
       doubleRollSources.push("Rush");
     }
 
+    const doubleRollMultiplier = 2 ** doubleRollSources.length;
     modifierParts.push(
       doubleRollSources.length === 1
         ? `${doubleRollSources[0]} double ×2`
-        : `double-roll buff ×2 (${doubleRollSources.join(" + ")})`,
+        : `double-roll buffs ×${doubleRollMultiplier} (${doubleRollSources.join(" + ")})`,
     );
   }
 

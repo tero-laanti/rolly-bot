@@ -680,6 +680,7 @@ test("successful raid clears grant rewards to all active raiders and update the 
     "./discord/discord-raid-status-publisher",
     "./live-runtime",
     "./sqlite/services",
+    "./tier-role-rewards",
   ] as const;
   clearModules(modulePaths);
 
@@ -761,8 +762,13 @@ test("successful raid clears grant rewards to all active raiders and update the 
     "./discord/discord-raid-recovery-inspector",
   ) as typeof import("./discord/discord-raid-recovery-inspector");
   const originalCreateInspector = inspectorModule.createDiscordRaidRecoveryInspector;
+  const tierRoleRewardsModule = moduleRequire(
+    "./tier-role-rewards",
+  ) as typeof import("./tier-role-rewards");
+  const originalGrantRaidTierRoleRewards = tierRoleRewardsModule.grantRaidTierRoleRewards;
 
   const encounterDescriptions: string[] = [];
+  let tierRoleRewardGrantCount = 0;
   const channelMessages: string[] = [];
   try {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -888,6 +894,13 @@ test("successful raid clears grant rewards to all active raiders and update the 
         }),
         cleanupProvisionedRunResources: async () => {},
       }) as never;
+    (
+      tierRoleRewardsModule as {
+        grantRaidTierRoleRewards: typeof tierRoleRewardsModule.grantRaidTierRoleRewards;
+      }
+    ).grantRaidTierRoleRewards = async () => {
+      tierRoleRewardGrantCount += 1;
+    };
 
     const { createRaidsLiveRuntime } = moduleRequire(
       "./live-runtime",
@@ -917,11 +930,14 @@ test("successful raid clears grant rewards to all active raiders and update the 
 
     assert.equal(result.defeated, true);
     assert.match(result.summary, /Rewards granted:/);
-    assert.equal(economy.getPips("leader-1"), 6);
-    assert.equal(economy.getPips("user-2"), 6);
+    assert.equal(economy.getPips("leader-1"), 106);
+    assert.equal(economy.getPips("user-2"), 106);
     const resolvedRun = repository.getRaidRun("raid-run-1");
     assert.equal(resolvedRun?.run.status, "resolved");
-    assert.match(resolvedRun?.run.rewardSummary ?? "", /6 pips and x2 roll buff/i);
+    assert.match(
+      resolvedRun?.run.rewardSummary ?? "",
+      /106 pips \(includes first-clear bonus\) and x2 roll buff/i,
+    );
     assert.ok(resolvedRun?.run.rewardGrantedAt instanceof Date);
 
     const leaderEffects = progression.getActiveDiceTemporaryEffects({ userId: "leader-1" });
@@ -933,12 +949,78 @@ test("successful raid clears grant rewards to all active raiders and update the 
     assert.equal(leaderEffects[0]?.source, "raid:raid-run-1");
     assert.ok(
       encounterDescriptions.some((description) =>
-        description.includes("Rewards granted: **6 pips"),
+        description.includes("Rewards granted: **106 pips"),
       ),
     );
     assert.ok(
       channelMessages.some((content) => content.includes("Raid instance closing in 5 minutes")),
     );
+
+    const secondCreated = repository.createRecruitingRaidRun({
+      runId: "raid-run-2",
+      tierId: "bronze",
+      bossId: stubBoss.bossId,
+      leaderUserId: "leader-1",
+      publicChannelId: "panel-channel",
+      recruitmentExpiresAt: new Date(now.getTime() + 15 * 60 * 1000),
+      now,
+    });
+    assert.equal(secondCreated.ok, true);
+    if (!secondCreated.ok) {
+      throw new Error("expected second raid run creation to succeed");
+    }
+
+    const secondJoined = repository.addRaidRunMember({
+      runId: "raid-run-2",
+      userId: "user-2",
+      expectedVersion: secondCreated.raidRun.run.version,
+      now,
+      partySizeLimit: 4,
+    });
+    assert.equal(secondJoined.ok, true);
+    if (!secondJoined.ok) {
+      throw new Error("expected second raid run join to succeed");
+    }
+
+    const secondActivated = repository.updateRaidRun({
+      runId: "raid-run-2",
+      expectedVersion: secondJoined.raidRun.run.version,
+      now,
+      status: "active",
+      publicMessageId: "public-message-2",
+      privateChannelId: "raid-channel-2",
+      participantRoleId: "role-2",
+      encounterMessageId: "encounter-message-2b",
+      encounterStartsAt: now,
+      encounterExpiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+      bossCurrentHp: 8,
+      versionDelta: 1,
+    });
+    assert.equal(secondActivated.ok, true);
+
+    const secondResult = runtime.applyDiceRoll({
+      channelId: "raid-channel-2",
+      userId: "leader-1",
+      userMention: "<@leader-1>",
+      damage: 8,
+      bestRollSet: [6, 2],
+      nowMs: now.getTime(),
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(secondResult.kind, "applied");
+    if (secondResult.kind !== "applied") {
+      throw new Error("expected second raid hit to be applied");
+    }
+
+    assert.equal(secondResult.defeated, true);
+    assert.equal(economy.getPips("leader-1"), 112);
+    assert.equal(economy.getPips("user-2"), 112);
+    assert.equal(tierRoleRewardGrantCount, 2);
+    const secondResolvedRun = repository.getRaidRun("raid-run-2");
+    assert.match(secondResolvedRun?.run.rewardSummary ?? "", /6 pips and x2 roll buff/i);
+    assert.doesNotMatch(secondResolvedRun?.run.rewardSummary ?? "", /first-clear bonus/i);
     await runtime.stop();
   } finally {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = originalGetDatabase;
@@ -995,6 +1077,11 @@ test("successful raid clears grant rewards to all active raiders and update the 
         createDiscordRaidRecoveryInspector: typeof inspectorModule.createDiscordRaidRecoveryInspector;
       }
     ).createDiscordRaidRecoveryInspector = originalCreateInspector;
+    (
+      tierRoleRewardsModule as {
+        grantRaidTierRoleRewards: typeof tierRoleRewardsModule.grantRaidTierRoleRewards;
+      }
+    ).grantRaidTierRoleRewards = originalGrantRaidTierRoleRewards;
     db.close();
     clearModules(modulePaths);
   }
@@ -1010,6 +1097,7 @@ test("startup recovery settles zero-hp raids exactly once after a restart", asyn
     "./discord/discord-raid-status-publisher",
     "./live-runtime",
     "./sqlite/services",
+    "./tier-role-rewards",
   ] as const;
   clearModules(modulePaths);
 
@@ -1091,8 +1179,13 @@ test("startup recovery settles zero-hp raids exactly once after a restart", asyn
     "./discord/discord-raid-recovery-inspector",
   ) as typeof import("./discord/discord-raid-recovery-inspector");
   const originalCreateInspector = inspectorModule.createDiscordRaidRecoveryInspector;
+  const tierRoleRewardsModule = moduleRequire(
+    "./tier-role-rewards",
+  ) as typeof import("./tier-role-rewards");
+  const originalGrantRaidTierRoleRewards = tierRoleRewardsModule.grantRaidTierRoleRewards;
 
   const encounterDescriptions: string[] = [];
+  let tierRoleRewardGrantCount = 0;
 
   try {
     (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
@@ -1216,6 +1309,13 @@ test("startup recovery settles zero-hp raids exactly once after a restart", asyn
         }),
         cleanupProvisionedRunResources: async () => {},
       }) as never;
+    (
+      tierRoleRewardsModule as {
+        grantRaidTierRoleRewards: typeof tierRoleRewardsModule.grantRaidTierRoleRewards;
+      }
+    ).grantRaidTierRoleRewards = async () => {
+      tierRoleRewardGrantCount += 1;
+    };
 
     const { createRaidsLiveRuntime } = moduleRequire(
       "./live-runtime",
@@ -1230,8 +1330,8 @@ test("startup recovery settles zero-hp raids exactly once after a restart", asyn
     await runtime.recoverRunsOnStartup({ now });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    assert.equal(economy.getPips("leader-1"), 6);
-    assert.equal(economy.getPips("user-2"), 6);
+    assert.equal(economy.getPips("leader-1"), 106);
+    assert.equal(economy.getPips("user-2"), 106);
     assert.equal(progression.getActiveDiceTemporaryEffects({ userId: "leader-1" }).length, 1);
     assert.equal(progression.getActiveDiceTemporaryEffects({ userId: "user-2" }).length, 1);
 
@@ -1239,15 +1339,20 @@ test("startup recovery settles zero-hp raids exactly once after a restart", asyn
     assert.equal(resolvedRun?.run.status, "resolved");
     assert.equal(resolvedRun?.run.isOpen, false);
     assert.ok(resolvedRun?.run.rewardGrantedAt instanceof Date);
-    assert.match(resolvedRun?.run.rewardSummary ?? "", /6 pips and x2 roll buff/i);
+    assert.match(
+      resolvedRun?.run.rewardSummary ?? "",
+      /106 pips \(includes first-clear bonus\) and x2 roll buff/i,
+    );
+    assert.equal(tierRoleRewardGrantCount, 1);
 
     await runtime.recoverRunsOnStartup({ now: new Date(now.getTime() + 30_000) });
 
-    assert.equal(economy.getPips("leader-1"), 6);
-    assert.equal(economy.getPips("user-2"), 6);
+    assert.equal(economy.getPips("leader-1"), 106);
+    assert.equal(economy.getPips("user-2"), 106);
+    assert.equal(tierRoleRewardGrantCount, 2);
     assert.ok(
       encounterDescriptions.some((description) =>
-        description.includes("Rewards granted: **6 pips"),
+        description.includes("Rewards granted: **106 pips"),
       ),
     );
     await runtime.stop();
@@ -1306,6 +1411,11 @@ test("startup recovery settles zero-hp raids exactly once after a restart", asyn
         createDiscordRaidRecoveryInspector: typeof inspectorModule.createDiscordRaidRecoveryInspector;
       }
     ).createDiscordRaidRecoveryInspector = originalCreateInspector;
+    (
+      tierRoleRewardsModule as {
+        grantRaidTierRoleRewards: typeof tierRoleRewardsModule.grantRaidTierRoleRewards;
+      }
+    ).grantRaidTierRoleRewards = originalGrantRaidTierRoleRewards;
     db.close();
     clearModules(modulePaths);
   }

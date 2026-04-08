@@ -924,6 +924,95 @@ test("Double Roll Rush reuses the normal double-roll modifier inside the active 
   }
 });
 
+test("Double Roll Rush stacks with item double-roll buffs to reach x4", () => {
+  const originalRandom = Math.random;
+  const randomValues = [0, 0.1, 0.2, 0.3];
+  let randomIndex = 0;
+  Math.random = () => {
+    const value = randomValues[randomIndex] ?? 0;
+    randomIndex += 1;
+    return value;
+  };
+
+  try {
+    const useCase = createRunRollDiceUseCase({
+      analytics: {
+        recordDiceRollAnalytics: () => {},
+        resetDiceCountAnalyticsProgress: () => {},
+      },
+      economy: {
+        applyFameDelta: ({ amount }) => amount,
+        getFame: () => 0,
+        grantDailyPipsIfEligible: () => ({
+          awarded: false,
+          awardedAmount: 0,
+          pips: 0,
+          lastDailyPipRewardAt: null,
+        }),
+      },
+      itemEffects: {
+        consumeOneDoubleRollUse: () => true,
+        getItemDoubleRollStatus: () => ({
+          isActive: true,
+          remainingUses: 2,
+          expiresAtMs: null,
+        }),
+      },
+      permanentBonuses: zeroPermanentBonuses,
+      progression: {
+        ...createProgressionStub(),
+        awardAchievements: () => [],
+        consumeDiceTemporaryEffectsForRoll: () => 0,
+        recordDiceProgressionAchievementStats: () => ({
+          rollCommandsTotal: 1,
+          nearDiceCountIncreaseRollsTotal: 0,
+          highestChargeMultiplier: 1,
+          highestRollPassCount: 4,
+          diceCountIncreasesTotal: 0,
+          firstBanAt: null,
+        }),
+        getActiveDiceTemporaryEffects: () => [],
+        getDiceBans: () => new Map(),
+        getDiceCount: () => 1,
+        getDicePrestige: () => 0,
+        getDiceSides: () => 6,
+        getLastDiceRollAt: () => null,
+        getUserDiceAchievements: () => [],
+        setDiceCount: () => {},
+        setLastDiceRollAt: () => {},
+      },
+      pvp: {
+        getActiveDiceLockout: () => null,
+        getActiveDoubleRoll: () => null,
+      },
+      worldBossDoubleRollRush: {
+        getActiveDoubleRollRushStatus: () => ({
+          isActive: true,
+          expiresAtMs: 1_710_000_900_000,
+        }),
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = useCase({
+      userId: "rush-item-user",
+      userMention: "<@rush-item-user>",
+      channelId: "double-roll-rush-thread",
+      nowMs: 1_710_000_000_000,
+    });
+
+    assert.match(
+      result.content,
+      /Roll modifiers: double-roll buffs ×4 \(item \+ Rush\) → effective ×4\./,
+    );
+    assert.match(result.content, /Set 4:/);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
 test("manual rolls increment total /roll call analytics", () => {
   const originalRandom = Math.random;
   let recordedRollCommandCount = -1;

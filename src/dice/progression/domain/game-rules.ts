@@ -69,8 +69,12 @@ export const getBaseRollPassCount = (prestige: number): number => {
   return normalizedPrestige + 1;
 };
 
-export const getDoubleBuffRollPassCount = (prestige: number): number => {
-  return getBaseRollPassCount(prestige) * 2;
+export const getDoubleBuffRollPassCount = (
+  prestige: number,
+  activeSourceCount: number = 1,
+): number => {
+  const normalizedSourceCount = Math.max(0, Math.floor(activeSourceCount));
+  return getBaseRollPassCount(prestige) * 2 ** normalizedSourceCount;
 };
 
 export const getMaxBansPerDie = (dieSides: number): number => {

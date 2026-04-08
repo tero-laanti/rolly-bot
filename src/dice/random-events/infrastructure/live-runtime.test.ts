@@ -80,6 +80,7 @@ const withPatchedRuntime = async (
           stageIndex: number;
           stageProgress: number;
           resolvedLines: string[];
+          successfulParticipantUserIds: Set<string>;
           participantUserIds: Set<string>;
           currentStageContributorUserIds: Set<string>;
           currentStageAttemptedUserIds: Set<string>;
@@ -351,6 +352,7 @@ test("group-meter keep-open failures publish failure achievements immediately", 
         stageIndex: 0,
         stageProgress: 0,
         resolvedLines: [],
+        successfulParticipantUserIds: new Set<string>(),
         participantUserIds: new Set<string>(),
         currentStageContributorUserIds: new Set<string>(),
         currentStageAttemptedUserIds: new Set<string>(),
@@ -380,6 +382,127 @@ test("group-meter keep-open failures publish failure achievements immediately", 
       ]);
     },
   );
+});
+
+test("group-meter stages allow the same successful party to continue into the next stage", async () => {
+  const originalRandom = Math.random;
+  const originalDateNow = Date.now;
+  let currentNowMs = 10_000;
+  Math.random = () => 0;
+  Date.now = () => currentNowMs;
+
+  const scenario: RandomEventScenario = {
+    ...createBaseScenario(),
+    claimPolicy: "multi-user",
+    flow: {
+      type: "group-meter",
+      stages: [
+        {
+          id: "meter-one",
+          label: "Meter One",
+          prompt: "Get two voices on beat.",
+          actionLabel: "Sing",
+          requiredSuccesses: 2,
+          rollChallenge: {
+            id: "meter-one-check",
+            mode: "single-step",
+            steps: [
+              {
+                id: "meter-one-step",
+                label: "Roll 1+ on d2",
+                source: { type: "static-die", sides: 2 },
+                target: 1,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "The first harmony lands.",
+          successEffects: [{ type: "currency", minAmount: 2, maxAmount: 2 }],
+          failureMessage: "You miss the beat.",
+          failureEffects: [],
+          failureResolution: "keep-open",
+        },
+        {
+          id: "meter-two",
+          label: "Meter Two",
+          prompt: "Push into the second verse.",
+          actionLabel: "Raise chorus",
+          requiredSuccesses: 2,
+          rollChallenge: {
+            id: "meter-two-check",
+            mode: "single-step",
+            steps: [
+              {
+                id: "meter-two-step",
+                label: "Roll 1+ on d2",
+                source: { type: "static-die", sides: 2 },
+                target: 1,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "The chorus rises higher.",
+          successEffects: [{ type: "currency", minAmount: 3, maxAmount: 3 }],
+          failureMessage: "The verse slips.",
+          failureEffects: [],
+          failureResolution: "keep-open",
+        },
+      ],
+    },
+  };
+
+  try {
+    await withPatchedRuntime(
+      {
+        scenario,
+        flowState: {
+          type: "group-meter",
+          stageIndex: 0,
+          stageProgress: 0,
+          resolvedLines: [],
+          successfulParticipantUserIds: new Set<string>(),
+          participantUserIds: new Set<string>(),
+          currentStageContributorUserIds: new Set<string>(),
+          currentStageAttemptedUserIds: new Set<string>(),
+        },
+      },
+      async ({ runtime, db, messageEdits }) => {
+        const economy = createSqliteEconomyRepository(db as never);
+        const result = await runtime.onTriggerOpportunity({ now: new Date(0) });
+        assert.equal(result?.created, true);
+
+        const join = async (userId: string) => {
+          currentNowMs += 3_000;
+          await runtime.handleButtonInteraction({
+            customId: "random-event:event-1:join",
+            user: { id: userId },
+            deferUpdate: async () => undefined,
+            reply: async () => undefined,
+            followUp: async () => undefined,
+          } as never);
+        };
+
+        await join("user-1");
+        await join("user-2");
+
+        assert.ok(
+          messageEdits.some((payload) => {
+            const serialized = JSON.stringify(payload);
+            return serialized.includes("Meter Two") && serialized.includes("Progress: 0/2.");
+          }),
+        );
+
+        await join("user-1");
+        await join("user-2");
+
+        assert.equal(economy.getPips("user-1"), 5);
+        assert.equal(economy.getPips("user-2"), 6);
+      },
+    );
+  } finally {
+    Math.random = originalRandom;
+    Date.now = originalDateNow;
+  }
 });
 
 test("stake offers release ownership after an insufficient-funds continue and still publish achievements", async () => {

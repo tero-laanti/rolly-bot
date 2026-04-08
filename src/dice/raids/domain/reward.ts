@@ -13,6 +13,9 @@ export const describeRaidReward = (reward: RaidRewardDefinition): string => {
 export const describeAppliedRaidReward = (
   reward: RaidRewardDefinition,
   awardedPipAmounts: readonly number[],
+  options: {
+    firstClearBonusApplied?: boolean;
+  } = {},
 ): string => {
   const normalizedAwardedPips = awardedPipAmounts
     .map((amount) => Math.max(0, Math.floor(amount)))
@@ -24,12 +27,18 @@ export const describeAppliedRaidReward = (
   const minimumAwardedPips = Math.min(...normalizedAwardedPips);
   const maximumAwardedPips = Math.max(...normalizedAwardedPips);
   if (minimumAwardedPips === maximumAwardedPips) {
-    const pipText = `${minimumAwardedPips} pip${minimumAwardedPips === 1 ? "" : "s"}`;
+    const firstClearNote = options.firstClearBonusApplied ? " (includes first-clear bonus)" : "";
+    const pipText = `${minimumAwardedPips} pip${minimumAwardedPips === 1 ? "" : "s"}${firstClearNote}`;
     return buildRaidRewardSummary(reward, pipText);
+  }
+
+  const reasons = ["permanent bonuses"];
+  if (options.firstClearBonusApplied) {
+    reasons.push("first-clear bonuses");
   }
 
   return buildRaidRewardSummary(
     reward,
-    `${minimumAwardedPips}-${maximumAwardedPips} pips, based on permanent bonuses`,
+    `${minimumAwardedPips}-${maximumAwardedPips} pips, based on ${reasons.join(" and ")}`,
   );
 };

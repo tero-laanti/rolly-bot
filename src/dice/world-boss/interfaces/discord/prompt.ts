@@ -374,7 +374,7 @@ export const buildWorldBossDoubleRollRushKickoffPrompt = ({
         [
           `Use /roll in this thread until ${formatDiscordRelativeTime(endsAtMs)}.`,
           "This thread grants the normal double-roll buff and only this thread grants it.",
-          "Other double-roll sources still cap at the normal ×2 boost.",
+          "Other double-roll sources stack with this thread's ×2 boost.",
         ].join("\n"),
         discordEmbedDescriptionCharacterLimit,
         "\n... (truncated)",

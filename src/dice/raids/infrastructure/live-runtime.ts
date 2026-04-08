@@ -28,6 +28,7 @@ import { createDiscordRaidStatusPublisher } from "./discord/discord-raid-status-
 import { getActiveRaidRunMembers, type RaidRunAggregate } from "../domain/raid-run";
 import { describeAppliedRaidReward, describeRaidReward } from "../domain/reward";
 import { createSqliteRaidRunRepository } from "./sqlite/raid-run-repository";
+import { createSqliteRaidRewardStateRepository } from "./sqlite/reward-state-repository";
 import { grantRaidTierRoleRewards } from "./tier-role-rewards";
 import {
   createSqliteExpireRecruitingRaidRunsUseCase,
@@ -180,6 +181,7 @@ export const createRaidsLiveRuntime = ({
   assertConfiguredRaidTierBindings(catalogReader, config.tierBindings);
 
   const repository = createSqliteRaidRunRepository(db);
+  const rewardStateRepository = createSqliteRaidRewardStateRepository(db);
   const economy = createSqliteEconomyRepository(db);
   const progression = createSqliteProgressionRepository(db);
   const statusPublisher = createDiscordRaidStatusPublisher(client);
@@ -268,16 +270,58 @@ export const createRaidsLiveRuntime = ({
     };
   };
 
-  const applyRaidRewards = (raidRun: RaidRunAggregate, boss: RaidBossDefinition): string => {
+  const getRaidTierFirstClearBonusPips = (tierId: string): number => {
+    switch (tierId) {
+      case "bronze":
+        return 100;
+      case "silver":
+        return 200;
+      case "gold":
+        return 300;
+      default:
+        return 0;
+    }
+  };
+
+  const applyRaidRewards = ({
+    raidRun,
+    boss,
+    now,
+  }: {
+    raidRun: RaidRunAggregate;
+    boss: RaidBossDefinition;
+    now: Date;
+  }): string => {
     const awardedPipAmounts: number[] = [];
     const participantIds = getActiveRaidRunMembers(raidRun).map((member) => member.userId);
+    const firstClearBonusPips = getRaidTierFirstClearBonusPips(raidRun.run.tierId);
+    let firstClearBonusApplied = false;
 
     for (const participantId of participantIds) {
-      const grantedReward = economy.grantRewardPips({
+      const grantedBaseReward = economy.grantRewardPips({
         userId: participantId,
         baseAmount: boss.reward.pips,
       });
-      awardedPipAmounts.push(grantedReward.awardedAmount);
+      let totalAwardedAmount = grantedBaseReward.awardedAmount;
+
+      if (
+        firstClearBonusPips > 0 &&
+        rewardStateRepository.claimTierFirstClear({
+          userId: participantId,
+          tierId: raidRun.run.tierId,
+          runId: raidRun.run.runId,
+          clearedAt: now,
+        })
+      ) {
+        const grantedBonusReward = economy.grantRewardPips({
+          userId: participantId,
+          baseAmount: firstClearBonusPips,
+        });
+        totalAwardedAmount += grantedBonusReward.awardedAmount;
+        firstClearBonusApplied = true;
+      }
+
+      awardedPipAmounts.push(totalAwardedAmount);
       progression.applyDiceTemporaryEffect({
         userId: participantId,
         effectCode: "roll-pass-multiplier",
@@ -291,7 +335,9 @@ export const createRaidsLiveRuntime = ({
       });
     }
 
-    return describeAppliedRaidReward(boss.reward, awardedPipAmounts);
+    return describeAppliedRaidReward(boss.reward, awardedPipAmounts, {
+      firstClearBonusApplied,
+    });
   };
 
   const settleRaidRun = (
@@ -325,7 +371,11 @@ export const createRaidsLiveRuntime = ({
         let rewardSummary = raidRun.run.rewardSummary;
 
         if (outcome === "success" && !rewardGrantedAt) {
-          rewardSummary = applyRaidRewards(raidRun, boss);
+          rewardSummary = applyRaidRewards({
+            raidRun,
+            boss,
+            now,
+          });
           rewardGrantedAt = now;
         }
 
@@ -543,6 +593,28 @@ export const createRaidsLiveRuntime = ({
     return true;
   };
 
+  const retryResolvedRaidTierRoleRewards = async (raidRun: RaidRunAggregate): Promise<void> => {
+    if (raidRun.run.status !== "resolved" || raidRun.run.bossCurrentHp !== 0) {
+      return;
+    }
+
+    const tier = catalogReader.getRaidTier(raidRun.run.tierId);
+    if (!tier?.roleReward) {
+      return;
+    }
+
+    try {
+      await grantRaidTierRoleRewards({
+        client,
+        raidRun,
+        tier,
+        logger,
+      });
+    } catch (error) {
+      logger.error?.("[raids] Failed to retry raid tier role rewards:", error);
+    }
+  };
+
   const clearExpirySweepTimer = (): void => {
     if (!expirySweepTimer) {
       return;
@@ -602,6 +674,8 @@ export const createRaidsLiveRuntime = ({
       }
 
       for (const raidRun of repository.listRaidRunsByStatuses(["resolved"])) {
+        await retryResolvedRaidTierRoleRewards(raidRun);
+
         if (
           raidRun.run.closeScheduledAt &&
           raidRun.run.closeScheduledAt.getTime() <= now.getTime() &&
@@ -966,6 +1040,10 @@ export const createRaidsLiveRuntime = ({
           ) {
             await resolveRaidRun(raidRun.run.runId, "success", now);
             continue;
+          }
+
+          if (raidRun.run.status === "resolved") {
+            await retryResolvedRaidTierRoleRewards(raidRun);
           }
 
           if (

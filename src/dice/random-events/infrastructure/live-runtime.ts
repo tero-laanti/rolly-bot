@@ -1297,67 +1297,67 @@ export const createRandomEventsLiveRuntime = ({
     }
 
     const participantIds = [...context.flowState.participantUserIds];
+    const successfulParticipantIds = [...context.flowState.successfulParticipantUserIds];
     const rewardPolicy = flow.participantRewardPolicy ?? "finisher-bonus";
     const lines = [...context.flowState.resolvedLines];
-    while (context.flowState.stageIndex < flow.stages.length) {
-      const stage = flow.stages[context.flowState.stageIndex];
-      if (!stage || participantIds.length < (stage.requiredSuccesses ?? Number.MAX_SAFE_INTEGER)) {
-        break;
-      }
-
-      const baseCurrencyAmounts = resolveRandomEventCurrencyEffectAmounts(
-        stage.successEffects,
-        Math.random,
-      );
-      const totalCurrency = baseCurrencyAmounts.reduce((sum, amount) => sum + amount, 0);
-
-      for (const participantId of participantIds) {
-        const result = applyEffectsToUser({
-          userId: participantId,
-          scenarioId: context.selection.scenario.id,
-          effectSourceId: `${stage.id}-reward`,
-          effects: stage.successEffects,
-          resolvedCurrencyAmounts: baseCurrencyAmounts,
-        });
-        recordCustomFlowEffectApplication({
-          eventId,
-          userId: participantId,
-          appliedNegativeEffects: result.appliedNegativeEffects,
-          hadActiveNegativeEffectBeforeAttempt: result.hadActiveNegativeEffectBeforeAttempt,
-        });
-        lines.push(
-          `<@${participantId}>: ${stage.successMessage} ${result.effectNotes.join(" ")}`.trim(),
-        );
-      }
-
-      if (
-        rewardPolicy === "finisher-bonus" &&
-        context.flowState.stageIndex === flow.stages.length - 1 &&
-        totalCurrency > 0
-      ) {
-        const bonus = Math.max(1, Math.floor(totalCurrency * 0.2));
-        const result = applyEffectsToUser({
-          userId,
-          scenarioId: context.selection.scenario.id,
-          effectSourceId: `${stage.id}-finisher-bonus`,
-          effects: [
-            {
-              type: "currency",
-              minAmount: bonus,
-              maxAmount: bonus,
-            },
-          ],
-        });
-        lines.push(
-          `<@${userId}>: Finisher bonus for **${stage.label}**. ${result.effectNotes.join(" ")}`.trim(),
-        );
-      }
-
-      context.flowState.stageIndex += 1;
-      context.flowState.currentStageContributorUserIds = new Set<string>();
-      context.flowState.currentStageAttemptedUserIds = new Set<string>();
-      context.failedAttemptLines = [];
+    const stage = flow.stages[context.flowState.stageIndex];
+    if (!stage || participantIds.length < (stage.requiredSuccesses ?? Number.MAX_SAFE_INTEGER)) {
+      return;
     }
+
+    const baseCurrencyAmounts = resolveRandomEventCurrencyEffectAmounts(
+      stage.successEffects,
+      Math.random,
+    );
+    const totalCurrency = baseCurrencyAmounts.reduce((sum, amount) => sum + amount, 0);
+
+    for (const participantId of participantIds) {
+      const result = applyEffectsToUser({
+        userId: participantId,
+        scenarioId: context.selection.scenario.id,
+        effectSourceId: `${stage.id}-reward`,
+        effects: stage.successEffects,
+        resolvedCurrencyAmounts: baseCurrencyAmounts,
+      });
+      recordCustomFlowEffectApplication({
+        eventId,
+        userId: participantId,
+        appliedNegativeEffects: result.appliedNegativeEffects,
+        hadActiveNegativeEffectBeforeAttempt: result.hadActiveNegativeEffectBeforeAttempt,
+      });
+      lines.push(
+        `<@${participantId}>: ${stage.successMessage} ${result.effectNotes.join(" ")}`.trim(),
+      );
+    }
+
+    if (
+      rewardPolicy === "finisher-bonus" &&
+      context.flowState.stageIndex === flow.stages.length - 1 &&
+      totalCurrency > 0
+    ) {
+      const bonus = Math.max(1, Math.floor(totalCurrency * 0.2));
+      const result = applyEffectsToUser({
+        userId,
+        scenarioId: context.selection.scenario.id,
+        effectSourceId: `${stage.id}-finisher-bonus`,
+        effects: [
+          {
+            type: "currency",
+            minAmount: bonus,
+            maxAmount: bonus,
+          },
+        ],
+      });
+      lines.push(
+        `<@${userId}>: Finisher bonus for **${stage.label}**. ${result.effectNotes.join(" ")}`.trim(),
+      );
+    }
+
+    context.flowState.stageIndex += 1;
+    context.flowState.participantUserIds = new Set<string>();
+    context.flowState.currentStageContributorUserIds = new Set<string>();
+    context.flowState.currentStageAttemptedUserIds = new Set<string>();
+    context.failedAttemptLines = [];
 
     context.flowState.resolvedLines = lines;
     context.flowState.stageProgress = context.flowState.participantUserIds.size;
@@ -1366,7 +1366,7 @@ export const createRandomEventsLiveRuntime = ({
       await resolveCustomEvent({
         eventId,
         lines: context.flowState.resolvedLines,
-        achievementAttempts: participantIds.map((participantId) => ({
+        achievementAttempts: successfulParticipantIds.map((participantId) => ({
           userId: participantId,
           attemptResolution: buildCustomFlowAchievementAttemptResolution({
             eventId,
@@ -1815,6 +1815,7 @@ export const createRandomEventsLiveRuntime = ({
     }
 
     context.flowState.participantUserIds.add(userId);
+    context.flowState.successfulParticipantUserIds.add(userId);
     context.flowState.currentStageContributorUserIds.add(userId);
     context.flowState.stageProgress = context.flowState.participantUserIds.size;
     if (context.flowState.stageProgress >= (stage.requiredSuccesses ?? 1)) {

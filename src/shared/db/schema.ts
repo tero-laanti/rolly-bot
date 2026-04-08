@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 10;
+const currentSchemaVersion = 11;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -880,6 +880,18 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       ON dice_raid_run_members (user_id)
       WHERE active = 1;
 
+    CREATE TABLE IF NOT EXISTS dice_raid_tier_first_clears (
+      user_id TEXT NOT NULL,
+      tier_id TEXT NOT NULL,
+      run_id TEXT NOT NULL,
+      cleared_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, tier_id),
+      FOREIGN KEY (run_id) REFERENCES dice_raid_runs(run_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dice_raid_tier_first_clears_tier_id
+      ON dice_raid_tier_first_clears (tier_id, cleared_at, user_id);
+
     CREATE TABLE IF NOT EXISTS dice_world_boss_double_roll_rush_zones (
       rush_id TEXT PRIMARY KEY,
       source_world_boss_id TEXT NOT NULL,
@@ -952,6 +964,24 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
       ADD COLUMN reward_summary TEXT;
     `);
   }
+
+  if (!hasTable(db, "dice_raid_tier_first_clears")) {
+    db.exec(`
+      CREATE TABLE dice_raid_tier_first_clears (
+        user_id TEXT NOT NULL,
+        tier_id TEXT NOT NULL,
+        run_id TEXT NOT NULL,
+        cleared_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, tier_id),
+        FOREIGN KEY (run_id) REFERENCES dice_raid_runs(run_id) ON DELETE CASCADE
+      );
+    `);
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_dice_raid_tier_first_clears_tier_id
+      ON dice_raid_tier_first_clears (tier_id, cleared_at, user_id);
+  `);
 
   if (!hasTable(db, "dice_world_boss_double_roll_rush_zones")) {
     db.exec(`

@@ -35,6 +35,7 @@ export type ActiveRandomEventGroupMeterState = {
   stageIndex: number;
   stageProgress: number;
   resolvedLines: string[];
+  successfulParticipantUserIds: Set<string>;
   participantUserIds: Set<string>;
   currentStageContributorUserIds: Set<string>;
   currentStageAttemptedUserIds: Set<string>;

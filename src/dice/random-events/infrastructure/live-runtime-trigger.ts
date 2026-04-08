@@ -212,6 +212,7 @@ export const triggerRandomEventOpportunity = async ({
                   stageIndex: 0,
                   stageProgress: 0,
                   resolvedLines: [],
+                  successfulParticipantUserIds: new Set(),
                   participantUserIds: new Set(),
                   currentStageContributorUserIds: new Set(),
                   currentStageAttemptedUserIds: new Set(),

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildDiceRollModifierFooter } from "./roll-status";
+import { buildDiceRollModifierFooter, createDiceRollModifierState } from "./roll-status";
 
 test("roll modifier footer labels item-only double rolls correctly", () => {
   const footer = buildDiceRollModifierFooter({
@@ -33,9 +33,9 @@ test("roll modifier footer labels item-only double rolls correctly", () => {
 
 test("roll modifier footer labels combined PvP and item double rolls correctly", () => {
   const footer = buildDiceRollModifierFooter({
-    rollPassCount: 2,
+    rollPassCount: 4,
     didUseChargeRoll: false,
-    effectiveFactor: 2,
+    effectiveFactor: 4,
     hasActivePvpDoubleRoll: true,
     hasActiveItemDoubleRoll: true,
     hasActiveDoubleRollRush: false,
@@ -57,7 +57,7 @@ test("roll modifier footer labels combined PvP and item double rolls correctly",
     },
   });
 
-  assert.equal(footer, "Roll modifiers: double-roll buff ×2 (PvP + item) → effective ×2.");
+  assert.equal(footer, "Roll modifiers: double-roll buffs ×4 (PvP + item) → effective ×4.");
 });
 
 test("roll modifier footer switches to 'other active' wording during charged rolls", () => {
@@ -116,4 +116,30 @@ test("roll modifier footer includes Double Roll Rush as a double-roll source", (
   });
 
   assert.equal(footer, "Roll modifiers: Rush double ×2 → effective ×2.");
+});
+
+test("stacked double-roll sources increase effective roll power", () => {
+  const state = createDiceRollModifierState({
+    prestige: 0,
+    lastGlobalRollAtMs: null,
+    lastPersonalRollAtMs: null,
+    personalChargeBonus: {
+      unlocked: false,
+      minutesPerMultiplier: 0,
+      speedMultiplier: 1,
+      maxMultiplier: 1,
+    },
+    pvpDoubleRollUntilMs: Date.parse("2026-04-08T12:10:00.000Z"),
+    itemDoubleRollStatus: {
+      isActive: true,
+      remainingUses: 2,
+      expiresAtMs: null,
+    },
+    hasActiveDoubleRollRush: false,
+    temporaryEffects: [],
+    nowMs: Date.parse("2026-04-08T12:00:00.000Z"),
+  });
+
+  assert.equal(state.rollPassCount, 4);
+  assert.equal(state.effectiveFactor, 4);
 });

@@ -193,6 +193,7 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_description"), true);
   assert.equal(hasTable(db, "dice_raid_runs"), true);
   assert.equal(hasTable(db, "dice_raid_run_members"), true);
+  assert.equal(hasTable(db, "dice_raid_tier_first_clears"), true);
   assert.equal(hasTable(db, "dice_world_boss_double_roll_rush_zones"), true);
   assert.equal(hasColumn(db, "dice_raid_runs", "is_open"), true);
   assert.equal(hasColumn(db, "dice_raid_runs", "encounter_message_id"), true);
@@ -207,13 +208,14 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasIndex(db, "idx_dice_raid_runs_status_created_at"), true);
   assert.equal(hasIndex(db, "idx_dice_raid_runs_is_open_created_at"), true);
   assert.equal(hasIndex(db, "idx_dice_raid_run_members_active_user_id"), true);
+  assert.equal(hasIndex(db, "idx_dice_raid_tier_first_clears_tier_id"), true);
   assert.equal(hasIndex(db, "idx_dice_world_boss_double_roll_rush_source_world_boss_id"), true);
   assert.equal(hasIndex(db, "idx_dice_world_boss_double_roll_rush_channel_id"), true);
   assert.equal(hasIndex(db, "idx_dice_world_boss_double_roll_rush_open_expires_at"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_dice_sets_rolled"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_roll_commands_called"), true);
   assert.equal(hasColumn(db, "dice_analytics_by_prestige", "prestige_started_at"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 10);
+  assert.equal(db.pragma("user_version", { simple: true }), 11);
 });
 
 test("initializeDatabaseSchema rejects unsupported legacy progression schema without mutating the database", () => {
@@ -277,7 +279,7 @@ test("initializeDatabaseSchema adds the personal charge table on the supported v
   assert.equal(hasTable(db, "dice_personal_charge_state"), true);
   assert.equal(hasTable(db, "dice_contract_master_runs"), true);
   assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 10);
+  assert.equal(db.pragma("user_version", { simple: true }), 11);
   assert.deepEqual(db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get("user-1"), {
     fame: 7,
     pips: 11,
@@ -348,7 +350,7 @@ test("initializeDatabaseSchema resets legacy contracts rows and adds contract ma
     { count: 0 },
   );
   assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 10);
+  assert.equal(db.pragma("user_version", { simple: true }), 11);
 });
 
 test("initializeDatabaseSchema upgrades v5 contract master runs with metadata columns and unique indexes", () => {
@@ -411,7 +413,7 @@ test("initializeDatabaseSchema upgrades v5 contract master runs with metadata co
       .get("user-1", "daily", "2026-03-28", 1),
     { contract_title: "", contract_description: "" },
   );
-  assert.equal(db.pragma("user_version", { simple: true }), 10);
+  assert.equal(db.pragma("user_version", { simple: true }), 11);
 });
 
 test("initializeDatabaseSchema migrates legacy world boss stats and persisted source ids", () => {
