@@ -60,6 +60,9 @@ export type FinalizeAutoRollItemUseResult = {
   achievementAnnouncements?: AchievementAnnouncement[];
 };
 
+const activeItemDoubleRollMessage =
+  "You already have an item providing a roll set multiplier, please finish that usage before using another one!";
+
 const recordDiceItemUseAchievements = ({
   inventory,
   progression,
@@ -192,6 +195,14 @@ export const createUseDiceItemUseCase = ({
 
     if (item.effect.type === "double-roll-uses") {
       const effect = item.effect;
+      const activeDoubleRoll = itemEffects.getItemDoubleRollStatus(userId);
+      if (activeDoubleRoll.isActive) {
+        return {
+          ok: false,
+          message: activeItemDoubleRollMessage,
+        };
+      }
+
       return unitOfWork.runInTransaction(() => {
         const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
         if (!consumed.ok) {
@@ -225,6 +236,14 @@ export const createUseDiceItemUseCase = ({
 
     if (item.effect.type === "double-roll-duration") {
       const effect = item.effect;
+      const activeDoubleRoll = itemEffects.getItemDoubleRollStatus(userId);
+      if (activeDoubleRoll.isActive) {
+        return {
+          ok: false,
+          message: activeItemDoubleRollMessage,
+        };
+      }
+
       return unitOfWork.runInTransaction(() => {
         const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
         if (!consumed.ok) {

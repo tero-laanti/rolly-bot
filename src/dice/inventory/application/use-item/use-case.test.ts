@@ -29,6 +29,30 @@ const umbrellaItem: DiceShopItem = {
   },
 };
 
+const revolverItem: DiceShopItem = {
+  id: "dice-revolver",
+  name: "Dice Revolver",
+  description: "Your next 6 /roll uses roll twice.",
+  pricePips: 6,
+  consumable: true,
+  effect: {
+    type: "double-roll-uses",
+    uses: 6,
+  },
+};
+
+const longburnSpringItem: DiceShopItem = {
+  id: "longburn-spring",
+  name: "Longburn Spring",
+  description: "Your /roll uses roll twice for 5 minutes.",
+  pricePips: 12,
+  consumable: true,
+  effect: {
+    type: "double-roll-duration",
+    minutes: 5,
+  },
+};
+
 const cleanseSaltItem: DiceShopItem = {
   id: "cleanse-salt",
   name: "Cleanse Salt",
@@ -280,4 +304,126 @@ test("clean room kit grants a Bad Luck Umbrella charge when using Cleanse Salt",
   if (result.ok) {
     assert.match(result.statusMessage, /Clean Room Kit also granted 1 Bad Luck Umbrella charge/);
   }
+});
+
+test("double-roll uses items cannot be consumed while another item double-roll buff is active", async () => {
+  let consumeCalls = 0;
+  const useDiceItem = createUseDiceItemUseCase({
+    inventory: {
+      consumeInventoryItem: () => {
+        consumeCalls += 1;
+        return {
+          ok: true,
+          item: revolverItem,
+          remainingQuantity: 0,
+        };
+      },
+      getInventoryQuantities: () => new Map(),
+      getInventoryQuantity: () => 1,
+      grantInventoryItem: () => 1,
+      recordItemUse: () => ({
+        shopPurchaseCount: 0,
+        itemUseCount: 1,
+        usedTriggerRandomGroupEvent: false,
+        usedAutoRollItem: false,
+        usedCleanseItem: false,
+      }),
+    },
+    itemEffects: {
+      ...createItemEffectsStub(),
+      getItemDoubleRollStatus: () => ({
+        isActive: true,
+        remainingUses: 2,
+        expiresAtMs: null,
+      }),
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      setDicePvpEffects: () => undefined,
+    },
+    progression: {
+      awardAchievements: () => [],
+    },
+    shopCatalog: {
+      getDiceShopItem: () => revolverItem,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = await useDiceItem({
+    userId: "user-1",
+    itemId: revolverItem.id,
+    reserveAutoRollSession: () => null,
+    triggerRandomGroupEvent: async () => ({ ok: false, reason: "disabled" }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(
+    result.message,
+    "You already have an item providing a roll set multiplier, please finish that usage before using another one!",
+  );
+  assert.equal(consumeCalls, 0);
+});
+
+test("double-roll duration items cannot be consumed while another item double-roll buff is active", async () => {
+  let consumeCalls = 0;
+  const useDiceItem = createUseDiceItemUseCase({
+    inventory: {
+      consumeInventoryItem: () => {
+        consumeCalls += 1;
+        return {
+          ok: true,
+          item: longburnSpringItem,
+          remainingQuantity: 0,
+        };
+      },
+      getInventoryQuantities: () => new Map(),
+      getInventoryQuantity: () => 1,
+      grantInventoryItem: () => 1,
+      recordItemUse: () => ({
+        shopPurchaseCount: 0,
+        itemUseCount: 1,
+        usedTriggerRandomGroupEvent: false,
+        usedAutoRollItem: false,
+        usedCleanseItem: false,
+      }),
+    },
+    itemEffects: {
+      ...createItemEffectsStub(),
+      getItemDoubleRollStatus: () => ({
+        isActive: true,
+        remainingUses: 0,
+        expiresAtMs: Date.now() + 60_000,
+      }),
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      setDicePvpEffects: () => undefined,
+    },
+    progression: {
+      awardAchievements: () => [],
+    },
+    shopCatalog: {
+      getDiceShopItem: () => longburnSpringItem,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = await useDiceItem({
+    userId: "user-1",
+    itemId: longburnSpringItem.id,
+    reserveAutoRollSession: () => null,
+    triggerRandomGroupEvent: async () => ({ ok: false, reason: "disabled" }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(
+    result.message,
+    "You already have an item providing a roll set multiplier, please finish that usage before using another one!",
+  );
+  assert.equal(consumeCalls, 0);
 });
