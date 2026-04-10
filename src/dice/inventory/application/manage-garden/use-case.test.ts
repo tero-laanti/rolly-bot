@@ -2,11 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiceShopItem } from "../../domain/shop";
 import { createDiceGardenUseCase } from "./use-case";
-import type {
-  DiceGardenAchievementStats,
-  DiceGardenPlot,
-  DiceInventoryRepository,
-} from "../ports";
+import type { DiceGardenAchievementStats, DiceGardenPlot, DiceInventoryRepository } from "../ports";
 
 const seedSatchel: DiceShopItem = {
   id: "seed-satchel",

@@ -303,10 +303,63 @@ test("initializeDatabaseSchema adds garden tables on the supported v11 schema", 
   const db = new Database(":memory:");
   createCurrentSchemaV11(db);
 
+  db.prepare(
+    `
+    INSERT INTO dice_contract_rotations (cadence, period_key, contract_ids_json, reset_at, activated_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    "daily",
+    "2026-03-28",
+    JSON.stringify(["daily-roll"]),
+    "2026-03-29T00:00:00.000Z",
+    "2026-03-28T10:00:00.000Z",
+    "2026-03-28T10:00:00.000Z",
+  );
+  db.prepare(
+    `
+    INSERT INTO dice_contract_progress (
+      user_id,
+      contract_id,
+      cadence,
+      period_key,
+      objective_type,
+      required_count,
+      current_count,
+      completed_at,
+      rewarded_at,
+      reward_pips,
+      reward_fame,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  ).run(
+    "user-1",
+    "daily-roll",
+    "daily",
+    "2026-03-28",
+    "roll_count",
+    10,
+    5,
+    null,
+    null,
+    10,
+    2,
+    "2026-03-28T10:00:00.000Z",
+  );
+
   initializeDatabaseSchema(db);
 
   assert.equal(hasTable(db, "dice_garden_plots"), true);
   assert.equal(hasTable(db, "dice_garden_achievement_stats"), true);
+  assert.deepEqual(
+    db.prepare("SELECT COUNT(*) AS count FROM dice_contract_rotations").get() as { count: number },
+    { count: 1 },
+  );
+  assert.deepEqual(
+    db.prepare("SELECT COUNT(*) AS count FROM dice_contract_progress").get() as { count: number },
+    { count: 1 },
+  );
   assert.equal(db.pragma("user_version", { simple: true }), 12);
 });
 

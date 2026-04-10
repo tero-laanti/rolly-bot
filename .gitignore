@@ -5,6 +5,7 @@ dist-test/
 data/
 *.sqlite
 /rolly-data/
+/specs/
 .vscode/
 
 # Beads / Dolt files (added by bd init)

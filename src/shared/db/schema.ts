@@ -1,6 +1,7 @@
 import type { SqliteDatabase } from "../db";
 
 const currentSchemaVersion = 12;
+const contractMasterResetCutoverSchemaVersion = 5;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -1070,7 +1071,7 @@ const resetLegacyContractsStateForContractMaster = (
   db: SqliteDatabase,
   previousSchemaVersion: number,
 ): void => {
-  if (previousSchemaVersion >= currentSchemaVersion) {
+  if (previousSchemaVersion >= contractMasterResetCutoverSchemaVersion) {
     return;
   }
 

@@ -2,9 +2,7 @@ import type { UnitOfWork } from "../../../../shared-kernel/application/unit-of-w
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 import { formatDiscordRelativeTime } from "../../../../shared/discord";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
-import {
-  awardManualDiceAchievements,
-} from "../../../progression/application/achievement-awards";
+import { awardManualDiceAchievements } from "../../../progression/application/achievement-awards";
 import {
   createAchievementAnnouncement,
   type AchievementAnnouncement,
@@ -181,7 +179,9 @@ export const createDiceGardenUseCase = ({
         const outcome = rollGardenSeedOutcome(seedEffect.outcomes);
         const plantedAtMs = Date.now();
         const plantedAt = new Date(plantedAtMs).toISOString();
-        const readyAt = new Date(plantedAtMs + getGardenGrowDurationMs(outcome.sides)).toISOString();
+        const readyAt = new Date(
+          plantedAtMs + getGardenGrowDurationMs(outcome.sides),
+        ).toISOString();
         const plot = garden.createGardenPlot({
           userId: action.ownerId,
           slotIndex: 0,
@@ -235,9 +235,9 @@ export const createDiceGardenUseCase = ({
             ),
           },
         },
-        achievementAnnouncements: [createAchievementAnnouncement(action.ownerId, plantResult.newlyEarned)].flatMap(
-          (announcement) => (announcement ? [announcement] : []),
-        ),
+        achievementAnnouncements: [
+          createAchievementAnnouncement(action.ownerId, plantResult.newlyEarned),
+        ].flatMap((announcement) => (announcement ? [announcement] : [])),
       };
     }
 
@@ -310,9 +310,9 @@ export const createDiceGardenUseCase = ({
           ),
         },
       },
-      achievementAnnouncements: [createAchievementAnnouncement(action.ownerId, harvestResult.newlyEarned)].flatMap(
-        (announcement) => (announcement ? [announcement] : []),
-      ),
+      achievementAnnouncements: [
+        createAchievementAnnouncement(action.ownerId, harvestResult.newlyEarned),
+      ].flatMap((announcement) => (announcement ? [announcement] : [])),
     };
   };
 
@@ -427,7 +427,9 @@ const buildGardenComponents = (
   return [
     [
       {
-        action: isReady ? { type: "harvest", ownerId: userId } : { type: "refresh", ownerId: userId },
+        action: isReady
+          ? { type: "harvest", ownerId: userId }
+          : { type: "refresh", ownerId: userId },
         label: isReady ? "Harvest" : "Refresh",
         style: isReady ? "success" : "secondary",
       },
