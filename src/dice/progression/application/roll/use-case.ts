@@ -370,7 +370,7 @@ export const createRunRollDiceUseCase = ({
     const unlockedBansAfter =
       getUnlockedBanSlotsFromFame(result.fameAfter, result.diceCountAfter, dieSides) +
       permanentBonusSnapshot.extraBanSlots;
-    const unlockedFooter = unlockedBansAfter > unlockedBansBefore ? "New ban slot unlocked." : "";
+    const unlockedFooter = getBanSlotUnlockFooter(unlockedBansBefore, unlockedBansAfter);
     const remainingItemDoubleRollUses =
       !didUseChargeRoll && itemDoubleRollStatus.remainingUses > 0
         ? itemDoubleRollStatus.remainingUses - 1
@@ -602,6 +602,18 @@ const buildAutoRollClassification = ({
     kind: "interesting",
     summary: summarizeAutoRollText(summaryParts.join(" | ")),
   };
+};
+
+const getBanSlotUnlockFooter = (unlockedBansBefore: number, unlockedBansAfter: number): string => {
+  if (unlockedBansAfter <= unlockedBansBefore) {
+    return "";
+  }
+
+  if (unlockedBansBefore < 1) {
+    return "You unlocked your first ban slot. Use /bans to customize your roll pool.";
+  }
+
+  return "New ban slot unlocked.";
 };
 
 const summarizeAutoRollText = (content: string): string => {
