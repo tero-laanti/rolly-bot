@@ -1,5 +1,6 @@
 import type { ActionResult, ActionView } from "../../../../shared-kernel/application/action-view";
 import { formatDiscordFullTime, formatDiscordRelativeTime } from "../../../../shared/discord";
+import type { DiceEconomyRepository } from "../../../economy/application/ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import type { RandomEventsAdminPort } from "../../../random-events/application/ports";
@@ -46,6 +47,7 @@ export type DiceAdminAction =
 export type DiceAdminResult = ActionResult<DiceAdminAction>;
 
 type ManageAdminDependencies = {
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">;
   progression: Pick<
     DiceProgressionRepository,
     "clearAllDiceTemporaryEffects" | "getActiveDiceTemporaryEffects"
@@ -59,9 +61,11 @@ type ManageAdminDependencies = {
 };
 
 export const createDiceAdminReply = (
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">,
   ownerId: string | null,
   actorId: string,
   targetUserId: string,
+  grantPipsAmount?: number | null,
 ): DiceAdminResult => {
   if (!ownerId) {
     return replyMessage("Missing DISCORD_OWNER_ID in environment.", true);
@@ -71,17 +75,23 @@ export const createDiceAdminReply = (
     return replyMessage("You are not authorized to run this command.", true);
   }
 
+  const menuNotice =
+    grantPipsAmount && grantPipsAmount > 0
+      ? buildPipsGrantedNotice(economy, targetUserId, grantPipsAmount)
+      : null;
+
   return {
     kind: "reply",
     payload: {
       type: "view",
-      view: buildMenuView(actorId, targetUserId),
+      view: buildMenuView(actorId, targetUserId, menuNotice),
       ephemeral: true,
     },
   };
 };
 
 export const createDiceAdminUseCase = ({
+  economy,
   progression,
   pvp,
   randomEventsAdmin,
@@ -137,17 +147,27 @@ export const createDiceAdminUseCase = ({
   };
 
   return {
-    createDiceAdminReply,
+    createDiceAdminReply: (
+      ownerId: string | null,
+      actorId: string,
+      targetUserId: string,
+      grantPipsAmount?: number | null,
+    ) => createDiceAdminReply(economy, ownerId, actorId, targetUserId, grantPipsAmount),
     handleDiceAdminAction,
   };
 };
 
-const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAdminAction> => {
+const buildMenuView = (
+  ownerId: string,
+  targetUserId: string,
+  menuNotice?: string[] | null,
+): ActionView<DiceAdminAction> => {
   return {
     content: [
       "**Dice admin**",
       `- Target user: <@${targetUserId}>`,
       "- Choose a section below.",
+      ...(menuNotice ? ["", ...menuNotice] : []),
     ].join("\n"),
     components: [
       [
@@ -186,6 +206,24 @@ const buildMenuView = (ownerId: string, targetUserId: string): ActionView<DiceAd
       ],
     ],
   };
+};
+
+const buildPipsGrantedNotice = (
+  economy: Pick<DiceEconomyRepository, "applyPipsDelta">,
+  targetUserId: string,
+  amount: number,
+): string[] => {
+  const updatedPips = economy.applyPipsDelta({
+    userId: targetUserId,
+    amount,
+  });
+
+  return [
+    "**Pips granted**",
+    `- User: <@${targetUserId}>`,
+    `- Granted: ${amount} pip${amount === 1 ? "" : "s"}`,
+    `- New balance: ${updatedPips} pips`,
+  ];
 };
 
 const buildStatusView = (

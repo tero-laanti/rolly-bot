@@ -48,6 +48,13 @@ export const data = new SlashCommandBuilder()
   .setDescription("Owner-only dice administration tools.")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .setContexts(InteractionContextType.Guild)
+  .addIntegerOption((option) =>
+    option
+      .setName("grant-pips")
+      .setDescription("Optional pip amount to grant to the target user.")
+      .setMinValue(1)
+      .setRequired(false),
+  )
   .addUserOption((option) =>
     option
       .setName("user")
@@ -58,10 +65,16 @@ export const data = new SlashCommandBuilder()
 export const execute = async (interaction: ChatInputCommandInteraction): Promise<void> => {
   const adminUseCase = createSqliteDiceAdminUseCase(getDatabase());
   const targetUserId = interaction.options.getUser("user")?.id ?? interaction.user.id;
+  const grantPipsAmount = interaction.options.getInteger("grant-pips");
   await applyRenderedChatInputResult(
     interaction,
     renderDiceAdminResult(
-      adminUseCase.createDiceAdminReply(getDiceAdminOwnerId(), interaction.user.id, targetUserId),
+      adminUseCase.createDiceAdminReply(
+        getDiceAdminOwnerId(),
+        interaction.user.id,
+        targetUserId,
+        grantPipsAmount,
+      ),
     ),
   );
 };
