@@ -10,6 +10,7 @@ import * as casinoCommand from "../../dice/casino/interfaces/discord/commands/ca
 import * as contractsCommand from "../../dice/contracts/interfaces/discord/commands/contracts.command";
 import * as balanceCommand from "../../dice/economy/interfaces/discord/commands/balance.command";
 import * as leaderboardsCommand from "../../dice/economy/interfaces/discord/commands/leaderboards.command";
+import * as gardenCommand from "../../dice/inventory/interfaces/discord/commands/garden.command";
 import * as inventoryCommand from "../../dice/inventory/interfaces/discord/commands/inventory.command";
 import * as shopCommand from "../../dice/inventory/interfaces/discord/commands/shop.command";
 import * as pvpCommand from "../../dice/pvp/interfaces/discord/commands/pvp.command";
@@ -41,6 +42,7 @@ const discordCommandModules: DiscordCommandModule[] = [
   contractsCommand,
   balanceCommand,
   leaderboardsCommand,
+  gardenCommand,
   shopCommand,
   inventoryCommand,
   pvpCommand,

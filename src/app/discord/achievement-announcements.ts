@@ -52,7 +52,7 @@ export const formatAchievementAnnouncementContent = (
   ];
   const unlockTextSuffix = unlockTexts.length > 0 ? ` ${unlockTexts.join(" ")}` : "";
 
-  return `<@${announcement.userId}> ${label} unlocked: ${entries.join(", ")}. ${roleLabel}: ${roleNames}. Role-gated channels or access may now be available.${unlockTextSuffix}`;
+  return `<@${announcement.userId}> ${label} unlocked: ${entries.join(", ")}. ${roleLabel}: ${roleNames}.${unlockTextSuffix}`;
 };
 
 export const publishAchievementAnnouncements = async ({

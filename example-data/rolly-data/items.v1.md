@@ -32,11 +32,13 @@ Shared notes:
 Effect types:
 
 - `negative-effect-shield`: grants charges that block the next matching hostile effect. Current item behavior covers PvP and random events that consume the same shield effect.
+- `garden-seed`: a consumable bought from `/shop` and planted from `/garden`. `outcomes` defines the weighted die results the seed can grow into.
 - `double-roll-uses`: the next `uses` `/roll` actions roll twice.
 - `double-roll-duration`: `/roll` rolls twice for the next `minutes`.
 - `trigger-random-group-event`: tries to spawn a random event immediately. If the runtime is disabled, unavailable, or already busy, the item is refunded.
 - `auto-roll-session`: reserves an automated rolling session. Only one active auto-roll session per user is allowed.
 - `cleanse-all-negative-effects`: clears negative temporary effects and any active PvP lockout. If nothing negative is active, use fails and the item is not consumed.
+- `passive-garden-unlock`: unlocks `/garden` and grants `slotCount` planting slot(s) while owned.
 - `passive-extra-shield-on-umbrella`: adds `extraCharges` to each Bad Luck Umbrella use while owned.
 - `passive-pvp-loser-lockout-reduction`: reduces PvP loser lockout by `reductionPercent`, with a final floor of `minimumMinutes`.
 - `passive-cleanse-grants-negative-effect-shield`: grants `charges` shield charge(s) whenever Cleanse Salt is used.
@@ -72,6 +74,45 @@ Passive upgrade example:
   "effect": {
     "type": "passive-extra-shield-on-umbrella",
     "extraCharges": 1
+  }
+}
+```
+
+Garden seed example:
+
+```json
+{
+  "id": "mysterious-die-seed",
+  "name": "Mysterious Die Seed",
+  "description": "Plant this in /garden to grow a strange die sapling for later harvest.",
+  "pricePips": 5,
+  "consumable": true,
+  "requiresItemId": "seed-satchel",
+  "effect": {
+    "type": "garden-seed",
+    "outcomes": [
+      { "sides": 4, "weight": 30 },
+      { "sides": 6, "weight": 25 },
+      { "sides": 8, "weight": 20 },
+      { "sides": 10, "weight": 15 },
+      { "sides": 12, "weight": 5 }
+    ]
+  }
+}
+```
+
+Garden unlock example:
+
+```json
+{
+  "id": "seed-satchel",
+  "name": "Seed Satchel",
+  "description": "Permanent upgrade: unlocks /garden and lets you tend one die-seed at a time.",
+  "pricePips": 10,
+  "consumable": false,
+  "effect": {
+    "type": "passive-garden-unlock",
+    "slotCount": 1
   }
 }
 ```

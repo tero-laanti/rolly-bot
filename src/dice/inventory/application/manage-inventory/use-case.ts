@@ -17,7 +17,7 @@ import type {
   DicePermanentBonuses,
   DicePermanentBonusesPort,
 } from "../ports";
-import { getItemOwnershipLabel } from "../../domain/passive-items";
+import { getItemOwnershipLabel, isDirectlyUsableConsumableItem } from "../../domain/passive-items";
 import {
   discordActionRowLimit,
   discordMessageCharacterLimit,
@@ -294,7 +294,7 @@ const buildInventoryComponents = (
   totalPages: number,
 ): ActionView<DiceInventoryAction>["components"] => {
   const useButtons = entries
-    .filter((entry) => entry.item.consumable)
+    .filter((entry) => isDirectlyUsableConsumableItem(entry.item))
     .map((entry) => ({
       action: {
         type: "use",

@@ -72,5 +72,55 @@
     "roleRewardId": "example-prestige-role",
     "roleRewardUnlockText": "TODO: This role will unlock channels in the future.",
     "unlockReasonText": "reached Prestige 1"
+  },
+  {
+    "id": "item-seed-satchel",
+    "name": "Pocket Plot",
+    "description": "Buy a Seed Satchel and unlock your garden.",
+    "category": "items",
+    "rule": {
+      "type": "manual"
+    },
+    "unlockReasonText": "bought a Seed Satchel"
+  },
+  {
+    "id": "garden-first-plant",
+    "name": "First Root",
+    "description": "Plant your first Mysterious Die Seed.",
+    "category": "items",
+    "rule": {
+      "type": "manual"
+    },
+    "unlockReasonText": "planted a Mysterious Die Seed"
+  },
+  {
+    "id": "garden-first-harvest",
+    "name": "Garden Payday",
+    "description": "Harvest your first die sapling.",
+    "category": "items",
+    "rule": {
+      "type": "manual"
+    },
+    "unlockReasonText": "harvested a die sapling"
+  },
+  {
+    "id": "garden-d12-harvest",
+    "name": "Perfect Bloom",
+    "description": "Harvest a d12 sapling from your garden.",
+    "category": "items",
+    "rule": {
+      "type": "manual"
+    },
+    "unlockReasonText": "harvested a d12 sapling"
+  },
+  {
+    "id": "garden-ten-harvests",
+    "name": "Green Thumb",
+    "description": "Harvest 10 die saplings from your garden.",
+    "category": "items",
+    "rule": {
+      "type": "manual"
+    },
+    "unlockReasonText": "harvested 10 die saplings"
   }
 ]

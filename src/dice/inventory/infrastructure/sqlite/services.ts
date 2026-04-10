@@ -4,6 +4,7 @@ import { createSqliteEconomyRepository } from "../../../economy/infrastructure/s
 import { createSqlitePvpRepository } from "../../../pvp/infrastructure/sqlite/pvp-repository";
 import { createSqliteProgressionRepository } from "../../../progression/infrastructure/sqlite/progression-repository";
 import { triggerRandomGroupEventNow } from "../../../random-events/infrastructure/admin-controller";
+import { createDiceGardenUseCase } from "../../application/manage-garden/use-case";
 import { createDiceInventoryUseCase } from "../../application/manage-inventory/use-case";
 import { createDiceShopUseCase } from "../../application/manage-shop/use-case";
 import {
@@ -11,6 +12,7 @@ import {
   createUseDiceItemUseCase,
 } from "../../application/use-item/use-case";
 import { createSqliteInventoryRepository, createDiceShopCatalog } from "./inventory-repository";
+import { createSqliteGardenRepository } from "./garden-repository";
 import { createSqliteDiceItemEffectsService } from "./item-effects-service";
 import { createSqlitePermanentBonusesPort } from "./permanent-bonuses-service";
 
@@ -84,6 +86,24 @@ export const createSqliteDiceShopUseCase = (db: SqliteDatabase) => {
     shopCatalog,
     unitOfWork,
     useDiceItem,
+  });
+};
+
+export const createSqliteDiceGardenUseCase = (db: SqliteDatabase) => {
+  const unitOfWork = createSqliteUnitOfWork(db);
+  const economy = createSqliteEconomyRepository(db);
+  const inventory = createSqliteInventoryRepository(db);
+  const garden = createSqliteGardenRepository(db);
+  const progression = createSqliteProgressionRepository(db);
+  const shopCatalog = createDiceShopCatalog();
+
+  return createDiceGardenUseCase({
+    economy,
+    inventory,
+    garden,
+    progression,
+    shopCatalog,
+    unitOfWork,
   });
 };
 

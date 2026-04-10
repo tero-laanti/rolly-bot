@@ -231,6 +231,14 @@ const readStringArray = (value: unknown, label: string): string[] => {
   return value.map((entry, index) => readNonEmptyString(entry, `${label}[${index}]`));
 };
 
+const assertArray = (value: unknown, label: string): unknown[] => {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array.`);
+  }
+
+  return value;
+};
+
 const getRandomEventRarityLabel = (rarity: RandomEventRarityTier): string => {
   switch (rarity) {
     case "common":
@@ -1007,6 +1015,36 @@ const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
   const record = assertRecord(value, label);
   const type = readNonEmptyString(record.type, `${label}.type`);
 
+  if (type === "garden-seed") {
+    const outcomesValue = assertArray(record.outcomes, `${label}.outcomes`);
+    const outcomes = outcomesValue.map((entry, index) => {
+      const outcome = assertRecord(entry, `${label}.outcomes[${index}]`);
+      const sides = readInteger(outcome.sides, `${label}.outcomes[${index}].sides`, 1);
+      if (sides !== 4 && sides !== 6 && sides !== 8 && sides !== 10 && sides !== 12) {
+        throw new Error(`${label}.outcomes[${index}].sides must be one of 4, 6, 8, 10, 12.`);
+      }
+
+      return {
+        sides,
+        weight: readInteger(outcome.weight, `${label}.outcomes[${index}].weight`, 1),
+      } as const;
+    });
+
+    if (outcomes.length < 1) {
+      throw new Error(`${label}.outcomes must contain at least one outcome.`);
+    }
+
+    const uniqueSides = new Set(outcomes.map((outcome) => outcome.sides));
+    if (uniqueSides.size !== outcomes.length) {
+      throw new Error(`${label}.outcomes must not contain duplicate sides.`);
+    }
+
+    return {
+      type,
+      outcomes,
+    };
+  }
+
   if (type === "negative-effect-shield") {
     return {
       type,
@@ -1042,6 +1080,13 @@ const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
 
   if (type === "cleanse-all-negative-effects") {
     return { type };
+  }
+
+  if (type === "passive-garden-unlock") {
+    return {
+      type,
+      slotCount: readInteger(record.slotCount, `${label}.slotCount`, 1),
+    };
   }
 
   if (type === "passive-extra-shield-on-umbrella") {
@@ -1115,6 +1160,7 @@ const readDiceItemEffect = (value: unknown, label: string): DiceItemEffect => {
 
 const isPassiveDiceItemEffect = (effect: DiceItemEffect): boolean => {
   return (
+    effect.type === "passive-garden-unlock" ||
     effect.type === "passive-extra-shield-on-umbrella" ||
     effect.type === "passive-pvp-loser-lockout-reduction" ||
     effect.type === "passive-cleanse-grants-negative-effect-shield" ||

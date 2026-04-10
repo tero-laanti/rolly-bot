@@ -155,6 +155,13 @@ export const createUseDiceItemUseCase = ({
       };
     }
 
+    if (item.effect.type === "garden-seed") {
+      return {
+        ok: false,
+        message: `Use /garden to plant ${item.name}.`,
+      };
+    }
+
     if (item.effect.type === "negative-effect-shield") {
       const effect = item.effect;
       const ownedQuantities = inventory.getInventoryQuantities(userId);

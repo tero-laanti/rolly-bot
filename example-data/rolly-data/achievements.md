@@ -91,3 +91,5 @@ Manual prestige awards:
 - `manualAward.prestige` maps a prestige number to one achievement id.
 - Each prestige number must be unique across the file.
 - Omit `manualAward` for achievements that should only come from roll evaluation.
+
+Other manual awards, like item or garden milestones, should omit `manualAward` and be granted directly by application logic when the matching event happens.

@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 11;
+const currentSchemaVersion = 12;
 
 const schemaVersion2Columns = new Map<string, string[]>([
   [
@@ -193,6 +193,14 @@ const schemaVersion2Columns = new Map<string, string[]>([
 const currentSchemaColumns = new Map<string, string[]>([
   ...schemaVersion2Columns,
   ["dice_personal_charge_state", ["user_id", "last_roll_at", "updated_at"]],
+  [
+    "dice_garden_plots",
+    ["user_id", "slot_index", "seed_item_id", "die_sides", "planted_at", "ready_at", "updated_at"],
+  ],
+  [
+    "dice_garden_achievement_stats",
+    ["user_id", "planted_seed_count", "harvested_seed_count", "harvested_d12_count", "updated_at"],
+  ],
   [
     "dice_contract_rotations",
     ["cadence", "period_key", "contract_ids_json", "reset_at", "activated_at", "updated_at"],
@@ -545,6 +553,25 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS dice_garden_plots (
+      user_id TEXT NOT NULL,
+      slot_index INTEGER NOT NULL,
+      seed_item_id TEXT NOT NULL,
+      die_sides INTEGER NOT NULL,
+      planted_at TEXT NOT NULL,
+      ready_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, slot_index)
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_garden_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      planted_seed_count INTEGER NOT NULL DEFAULT 0,
+      harvested_seed_count INTEGER NOT NULL DEFAULT 0,
+      harvested_d12_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS dice_temporary_effects (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -726,6 +753,25 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
     CREATE TABLE IF NOT EXISTS dice_personal_charge_state (
       user_id TEXT PRIMARY KEY,
       last_roll_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_garden_plots (
+      user_id TEXT NOT NULL,
+      slot_index INTEGER NOT NULL,
+      seed_item_id TEXT NOT NULL,
+      die_sides INTEGER NOT NULL,
+      planted_at TEXT NOT NULL,
+      ready_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, slot_index)
+    );
+
+    CREATE TABLE IF NOT EXISTS dice_garden_achievement_stats (
+      user_id TEXT PRIMARY KEY,
+      planted_seed_count INTEGER NOT NULL DEFAULT 0,
+      harvested_seed_count INTEGER NOT NULL DEFAULT 0,
+      harvested_d12_count INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL
     );
 
