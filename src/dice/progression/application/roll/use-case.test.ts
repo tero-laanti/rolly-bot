@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getAchievementPipRewardTotal } from "../../domain/achievements-store";
-import { getDiceChargeStartMs, getFirstDailyRollPipReward } from "../../domain/game-rules";
+import {
+  getDiceBanStep,
+  getDiceChargeStartMs,
+  getFirstDailyRollPipReward,
+} from "../../domain/game-rules";
 import { minuteMs } from "../../../../shared/time";
 import { createRunRollDiceUseCase } from "./use-case";
 
@@ -186,6 +190,143 @@ test("first roll of the UTC day awards daily pips", () => {
 
   assert.match(result.content, /\*\*Daily first roll bonus!\*\*/);
   assert.match(result.content, new RegExp(`${firstDailyRollPipReward} Pips`));
+});
+
+test("first unlocked ban slot tells the user to use /bans without the generic unlock text", () => {
+  const banStep = getDiceBanStep();
+  const useCase = createRunRollDiceUseCase({
+    analytics: {
+      recordDiceRollAnalytics: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
+    },
+    economy: {
+      applyFameDelta: () => banStep,
+      getFame: () => banStep - 1,
+      grantDailyPipsIfEligible: () => ({
+        awarded: false,
+        awardedAmount: 0,
+        pips: 0,
+        lastDailyPipRewardAt: null,
+      }),
+    },
+    itemEffects: {
+      consumeOneDoubleRollUse: () => false,
+      getItemDoubleRollStatus: () => ({
+        isActive: false,
+        remainingUses: 0,
+        expiresAtMs: null,
+      }),
+    },
+    permanentBonuses: zeroPermanentBonuses,
+    progression: {
+      ...createProgressionStub(),
+      awardAchievements: () => [],
+      consumeDiceTemporaryEffectsForRoll: () => 0,
+      recordDiceProgressionAchievementStats: () => ({
+        rollCommandsTotal: 5,
+        nearDiceCountIncreaseRollsTotal: 0,
+        highestChargeMultiplier: 1,
+        highestRollPassCount: 1,
+        diceCountIncreasesTotal: 0,
+        firstBanAt: null,
+      }),
+      getActiveDiceTemporaryEffects: () => [],
+      getDiceBans: () => new Map(),
+      getDiceCount: () => 1,
+      getDicePrestige: () => 0,
+      getDiceSides: () => 6,
+      getLastDiceRollAt: () => null,
+      getUserDiceAchievements: () => ["first-roll"],
+      setDiceCount: () => {},
+      setLastDiceRollAt: () => {},
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      getActiveDoubleRoll: () => null,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = useCase({
+    userId: "user-ban-first",
+    userMention: "<@user-ban-first>",
+    nowMs: 1_710_000_000_000,
+  });
+
+  assert.match(
+    result.content,
+    /You unlocked your first ban slot\. Use \/bans to customize your roll pool\./,
+  );
+  assert.doesNotMatch(result.content, /\| New ban slot unlocked\./);
+});
+
+test("later unlocked ban slots keep the generic unlock text", () => {
+  const banStep = getDiceBanStep();
+  const useCase = createRunRollDiceUseCase({
+    analytics: {
+      recordDiceRollAnalytics: () => {},
+      resetDiceCountAnalyticsProgress: () => {},
+    },
+    economy: {
+      applyFameDelta: () => banStep * 2,
+      getFame: () => banStep * 2 - 1,
+      grantDailyPipsIfEligible: () => ({
+        awarded: false,
+        awardedAmount: 0,
+        pips: 0,
+        lastDailyPipRewardAt: null,
+      }),
+    },
+    itemEffects: {
+      consumeOneDoubleRollUse: () => false,
+      getItemDoubleRollStatus: () => ({
+        isActive: false,
+        remainingUses: 0,
+        expiresAtMs: null,
+      }),
+    },
+    permanentBonuses: zeroPermanentBonuses,
+    progression: {
+      ...createProgressionStub(),
+      awardAchievements: () => [],
+      consumeDiceTemporaryEffectsForRoll: () => 0,
+      recordDiceProgressionAchievementStats: () => ({
+        rollCommandsTotal: 8,
+        nearDiceCountIncreaseRollsTotal: 0,
+        highestChargeMultiplier: 1,
+        highestRollPassCount: 1,
+        diceCountIncreasesTotal: 0,
+        firstBanAt: null,
+      }),
+      getActiveDiceTemporaryEffects: () => [],
+      getDiceBans: () => new Map(),
+      getDiceCount: () => 1,
+      getDicePrestige: () => 0,
+      getDiceSides: () => 6,
+      getLastDiceRollAt: () => null,
+      getUserDiceAchievements: () => ["first-roll"],
+      setDiceCount: () => {},
+      setLastDiceRollAt: () => {},
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      getActiveDoubleRoll: () => null,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = useCase({
+    userId: "user-ban-later",
+    userMention: "<@user-ban-later>",
+    nowMs: 1_710_000_000_000,
+  });
+
+  assert.match(result.content, /New ban slot unlocked\./);
+  assert.doesNotMatch(result.content, /Use \/bans to customize your roll pool\./);
 });
 
 test("blocked rolls do not consume or grant the daily pip reward", () => {
