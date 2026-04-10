@@ -35,6 +35,22 @@ export type DicePermanentBonuses = {
   personalCharge: DicePersonalChargeBonus;
 };
 
+export type DiceGardenPlot = {
+  userId: string;
+  slotIndex: number;
+  seedItemId: string;
+  dieSides: 4 | 6 | 8 | 10 | 12;
+  plantedAt: string;
+  readyAt: string;
+  updatedAt: string;
+};
+
+export type DiceGardenAchievementStats = {
+  plantedSeedCount: number;
+  harvestedSeedCount: number;
+  harvestedD12Count: number;
+};
+
 export type DiceInventoryRepository = {
   getInventoryQuantities: (userId: string) => Map<DiceShopItemId, number>;
   getInventoryQuantity: (userId: string, itemId: DiceShopItemId) => number;
@@ -48,6 +64,25 @@ export type DiceInventoryRepository = {
 
 export type DicePermanentBonusesPort = {
   getPermanentBonuses: (userId: string) => DicePermanentBonuses;
+};
+
+export type DiceGardenRepository = {
+  getActiveGardenPlots: (userId: string) => DiceGardenPlot[];
+  createGardenPlot: (input: {
+    userId: string;
+    slotIndex: number;
+    seedItemId: string;
+    dieSides: 4 | 6 | 8 | 10 | 12;
+    plantedAt: string;
+    readyAt: string;
+  }) => DiceGardenPlot;
+  clearGardenPlot: (input: { userId: string; slotIndex: number }) => void;
+  getGardenAchievementStats: (userId: string) => DiceGardenAchievementStats;
+  recordGardenPlant: (userId: string) => DiceGardenAchievementStats;
+  recordGardenHarvest: (input: {
+    userId: string;
+    dieSides: 4 | 6 | 8 | 10 | 12;
+  }) => DiceGardenAchievementStats;
 };
 
 export type DiceShopCatalog = {

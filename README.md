@@ -41,7 +41,7 @@ Successful raids resolve in Discord with rewards, participants, and damage leade
 
 ## Command Surface
 
-- Player commands: `/roll`, `/balance`, `/leaderboards`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/pvp`, `/achievements`, `/contracts`, and `/stats`
+- Player commands: `/roll`, `/balance`, `/leaderboards`, `/prestige`, `/bans`, `/casino`, `/shop`, `/inventory`, `/garden`, `/pvp`, `/achievements`, `/contracts`, and `/stats`
 - Owner/admin commands: `/admin` (including optional pip grants to a selected user) and `/self-update`
 - Startup-synced panel surfaces: Contract Master and the player-started raid tier panels. Raids do not use a `/raids` slash command.
 

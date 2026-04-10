@@ -9,9 +9,10 @@ import {
   createAchievementAnnouncement,
   type AchievementAnnouncement,
 } from "../../../progression/application/achievement-announcements";
-import { getDiceItemAchievementIds } from "../achievement-rules";
+import { getDiceItemAchievementIds, getDiceShopPurchaseAchievementIds } from "../achievement-rules";
 import {
   getDiceShopItemCurrentPricePips,
+  isDirectlyUsableConsumableItem,
   isPassivePermanentItem,
   isRepeatablePassivePermanentItem,
   itemRequiresOwnership,
@@ -595,7 +596,10 @@ export const createDiceShopUseCase = ({
       const newlyEarned = awardManualDiceAchievements(
         progression,
         action.ownerId,
-        getDiceItemAchievementIds(itemAchievementStats),
+        [
+          ...getDiceItemAchievementIds(itemAchievementStats),
+          ...getDiceShopPurchaseAchievementIds(item.id),
+        ],
       );
 
       return {
@@ -812,7 +816,7 @@ const buildPurchaseReceiptViewModel = (
       ownedQuantity: purchase.quantity,
       remainingPips: purchase.remainingPips,
       changeSummary: buildPurchaseChangeSummary(purchase.item, purchase.quantity),
-      canUseItemNow: purchase.item.consumable,
+      canUseItemNow: isDirectlyUsableConsumableItem(purchase.item),
     },
   };
 };
@@ -969,6 +973,10 @@ const buildPurchaseChangeSummary = (item: DiceShopItem, ownedQuantity: number): 
   if (item.effect.type === "passive-pip-reward-bonus") {
     const totalBonusPercent = item.effect.bonusPercent * ownedQuantity;
     return `Permanent bonus active: +${totalBonusPercent}% pip rewards.`;
+  }
+
+  if (item.effect.type === "passive-garden-unlock") {
+    return "Your garden is now active. Use /garden to plant seeds.";
   }
 
   if (item.effect.type === "passive-personal-charge-unlock") {

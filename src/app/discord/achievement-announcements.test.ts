@@ -66,7 +66,7 @@ test("formatter includes role unlock details when a new role reward is granted",
   });
 
   assert.match(content, /New role unlocked: Beginner\./);
-  assert.match(content, /Role-gated channels or access may now be available\./);
+  assert.doesNotMatch(content, /Role-gated channels or access may now be available\./);
   assert.match(content, /TODO: This role will unlock channels in the future\./);
 });
 

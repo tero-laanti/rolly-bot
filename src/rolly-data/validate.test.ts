@@ -1004,6 +1004,44 @@ test("parseDiceItems accepts repeatable passive pricing and prerequisites", () =
   assert.equal(parsed[1]?.requiresItemId, "idle-dynamo");
 });
 
+test("parseDiceItems accepts garden unlocks and gated garden seeds", () => {
+  const parsed = parseDiceItems([
+    {
+      id: "seed-satchel",
+      name: "Seed Satchel",
+      description: "Permanent upgrade: unlocks /garden and lets you tend one die-seed at a time.",
+      pricePips: 10,
+      consumable: false,
+      effect: {
+        type: "passive-garden-unlock",
+        slotCount: 1,
+      },
+    },
+    {
+      id: "mysterious-die-seed",
+      name: "Mysterious Die Seed",
+      description: "Plant this in /garden to grow a strange die sapling for later harvest.",
+      pricePips: 5,
+      consumable: true,
+      requiresItemId: "seed-satchel",
+      effect: {
+        type: "garden-seed",
+        outcomes: [
+          { sides: 4, weight: 30 },
+          { sides: 6, weight: 25 },
+          { sides: 8, weight: 20 },
+          { sides: 10, weight: 15 },
+          { sides: 12, weight: 5 },
+        ],
+      },
+    },
+  ]);
+
+  assert.equal(parsed[0]?.effect.type, "passive-garden-unlock");
+  assert.equal(parsed[1]?.effect.type, "garden-seed");
+  assert.equal(parsed[1]?.requiresItemId, "seed-satchel");
+});
+
 test("parseDiceItems rejects repeatable pricing on non-passive items", () => {
   assert.throws(
     () =>

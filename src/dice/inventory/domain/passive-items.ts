@@ -9,6 +9,8 @@ export const pipMagnetItemId = "pip-magnet";
 export const idleDynamoItemId = "idle-dynamo";
 export const starterCoilItemId = "starter-coil";
 export const capacitorBankItemId = "capacitor-bank";
+export const seedSatchelItemId = "seed-satchel";
+export const mysteriousDieSeedItemId = "mysterious-die-seed";
 
 export type DicePersonalChargeBonus = {
   unlocked: boolean;
@@ -25,6 +27,7 @@ export type DicePermanentBonuses = {
 
 export const isPassivePermanentItem = (item: DiceShopItem): boolean => {
   return (
+    item.effect.type === "passive-garden-unlock" ||
     item.effect.type === "passive-extra-shield-on-umbrella" ||
     item.effect.type === "passive-pvp-loser-lockout-reduction" ||
     item.effect.type === "passive-cleanse-grants-negative-effect-shield" ||
@@ -47,7 +50,15 @@ export const getItemOwnershipLabel = (item: DiceShopItem): string => {
       : "Permanent passive upgrade.";
   }
 
+  if (item.effect.type === "garden-seed") {
+    return "Consumable. Plant with /garden.";
+  }
+
   return item.consumable ? "Consumable." : "Permanent collectible.";
+};
+
+export const isDirectlyUsableConsumableItem = (item: DiceShopItem): boolean => {
+  return item.consumable && item.effect.type !== "garden-seed";
 };
 
 const hasOwnedItem = (
@@ -116,6 +127,17 @@ export const getCleanseSaltShieldCharges = (
     "passive-cleanse-grants-negative-effect-shield",
   );
   return effect?.charges ?? 0;
+};
+
+export const getGardenSlotCount = (
+  ownedQuantities: ReadonlyMap<DiceShopItemId, number>,
+): number => {
+  if (!hasOwnedItem(ownedQuantities, seedSatchelItemId)) {
+    return 0;
+  }
+
+  const effect = getPassiveItemEffect(seedSatchelItemId, "passive-garden-unlock");
+  return effect?.slotCount ?? 0;
 };
 
 export const applyPvpLoserLockoutReduction = (

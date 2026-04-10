@@ -175,6 +175,15 @@ const createCurrentSchemaV5 = (db: Database.Database): void => {
   db.pragma("user_version = 5");
 };
 
+const createCurrentSchemaV11 = (db: Database.Database): void => {
+  initializeDatabaseSchema(db);
+  db.exec(`
+    DROP TABLE dice_garden_plots;
+    DROP TABLE dice_garden_achievement_stats;
+  `);
+  db.pragma("user_version = 11");
+};
+
 test("initializeDatabaseSchema creates the current schema on an empty database", () => {
   const db = new Database(":memory:");
 
@@ -185,6 +194,8 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasTable(db, "dice_analytics_by_prestige"), true);
   assert.equal(hasTable(db, "dice_progression_achievement_stats"), true);
   assert.equal(hasTable(db, "dice_personal_charge_state"), true);
+  assert.equal(hasTable(db, "dice_garden_plots"), true);
+  assert.equal(hasTable(db, "dice_garden_achievement_stats"), true);
   assert.equal(hasTable(db, "dice_contract_master_initial_offers"), true);
   assert.equal(hasTable(db, "dice_contract_master_user_cadence_state"), true);
   assert.equal(hasTable(db, "dice_contract_master_runs"), true);
@@ -215,7 +226,7 @@ test("initializeDatabaseSchema creates the current schema on an empty database",
   assert.equal(hasColumn(db, "dice_analytics", "total_dice_sets_rolled"), true);
   assert.equal(hasColumn(db, "dice_analytics", "total_roll_commands_called"), true);
   assert.equal(hasColumn(db, "dice_analytics_by_prestige", "prestige_started_at"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 11);
+  assert.equal(db.pragma("user_version", { simple: true }), 12);
 });
 
 test("initializeDatabaseSchema rejects unsupported legacy progression schema without mutating the database", () => {
@@ -277,13 +288,26 @@ test("initializeDatabaseSchema adds the personal charge table on the supported v
   initializeDatabaseSchema(db);
 
   assert.equal(hasTable(db, "dice_personal_charge_state"), true);
+  assert.equal(hasTable(db, "dice_garden_plots"), true);
+  assert.equal(hasTable(db, "dice_garden_achievement_stats"), true);
   assert.equal(hasTable(db, "dice_contract_master_runs"), true);
   assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 11);
+  assert.equal(db.pragma("user_version", { simple: true }), 12);
   assert.deepEqual(db.prepare("SELECT fame, pips FROM balances WHERE user_id = ?").get("user-1"), {
     fame: 7,
     pips: 11,
   });
+});
+
+test("initializeDatabaseSchema adds garden tables on the supported v11 schema", () => {
+  const db = new Database(":memory:");
+  createCurrentSchemaV11(db);
+
+  initializeDatabaseSchema(db);
+
+  assert.equal(hasTable(db, "dice_garden_plots"), true);
+  assert.equal(hasTable(db, "dice_garden_achievement_stats"), true);
+  assert.equal(db.pragma("user_version", { simple: true }), 12);
 });
 
 test("initializeDatabaseSchema resets legacy contracts rows and adds contract master tables during v5 rollout", () => {
@@ -350,7 +374,7 @@ test("initializeDatabaseSchema resets legacy contracts rows and adds contract ma
     { count: 0 },
   );
   assert.equal(hasColumn(db, "dice_contract_master_runs", "contract_title"), true);
-  assert.equal(db.pragma("user_version", { simple: true }), 11);
+  assert.equal(db.pragma("user_version", { simple: true }), 12);
 });
 
 test("initializeDatabaseSchema upgrades v5 contract master runs with metadata columns and unique indexes", () => {
@@ -413,7 +437,7 @@ test("initializeDatabaseSchema upgrades v5 contract master runs with metadata co
       .get("user-1", "daily", "2026-03-28", 1),
     { contract_title: "", contract_description: "" },
   );
-  assert.equal(db.pragma("user_version", { simple: true }), 11);
+  assert.equal(db.pragma("user_version", { simple: true }), 12);
 });
 
 test("initializeDatabaseSchema migrates legacy world boss stats and persisted source ids", () => {

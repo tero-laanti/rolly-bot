@@ -337,6 +337,13 @@ export type DiceItemEffect =
       charges: number;
     }
   | {
+      type: "garden-seed";
+      outcomes: Array<{
+        sides: 4 | 6 | 8 | 10 | 12;
+        weight: number;
+      }>;
+    }
+  | {
       type: "double-roll-uses";
       uses: number;
     }
@@ -354,6 +361,10 @@ export type DiceItemEffect =
     }
   | {
       type: "cleanse-all-negative-effects";
+    }
+  | {
+      type: "passive-garden-unlock";
+      slotCount: number;
     }
   | {
       type: "passive-extra-shield-on-umbrella";
