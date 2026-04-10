@@ -593,14 +593,10 @@ export const createDiceShopUseCase = ({
         quantity: 1,
       });
       const itemAchievementStats = inventory.recordShopPurchase(action.ownerId);
-      const newlyEarned = awardManualDiceAchievements(
-        progression,
-        action.ownerId,
-        [
-          ...getDiceItemAchievementIds(itemAchievementStats),
-          ...getDiceShopPurchaseAchievementIds(item.id),
-        ],
-      );
+      const newlyEarned = awardManualDiceAchievements(progression, action.ownerId, [
+        ...getDiceItemAchievementIds(itemAchievementStats),
+        ...getDiceShopPurchaseAchievementIds(item.id),
+      ]);
 
       return {
         ok: true,
