@@ -345,22 +345,19 @@ const buildGardenView = (
   const seedCount = inventory.getInventoryQuantity(userId, mysteriousDieSeedItemId);
 
   return {
-    content: buildGardenContent(userId, activePlot, seedCount, slotCount, statusLine),
+    content: buildGardenContent(activePlot, seedCount, statusLine),
     components: buildGardenComponents(userId, activePlot, seedCount),
   };
 };
 
 const buildGardenContent = (
-  userId: string,
   activePlot: DiceGardenPlot | null,
   seedCount: number,
-  slotCount: number,
   statusLine?: string,
 ): string => {
   const lines = [
     ...(statusLine ? [statusLine, ""] : []),
     "**Seed Satchel**",
-    `${getSlotCountLabel(slotCount)} available.`,
   ];
 
   if (!activePlot) {
@@ -446,6 +443,3 @@ export const isGardenLockedForUser = (
 
 export const getSeedSatchelItemId = (): string => seedSatchelItemId;
 
-const getSlotCountLabel = (slotCount: number): string => {
-  return `${slotCount} slot${slotCount === 1 ? "" : "s"}`;
-};
