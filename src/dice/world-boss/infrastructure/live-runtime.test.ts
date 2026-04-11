@@ -180,6 +180,252 @@ test("active World Boss thread names are truncated to Discord limits", async () 
   });
 });
 
+test("World Boss activation reuses the original message and tags joined players in the thread", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const threadMessages: string[] = [];
+      let raidChannelSendCount = 0;
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {},
+        edit: async (payload: unknown) => payload,
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+          send: async (options: { content?: string }) => {
+            threadMessages.push(options.content ?? "");
+            return {} as never;
+          },
+        }),
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => {
+          raidChannelSendCount += 1;
+          return announcementMessage;
+        },
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return raidChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      const raidRuntime = createWorldBossLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "world-boss-channel",
+          joinLeadMs: 50,
+          activeDurationMs: 60_000,
+          targetWorldBossesPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+      runtime = raidRuntime;
+
+      const triggerResult = await raidRuntime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await raidRuntime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: { id: "user-1" },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+      await raidRuntime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: { id: "user-2" },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      for (let attempt = 0; attempt < 10 && threadMessages.length < 1; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      assert.equal(raidChannelSendCount, 1);
+      assert.equal(threadMessages.length, 1);
+      assert.match(threadMessages[0] ?? "", /<@user-1>/);
+      assert.match(threadMessages[0] ?? "", /<@user-2>/);
+      assert.match(threadMessages[0] ?? "", /Use \/roll in this thread to attack\./);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
+test("World Boss activation still tags joined players when falling back to a separate thread starter message", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      const threadMessages: string[] = [];
+      let threadStarterSendCount = 0;
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => payload,
+        startThread: async () => ({
+          id: "world-boss-thread-1",
+          send: async (options: { content?: string }) => {
+            threadMessages.push(options.content ?? "");
+            return {} as never;
+          },
+        }),
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => {
+            threadStarterSendCount += 1;
+            return activeMessage;
+          },
+        },
+        edit: async (payload: unknown) => payload,
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return raidChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      const raidRuntime = createWorldBossLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "world-boss-channel",
+          joinLeadMs: 50,
+          activeDurationMs: 60_000,
+          targetWorldBossesPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+      runtime = raidRuntime;
+
+      const triggerResult = await raidRuntime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await raidRuntime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: { id: "user-1" },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      for (let attempt = 0; attempt < 10 && threadMessages.length < 1; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      assert.equal(threadStarterSendCount, 1);
+      assert.equal(threadMessages.length, 1);
+      assert.match(threadMessages[0] ?? "", /<@user-1>/);
+      assert.match(threadMessages[0] ?? "", /Use \/roll in this thread to attack\./);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
 test("World Boss join publishes achievement announcements even if the signup prompt edit fails", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
