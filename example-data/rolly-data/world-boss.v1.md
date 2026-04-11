@@ -8,6 +8,11 @@ Player-facing copy uses `World Boss`, while internal identifiers remain `world-b
 - `pipsFormula`: flat payout through a cutoff boss level, then payout equals boss level.
 - `pipsByBossLevel`: explicit tier rows keyed by `bossLevelAtLeast`.
 
+`reward.rollPassBuff` supports two duration shapes:
+
+- formula-based duration via `rollsPerBossLevelDivisor` + `minimumRolls` + `maximumRolls`
+- tiered duration via `rollsByBossLevel`
+
 ```json
 {
   "reward": {
@@ -54,12 +59,14 @@ Tiered reward alternative:
       { "bossLevelAtLeast": 10, "pips": 12 }
     ],
     "rollPassBuff": {
-      "multiplierPerBossLevel": 1,
-      "minimumMultiplier": 2,
-      "maximumMultiplier": 20,
-      "rollsPerBossLevelDivisor": 10,
-      "minimumRolls": 1,
-      "maximumRolls": 5
+      "multiplierPerBossLevel": 2,
+      "minimumMultiplier": 4,
+      "maximumMultiplier": 100,
+      "rollsByBossLevel": [
+        { "bossLevelAtLeast": 1, "rolls": 2 },
+        { "bossLevelAtLeast": 11, "rolls": 4 },
+        { "bossLevelAtLeast": 21, "rolls": 6 }
+      ]
     }
   }
 }
@@ -70,8 +77,8 @@ Tiered reward alternative:
 - Rows must be sorted by ascending `bossLevelAtLeast` with no duplicates.
 - `reward.rollPassBuff.multiplierPerBossLevel` scales the normal `/roll` roll-pass buff from boss level before clamping.
 - `reward.rollPassBuff.minimumMultiplier` and `reward.rollPassBuff.maximumMultiplier` clamp that buff magnitude.
-- `reward.rollPassBuff.rollsPerBossLevelDivisor` controls the clear-buff duration using `ceil(bossLevel / divisor)`.
-- `reward.rollPassBuff.minimumRolls` and `reward.rollPassBuff.maximumRolls` clamp the rewarded roll count.
+- Formula duration mode uses `reward.rollPassBuff.rollsPerBossLevelDivisor`, `reward.rollPassBuff.minimumRolls`, and `reward.rollPassBuff.maximumRolls` to calculate `ceil(bossLevel / divisor)` and clamp the result.
+- Tiered duration mode uses `reward.rollPassBuff.rollsByBossLevel`, which must start at `bossLevelAtLeast = 1` and be sorted ascending with no duplicates.
 - `bossNames.prefixes` and `bossNames.suffixes` are combined at runtime to generate boss names.
 - Startup validation rejects prefix/suffix combinations that would overflow the live World Boss embed titles once the boss name and level are composed.
 - `baseHp` is the level 1 boss HP before level scaling.

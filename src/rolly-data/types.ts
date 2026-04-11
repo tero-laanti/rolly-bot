@@ -119,14 +119,28 @@ export type DiceWorldBossPipRewardFormulaData = {
   flatPipsThroughBossLevel: number;
 };
 
-export type DiceWorldBossRollPassRewardData = {
+export type DiceWorldBossRollPassRewardMultiplierData = {
   multiplierPerBossLevel: number;
   minimumMultiplier: number;
   maximumMultiplier: number;
+};
+
+export type DiceWorldBossRollPassRewardFormulaData = {
   rollsPerBossLevelDivisor: number;
   minimumRolls: number;
   maximumRolls: number;
 };
+
+export type DiceWorldBossRollPassRollsTierData = {
+  bossLevelAtLeast: number;
+  rolls: number;
+};
+
+export type DiceWorldBossRollPassRewardData =
+  | (DiceWorldBossRollPassRewardMultiplierData & DiceWorldBossRollPassRewardFormulaData)
+  | (DiceWorldBossRollPassRewardMultiplierData & {
+      rollsByBossLevel: DiceWorldBossRollPassRollsTierData[];
+    });
 
 export type DiceWorldBossRewardData =
   | {
@@ -154,7 +168,8 @@ export type DiceWorldBossParticipantStrengthData = {
   prestigeMultiplier: number;
 };
 
-export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardData;
+export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardMultiplierData &
+  DiceWorldBossRollPassRewardFormulaData;
 
 export type DiceRaidRewardData = {
   pips: number;
