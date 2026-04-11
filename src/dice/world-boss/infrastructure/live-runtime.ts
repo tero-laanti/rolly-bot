@@ -107,6 +107,7 @@ const worldBossTitle = "World Boss";
 const worldBossProgressRenderThrottleMs = 1_500;
 const maxContributionLines = 5;
 const threadNameCharacterLimit = 100;
+const worldBossThreadKickoffCharacterLimit = 2_000;
 const doubleRollRushInactiveStatus: WorldBossDoubleRollRushStatus = {
   isActive: false,
   expiresAtMs: null,
@@ -646,6 +647,130 @@ export const createWorldBossLiveRuntime = ({
       });
   };
 
+  const buildWorldBossThreadKickoffContent = (participantIds: readonly string[]): string => {
+    const base = "World Boss is live.";
+    const instructions = "Use /roll in this thread to attack.";
+    if (participantIds.length < 1) {
+      return `${base}\n${instructions}`;
+    }
+
+    let mentionsLine = "Joined players: ";
+    let includedCount = 0;
+    for (const participantId of participantIds) {
+      const mention = `<@${participantId}>`;
+      const nextLine = `${mentionsLine}${includedCount > 0 ? " " : ""}${mention}`;
+      const candidate = `${base}\n${nextLine}\n${instructions}`;
+      if (candidate.length > worldBossThreadKickoffCharacterLimit) {
+        break;
+      }
+
+      mentionsLine = nextLine;
+      includedCount += 1;
+    }
+
+    const remainingCount = participantIds.length - includedCount;
+    if (remainingCount > 0) {
+      const suffix = ` (+${remainingCount} more)`;
+      const withSuffix = `${mentionsLine}${suffix}`;
+      mentionsLine =
+        `${base}\n${withSuffix}\n${instructions}`.length <= worldBossThreadKickoffCharacterLimit
+          ? withSuffix
+          : mentionsLine;
+    }
+
+    return `${base}\n${mentionsLine}\n${instructions}`;
+  };
+
+  const notifyWorldBossThreadParticipants = async ({
+    thread,
+    participantIds,
+  }: {
+    thread: { send?: (options: BaseMessageOptions) => Promise<unknown> };
+    participantIds: readonly string[];
+  }): Promise<void> => {
+    if (typeof thread.send !== "function") {
+      return;
+    }
+
+    await thread
+      .send({
+        content: buildWorldBossThreadKickoffContent(participantIds),
+      })
+      .catch((error: unknown) => {
+        logger.warn("[world-boss] Failed to send World Boss thread kickoff message.", error);
+      });
+  };
+
+  const openWorldBossThread = async ({
+    message,
+    threadName,
+  }: {
+    message: Message;
+    threadName: string;
+  }): Promise<{
+    activeMessage: Message;
+    activeThread: { id: string; send?: (options: BaseMessageOptions) => Promise<unknown> };
+  } | null> => {
+    if (typeof message.startThread === "function") {
+      const activeThread = await message
+        .startThread({
+          name: threadName,
+          autoArchiveDuration: 60,
+        })
+        .catch((error: unknown) => {
+          logger.error("[world-boss] Failed to open World Boss thread.", error);
+          return null;
+        });
+
+      if (!activeThread) {
+        return null;
+      }
+
+      return {
+        activeMessage: message,
+        activeThread,
+      };
+    }
+
+    const activeChannel = message.channel;
+    if (!("send" in activeChannel) || typeof activeChannel.send !== "function") {
+      logger.error("[world-boss] Active World Boss channel is not writable.");
+      return null;
+    }
+
+    const activeMessage = await activeChannel
+      .send({
+        content: "Opening World Boss thread...",
+      })
+      .catch((error: unknown) => {
+        logger.error("[world-boss] Failed to send active World Boss prompt.", error);
+        return null;
+      });
+
+    if (!activeMessage) {
+      return null;
+    }
+
+    const activeThread = await activeMessage
+      .startThread({
+        name: threadName,
+        autoArchiveDuration: 60,
+      })
+      .catch((error: unknown) => {
+        logger.error("[world-boss] Failed to open World Boss thread.", error);
+        return null;
+      });
+
+    if (!activeThread) {
+      return null;
+    }
+
+    return {
+      activeMessage,
+      activeThread,
+    };
+  };
+
   const queueAnnouncementRender = async ({
     context,
     logFailureMessage,
@@ -1144,6 +1269,7 @@ export const createWorldBossLiveRuntime = ({
       allowedStatuses: ["resolved"],
       logFailureMessage: "[world-boss] Failed to update resolved World Boss announcement.",
     });
+
     await publishAchievementEffects({
       client,
       announcements: context.worldBoss.achievementAnnouncements,
@@ -1209,19 +1335,6 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    const activeChannel = context.handles.announcementMessage.channel;
-    if (!("send" in activeChannel) || typeof activeChannel.send !== "function") {
-      logger.error("[world-boss] Active World Boss channel is not writable.");
-      transitionToTerminal(context, "start-failed");
-      await queueAnnouncementRender({
-        context,
-        allowedStatuses: ["start-failed"],
-        logFailureMessage: "[world-boss] Failed to update failed-start World Boss announcement.",
-      });
-      finalizeWorldBoss(context);
-      return;
-    }
-
     const participantIds = participantIdsFromContext(context);
     const totalParticipantStrength = participantIds.reduce((strengthTotal, participantId) => {
       return (
@@ -1233,44 +1346,19 @@ export const createWorldBossLiveRuntime = ({
       raiderStrength: totalParticipantStrength,
     });
 
-    const activeMessage = await activeChannel
-      .send({
-        content: "Opening World Boss thread...",
-      })
-      .catch((error: unknown) => {
-        logger.error("[world-boss] Failed to send active World Boss prompt.", error);
-        return null;
-      });
-
-    if (!activeMessage) {
-      transitionToTerminal(context, "start-failed");
-      await queueAnnouncementRender({
-        context,
-        allowedStatuses: ["start-failed"],
-        logFailureMessage: "[world-boss] Failed to update failed-start World Boss announcement.",
-      });
-      finalizeWorldBoss(context);
-      return;
-    }
-
     const threadName = truncateDiscordText(
       `${bossDefinition.name} World Boss`,
       threadNameCharacterLimit,
     );
 
-    const activeThread = await activeMessage
-      .startThread({
-        name: threadName,
-        autoArchiveDuration: 60,
-      })
-      .catch((error: unknown) => {
-        logger.error("[world-boss] Failed to open World Boss thread.", error);
-        return null;
-      });
+    const threadStart = await openWorldBossThread({
+      message: context.handles.announcementMessage,
+      threadName,
+    });
 
-    if (!activeThread) {
+    if (!threadStart) {
       await editMessage({
-        message: activeMessage,
+        message: context.handles.announcementMessage,
         prompt: buildWorldBossStartFailedPrompt({
           participantIds,
         }),
@@ -1285,6 +1373,8 @@ export const createWorldBossLiveRuntime = ({
       finalizeWorldBoss(context);
       return;
     }
+
+    const { activeMessage, activeThread } = threadStart;
 
     if (!isCurrentContext(context) || currentWorldBossStatus(context) !== "starting" || stopping) {
       await closeUntrackedWorldBossMessage({
@@ -1316,6 +1406,11 @@ export const createWorldBossLiveRuntime = ({
       },
     });
 
+    await notifyWorldBossThreadParticipants({
+      thread: activeThread,
+      participantIds,
+    });
+
     const rendered = await queueActiveRenderNow({
       context,
       logFailureMessage: "[world-boss] Failed to render active World Boss prompt.",
@@ -1332,11 +1427,6 @@ export const createWorldBossLiveRuntime = ({
       return;
     }
 
-    await queueAnnouncementRender({
-      context,
-      allowedStatuses: ["active"],
-      logFailureMessage: "[world-boss] Failed to refresh active World Boss announcement prompt.",
-    });
     scheduleResolve(context);
   };
 
