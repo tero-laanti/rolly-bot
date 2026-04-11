@@ -93,6 +93,12 @@ export type DiceShopAction =
       itemId: string;
     }
   | {
+      type: "buy-another-item";
+      ownerId: string;
+      categoryId: DiceShopCategoryId;
+      itemId: string;
+    }
+  | {
       type: "view-adjacent-item";
       ownerId: string;
       categoryId: DiceShopCategoryId;
@@ -141,6 +147,7 @@ export type DiceShopPurchaseReceipt = {
   itemId: string;
   categoryId: DiceShopCategoryId;
   itemName: string;
+  boughtAnother: boolean;
   ownedQuantity: number;
   remainingPips: number;
   changeSummary: string;
@@ -644,7 +651,13 @@ export const createDiceShopUseCase = ({
         ].flatMap((announcement) => (announcement ? [announcement] : [])),
         payload: {
           type: "view",
-          view: buildPurchaseReceiptViewModel(inventory, shopCatalog, action.ownerId, purchase),
+          view: buildPurchaseReceiptViewModel(
+            inventory,
+            shopCatalog,
+            action.ownerId,
+            purchase,
+            action.type === "buy-another-item",
+          ),
         },
       },
     };
@@ -797,6 +810,7 @@ const buildPurchaseReceiptViewModel = (
   shopCatalog: DiceShopCatalog,
   userId: string,
   purchase: Extract<ShopPurchaseAttempt, { ok: true }>,
+  boughtAnother: boolean,
 ): DiceShopViewModel => {
   const inventoryQuantities = inventory.getInventoryQuantities(userId);
 
@@ -809,6 +823,7 @@ const buildPurchaseReceiptViewModel = (
       itemId: purchase.item.id,
       categoryId: getDiceShopCategoryId(purchase.item),
       itemName: purchase.item.name,
+      boughtAnother,
       ownedQuantity: purchase.quantity,
       remainingPips: purchase.remainingPips,
       changeSummary: buildPurchaseChangeSummary(purchase.item, purchase.quantity),

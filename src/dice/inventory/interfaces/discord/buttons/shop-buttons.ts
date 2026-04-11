@@ -52,6 +52,14 @@ export const encodeDiceShopButtonAction = (
         action.categoryId,
         action.itemId,
       );
+    case "buy-another-item":
+      return encodeActionId(
+        diceShopButtonPrefix,
+        "buy-another-item",
+        action.ownerId,
+        action.categoryId,
+        action.itemId,
+      );
     case "view-adjacent-item":
       return encodeActionId(
         diceShopButtonPrefix,
@@ -116,6 +124,10 @@ export const parseDiceShopButtonAction = (
 
   if (action === "buy-selected-item" && isDiceShopCategoryId(categoryId) && itemIdOrPage) {
     return { type: "buy-selected-item", ownerId, categoryId, itemId: itemIdOrPage };
+  }
+
+  if (action === "buy-another-item" && isDiceShopCategoryId(categoryId) && itemIdOrPage) {
+    return { type: "buy-another-item", ownerId, categoryId, itemId: itemIdOrPage };
   }
 
   if (

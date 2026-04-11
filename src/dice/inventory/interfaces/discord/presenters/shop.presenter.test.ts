@@ -177,6 +177,7 @@ test("receipt renders success embed plus buy another, use item, and close", () =
           itemId: "dice-revolver",
           categoryId: "consumables",
           itemName: "Dice Revolver",
+          boughtAnother: false,
           ownedQuantity: 1,
           remainingPips: 34,
           changeSummary:
@@ -189,6 +190,7 @@ test("receipt renders success embed plus buy another, use item, and close", () =
 
   const embed = interaction.payload.embeds?.[0]?.toJSON();
   assert.equal(embed?.title, "Purchase Complete");
+  assert.equal(embed?.description, "Bought **Dice Revolver**.");
 
   const rows = interaction.payload.components?.map((row) => row.toJSON()) ?? [];
   assert.equal(rows.length, 1);
@@ -196,6 +198,35 @@ test("receipt renders success embed plus buy another, use item, and close", () =
     rows[0]?.components.map((component) => ("label" in component ? component.label : undefined)),
     ["Buy Another", "Use Item", "Close"],
   );
+});
+
+test("repeat purchase receipt says bought another", () => {
+  const interaction = renderDiceShopResult({
+    kind: "update",
+    payload: {
+      type: "view",
+      view: {
+        screen: "purchase-receipt",
+        ownerId: "user-1",
+        balancePips: 28,
+        categorySummaries,
+        receipt: {
+          itemId: "dice-revolver",
+          categoryId: "consumables",
+          itemName: "Dice Revolver",
+          boughtAnother: true,
+          ownedQuantity: 2,
+          remainingPips: 28,
+          changeSummary:
+            "The item was added to your inventory. Use /inventory when you want to activate it.",
+          canUseItemNow: true,
+        },
+      },
+    },
+  }).interactionResult;
+
+  const embed = interaction.payload.embeds?.[0]?.toJSON();
+  assert.equal(embed?.description, "Bought another **Dice Revolver**.");
 });
 
 test("use-item confirmation renders yes and no buttons", () => {
