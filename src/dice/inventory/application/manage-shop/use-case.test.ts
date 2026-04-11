@@ -395,6 +395,7 @@ test("successful purchase returns a purchase receipt with the updated balance an
     itemId: diceRevolver.id,
     categoryId: "consumables",
     itemName: "Dice Revolver",
+    boughtAnother: false,
     ownedQuantity: 1,
     remainingPips: 34,
     changeSummary:
@@ -487,6 +488,49 @@ test("permanent upgrades still reject repeat purchase", async () => {
   assert.equal(getApplyPipsDeltaCalls(), 0);
   assert.equal(getGrantInventoryItemCalls(), 0);
   assert.equal(getRecordShopPurchaseCalls(), 0);
+});
+
+test("buy another immediately repurchases the same item and marks the receipt as a repeat buy", async () => {
+  const { handleAction, inventoryQuantities, getPips } = createTestShopUseCase({ initialPips: 40 });
+
+  await handleAction({
+    type: "buy-selected-item",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    itemId: diceRevolver.id,
+  });
+
+  const result = await handleAction({
+    type: "buy-another-item",
+    ownerId: "user-1",
+    categoryId: "consumables",
+    itemId: diceRevolver.id,
+  });
+
+  assert.equal(result.result.kind, "update");
+  assert.equal(result.result.payload.type, "view");
+  if (result.result.payload.type !== "view") {
+    return;
+  }
+
+  assert.equal(result.result.payload.view.screen, "purchase-receipt");
+  if (result.result.payload.view.screen !== "purchase-receipt") {
+    return;
+  }
+
+  assert.deepEqual(result.result.payload.view.receipt, {
+    itemId: diceRevolver.id,
+    categoryId: "consumables",
+    itemName: "Dice Revolver",
+    boughtAnother: true,
+    ownedQuantity: 2,
+    remainingPips: 28,
+    changeSummary:
+      "The item was added to your inventory. Use /inventory when you want to activate it.",
+    canUseItemNow: true,
+  });
+  assert.equal(inventoryQuantities.get(diceRevolver.id), 2);
+  assert.equal(getPips(), 28);
 });
 
 test("buying a hidden prerequisite-gated upgrade is rejected as unavailable", async () => {

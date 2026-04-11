@@ -168,7 +168,11 @@ const buildDiceShopEmbed = (view: DiceShopViewModel): EmbedBuilder => {
 
   const embed = new EmbedBuilder()
     .setTitle("Purchase Complete")
-    .setDescription(`Bought **${view.receipt.itemName}**.`)
+    .setDescription(
+      view.receipt.boughtAnother
+        ? `Bought another **${view.receipt.itemName}**.`
+        : `Bought **${view.receipt.itemName}**.`,
+    )
     .addFields(
       {
         name: "Quantity Now Owned",
@@ -423,7 +427,14 @@ const buildDiceShopComponents = (
   return [
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(encodeDiceShopButtonAction({ type: "view-home", ownerId: view.ownerId }))
+        .setCustomId(
+          encodeDiceShopButtonAction({
+            type: "buy-another-item",
+            ownerId: view.ownerId,
+            categoryId: view.receipt.categoryId,
+            itemId: view.receipt.itemId,
+          }),
+        )
         .setLabel("Buy Another")
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
