@@ -355,10 +355,7 @@ const buildGardenContent = (
   seedCount: number,
   statusLine?: string,
 ): string => {
-  const lines = [
-    ...(statusLine ? [statusLine, ""] : []),
-    "**Seed Satchel**",
-  ];
+  const lines = [...(statusLine ? [statusLine, ""] : []), "**Seed Satchel**"];
 
   if (!activePlot) {
     lines.push("Status: empty.");
@@ -442,4 +439,3 @@ export const isGardenLockedForUser = (
 };
 
 export const getSeedSatchelItemId = (): string => seedSatchelItemId;
-
