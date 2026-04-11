@@ -762,6 +762,11 @@ export const createWorldBossLiveRuntime = ({
       });
 
     if (!activeThread) {
+      await deleteUntrackedWorldBossMessage({
+        message: activeMessage,
+        logFailureMessage:
+          "[world-boss] Failed to delete fallback World Boss thread starter message.",
+      });
       return null;
     }
 
@@ -979,6 +984,22 @@ export const createWorldBossLiveRuntime = ({
         bossName,
       }),
       logFailureMessage,
+    });
+  };
+
+  const deleteUntrackedWorldBossMessage = async ({
+    message,
+    logFailureMessage,
+  }: {
+    message: Message;
+    logFailureMessage: string;
+  }): Promise<void> => {
+    if (typeof message.delete !== "function") {
+      return;
+    }
+
+    await message.delete().catch((error: unknown) => {
+      logger.warn(logFailureMessage, error);
     });
   };
 

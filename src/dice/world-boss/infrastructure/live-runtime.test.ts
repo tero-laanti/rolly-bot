@@ -426,6 +426,131 @@ test("World Boss activation still tags joined players when falling back to a sep
   });
 });
 
+test("World Boss fallback starter message is cleaned up when thread creation fails", async () => {
+  await withEnv({ ACHIEVEMENTS_CHANNEL_ID: undefined }, async () => {
+    const modulePaths = ["../../../shared/config", "../../../shared/db", "./live-runtime"] as const;
+    clearModules(modulePaths);
+
+    const db = new Database(":memory:");
+    initializeDatabaseSchema(db as never);
+
+    const sharedDb = moduleRequire("../../../shared/db") as typeof import("../../../shared/db");
+    const originalGetDatabase = sharedDb.getDatabase;
+    let runtime: import("./live-runtime").WorldBossLiveRuntime | null = null;
+
+    try {
+      (sharedDb as { getDatabase: typeof sharedDb.getDatabase }).getDatabase = () => db as never;
+
+      let threadStarterSendCount = 0;
+      let fallbackStarterDeleteCount = 0;
+      const announcementEdits: unknown[] = [];
+      const activeMessage = {
+        id: "active-message-1",
+        edit: async (payload: unknown) => payload,
+        delete: async () => {
+          fallbackStarterDeleteCount += 1;
+          return activeMessage;
+        },
+        startThread: async () => {
+          throw new Error("thread create failed");
+        },
+      };
+      const announcementMessage = {
+        id: "world-boss-message-1",
+        channelId: "world-boss-channel",
+        channel: {
+          send: async () => {
+            threadStarterSendCount += 1;
+            return activeMessage;
+          },
+        },
+        edit: async (payload: unknown) => {
+          announcementEdits.push(payload);
+          return payload;
+        },
+      };
+      const raidChannel = {
+        isTextBased: () => true,
+        send: async () => announcementMessage,
+      };
+      const client = {
+        channels: {
+          fetch: async (channelId: string) => {
+            if (channelId === "world-boss-channel") {
+              return raidChannel;
+            }
+
+            return null;
+          },
+        },
+      } as never;
+
+      const { createWorldBossLiveRuntime } = moduleRequire(
+        "./live-runtime",
+      ) as typeof import("./live-runtime");
+      const raidRuntime = createWorldBossLiveRuntime({
+        client,
+        config: {
+          enabled: true,
+          inactiveReason: null,
+          channelId: "world-boss-channel",
+          joinLeadMs: 50,
+          activeDurationMs: 60_000,
+          targetWorldBossesPerDay: 0,
+          minGapMs: 1,
+          retryDelayMs: 1,
+          jitterRatio: 0,
+          quietHours: {
+            start: "00:00",
+            end: "00:00",
+            timezone: "UTC",
+          },
+        },
+        logger: {
+          info: () => undefined,
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      });
+      runtime = raidRuntime;
+
+      const triggerResult = await raidRuntime.triggerWorldBossNow();
+      assert.equal(triggerResult.created, true);
+      if (!triggerResult.created) {
+        throw new Error("Expected live World Boss to be created.");
+      }
+
+      await raidRuntime.handleButtonInteraction({
+        customId: `world-boss-join:${triggerResult.worldBossId}`,
+        user: { id: "user-1" },
+        client,
+        deferUpdate: async () => undefined,
+        reply: async () => undefined,
+      } as never);
+
+      for (let attempt = 0; attempt < 10 && fallbackStarterDeleteCount < 1; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      assert.equal(threadStarterSendCount, 1);
+      assert.equal(fallbackStarterDeleteCount, 1);
+      assert.match(JSON.stringify(announcementEdits), /World Boss failed to start/);
+    } finally {
+      if (runtime) {
+        await runtime.stop();
+      }
+
+      (
+        sharedDb as {
+          getDatabase: typeof sharedDb.getDatabase;
+        }
+      ).getDatabase = originalGetDatabase;
+      db.close();
+      clearModules(modulePaths);
+    }
+  });
+});
+
 test("World Boss join publishes achievement announcements even if the signup prompt edit fails", async () => {
   await withEnv({ ACHIEVEMENTS_CHANNEL_ID: "achievements-channel" }, async () => {
     const modulePaths = [
