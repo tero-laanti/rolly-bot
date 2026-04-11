@@ -164,6 +164,34 @@ test("planting a seed shows the agreed status copy", () => {
   assert.equal(plots[0]?.dieSides, 6);
 });
 
+test("garden status no longer shows slot-availability copy", () => {
+  const { useCase } = createTestUseCase({
+    initialPlots: [
+      {
+        userId: "user-1",
+        slotIndex: 0,
+        seedItemId: "mysterious-die-seed",
+        dieSides: 6,
+        plantedAt: "2026-04-10T10:00:00.000Z",
+        readyAt: "2999-04-10T18:00:00.000Z",
+        updatedAt: "2026-04-10T10:00:00.000Z",
+      },
+    ],
+  });
+
+  const outcome = useCase.handleDiceGardenAction("user-1", {
+    type: "refresh",
+    ownerId: "user-1",
+  });
+
+  assert.equal(outcome.result.kind, "update");
+  assert.equal(outcome.result.payload.type, "view");
+  if (outcome.result.payload.type !== "view") {
+    throw new Error("Expected garden refresh to return a view payload.");
+  }
+  assert.doesNotMatch(outcome.result.payload.view.content, /slot available/i);
+});
+
 test("planting is blocked when an active plot already exists", () => {
   const { useCase } = createTestUseCase({
     initialPlots: [
