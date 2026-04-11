@@ -16,21 +16,21 @@ const rewardBands = {
   },
   rare: {
     baseline: { min: 7, max: 10 },
-    challenge: { min: 9, max: 13 },
-    sequence: { min: 10, max: 14 },
-    "multi-user": { min: 10, max: 14 },
+    challenge: { min: 11, max: 16 },
+    sequence: { min: 12, max: 18 },
+    "multi-user": { min: 12, max: 18 },
   },
   epic: {
     baseline: { min: 11, max: 18 },
-    challenge: { min: 14, max: 20 },
-    sequence: { min: 16, max: 24 },
-    "multi-user": { min: 16, max: 24 },
+    challenge: { min: 18, max: 26 },
+    sequence: { min: 20, max: 30 },
+    "multi-user": { min: 20, max: 30 },
   },
   legendary: {
     baseline: { min: 20, max: 30 },
-    challenge: { min: 24, max: 34 },
-    sequence: { min: 28, max: 40 },
-    "multi-user": { min: 28, max: 40 },
+    challenge: { min: 30, max: 44 },
+    sequence: { min: 34, max: 50 },
+    "multi-user": { min: 34, max: 50 },
   },
 } as const;
 
@@ -67,9 +67,9 @@ type RewardProfile = "baseline" | "challenge" | "sequence" | "multi-user";
 const stagedGroupMeterTotalBands: Partial<
   Record<RandomEventRarityTier, { min: number; max: number }>
 > = {
-  rare: { min: 16, max: 20 },
-  epic: { min: 24, max: 34 },
-  legendary: { min: 34, max: 44 },
+  rare: { min: 20, max: 26 },
+  epic: { min: 30, max: 42 },
+  legendary: { min: 44, max: 60 },
 };
 
 const sumCurrencyEffects = (
