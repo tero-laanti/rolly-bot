@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import test from "node:test";
 import {
   calculateWorldBossMaxHp,
@@ -9,11 +10,87 @@ import {
   getDefaultWorldBossReward,
 } from "./raid";
 
+const moduleRequire = createRequire(__filename);
+
+const clearModules = (modulePaths: readonly string[]): void => {
+  for (const modulePath of modulePaths) {
+    const resolved = moduleRequire.resolve(modulePath);
+    delete require.cache[resolved];
+  }
+};
+
 test("world boss pip reward formula stays flat through level 5 and scales from level 6", () => {
   assert.equal(getDefaultWorldBossReward(1).pips, 5);
   assert.equal(getDefaultWorldBossReward(5).pips, 5);
   assert.equal(getDefaultWorldBossReward(6).pips, 6);
   assert.equal(getDefaultWorldBossReward(35).pips, 35);
+});
+
+test("world boss reward tables support tiered roll-pass lengths", () => {
+  const modulePaths = ["../../../rolly-data/load", "./raid"] as const;
+  clearModules(modulePaths);
+
+  const load = moduleRequire(
+    "../../../rolly-data/load",
+  ) as typeof import("../../../rolly-data/load");
+  const originalGetWorldBossData = load.getWorldBossData;
+
+  try {
+    (load as { getWorldBossData: typeof load.getWorldBossData }).getWorldBossData = () => ({
+      reward: {
+        pipsByBossLevel: [
+          { bossLevelAtLeast: 1, pips: 15 },
+          { bossLevelAtLeast: 6, pips: 25 },
+          { bossLevelAtLeast: 11, pips: 40 },
+        ],
+        rollPassBuff: {
+          multiplierPerBossLevel: 2,
+          minimumMultiplier: 4,
+          maximumMultiplier: 100,
+          rollsByBossLevel: [
+            { bossLevelAtLeast: 1, rolls: 2 },
+            { bossLevelAtLeast: 11, rolls: 4 },
+            { bossLevelAtLeast: 21, rolls: 6 },
+          ],
+        },
+      },
+      bossNames: {
+        prefixes: ["Example"],
+        suffixes: ["Boss"],
+      },
+      bossBalance: {
+        baseHp: 120,
+        hpIncreasePerBossLevelPercent: 3,
+        levelHalfLifeLevels: 10,
+        maxBossLevel: 50,
+      },
+      participantStrength: {
+        prestigeMultiplier: 1.5,
+      },
+    });
+
+    const raid = moduleRequire("./raid") as typeof import("./raid");
+
+    assert.deepEqual(raid.getDefaultWorldBossReward(1), {
+      pips: 15,
+      rollPassMultiplier: 4,
+      rollPassRolls: 2,
+    });
+    assert.deepEqual(raid.getDefaultWorldBossReward(12), {
+      pips: 40,
+      rollPassMultiplier: 24,
+      rollPassRolls: 4,
+    });
+    assert.deepEqual(raid.getDefaultWorldBossReward(35), {
+      pips: 40,
+      rollPassMultiplier: 70,
+      rollPassRolls: 6,
+    });
+  } finally {
+    (load as { getWorldBossData: typeof load.getWorldBossData }).getWorldBossData =
+      originalGetWorldBossData;
+    clearModules(modulePaths);
+  }
 });
 
 test("world boss hp scales by 3 percent per boss level", () => {

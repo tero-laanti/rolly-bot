@@ -39,6 +39,7 @@ import type {
   DiceWorldBossPipRewardFormulaData,
   DiceWorldBossPipRewardTierData,
   DiceWorldBossRewardData,
+  DiceWorldBossRollPassRollsTierData,
 } from "./types";
 import {
   validateRandomEventScenarios,
@@ -1833,7 +1834,7 @@ const readWorldBossRewardConfig = (value: unknown, label: string): DiceWorldBoss
   }
 
   const rollPassBuff = assertRecord(record.rollPassBuff, `${label}.rollPassBuff`);
-  const parsedRollPassBuff = {
+  const parsedRollPassBuffBase = {
     multiplierPerBossLevel: readFiniteNumberAtLeast(
       rollPassBuff.multiplierPerBossLevel,
       `${label}.rollPassBuff.multiplierPerBossLevel`,
@@ -1849,21 +1850,80 @@ const readWorldBossRewardConfig = (value: unknown, label: string): DiceWorldBoss
       `${label}.rollPassBuff.maximumMultiplier`,
       1,
     ),
-    rollsPerBossLevelDivisor: readFiniteNumberAtLeast(
-      rollPassBuff.rollsPerBossLevelDivisor,
-      `${label}.rollPassBuff.rollsPerBossLevelDivisor`,
-      1,
-    ),
-    minimumRolls: readInteger(rollPassBuff.minimumRolls, `${label}.rollPassBuff.minimumRolls`, 1),
-    maximumRolls: readInteger(rollPassBuff.maximumRolls, `${label}.rollPassBuff.maximumRolls`, 1),
   };
 
-  if (parsedRollPassBuff.maximumMultiplier < parsedRollPassBuff.minimumMultiplier) {
+  if (parsedRollPassBuffBase.maximumMultiplier < parsedRollPassBuffBase.minimumMultiplier) {
     throw new Error(`${label}.rollPassBuff.maximumMultiplier must be at least minimumMultiplier.`);
   }
 
-  if (parsedRollPassBuff.maximumRolls < parsedRollPassBuff.minimumRolls) {
-    throw new Error(`${label}.rollPassBuff.maximumRolls must be at least minimumRolls.`);
+  let parsedRollPassBuff:
+    | (typeof parsedRollPassBuffBase & {
+        rollsPerBossLevelDivisor: number;
+        minimumRolls: number;
+        maximumRolls: number;
+      })
+    | (typeof parsedRollPassBuffBase & {
+        rollsByBossLevel: DiceWorldBossRollPassRollsTierData[];
+      });
+
+  if (Array.isArray(rollPassBuff.rollsByBossLevel)) {
+    const rollTiers = rollPassBuff.rollsByBossLevel.map((entry, index) => {
+      const tierRecord = assertRecord(entry, `${label}.rollPassBuff.rollsByBossLevel[${index}]`);
+      return {
+        bossLevelAtLeast: readInteger(
+          tierRecord.bossLevelAtLeast,
+          `${label}.rollPassBuff.rollsByBossLevel[${index}].bossLevelAtLeast`,
+          1,
+        ),
+        rolls: readInteger(
+          tierRecord.rolls,
+          `${label}.rollPassBuff.rollsByBossLevel[${index}].rolls`,
+          1,
+        ),
+      };
+    });
+
+    if (rollTiers.length < 1) {
+      throw new Error(`${label}.rollPassBuff.rollsByBossLevel must include at least one entry.`);
+    }
+
+    if (rollTiers[0]?.bossLevelAtLeast !== 1) {
+      throw new Error(`${label}.rollPassBuff.rollsByBossLevel must start at bossLevelAtLeast = 1.`);
+    }
+
+    for (let index = 1; index < rollTiers.length; index += 1) {
+      const previousTier = rollTiers[index - 1];
+      const currentTier = rollTiers[index];
+      if (!previousTier || !currentTier) {
+        continue;
+      }
+
+      if (currentTier.bossLevelAtLeast <= previousTier.bossLevelAtLeast) {
+        throw new Error(
+          `${label}.rollPassBuff.rollsByBossLevel must be sorted by ascending bossLevelAtLeast with no duplicates.`,
+        );
+      }
+    }
+
+    parsedRollPassBuff = {
+      ...parsedRollPassBuffBase,
+      rollsByBossLevel: rollTiers,
+    };
+  } else {
+    parsedRollPassBuff = {
+      ...parsedRollPassBuffBase,
+      rollsPerBossLevelDivisor: readFiniteNumberAtLeast(
+        rollPassBuff.rollsPerBossLevelDivisor,
+        `${label}.rollPassBuff.rollsPerBossLevelDivisor`,
+        1,
+      ),
+      minimumRolls: readInteger(rollPassBuff.minimumRolls, `${label}.rollPassBuff.minimumRolls`, 1),
+      maximumRolls: readInteger(rollPassBuff.maximumRolls, `${label}.rollPassBuff.maximumRolls`, 1),
+    };
+
+    if (parsedRollPassBuff.maximumRolls < parsedRollPassBuff.minimumRolls) {
+      throw new Error(`${label}.rollPassBuff.maximumRolls must be at least minimumRolls.`);
+    }
   }
 
   if ("pipsFormula" in parsedPipRewards) {

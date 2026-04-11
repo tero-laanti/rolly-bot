@@ -109,6 +109,21 @@ const resolveWorldBossRewardRollPassMultiplier = (bossLevel: number): number => 
 
 const resolveWorldBossRewardRollPassRolls = (bossLevel: number): number => {
   const { rollPassBuff } = getWorldBossBalance().reward;
+
+  if ("rollsByBossLevel" in rollPassBuff) {
+    let matchedTier = rollPassBuff.rollsByBossLevel[0];
+
+    for (const rewardTier of rollPassBuff.rollsByBossLevel) {
+      if (rewardTier.bossLevelAtLeast > bossLevel) {
+        break;
+      }
+
+      matchedTier = rewardTier;
+    }
+
+    return matchedTier?.rolls ?? 1;
+  }
+
   const scaledRolls = Math.ceil(bossLevel / rollPassBuff.rollsPerBossLevelDivisor);
   return Math.max(rollPassBuff.minimumRolls, Math.min(rollPassBuff.maximumRolls, scaledRolls));
 };

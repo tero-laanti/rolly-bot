@@ -798,6 +798,89 @@ test("parseWorldBossData keeps legacy pipsByBossLevel rewards readable", () => {
   assert.equal(worldBoss.participantStrength.prestigeMultiplier, 1.5);
 });
 
+test("parseWorldBossData accepts tiered World Boss roll-pass lengths", () => {
+  const worldBoss = parseWorldBossData({
+    reward: {
+      pipsByBossLevel: [
+        { bossLevelAtLeast: 1, pips: 15 },
+        { bossLevelAtLeast: 6, pips: 25 },
+      ],
+      rollPassBuff: {
+        multiplierPerBossLevel: 2,
+        minimumMultiplier: 4,
+        maximumMultiplier: 100,
+        rollsByBossLevel: [
+          { bossLevelAtLeast: 1, rolls: 2 },
+          { bossLevelAtLeast: 11, rolls: 4 },
+          { bossLevelAtLeast: 21, rolls: 6 },
+        ],
+      },
+    },
+    bossNames: {
+      prefixes: ["Example"],
+      suffixes: ["Boss"],
+    },
+    bossBalance: {
+      baseHp: 120,
+      hpIncreasePerBossLevelPercent: 3,
+      levelHalfLifeLevels: 10,
+      maxBossLevel: 50,
+    },
+    participantStrength: {
+      prestigeMultiplier: 1.5,
+    },
+  });
+
+  assert.ok("rollsByBossLevel" in worldBoss.reward.rollPassBuff);
+  if (!("rollsByBossLevel" in worldBoss.reward.rollPassBuff)) {
+    throw new Error("Expected tiered World Boss roll-pass lengths.");
+  }
+
+  assert.deepEqual(worldBoss.reward.rollPassBuff.rollsByBossLevel, [
+    { bossLevelAtLeast: 1, rolls: 2 },
+    { bossLevelAtLeast: 11, rolls: 4 },
+    { bossLevelAtLeast: 21, rolls: 6 },
+  ]);
+});
+
+test("parseWorldBossData rejects unsorted tiered World Boss roll-pass lengths", () => {
+  assert.throws(
+    () =>
+      parseWorldBossData({
+        reward: {
+          pipsFormula: {
+            flatPips: 5,
+            flatPipsThroughBossLevel: 5,
+          },
+          rollPassBuff: {
+            multiplierPerBossLevel: 2,
+            minimumMultiplier: 4,
+            maximumMultiplier: 100,
+            rollsByBossLevel: [
+              { bossLevelAtLeast: 1, rolls: 2 },
+              { bossLevelAtLeast: 11, rolls: 4 },
+              { bossLevelAtLeast: 11, rolls: 6 },
+            ],
+          },
+        },
+        bossNames: {
+          prefixes: ["Example"],
+          suffixes: ["Boss"],
+        },
+        bossBalance: {
+          baseHp: 120,
+          hpIncreasePerBossLevelPercent: 3,
+          levelHalfLifeLevels: 10,
+          maxBossLevel: 50,
+        },
+        participantStrength: {
+          prestigeMultiplier: 1.5,
+        },
+      }),
+    /rollsByBossLevel must be sorted by ascending bossLevelAtLeast with no duplicates/i,
+  );
+});
+
 test("parseWorldBossData rejects boss names that overflow World Boss titles", () => {
   assert.throws(
     () =>
