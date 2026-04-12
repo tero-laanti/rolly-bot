@@ -127,7 +127,9 @@ test("clear bans requires an explicit confirmation step", () => {
       },
       permanentBonuses: zeroPermanentBonuses,
       progression: {
-        clearDiceBan: () => undefined,
+        clearDiceBan: (_userId, dieIndex) => {
+          bans.delete(dieIndex);
+        },
         clearSingleDiceBan: () => undefined,
         markFirstDiceBan: () => false,
         awardAchievements: () => [],
@@ -203,5 +205,45 @@ test("confirmed clear bans removes all bans and returns to the die selection vie
       result.payload.view.components.at(-1)?.map((button) => button.label),
       ["Close", "Clear bans"],
     );
+  });
+});
+
+test("ban menu hides stale higher-die bans after prestige reduces the active dice count", () => {
+  withCustomRollyData((dataDir) => {
+    const { createDiceBansUseCase } = loadUseCase(dataDir);
+    const bans = new Map<number, Set<number>>([
+      [1, new Set([2])],
+      [6, new Set([4])],
+    ]);
+    const useCase = createDiceBansUseCase({
+      economy: {
+        getFame: () => 100,
+      },
+      permanentBonuses: zeroPermanentBonuses,
+      progression: {
+        clearDiceBan: (_userId, dieIndex) => {
+          bans.delete(dieIndex);
+        },
+        clearSingleDiceBan: () => undefined,
+        markFirstDiceBan: () => false,
+        awardAchievements: () => [],
+        getDiceBans: () => bans,
+        getDiceCount: () => 1,
+        getDiceSides: () => 8,
+        setDiceBan: () => undefined,
+      },
+    });
+
+    const result = useCase.createDiceBansReply("user-1");
+
+    assert.equal(result.payload.type, "view");
+    if (result.payload.type !== "view") {
+      return;
+    }
+
+    const labels = result.payload.view.components.flat().map((button) => button.label);
+    assert.ok(labels.includes("Die 1 (1)"));
+    assert.ok(!labels.includes("Die 6 (1)"));
+    assert.deepEqual([...bans.keys()], [1]);
   });
 });

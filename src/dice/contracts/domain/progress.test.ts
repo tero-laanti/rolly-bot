@@ -87,7 +87,7 @@ test("progress updates complete a run and grant pips once", () => {
   assert.equal(third, null);
 });
 
-test("completion state unlocks exactly one refill and caps at two completions", () => {
+test("completion state keeps same-difficulty refills open until the cadence cap is reached", () => {
   const state = createEmptyContractCadenceState("user-1", "daily", "2026-03-28");
   const firstRun = createAcceptedRun(
     makeChoice(),
@@ -108,6 +108,7 @@ test("completion state unlocks exactly one refill and caps at two completions", 
     state,
     { ...firstRun, completedAt: new Date("2026-03-28T10:30:00.000Z") },
     new Date("2026-03-28T10:30:00.000Z"),
+    3,
   );
   assert.equal(afterFirst.completionCount, 1);
   assert.equal(afterFirst.refillAvailableDifficulty, "serious");
@@ -116,9 +117,19 @@ test("completion state unlocks exactly one refill and caps at two completions", 
     afterFirst,
     { ...secondRun, completedAt: new Date("2026-03-28T11:30:00.000Z") },
     new Date("2026-03-28T11:30:00.000Z"),
+    3,
   );
   assert.equal(afterSecond.completionCount, 2);
-  assert.equal(afterSecond.refillAvailableDifficulty, undefined);
+  assert.equal(afterSecond.refillAvailableDifficulty, "serious");
+
+  const afterThird = applyCompletionToCadenceState(
+    afterSecond,
+    { ...secondRun, completedAt: new Date("2026-03-28T12:30:00.000Z") },
+    new Date("2026-03-28T12:30:00.000Z"),
+    3,
+  );
+  assert.equal(afterThird.completionCount, 3);
+  assert.equal(afterThird.refillAvailableDifficulty, undefined);
 });
 
 test("active run lookup and used contract ids reflect accepted history", () => {

@@ -3,7 +3,7 @@
     "title": "Contract Master",
     "imageUrl": "https://example.com/rolly/contract-master.png",
     "description": "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
-    "helperText": "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",
+    "helperText": "Finish your first contract in a cadence to unlock more offers from the same difficulty.",
     "dailyButtonLabel": "Daily Contracts",
     "weeklyButtonLabel": "Weekly Contracts",
     "askForContractButtonLabel": "Ask for a new contract"
@@ -12,6 +12,7 @@
     "label": "Daily",
     "chooserTitle": "Daily Contracts",
     "chooserDescription": "Choose a Daily contract from one of three difficulties.",
+    "contractsPerWindow": 3,
     "difficulties": {
       "simple": {
         "label": "Simple",
@@ -35,6 +36,15 @@
             "objective": {
               "type": "casino_game_count",
               "requiredCount": 2
+            }
+          },
+          {
+            "id": "daily-simple-world-boss-watch",
+            "title": "World Boss Watch",
+            "description": "Join 1 World Boss encounter.",
+            "objective": {
+              "type": "world_boss_join_count",
+              "requiredCount": 1
             }
           }
         ]
@@ -62,6 +72,15 @@
               "type": "world_boss_join_count",
               "requiredCount": 1
             }
+          },
+          {
+            "id": "daily-serious-casino-push",
+            "title": "Casino Push",
+            "description": "Finish 5 casino games.",
+            "objective": {
+              "type": "casino_game_count",
+              "requiredCount": 5
+            }
           }
         ]
       },
@@ -88,6 +107,15 @@
               "type": "casino_game_count",
               "requiredCount": 8
             }
+          },
+          {
+            "id": "daily-brutal-world-boss-vanguard",
+            "title": "World Boss Vanguard",
+            "description": "Join 2 World Boss encounters.",
+            "objective": {
+              "type": "world_boss_join_count",
+              "requiredCount": 2
+            }
           }
         ]
       }
@@ -97,6 +125,7 @@
     "label": "Weekly",
     "chooserTitle": "Weekly Contracts",
     "chooserDescription": "Choose a Weekly contract from one of three difficulties.",
+    "contractsPerWindow": 5,
     "difficulties": {
       "simple": {
         "label": "Simple",
@@ -120,6 +149,33 @@
             "objective": {
               "type": "casino_game_count",
               "requiredCount": 10
+            }
+          },
+          {
+            "id": "weekly-simple-world-boss-watch",
+            "title": "World Boss Watch",
+            "description": "Join 2 World Boss encounters.",
+            "objective": {
+              "type": "world_boss_join_count",
+              "requiredCount": 2
+            }
+          },
+          {
+            "id": "weekly-simple-duel-drills",
+            "title": "Duel Drills",
+            "description": "Win 3 PvP challenges.",
+            "objective": {
+              "type": "pvp_win_count",
+              "requiredCount": 3
+            }
+          },
+          {
+            "id": "weekly-simple-steady-rolling",
+            "title": "Steady Rolling",
+            "description": "Use /roll 110 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 110
             }
           }
         ]
@@ -147,6 +203,33 @@
               "type": "world_boss_join_count",
               "requiredCount": 2
             }
+          },
+          {
+            "id": "weekly-serious-casino-push",
+            "title": "Casino Push",
+            "description": "Finish 15 casino games.",
+            "objective": {
+              "type": "casino_game_count",
+              "requiredCount": 15
+            }
+          },
+          {
+            "id": "weekly-serious-long-roll-patrol",
+            "title": "Long Roll Patrol",
+            "description": "Use /roll 120 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 120
+            }
+          },
+          {
+            "id": "weekly-serious-rival-sweep",
+            "title": "Rival Sweep",
+            "description": "Win 5 PvP challenges.",
+            "objective": {
+              "type": "pvp_win_count",
+              "requiredCount": 5
+            }
           }
         ]
       },
@@ -172,6 +255,33 @@
             "objective": {
               "type": "casino_game_count",
               "requiredCount": 30
+            }
+          },
+          {
+            "id": "weekly-brutal-world-boss-vanguard",
+            "title": "World Boss Vanguard",
+            "description": "Join 4 World Boss encounters.",
+            "objective": {
+              "type": "world_boss_join_count",
+              "requiredCount": 4
+            }
+          },
+          {
+            "id": "weekly-brutal-duel-sweep",
+            "title": "Duel Sweep",
+            "description": "Win 8 PvP challenges.",
+            "objective": {
+              "type": "pvp_win_count",
+              "requiredCount": 8
+            }
+          },
+          {
+            "id": "weekly-brutal-endless-marathon",
+            "title": "Endless Marathon",
+            "description": "Use /roll 220 times.",
+            "objective": {
+              "type": "roll_count",
+              "requiredCount": 220
             }
           }
         ]

@@ -175,6 +175,29 @@ test("stats dashboard shows permanent bonuses and personal charge configuration"
   );
 });
 
+test("stats dashboard hides bans on dice above the current active dice count", () => {
+  const useCase = createUseCase({
+    progression: {
+      getDiceBans: () =>
+        new Map<number, Set<number>>([
+          [1, new Set([2])],
+          [6, new Set([4])],
+        ]),
+      getDiceCount: () => 1,
+    },
+  });
+
+  const result = useCase({
+    userId: "user-1",
+    userMention: "<@user-1>",
+    nowMs: Date.parse("2026-03-27T10:00:00.000Z"),
+  });
+
+  assert.match(result.content, /Ban slots: \*\*1\/[0-9]+\*\* used/);
+  assert.match(result.content, /Current bans: D1: 2/);
+  assert.doesNotMatch(result.content, /D6/);
+});
+
 test("stats dashboard shows active roll effects and charge state", () => {
   const nowMs = Date.parse("2026-03-27T10:00:00.000Z");
   const globalChargeAtMs = nowMs - (getDiceChargeStartMs() + 2 * minuteMs);

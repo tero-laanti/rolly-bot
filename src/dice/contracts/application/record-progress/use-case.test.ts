@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createRecordContractsProgressUseCase } from "./use-case";
-import type { ContractsRunRepository, ContractsUserCadenceStateRepository } from "../ports";
+import type {
+  ContractsCatalogReader,
+  ContractsRunRepository,
+  ContractsUserCadenceStateRepository,
+} from "../ports";
 import {
   createAcceptedRun,
   createEmptyContractCadenceState,
@@ -66,7 +70,44 @@ const createHarness = () => {
     },
   };
 
+  const catalogReader: ContractsCatalogReader = {
+    getCatalog: () => ({
+      panel: {
+        title: "Contract Master",
+        imageUrl: "https://example.com/contracts.png",
+        description: "desc",
+        helperText: "helper",
+        dailyButtonLabel: "Daily",
+        weeklyButtonLabel: "Weekly",
+        askForContractButtonLabel: "Ask",
+      },
+      daily: {
+        label: "Daily",
+        chooserTitle: "Daily Contracts",
+        chooserDescription: "Pick daily",
+        contractsPerWindow: 3,
+        difficulties: {
+          simple: { label: "Simple", rewardPips: 12, initialOffers: [], refillOffers: [] },
+          serious: { label: "Serious", rewardPips: 20, initialOffers: [], refillOffers: [] },
+          brutal: { label: "Brutal", rewardPips: 32, initialOffers: [], refillOffers: [] },
+        },
+      },
+      weekly: {
+        label: "Weekly",
+        chooserTitle: "Weekly Contracts",
+        chooserDescription: "Pick weekly",
+        contractsPerWindow: 5,
+        difficulties: {
+          simple: { label: "Simple", rewardPips: 30, initialOffers: [], refillOffers: [] },
+          serious: { label: "Serious", rewardPips: 45, initialOffers: [], refillOffers: [] },
+          brutal: { label: "Brutal", rewardPips: 70, initialOffers: [], refillOffers: [] },
+        },
+      },
+    }),
+  };
+
   const useCase = createRecordContractsProgressUseCase({
+    catalogReader,
     runRepository,
     userCadenceStateRepository,
     rewardGranter: {

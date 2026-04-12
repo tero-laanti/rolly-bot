@@ -12,6 +12,7 @@ const createCadenceView = (
   label: cadence === "daily" ? "Daily" : "Weekly",
   chooserTitle: cadence === "daily" ? "Daily Contracts" : "Weekly Contracts",
   chooserDescription: "Pick a contract.",
+  contractsPerWindow: cadence === "daily" ? 3 : 5,
   resetWindow: cadence === "daily" ? "2026-03-28" : "2026-03-23",
   resetAt:
     cadence === "daily"
@@ -103,7 +104,9 @@ test("contracts reply shows active accepted runs and summary state", () => {
   assert.match(result.content, /Reward: 20 Pips/);
   assert.match(result.content, /Status: In progress/);
   assert.match(result.content, /Rerolls: Simple: ready \| Serious: ready \| Brutal: ready/);
-  assert.match(result.content, /Refill: Available for brutal difficulty\./);
+  assert.match(result.content, /Refill: Finish your active serious contract first\./);
+  assert.match(result.content, /Completed this window: 1\/5/);
+  assert.match(result.content, /Refill: Available for brutal difficulty \(4 contracts left\)\./);
 });
 
 test("contracts reply shows unavailable state when contracts are disabled", () => {

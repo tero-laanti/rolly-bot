@@ -259,9 +259,10 @@ export const applyCompletionToCadenceState = (
   state: ContractCadenceState,
   completedRun: ContractRun,
   occurredAt: Date,
+  contractsPerWindow: number,
 ): ContractCadenceState => {
-  const nextCompletionCount = Math.min(state.completionCount + 1, 2);
-  if (nextCompletionCount >= 2) {
+  const nextCompletionCount = Math.min(state.completionCount + 1, Math.max(1, contractsPerWindow));
+  if (nextCompletionCount >= Math.max(1, contractsPerWindow)) {
     return {
       ...state,
       completionCount: nextCompletionCount,

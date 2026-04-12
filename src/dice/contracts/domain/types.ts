@@ -43,6 +43,7 @@ export type ContractCadenceCatalog = {
   label: string;
   chooserTitle: string;
   chooserDescription: string;
+  contractsPerWindow: number;
   difficulties: Record<ContractDifficulty, ContractDifficultyPool>;
 };
 
@@ -113,6 +114,7 @@ const contractCadenceCatalogFromData = (
   label: data.label,
   chooserTitle: data.chooserTitle,
   chooserDescription: data.chooserDescription,
+  contractsPerWindow: data.contractsPerWindow,
   difficulties: {
     simple: contractDifficultyPoolFromData(cadence, "simple", data.difficulties.simple),
     serious: contractDifficultyPoolFromData(cadence, "serious", data.difficulties.serious),

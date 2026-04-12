@@ -92,12 +92,7 @@ export const createManageContractMasterUseCase = ({
       const run = createAcceptedRun(choice, userId, context.resetWindow, nextSequenceNumber, now);
       runRepository.saveRun(run);
 
-      if (choice.source === "refill") {
-        userCadenceStateRepository.saveState({
-          ...context.state,
-          refillClaimedAt: now,
-        });
-      } else if (
+      if (
         choice.source === "reroll" &&
         !rerollUsageRepository.getUsage(userId, cadence, context.resetWindow, difficulty)
       ) {

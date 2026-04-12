@@ -78,11 +78,15 @@ export const createDiceBansUseCase = ({
   permanentBonuses,
   progression,
 }: ManageBansDependencies) => {
+  const getCurrentDiceBans = (userId: string, diceCount: number) => {
+    return pruneInvalidDiceBans(progression, userId, diceCount);
+  };
+
   const createDiceBansReply = (userId: string): DiceBansResult => {
     const diceCount = progression.getDiceCount(userId);
     const dieSides = progression.getDiceSides(userId);
     const fame = economy.getFame(userId);
-    const bans = progression.getDiceBans(userId);
+    const bans = getCurrentDiceBans(userId, diceCount);
     const unlockedSlots =
       getUnlockedBanSlotsFromFame(fame, diceCount, dieSides) +
       permanentBonuses.getPermanentBonuses(userId).extraBanSlots;
@@ -129,7 +133,7 @@ export const createDiceBansUseCase = ({
       permanentBonuses.getPermanentBonuses(action.ownerId).extraBanSlots;
 
     if (action.type === "back") {
-      const bans = progression.getDiceBans(action.ownerId);
+      const bans = getCurrentDiceBans(action.ownerId, diceCount);
       const usedCount = countUsedBans(bans);
       if (unlockedSlots < 1 && usedCount === 0) {
         return {
@@ -163,7 +167,7 @@ export const createDiceBansUseCase = ({
     }
 
     if (action.type === "request-clear-bans") {
-      const bans = progression.getDiceBans(action.ownerId);
+      const bans = getCurrentDiceBans(action.ownerId, diceCount);
       return {
         kind: "update",
         payload: {
@@ -174,14 +178,14 @@ export const createDiceBansUseCase = ({
     }
 
     if (action.type === "clear-bans") {
-      const bans = progression.getDiceBans(action.ownerId);
+      const bans = getCurrentDiceBans(action.ownerId, diceCount);
       for (const [dieIndex, bannedSides] of bans) {
         if (bannedSides.size > 0) {
           progression.clearDiceBan(action.ownerId, dieIndex);
         }
       }
 
-      const updatedBans = progression.getDiceBans(action.ownerId);
+      const updatedBans = getCurrentDiceBans(action.ownerId, diceCount);
       return {
         kind: "update",
         payload: {
@@ -208,7 +212,7 @@ export const createDiceBansUseCase = ({
       };
     }
 
-    const currentBans = progression.getDiceBans(action.ownerId);
+    const currentBans = getCurrentDiceBans(action.ownerId, diceCount);
     const hasBansOnSelectedDie = (currentBans.get(action.dieIndex)?.size ?? 0) > 0;
     if (action.dieIndex > diceCount && !hasBansOnSelectedDie) {
       return {
@@ -222,7 +226,7 @@ export const createDiceBansUseCase = ({
     }
 
     if (action.type === "die") {
-      const bans = progression.getDiceBans(action.ownerId);
+      const bans = getCurrentDiceBans(action.ownerId, diceCount);
       return {
         kind: "update",
         payload: {
@@ -251,7 +255,7 @@ export const createDiceBansUseCase = ({
         };
       }
 
-      const bans = progression.getDiceBans(action.ownerId);
+      const bans = getCurrentDiceBans(action.ownerId, diceCount);
       return {
         kind: "update",
         payload: {
@@ -279,7 +283,7 @@ export const createDiceBansUseCase = ({
       };
     }
 
-    const bansBefore = progression.getDiceBans(action.ownerId);
+    const bansBefore = getCurrentDiceBans(action.ownerId, diceCount);
     const bannedValuesBefore = bansBefore.get(action.dieIndex) ?? new Set<number>();
     const isUnban = bannedValuesBefore.has(action.value);
     const usedCount = countUsedBans(bansBefore);
@@ -322,7 +326,7 @@ export const createDiceBansUseCase = ({
       }
     }
 
-    const bans = progression.getDiceBans(action.ownerId);
+    const bans = getCurrentDiceBans(action.ownerId, diceCount);
     const confirmation = isUnban
       ? `Ban removed: ${action.value} from die ${action.dieIndex}.`
       : `Ban applied: ${action.value} on die ${action.dieIndex}.`;
@@ -581,6 +585,26 @@ const countUsedBans = (bans: Map<number, Set<number>>): number => {
     count += values.size;
   }
   return count;
+};
+
+const pruneInvalidDiceBans = (
+  progression: Pick<DiceProgressionRepository, "getDiceBans" | "clearDiceBan">,
+  userId: string,
+  diceCount: number,
+): Map<number, Set<number>> => {
+  const bans = progression.getDiceBans(userId);
+  let prunedAny = false;
+
+  for (const [dieIndex, values] of bans.entries()) {
+    if (dieIndex <= diceCount || values.size < 1) {
+      continue;
+    }
+
+    progression.clearDiceBan(userId, dieIndex);
+    prunedAny = true;
+  }
+
+  return prunedAny ? progression.getDiceBans(userId) : bans;
 };
 
 const getNumberPageCount = (dieSides: number): number => {

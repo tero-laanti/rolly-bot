@@ -87,6 +87,7 @@ export const createSqliteContractsProgressRecorder = (db: SqliteDatabase) => {
   const dependencies = createStrictContractMasterDependencies(db);
 
   return createRecordContractsProgressUseCase({
+    catalogReader: dependencies.catalogReader,
     runRepository: dependencies.runRepository,
     userCadenceStateRepository: dependencies.userCadenceStateRepository,
     rewardGranter: createRewardGranter(db),
@@ -102,6 +103,7 @@ export const createSqliteContractsGameplayProgressPort = (db: SqliteDatabase) =>
 
   return createContractsGameplayProgressPort({
     progressRecorder: createRecordContractsProgressUseCase({
+      catalogReader: dependencies.catalogReader,
       runRepository: dependencies.runRepository,
       userCadenceStateRepository: dependencies.userCadenceStateRepository,
       rewardGranter: createRewardGranter(db),
