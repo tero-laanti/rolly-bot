@@ -99,26 +99,26 @@ test("world boss hp scales by 3 percent per boss level", () => {
   assert.equal(calculateWorldBossMaxHp(50), 511);
 });
 
-test("world boss prestige strength uses the configured prestige multiplier", () => {
+test("world boss participant strength follows average five-die output", () => {
   assert.equal(calculateWorldBossParticipantStrength(0), 1);
-  assert.equal(calculateWorldBossParticipantStrength(1), 1.5);
-  assert.equal(calculateWorldBossParticipantStrength(2), 2.25);
-  assert.equal(calculateWorldBossParticipantStrength(3), 3.375);
-  assert.equal(calculateWorldBossParticipantStrength(4), 5.0625);
-  assert.equal(calculateWorldBossParticipantStrength(5), 7.59375);
-  assert.equal(calculateWorldBossParticipantStrength(8), 25.62890625);
+  assert.equal(calculateWorldBossParticipantStrength(1), 9 / 7);
+  assert.equal(calculateWorldBossParticipantStrength(2), 11 / 7);
+  assert.equal(calculateWorldBossParticipantStrength(3), 13 / 7);
+  assert.equal(calculateWorldBossParticipantStrength(4), 15 / 7);
+  assert.equal(calculateWorldBossParticipantStrength(5), 17 / 7);
+  assert.equal(calculateWorldBossParticipantStrength(8), 23 / 7);
 });
 
 test("world boss hp scales by summed player strength without a cap", () => {
   assert.equal(calculateWorldBossMaxHpForStrength(6, 1), 139);
   assert.equal(calculateWorldBossMaxHpForStrength(6, 2), 278);
-  assert.equal(calculateWorldBossMaxHpForStrength(1, 7.59375), 911);
+  assert.equal(calculateWorldBossMaxHpForStrength(1, 17 / 7), 291);
   assert.equal(
     calculateWorldBossMaxHpForStrength(
       1,
       calculateWorldBossParticipantStrength(0) + calculateWorldBossParticipantStrength(1),
     ),
-    300,
+    274,
   );
 });
 
@@ -141,7 +141,7 @@ test("world boss level roll is low-heavy and capped at level 50", () => {
   assert.equal(levelOneBoss.maxHp, 120);
   assert.equal(levelFiftyBoss.level, 50);
   assert.equal(levelFiftyBoss.maxHp, 511);
-  assert.equal(scaledBoss.maxHp, 570);
+  assert.equal(scaledBoss.maxHp, 463);
 });
 
 test("applied world boss reward summaries reflect permanent pip bonus outcomes", () => {

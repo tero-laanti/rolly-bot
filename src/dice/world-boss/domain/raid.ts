@@ -1,4 +1,5 @@
 import { getWorldBossData } from "../../../rolly-data/load";
+import { getDiceSidesForPrestige } from "../../progression/domain/game-rules";
 
 export type WorldBossRewardDefinition = {
   pips: number;
@@ -18,8 +19,8 @@ const getWorldBossBalance = () => {
 };
 
 export const calculateWorldBossParticipantStrength = (prestige: number): number => {
-  const normalizedPrestige = Math.max(0, Math.floor(prestige));
-  return getWorldBossBalance().participantStrength.prestigeMultiplier ** normalizedPrestige;
+  const dieSides = getDiceSidesForPrestige(prestige);
+  return (dieSides + 1) / 7;
 };
 
 const clampBossLevel = (value: number): number => {
