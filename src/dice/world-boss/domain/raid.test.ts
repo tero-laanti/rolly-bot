@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { createRequire } from "node:module";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   calculateWorldBossMaxHp,
@@ -11,6 +14,7 @@ import {
 } from "./raid";
 
 const moduleRequire = createRequire(__filename);
+const exampleRollyDataDir = path.resolve(__dirname, "../../../../example-data/rolly-data");
 
 const clearModules = (modulePaths: readonly string[]): void => {
   for (const modulePath of modulePaths) {
@@ -19,6 +23,22 @@ const clearModules = (modulePaths: readonly string[]): void => {
   }
 };
 
+const withEnv = (overrides: Record<string, string | undefined>, run: () => void): void => {
+  const previous = { ...process.env };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    run();
+  } finally {
+    process.env = previous;
+  }
+};
 test("world boss pip reward formula stays flat through level 5 and scales from level 6", () => {
   assert.equal(getDefaultWorldBossReward(1).pips, 5);
   assert.equal(getDefaultWorldBossReward(5).pips, 5);
@@ -64,9 +84,6 @@ test("world boss reward tables support tiered roll-pass lengths", () => {
         levelHalfLifeLevels: 10,
         maxBossLevel: 50,
       },
-      participantStrength: {
-        prestigeMultiplier: 1.5,
-      },
     });
 
     const raid = moduleRequire("./raid") as typeof import("./raid");
@@ -107,6 +124,41 @@ test("world boss participant strength follows average five-die output", () => {
   assert.equal(calculateWorldBossParticipantStrength(4), 15 / 7);
   assert.equal(calculateWorldBossParticipantStrength(5), 17 / 7);
   assert.equal(calculateWorldBossParticipantStrength(8), 23 / 7);
+});
+
+test("world boss participant strength normalizes against the configured base die", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "world-boss-base-die-"));
+  fs.cpSync(exampleRollyDataDir, tempRoot, { recursive: true });
+
+  const diceBalancePath = path.join(tempRoot, "dice-balance.json");
+  const diceBalance = JSON.parse(fs.readFileSync(diceBalancePath, "utf8")) as {
+    prestigeSides: number[];
+  };
+  diceBalance.prestigeSides = [8, 10, 12, 14];
+  fs.writeFileSync(diceBalancePath, `${JSON.stringify(diceBalance, null, 2)}\n`);
+
+  withEnv({ ROLLY_DATA_DIR: tempRoot }, () => {
+    clearModules([
+      "../../../rolly-data/load",
+      "../../../rolly-data/paths",
+      "../../progression/domain/game-rules",
+      "./raid",
+    ]);
+
+    try {
+      const reloadedRaid = moduleRequire("./raid") as typeof import("./raid");
+      assert.equal(reloadedRaid.calculateWorldBossParticipantStrength(0), 1);
+      assert.equal(reloadedRaid.calculateWorldBossParticipantStrength(1), 11 / 9);
+    } finally {
+      clearModules([
+        "../../../rolly-data/load",
+        "../../../rolly-data/paths",
+        "../../progression/domain/game-rules",
+        "./raid",
+      ]);
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 test("world boss hp scales by summed player strength without a cap", () => {
