@@ -4,11 +4,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {
-  getDiceAchievement,
-  getDiceAchievementPipReward,
-  getPrestigeAchievementId,
-} from "./achievements";
+import { getDiceAchievementPipReward, getPrestigeAchievementId } from "./achievements";
 
 const moduleRequire = createRequire(__filename);
 const exampleRollyDataDir = path.resolve(__dirname, "../../../../example-data/rolly-data");
