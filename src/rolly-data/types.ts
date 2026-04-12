@@ -164,12 +164,8 @@ export type DiceWorldBossBossBalanceData = {
   maxBossLevel: number;
 };
 
-export type DiceWorldBossParticipantStrengthData = {
-  prestigeMultiplier: number;
-};
-
-export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardMultiplierData &
-  DiceWorldBossRollPassRewardFormulaData;
+<<<<<<< HEAD
+export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardData;
 
 export type DiceRaidRewardData = {
   pips: number;
@@ -298,7 +294,6 @@ export type DiceWorldBossData = {
   reward: DiceWorldBossRewardData;
   bossNames: DiceWorldBossBossNamesData;
   bossBalance: DiceWorldBossBossBalanceData;
-  participantStrength: DiceWorldBossParticipantStrengthData;
 };
 
 export type DiceCasinoPayoutRatio = {

@@ -35,7 +35,6 @@ import type {
   DiceWorldBossBossBalanceData,
   DiceWorldBossBossNamesData,
   DiceWorldBossData,
-  DiceWorldBossParticipantStrengthData,
   DiceWorldBossPipRewardFormulaData,
   DiceWorldBossPipRewardTierData,
   DiceWorldBossRewardData,
@@ -1982,21 +1981,6 @@ const readWorldBossBossBalanceConfig = (
   };
 };
 
-const readWorldBossParticipantStrengthConfig = (
-  value: unknown,
-  label: string,
-): DiceWorldBossParticipantStrengthData => {
-  const record = assertRecord(value, label);
-
-  return {
-    prestigeMultiplier: readFiniteNumberAtLeast(
-      record.prestigeMultiplier,
-      `${label}.prestigeMultiplier`,
-      1,
-    ),
-  };
-};
-
 const readRaidRollPassReward = (value: unknown, label: string) => {
   const rollPassBuff = assertRecord(value, label);
 
@@ -2279,10 +2263,6 @@ export const parseWorldBossData = (value: unknown): DiceWorldBossData => {
     reward: readWorldBossRewardConfig(record.reward, "worldBoss.reward"),
     bossNames: readWorldBossBossNamesConfig(record.bossNames, "worldBoss.bossNames"),
     bossBalance: readWorldBossBossBalanceConfig(record.bossBalance, "worldBoss.bossBalance"),
-    participantStrength: readWorldBossParticipantStrengthConfig(
-      record.participantStrength,
-      "worldBoss.participantStrength",
-    ),
   };
 
   validateWorldBossDiscordText(parsed);
