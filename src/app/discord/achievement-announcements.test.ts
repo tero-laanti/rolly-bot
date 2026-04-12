@@ -34,13 +34,13 @@ test("formatter hides detail for hidden achievements and keeps visible detail fo
     >("./achievement-announcements");
     return formatAchievementAnnouncementContent({
       userId: "user-1",
-      achievementIds: ["example-manual-prestige", "example-pair"],
+      achievementIds: ["example-manual-achievement", "example-pair"],
     });
   });
 
   assert.match(content, /^<@user-1> Achievements unlocked: /);
-  assert.match(content, /Example Manual Prestige/);
-  assert.doesNotMatch(content, /Example Manual Prestige \(/);
+  assert.match(content, /Example Manual Achievement/);
+  assert.doesNotMatch(content, /Example Manual Achievement \(/);
   assert.match(content, /Example Pair, \+3 pips/);
 });
 

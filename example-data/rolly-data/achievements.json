@@ -56,12 +56,24 @@
     }
   },
   {
-    "id": "example-manual-prestige",
-    "name": "Example Manual Prestige",
-    "description": "Example achievement: reach Prestige 1 through application logic.",
+    "id": "example-manual-achievement",
+    "name": "Example Manual Achievement",
+    "description": "Example hidden manual achievement awarded through application logic.",
     "hidden": true,
     "category": "progression",
     "pipReward": 20,
+    "rule": {
+      "type": "manual"
+    },
+    "roleRewardId": "example-manual-role",
+    "roleRewardUnlockText": "TODO: This role will unlock channels in the future.",
+    "unlockReasonText": "completed an example manual trigger"
+  },
+  {
+    "id": "prestige-1",
+    "name": "Fresh Cycle",
+    "description": "Reach Prestige 1.",
+    "category": "progression",
     "rule": {
       "type": "manual"
     },
@@ -69,6 +81,7 @@
       "type": "prestige",
       "prestige": 1
     },
+    "pipReward": 20,
     "roleRewardId": "example-prestige-role",
     "roleRewardUnlockText": "TODO: This role will unlock channels in the future.",
     "unlockReasonText": "reached Prestige 1"
