@@ -164,8 +164,8 @@ export type DiceWorldBossBossBalanceData = {
   maxBossLevel: number;
 };
 
-<<<<<<< HEAD
-export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardData;
+export type DiceRaidRollPassRewardData = DiceWorldBossRollPassRewardMultiplierData &
+  DiceWorldBossRollPassRewardFormulaData;
 
 export type DiceRaidRewardData = {
   pips: number;
