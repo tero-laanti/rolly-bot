@@ -6,8 +6,8 @@ import { applyChatInputResult } from "../../../../../app/discord/interaction-res
 import { getDatabase } from "../../../../../shared/db";
 import { createSqliteRollDiceUseCase } from "../../../infrastructure/sqlite/services";
 import {
+  handleBeginnerRollAfterRoll,
   hasBeginnerRollerAchievementAnnouncement,
-  publishBeginnerRollGraduationMessage,
 } from "../beginner-roll-graduation";
 import { renderDiceRollResult } from "../presenters/roll.presenter";
 
@@ -25,21 +25,19 @@ export const execute = async (interaction: ChatInputCommandInteraction): Promise
 
   await applyChatInputResult(interaction, rendered.interactionResult);
 
-  if (
-    hasBeginnerRollerAchievementAnnouncement(
-      rendered.achievementAnnouncements ?? [],
-      interaction.user.id,
-    )
-  ) {
-    await publishBeginnerRollGraduationMessage({
-      channel: interaction.channel,
-      userId: interaction.user.id,
-    });
-  }
-
   await publishAchievementEffects({
     client: interaction.client,
     announcements: rendered.achievementAnnouncements ?? [],
+  });
+  await handleBeginnerRollAfterRoll({
+    client: interaction.client,
+    channel: interaction.channel,
+    guildId: interaction.guildId,
+    userId: interaction.user.id,
+    wasBeginnerRollerAchievementAnnounced: hasBeginnerRollerAchievementAnnouncement(
+      rendered.achievementAnnouncements ?? [],
+      interaction.user.id,
+    ),
   });
   await publishContractCompletionAnnouncements({
     client: interaction.client,

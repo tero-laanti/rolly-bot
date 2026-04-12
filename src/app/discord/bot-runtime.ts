@@ -1,4 +1,12 @@
-import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
+import {
+  ApplicationFlagsBitField,
+  Client,
+  Collection,
+  Events,
+  GatewayIntentBits,
+  REST,
+  Routes,
+} from "discord.js";
 import type { ButtonInteraction } from "discord.js";
 import {
   discordButtonHandlers,
@@ -20,6 +28,7 @@ import {
 import { getDatabase, initDatabase } from "../../shared/db";
 import { requireEnv } from "../../shared/env";
 import { getRollyDataSourceDescription, primeRollyData } from "../../rolly-data/load";
+import type { LoadedRollyData } from "../../rolly-data/types";
 import type { Command } from "../../types/command";
 import { createRandomEventsLiveRuntime } from "../../dice/random-events/infrastructure/live-runtime";
 import { startRandomEventsFoundationScheduler } from "../../dice/random-events/infrastructure/foundation-scheduler";
@@ -49,15 +58,28 @@ import {
   registerRaidsController,
 } from "../../dice/raids/infrastructure/admin-controller";
 import { raidButtonPrefix } from "../../dice/raids/interfaces/discord/buttons/raid-buttons";
+import { handleBeginnerRollMemberJoin } from "../../dice/progression/interfaces/discord/beginner-roll-graduation";
 import { syncRaidTierPanelsOnStartup } from "../../dice/raids/infrastructure/tier-panel-sync";
 
 const token = requireEnv("DISCORD_TOKEN");
+let client!: Client;
+let hasClient = false;
 
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
-});
+const createDiscordClient = (
+  loaded: LoadedRollyData,
+  enableGuildMemberJoinPings: boolean,
+): Client => {
+  const clientIntents = [GatewayIntentBits.Guilds];
+  if ((loaded.beginnerOnboardingV1?.guilds.length ?? 0) > 0 && enableGuildMemberJoinPings) {
+    clientIntents.push(GatewayIntentBits.GuildMembers);
+  }
 
-client.commands = new Collection<string, Command>();
+  const createdClient = new Client({
+    intents: clientIntents,
+  });
+  createdClient.commands = new Collection<string, Command>();
+  return createdClient;
+};
 
 const registerDiscordCommands = (): void => {
   for (const command of discordCommands) {
@@ -317,7 +339,9 @@ const shutdown = async (signal: ShutdownSignal): Promise<void> => {
   console.log(`Received ${signal}. Shutting down...`);
 
   await stopBackgroundSchedulers();
-  client.destroy();
+  if (hasClient) {
+    client.destroy();
+  }
   process.exit(0);
 };
 
@@ -328,122 +352,167 @@ process.once("SIGTERM", () => {
   void shutdown("SIGTERM");
 });
 
-client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Logged in as ${readyClient.user.tag}`);
-  void syncIntroPostsOnStartup({
-    client,
-    config: introPostsConfig,
-    db: getDatabase(),
-    logger: console,
-  }).catch((error) => {
-    console.error("[intro-posts] Startup sync failed:", error);
+const registerDiscordClientEventHandlers = (
+  loaded: LoadedRollyData,
+  enableGuildMemberJoinPings: boolean,
+): void => {
+  client.once(Events.ClientReady, (readyClient) => {
+    console.log(`Logged in as ${readyClient.user.tag}`);
+    void syncIntroPostsOnStartup({
+      client,
+      config: introPostsConfig,
+      db: getDatabase(),
+      logger: console,
+    }).catch((error) => {
+      console.error("[intro-posts] Startup sync failed:", error);
+    });
+    void syncContractMasterPanelOnStartup({
+      client,
+      config: contractMasterConfig,
+      db: getDatabase(),
+      logger: console,
+    }).catch((error) => {
+      console.error("[contract-master] Startup sync failed:", error);
+    });
+    void startRaidsRuntime().catch((error) => {
+      console.error("[raids] Startup runtime failed:", error);
+    });
+    startRandomEventsFoundation();
+    void startWorldBossFoundation().catch((error) => {
+      console.error("[world-boss] Startup runtime failed:", error);
+    });
+    startDicePvpChallengeExpiration();
   });
-  void syncContractMasterPanelOnStartup({
-    client,
-    config: contractMasterConfig,
-    db: getDatabase(),
-    logger: console,
-  }).catch((error) => {
-    console.error("[contract-master] Startup sync failed:", error);
-  });
-  void startRaidsRuntime().catch((error) => {
-    console.error("[raids] Startup runtime failed:", error);
-  });
-  startRandomEventsFoundation();
-  void startWorldBossFoundation().catch((error) => {
-    console.error("[world-boss] Startup runtime failed:", error);
-  });
-  startDicePvpChallengeExpiration();
-});
 
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isChatInputCommand()) {
-    const command = interaction.client.commands.get(interaction.commandName);
-    if (!command) {
-      console.error(`No command matching ${interaction.commandName} was found.`);
-      return;
-    }
+  if ((loaded.beginnerOnboardingV1?.guilds.length ?? 0) > 0 && enableGuildMemberJoinPings) {
+    console.log("[onboarding] Beginner onboarding enabled. Join-time welcome pings are active.");
+    client.on(Events.GuildMemberAdd, (member) => {
+      void handleBeginnerRollMemberJoin({
+        client,
+        member,
+        logger: console,
+      });
+    });
+  } else if ((loaded.beginnerOnboardingV1?.guilds.length ?? 0) > 0) {
+    console.warn(
+      "[onboarding] Beginner onboarding enabled, but Discord Server Members Intent is unavailable. Join-time welcome pings are disabled; graduation still works through /roll.",
+    );
+  }
 
-    try {
-      await command.execute(interaction);
-    } catch (error) {
-      console.error(`Error executing ${interaction.commandName}:`, error);
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isChatInputCommand()) {
+      const command = interaction.client.commands.get(interaction.commandName);
+      if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+      }
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
+      try {
+        await command.execute(interaction);
+      } catch (error) {
+        console.error(`Error executing ${interaction.commandName}:`, error);
+
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({
+            content: "There was an error while executing this command!",
+            ephemeral: true,
+          });
+          return;
+        }
+
+        await interaction.reply({
           content: "There was an error while executing this command!",
           ephemeral: true,
         });
-        return;
       }
 
-      await interaction.reply({
-        content: "There was an error while executing this command!",
-        ephemeral: true,
-      });
+      return;
     }
 
-    return;
-  }
+    if (interaction.isButton()) {
+      try {
+        const handled = await dispatchButtonInteraction(interaction);
+        if (!handled) {
+          return;
+        }
+      } catch (error) {
+        console.error("Error handling button interaction:", error);
 
-  if (interaction.isButton()) {
-    try {
-      const handled = await dispatchButtonInteraction(interaction);
-      if (!handled) {
-        return;
-      }
-    } catch (error) {
-      console.error("Error handling button interaction:", error);
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({
+            content: "There was an error while handling this action!",
+            ephemeral: true,
+          });
+          return;
+        }
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
+        await interaction.reply({
           content: "There was an error while handling this action!",
           ephemeral: true,
         });
-        return;
       }
 
-      await interaction.reply({
-        content: "There was an error while handling this action!",
-        ephemeral: true,
-      });
+      return;
     }
 
-    return;
-  }
+    if (interaction.isStringSelectMenu()) {
+      try {
+        const handled = await dispatchStringSelectMenuInteraction(interaction);
+        if (!handled) {
+          return;
+        }
+      } catch (error) {
+        console.error("Error handling string select interaction:", error);
 
-  if (interaction.isStringSelectMenu()) {
-    try {
-      const handled = await dispatchStringSelectMenuInteraction(interaction);
-      if (!handled) {
-        return;
-      }
-    } catch (error) {
-      console.error("Error handling string select interaction:", error);
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({
+            content: "There was an error while handling this selection!",
+            ephemeral: true,
+          });
+          return;
+        }
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
+        await interaction.reply({
           content: "There was an error while handling this selection!",
           ephemeral: true,
         });
-        return;
       }
-
-      await interaction.reply({
-        content: "There was an error while handling this selection!",
-        ephemeral: true,
-      });
     }
-  }
-});
+  });
+};
 
-const initializeRollyData = (): void => {
+const canUseGuildMemberJoinPings = async (): Promise<boolean> => {
+  const rest = new REST({ version: "10" }).setToken(token);
+
+  try {
+    const application = (await rest.get(Routes.oauth2CurrentApplication())) as {
+      flags?: number;
+    };
+    const flags = new ApplicationFlagsBitField(application.flags ?? 0);
+
+    return (
+      flags.has(ApplicationFlagsBitField.Flags.GatewayGuildMembers) ||
+      flags.has(ApplicationFlagsBitField.Flags.GatewayGuildMembersLimited)
+    );
+  } catch (error) {
+    console.warn(
+      "[onboarding] Failed to verify Discord Server Members Intent. Join-time welcome pings are disabled.",
+      error,
+    );
+    return false;
+  } finally {
+    rest.clearHashSweeper();
+    rest.clearHandlerSweeper();
+  }
+};
+
+const initializeRollyData = (): LoadedRollyData => {
   const loaded = primeRollyData();
   const sourceDescription = getRollyDataSourceDescription();
   if (loaded.source.kind === "example") {
     console.warn(`[rolly-data] Loaded public example data from ${sourceDescription}.`);
     console.warn("[rolly-data] Example data is for local development only.");
-    return;
+    return loaded;
   }
 
   console.log(`[rolly-data] Loaded game data from ${sourceDescription}.`);
@@ -452,15 +521,25 @@ const initializeRollyData = (): void => {
       "[contracts] contracts.v2.json is missing from local rolly-data. Contracts are disabled.",
     );
   }
+
+  return loaded;
 };
 
 export const startDiscordBot = async (): Promise<void> => {
   try {
-    initializeRollyData();
+    const loaded = initializeRollyData();
+    const enableGuildMemberJoinPings =
+      (loaded.beginnerOnboardingV1?.guilds.length ?? 0) > 0
+        ? await canUseGuildMemberJoinPings()
+        : false;
+
+    client = createDiscordClient(loaded, enableGuildMemberJoinPings);
+    hasClient = true;
     initDatabase();
     registerDiscordCommands();
     registerDiscordButtonHandlers();
     registerDiscordStringSelectMenuHandlers();
+    registerDiscordClientEventHandlers(loaded, enableGuildMemberJoinPings);
     await client.login(token);
   } catch (error) {
     console.error("Failed to start bot:", error);

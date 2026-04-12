@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db";
 
-const currentSchemaVersion = 12;
+const currentSchemaVersion = 13;
 const contractMasterResetCutoverSchemaVersion = 5;
 
 const schemaVersion2Columns = new Map<string, string[]>([
@@ -193,6 +193,10 @@ const schemaVersion2Columns = new Map<string, string[]>([
 
 const currentSchemaColumns = new Map<string, string[]>([
   ...schemaVersion2Columns,
+  [
+    "dice_beginner_onboarding_guild_graduations",
+    ["guild_id", "user_id", "graduated_at", "updated_at"],
+  ],
   ["dice_personal_charge_state", ["user_id", "last_roll_at", "updated_at"]],
   [
     "dice_garden_plots",
@@ -704,6 +708,14 @@ export const initializeDatabaseSchema = (db: SqliteDatabase): void => {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS dice_beginner_onboarding_guild_graduations (
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      graduated_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (guild_id, user_id)
+    );
   `);
 
   createAdditiveSchemaArtifacts(db);
@@ -961,6 +973,14 @@ const createAdditiveSchemaArtifacts = (db: SqliteDatabase): void => {
 
     CREATE INDEX IF NOT EXISTS idx_dice_world_boss_double_roll_rush_open_expires_at
       ON dice_world_boss_double_roll_rush_zones (closed_at, expires_at, activated_at);
+
+    CREATE TABLE IF NOT EXISTS dice_beginner_onboarding_guild_graduations (
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      graduated_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (guild_id, user_id)
+    );
   `);
 
   if (!hasColumn(db, "dice_contract_master_runs", "contract_title")) {

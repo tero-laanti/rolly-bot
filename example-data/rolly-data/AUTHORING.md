@@ -5,6 +5,7 @@ All data files are plain JSON.
 
 Use the file-specific guides when authoring or reviewing private `rolly-data`:
 
+- `beginner-onboarding.v1.json` (optional): per-guild beginner-channel join pings, graduation-channel welcome copy, and optional graduation role unlocks.
 - [achievements.md](achievements.md): achievement rules, ordered vs unordered matching, analytics milestones, manual prestige awards, and optional role reward ids.
 - [dice-balance.md](dice-balance.md): prestige, bans, charge, and core `/roll` progression tuning.
 - [casino.v1.md](casino.v1.md): payout math, bet settings, and game-specific tuning rules.
