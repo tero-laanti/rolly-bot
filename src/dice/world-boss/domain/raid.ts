@@ -19,8 +19,9 @@ const getWorldBossBalance = () => {
 };
 
 export const calculateWorldBossParticipantStrength = (prestige: number): number => {
+  const baseDieSides = getDiceSidesForPrestige(0);
   const dieSides = getDiceSidesForPrestige(prestige);
-  return (dieSides + 1) / 7;
+  return (dieSides + 1) / (baseDieSides + 1);
 };
 
 const clampBossLevel = (value: number): number => {
