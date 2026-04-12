@@ -1,7 +1,15 @@
 import type { DiceAnalyticsRepository } from "../ports";
 import type { DiceEconomyRepository } from "../../../economy/application/ports";
-import type { DicePermanentBonusesPort } from "../../../inventory/application/ports";
+import type {
+  DiceGardenRepository,
+  DiceInventoryRepository,
+  DicePermanentBonusesPort,
+} from "../../../inventory/application/ports";
 import type { DiceItemEffectsService } from "../../../inventory/application/item-effects-service";
+import {
+  getGardenSlotCount,
+  mysteriousDieSeedItemId,
+} from "../../../inventory/domain/passive-items";
 import type { DiceProgressionRepository } from "../../../progression/application/ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
 import {
@@ -24,6 +32,8 @@ export type DiceStatsView = {
 type QueryDiceStatsDependencies = {
   analytics: Pick<DiceAnalyticsRepository, "getDiceAnalytics">;
   economy: Pick<DiceEconomyRepository, "getEconomySnapshot">;
+  garden: Pick<DiceGardenRepository, "getActiveGardenPlots" | "getGardenAchievementStats">;
+  inventory: Pick<DiceInventoryRepository, "getInventoryQuantities">;
   itemEffects: Pick<DiceItemEffectsService, "getItemDoubleRollStatus">;
   permanentBonuses: Pick<DicePermanentBonusesPort, "getPermanentBonuses">;
   progression: Pick<
@@ -49,6 +59,8 @@ type QueryDiceStatsInput = {
 export const createQueryDiceStatsUseCase = ({
   analytics,
   economy,
+  garden,
+  inventory,
   itemEffects,
   permanentBonuses,
   progression,
@@ -57,6 +69,7 @@ export const createQueryDiceStatsUseCase = ({
   return ({ userId, userMention, nowMs = Date.now() }: QueryDiceStatsInput): DiceStatsView => {
     const analyticsView = analytics.getDiceAnalytics(userId);
     const balance = economy.getEconomySnapshot(userId);
+    const inventoryQuantities = inventory.getInventoryQuantities(userId);
     const dieSides = progression.getDiceSides(userId);
     const diceCount = progression.getDiceCount(userId);
     const highestPrestige = progression.getDicePrestige(userId);
@@ -83,6 +96,7 @@ export const createQueryDiceStatsUseCase = ({
     const unlockedBanSlots =
       getUnlockedBanSlotsFromFame(balance.fame, diceCount, dieSides) +
       permanentBonusSnapshot.extraBanSlots;
+    const hasGardenUnlocked = getGardenSlotCount(inventoryQuantities) > 0;
 
     const sections = [
       formatStatsSection("Economy", [`Fame: **${balance.fame}** | Pips: **${balance.pips}**`]),
@@ -108,6 +122,14 @@ export const createQueryDiceStatsUseCase = ({
         `Lifetime: **${analyticsView.totalDiceRolled}** dice | **${analyticsView.totalDiceSetsRolled}** sets | **${analyticsView.totalRollCommandsCalled}** /roll calls`,
         `PvP: **${analyticsView.pvpWins}W / ${analyticsView.pvpLosses}L / ${analyticsView.pvpDraws}D**`,
       ]),
+      ...(hasGardenUnlocked
+        ? [
+            formatStatsSection("Garden", [
+              `Seeds: **${inventoryQuantities.get(mysteriousDieSeedItemId) ?? 0}** in satchel | Harvested: **${garden.getGardenAchievementStats(userId).harvestedSeedCount}**`,
+              `Current plot: ${formatGardenPlotStatus(garden.getActiveGardenPlots(userId)[0] ?? null, nowMs)}`,
+            ]),
+          ]
+        : []),
     ];
     const content = truncateWithSuffix(
       [formatStatsHeader(userMention), ...sections].join("\n\n"),
@@ -304,6 +326,26 @@ const formatPermanentBonusesLine = (
 ): string[] => {
   const summary = formatPermanentBonuses(bonuses);
   return summary === "none" ? [] : [`Permanent bonuses: ${summary}`];
+};
+
+const formatGardenPlotStatus = (
+  activePlot: DiceGardenRepository["getActiveGardenPlots"] extends (userId: string) => infer TPlots
+    ? TPlots extends Array<infer TPlot>
+      ? TPlot | null
+      : never
+    : never,
+  nowMs: number,
+): string => {
+  if (!activePlot) {
+    return "empty";
+  }
+
+  const readyAtMs = Date.parse(activePlot.readyAt);
+  if (Number.isNaN(readyAtMs) || readyAtMs <= nowMs) {
+    return `**D${activePlot.dieSides}** sapling, ready **now**`;
+  }
+
+  return `**D${activePlot.dieSides}** sapling, ready **in ${formatRemainingDuration(readyAtMs, nowMs)}**`;
 };
 
 const formatMinutes = (value: number): string => {
