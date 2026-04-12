@@ -58,7 +58,7 @@ import {
   registerRaidsController,
 } from "../../dice/raids/infrastructure/admin-controller";
 import { raidButtonPrefix } from "../../dice/raids/interfaces/discord/buttons/raid-buttons";
-import { handleBeginnerRollMemberJoin } from "../../dice/progression/interfaces/discord/beginner-roll-graduation";
+import { handleBeginnerRollMemberJoin } from "../../dice/onboarding/interfaces/discord/beginner-roll-graduation";
 import { syncRaidTierPanelsOnStartup } from "../../dice/raids/infrastructure/tier-panel-sync";
 
 const token = requireEnv("DISCORD_TOKEN");
@@ -391,6 +391,8 @@ const registerDiscordClientEventHandlers = (
         client,
         member,
         logger: console,
+      }).catch((error) => {
+        console.error("[onboarding] Failed to handle beginner member join.", error);
       });
     });
   } else if ((loaded.beginnerOnboardingV1?.guilds.length ?? 0) > 0) {

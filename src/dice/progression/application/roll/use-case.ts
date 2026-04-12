@@ -33,6 +33,7 @@ import {
   getDicePrestigeBaseDiceCount,
   getUnlockedBanSlotsFromFame,
 } from "../../../progression/domain/game-rules";
+import { beginnerMilestoneAchievementId } from "../../../progression/domain/beginner-milestone";
 import { rollDieWithBans } from "../../../progression/domain/bans";
 import type { DiceProgressionAchievementStats, DiceProgressionRepository } from "../ports";
 import type { DicePvpRepository } from "../../../pvp/application/ports";
@@ -65,6 +66,7 @@ export type DiceRollResult = {
   content: string;
   ephemeral: boolean;
   autoRollClassification: DiceAutoRollClassification;
+  newlyEarnedAchievementIds: string[];
   achievementAnnouncements?: AchievementAnnouncement[];
   contractCompletionAnnouncements?: ContractCompletionAnnouncement[];
 };
@@ -117,7 +119,6 @@ type RunRollDiceDependencies = {
 
 const spamWindowMs = 2_000;
 const diceSpamTracker = new Map<string, number>();
-const beginnerRollerAchievementId = "manual-rolls-5";
 
 const formatDailyFirstRollBanner = (pipReward: number): string => {
   const pipLabel = pipReward === 1 ? "Pip" : "Pips";
@@ -183,6 +184,7 @@ export const createRunRollDiceUseCase = ({
           kind: "blocked",
           summary: summarizeAutoRollText(content),
         },
+        newlyEarnedAchievementIds: [],
       };
     }
 
@@ -197,6 +199,7 @@ export const createRunRollDiceUseCase = ({
           kind: "blocked",
           summary: content,
         },
+        newlyEarnedAchievementIds: [],
       };
     }
 
@@ -221,7 +224,7 @@ export const createRunRollDiceUseCase = ({
       lastDiceRollAt,
       lastPersonalDiceRollAt,
       personalChargeBonus: permanentBonusSnapshot.personalCharge,
-      chargeRollsEnabled: previouslyEarnedAchievementIds.has(beginnerRollerAchievementId),
+      chargeRollsEnabled: previouslyEarnedAchievementIds.has(beginnerMilestoneAchievementId),
       pvpDoubleRollUntil,
       itemDoubleRollStatus,
       hasActiveDoubleRollRush: doubleRollRushStatus.isActive,
@@ -469,6 +472,7 @@ export const createRunRollDiceUseCase = ({
         unlockedFooter,
         prestigeFooter,
       }),
+      newlyEarnedAchievementIds: result.newlyEarned,
       achievementAnnouncements,
       contractCompletionAnnouncements: contractProgress?.contractCompletionAnnouncements ?? [],
     };
