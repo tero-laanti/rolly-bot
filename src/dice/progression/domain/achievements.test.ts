@@ -49,7 +49,9 @@ test("prestige achievement lookup scales to a live-data style 15-tier pack", () 
 
   const achievementsPath = path.join(tempRoot, "achievements.json");
   const achievements = JSON.parse(fs.readFileSync(achievementsPath, "utf8"));
-  const filtered = achievements.filter((achievement: { id: string }) => achievement.id !== "prestige-1");
+  const filtered = achievements.filter(
+    (achievement: { id: string }) => achievement.id !== "prestige-1",
+  );
   for (let prestige = 1; prestige <= 15; prestige += 1) {
     filtered.push({
       id: `prestige-${prestige}`,
@@ -68,10 +70,18 @@ test("prestige achievement lookup scales to a live-data style 15-tier pack", () 
     clearModules(["../../../rolly-data/load", "./achievements"]);
 
     try {
-      const reloadedAchievements = moduleRequire("./achievements") as typeof import("./achievements");
+      const reloadedAchievements = moduleRequire(
+        "./achievements",
+      ) as typeof import("./achievements");
       for (let prestige = 1; prestige <= 15; prestige += 1) {
-        assert.equal(reloadedAchievements.getPrestigeAchievementId(prestige), `prestige-${prestige}`);
-        assert.equal(reloadedAchievements.getDiceAchievementPipReward(`prestige-${prestige}`), prestige * 20);
+        assert.equal(
+          reloadedAchievements.getPrestigeAchievementId(prestige),
+          `prestige-${prestige}`,
+        );
+        assert.equal(
+          reloadedAchievements.getDiceAchievementPipReward(`prestige-${prestige}`),
+          prestige * 20,
+        );
       }
       assert.equal(reloadedAchievements.getPrestigeAchievementId(16), undefined);
       assert.equal(reloadedAchievements.getDiceAchievement("prestige-15")?.name, "Max Prestige");
