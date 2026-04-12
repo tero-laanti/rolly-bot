@@ -10,7 +10,7 @@ This file controls PvP duel timing and the base durations for winner and loser e
 }
 ```
 
-- Max PvP tier is derived from `dice-balance.json` via `prestigeSides`, so adding a new prestige entry also extends the PvP tier ceiling.
+- Max PvP tier is capped at `5`, even if prestige progression continues beyond that.
 - `challengeExpireMinutes` is the lifetime of an unanswered challenge.
 - `loserLockoutBaseMinutes` and `winnerBuffBaseMinutes` are tier-1 base values.
 - The runtime scales both with `2 ** (tier - 1)`, so higher tiers ramp quickly.

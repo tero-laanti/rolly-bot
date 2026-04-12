@@ -1,5 +1,5 @@
 {
-  "prestigeSides": [6, 8, 12, 20],
+  "prestigeSides": [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36],
   "lowerPrestigeBaseDiceCount": 5,
   "banStep": 4,
   "diceCountIncreaseReward": 1,

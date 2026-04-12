@@ -6,13 +6,14 @@ Prestige progression:
 
 ```json
 {
-  "prestigeSides": [6, 8, 12, 20],
+  "prestigeSides": [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36],
   "lowerPrestigeBaseDiceCount": 5
 }
 ```
 
 - `prestigeSides[0]` is prestige `0`, `prestigeSides[1]` is prestige `1`, and so on.
 - Max prestige is `prestigeSides.length - 1`.
+- This example ladder makes prestige `15` the maximum prestige and increases die size by `+2` each prestige.
 - Within a prestige, dice count is the player's current number of dice. Dice count `1` means rolling `1` die, dice count `2` means rolling `2` dice, and so on.
 - `lowerPrestigeBaseDiceCount` is used when a player switches down to a previously unlocked lower prestige. Those lower prestiges start at this base dice count instead of `1`.
 
