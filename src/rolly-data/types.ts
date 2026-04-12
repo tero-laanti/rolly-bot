@@ -266,6 +266,7 @@ export type DiceContractsCadenceMetadataData = {
   label: string;
   chooserTitle: string;
   chooserDescription: string;
+  contractsPerWindow: number;
   difficulties: Record<DiceContractDifficulty, DiceContractsDifficultyData>;
 };
 

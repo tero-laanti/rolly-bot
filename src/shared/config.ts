@@ -214,7 +214,7 @@ const resolveFeatureActivation = ({
 };
 
 const defaultRandomEventsConfig = {
-  targetEventsPerDay: 10,
+  targetEventsPerDay: 15,
   minGapMinutes: 45,
   maxActiveEvents: 1,
   retryDelaySeconds: 5 * 60,

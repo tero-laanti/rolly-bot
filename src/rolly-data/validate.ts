@@ -1634,10 +1634,26 @@ const readContractsCadenceMetadata = (
     discordEmbedDescriptionCharacterLimit,
   );
 
+  const contractsPerWindow = readInteger(
+    record.contractsPerWindow,
+    `${label}.contractsPerWindow`,
+    1,
+  );
+  const minimumRefillOffers = Math.max(0, contractsPerWindow - 1);
+  for (const difficulty of contractDifficulties) {
+    const refillOffers = difficulties[difficulty].refillOffers;
+    if (refillOffers.length < minimumRefillOffers) {
+      throw new Error(
+        `${label}.difficulties.${difficulty}.refillOffers must include at least ${minimumRefillOffers} offer${minimumRefillOffers === 1 ? "" : "s"} to support contractsPerWindow=${contractsPerWindow}.`,
+      );
+    }
+  }
+
   return {
     label: cadenceLabel,
     chooserTitle,
     chooserDescription,
+    contractsPerWindow,
     difficulties,
   };
 };

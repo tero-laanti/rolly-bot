@@ -61,7 +61,7 @@ export const createQueryDiceStatsUseCase = ({
     const diceCount = progression.getDiceCount(userId);
     const highestPrestige = progression.getDicePrestige(userId);
     const activePrestige = progression.getActiveDicePrestige(userId);
-    const bans = progression.getDiceBans(userId);
+    const bans = filterBansToCurrentDice(progression.getDiceBans(userId), diceCount);
     const permanentBonusSnapshot = permanentBonuses.getPermanentBonuses(userId);
     const pvpDoubleRollUntil = pvp.getActiveDoubleRoll(userId, nowMs);
     const itemDoubleRollStatus = itemEffects.getItemDoubleRollStatus(userId, nowMs);
@@ -129,6 +129,23 @@ const countUsedBans = (bans: Map<number, Set<number>>): number => {
   }
 
   return count;
+};
+
+const filterBansToCurrentDice = (
+  bans: Map<number, Set<number>>,
+  diceCount: number,
+): Map<number, Set<number>> => {
+  const visibleBans = new Map<number, Set<number>>();
+
+  for (const [dieIndex, values] of bans.entries()) {
+    if (dieIndex > diceCount || values.size < 1) {
+      continue;
+    }
+
+    visibleBans.set(dieIndex, values);
+  }
+
+  return visibleBans;
 };
 
 const formatStatsHeader = (userMention: string): string => {

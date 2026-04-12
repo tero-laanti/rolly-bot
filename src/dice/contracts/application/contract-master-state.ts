@@ -53,6 +53,10 @@ type CadenceStateContext = {
   rerollUsage: Map<ContractDifficulty, Date>;
 };
 
+const getContractsPerWindow = (cadenceCatalog: ContractCadenceCatalog): number => {
+  return Math.max(1, cadenceCatalog.contractsPerWindow);
+};
+
 const getCadenceCatalog = (
   catalog: ContractCatalog,
   cadence: ContractCadence,
@@ -201,17 +205,19 @@ export const buildContractCadenceContext = (
   const persistedState =
     dependencies.userCadenceStateRepository.getState(userId, cadence, resetWindow) ??
     createEmptyContractCadenceState(userId, cadence, resetWindow);
+  const contractsPerWindow = getContractsPerWindow(cadenceCatalog);
   const completionCount = Math.min(
     Math.max(persistedState.completionCount, completedRuns.length),
-    2,
+    contractsPerWindow,
   );
   const refillAvailableDifficulty =
-    completionCount === 1
+    completionCount >= 1 && completionCount < contractsPerWindow
       ? (persistedState.refillAvailableDifficulty ?? completedRuns[0]?.difficulty)
       : undefined;
   const refillClaimedAt =
-    persistedState.refillClaimedAt ??
-    runs.find((run) => run.sequenceNumber >= 2 || run.acceptedVia === "refill")?.acceptedAt;
+    completionCount >= contractsPerWindow
+      ? (persistedState.refillClaimedAt ?? completedRuns.at(-1)?.completedAt)
+      : undefined;
   const state: ContractCadenceState = {
     ...persistedState,
     completionCount,
@@ -244,7 +250,8 @@ export const resolveContractOfferChoice = (
   difficulty: ContractDifficulty,
   now: Date,
 ): ContractOfferChoice | null => {
-  if (context.activeRun || context.state.completionCount >= 2) {
+  const contractsPerWindow = getContractsPerWindow(context.cadenceCatalog);
+  if (context.activeRun || context.state.completionCount >= contractsPerWindow) {
     return null;
   }
 
@@ -252,10 +259,7 @@ export const resolveContractOfferChoice = (
     return resolveInitialChoice(context, repository, difficulty, now);
   }
 
-  if (
-    context.state.refillAvailableDifficulty !== difficulty ||
-    context.state.refillClaimedAt !== undefined
-  ) {
+  if (context.state.refillAvailableDifficulty !== difficulty) {
     return null;
   }
 
@@ -298,7 +302,8 @@ const buildOfferView = (
     };
   }
 
-  if (context.state.completionCount >= 2) {
+  const contractsPerWindow = getContractsPerWindow(context.cadenceCatalog);
+  if (context.state.completionCount >= contractsPerWindow) {
     return {
       difficulty,
       label: pool.label,
@@ -308,12 +313,12 @@ const buildOfferView = (
       rerollUsed: Boolean(context.rerollUsage.get(difficulty)),
       rerollAvailable: false,
       selectable: false,
-      unavailableReason: "You have completed both available contracts for this cadence.",
+      unavailableReason: "You have completed every available contract for this cadence.",
     };
   }
 
   if (
-    context.state.completionCount === 1 &&
+    context.state.completionCount >= 1 &&
     context.state.refillAvailableDifficulty !== difficulty
   ) {
     return {
@@ -326,7 +331,7 @@ const buildOfferView = (
       rerollAvailable: false,
       selectable: false,
       unavailableReason:
-        "Your second contract must come from the difficulty of your completed first contract.",
+        "Your remaining contracts this window must come from the difficulty of your first completion.",
     };
   }
 
@@ -352,6 +357,7 @@ export const buildContractCadenceView = (
   label: context.cadenceCatalog.label,
   chooserTitle: context.cadenceCatalog.chooserTitle,
   chooserDescription: context.cadenceCatalog.chooserDescription,
+  contractsPerWindow: getContractsPerWindow(context.cadenceCatalog),
   resetWindow: context.resetWindow,
   resetAt: context.resetAt,
   activeRun: context.activeRun,

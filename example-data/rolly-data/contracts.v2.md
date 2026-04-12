@@ -7,6 +7,7 @@ This file defines the authored data for the Contract Master surface.
   - `simple`
   - `serious`
   - `brutal`
+- Each cadence also defines `contractsPerWindow`, the total number of contracts available in that reset window.
 - Each difficulty tier carries one Pip reward value plus two offer pools:
   - `initialOffers` for the global first offer in that tier
   - `refillOffers` for same-difficulty follow-up offers after a completion
@@ -22,7 +23,9 @@ Contract catalog shape:
 ```
 
 - Contract `id` values must be unique across all cadences, difficulties, and offer pools.
+- `contractsPerWindow` must be an integer >= 1.
 - Each difficulty must include at least one `initialOffers` entry and one `refillOffers` entry.
+- Each difficulty must include enough `refillOffers` to satisfy the cadence cap, so `refillOffers.length >= contractsPerWindow - 1`.
 - Pip rewards must increase strictly from `simple` to `serious` to `brutal` within each cadence.
 
 Panel shape:
@@ -32,7 +35,7 @@ Panel shape:
   "title": "Contract Master",
   "imageUrl": "https://example.com/rolly/contract-master.png",
   "description": "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
-  "helperText": "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",
+  "helperText": "Finish your first contract in a cadence to unlock more offers from the same difficulty.",
   "dailyButtonLabel": "Daily Contracts",
   "weeklyButtonLabel": "Weekly Contracts",
   "askForContractButtonLabel": "Ask for a new contract"
@@ -46,6 +49,7 @@ Cadence shape:
   "label": "Daily",
   "chooserTitle": "Daily Contracts",
   "chooserDescription": "Choose a Daily contract from one of three difficulties.",
+  "contractsPerWindow": 3,
   "difficulties": {
     "simple": {},
     "serious": {},

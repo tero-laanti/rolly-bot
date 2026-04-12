@@ -63,7 +63,7 @@ If you have a private `rolly-data` checkout, either place it in `./rolly-data` o
 ### Random events
 
 - `RANDOM_EVENTS_CHANNEL_ID`: Optional. Channel ID where random events are posted. Random events stay inactive until this is set.
-- `RANDOM_EVENTS_TARGET_PER_DAY`: Optional. Target number of random events per day. Default: `10`.
+- `RANDOM_EVENTS_TARGET_PER_DAY`: Optional. Target number of random events per day. Default: `15`.
 - `RANDOM_EVENTS_MIN_GAP_MINUTES`: Optional. Minimum time between random-event opportunities. Units: minutes. Default: `45`.
 - `RANDOM_EVENTS_MAX_ACTIVE`: Optional. Maximum number of active random events at once. Default: `1`.
 - `RANDOM_EVENTS_RETRY_DELAY_SECONDS`: Optional. Retry delay after a failed or skipped trigger. Units: seconds. Default: `300`.

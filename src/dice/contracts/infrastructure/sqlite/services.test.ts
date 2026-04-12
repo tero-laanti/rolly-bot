@@ -174,8 +174,8 @@ test("services wire Contract Master acceptance, gameplay progress, and summary r
       });
 
       assert.match(reply.content, /Daily Contracts/);
-      assert.match(reply.content, /Completed this window: 1\/2/);
-      assert.match(reply.content, /Available for simple difficulty\./);
+      assert.match(reply.content, /Completed this window: 1\/3/);
+      assert.match(reply.content, /Available for simple difficulty \(2 contracts left\)\./);
     } finally {
       clearContractsModuleGraph();
     }

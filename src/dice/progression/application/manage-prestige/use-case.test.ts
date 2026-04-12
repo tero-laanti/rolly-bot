@@ -15,7 +15,9 @@ test("switching active prestige does not reset dice-count analytics progress", (
     },
     progression: {
       awardAchievements: () => [],
+      clearDiceBan: () => {},
       getActiveDicePrestige: () => activePrestige,
+      getDiceBans: () => new Map(),
       getDiceCount: () => 8,
       getDicePrestige: () => 2,
       setActiveDicePrestige: ({ prestige }) => {
@@ -53,7 +55,9 @@ test("prestige up still resets prestige analytics progress", () => {
     },
     progression: {
       awardAchievements: () => [],
+      clearDiceBan: () => {},
       getActiveDicePrestige: () => activePrestige,
+      getDiceBans: () => new Map(),
       getDiceCount: () => getDicePrestigeBaseDiceCount(),
       getDicePrestige: () => highestPrestige,
       setActiveDicePrestige: ({ prestige }) => {
@@ -87,7 +91,9 @@ test("prestige chooser opens on the active page and only shows needed arrows", (
     },
     progression: {
       awardAchievements: () => [],
+      clearDiceBan: () => {},
       getActiveDicePrestige: () => 24,
+      getDiceBans: () => new Map(),
       getDiceCount: () => 8,
       getDicePrestige: () => 25,
       setActiveDicePrestige: () => {},
@@ -123,7 +129,9 @@ test("prestige chooser page actions navigate and show a forward arrow only when 
     },
     progression: {
       awardAchievements: () => [],
+      clearDiceBan: () => {},
       getActiveDicePrestige: () => 24,
+      getDiceBans: () => new Map(),
       getDiceCount: () => 8,
       getDicePrestige: () => 25,
       setActiveDicePrestige: () => {},
@@ -151,4 +159,44 @@ test("prestige chooser page actions navigate and show a forward arrow only when 
     result.payload.view.components.at(-1)?.map((button) => button.label),
     ["Back", "→"],
   );
+});
+
+test("switching active prestige prunes bans on dice above the new active dice count", () => {
+  let activePrestige = 1;
+  const bans = new Map<number, Set<number>>([
+    [1, new Set([2])],
+    [6, new Set([4])],
+  ]);
+
+  const useCase = createDicePrestigeUseCase({
+    analytics: {
+      resetDicePrestigeAnalyticsProgress: () => {},
+    },
+    progression: {
+      awardAchievements: () => [],
+      clearDiceBan: (_userId, dieIndex) => {
+        bans.delete(dieIndex);
+      },
+      getActiveDicePrestige: () => activePrestige,
+      getDiceBans: () => bans,
+      getDiceCount: () => (activePrestige === 2 ? 1 : 6),
+      getDicePrestige: () => 2,
+      setActiveDicePrestige: ({ prestige }) => {
+        activePrestige = prestige;
+      },
+      setDiceCountForPrestige: () => {},
+      setDicePrestige: () => {},
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  useCase.handleDicePrestigeAction("user-1", {
+    type: "set",
+    ownerId: "user-1",
+    prestige: 2,
+  });
+
+  assert.deepEqual([...bans.keys()], [1]);
 });

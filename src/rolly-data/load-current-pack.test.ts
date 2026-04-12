@@ -37,6 +37,8 @@ test("example rolly-data source loads Contract Master cadence and difficulty dat
 
   assert.ok(
     contracts.panel.title === "Contract Master" &&
+      contracts.daily.contractsPerWindow === 3 &&
+      contracts.weekly.contractsPerWindow === 5 &&
       contracts.daily.difficulties.simple.initialOffers.length > 0 &&
       contracts.weekly.difficulties.brutal.refillOffers.length > 0,
     `Expected contracts content from ${getRollyDataSourceDescription()}`,

@@ -165,6 +165,7 @@ export type ContractCadenceView = {
   label: string;
   chooserTitle: string;
   chooserDescription: string;
+  contractsPerWindow: number;
   resetWindow: string;
   resetAt: Date;
   activeRun: ContractRun | null;

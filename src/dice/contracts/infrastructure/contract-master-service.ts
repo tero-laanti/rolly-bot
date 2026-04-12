@@ -122,19 +122,21 @@ const formatRerollStatus = (view: ContractCadenceView): string => {
 };
 
 const formatRefillStatus = (view: ContractCadenceView): string => {
+  if (view.activeRun) {
+    return `Finish your active ${view.activeRun.difficulty} contract first.`;
+  }
+
   if (view.completionCount < 1) {
     return "Locked until your first completion.";
   }
 
-  if (view.completionCount >= 2) {
+  if (view.completionCount >= view.contractsPerWindow) {
     return "Exhausted for this reset window.";
   }
 
-  if (view.refillClaimed) {
-    return `Claimed from ${view.refillAvailableDifficulty ?? "unknown"} difficulty.`;
-  }
-
-  return `Available for ${view.refillAvailableDifficulty ?? "unknown"} difficulty.`;
+  const remainingCount = view.contractsPerWindow - view.completionCount;
+  const contractLabel = remainingCount === 1 ? "contract" : "contracts";
+  return `Available for ${view.refillAvailableDifficulty ?? "unknown"} difficulty (${remainingCount} ${contractLabel} left).`;
 };
 
 const renderActiveRunLines = (view: ContractCadenceView): string[] => {
@@ -169,7 +171,7 @@ const renderCadenceSummaryContent = ({
     [`**${view.label} Contracts**`, formatResetLine(view.resetAt)].join("\n"),
     renderActiveRunLines(view).join("\n"),
     [
-      `Completed this window: ${view.completionCount}/2`,
+      `Completed this window: ${view.completionCount}/${view.contractsPerWindow}`,
       `Rerolls: ${formatRerollStatus(view)}`,
       `Refill: ${formatRefillStatus(view)}`,
     ].join("\n"),

@@ -1,4 +1,5 @@
 import type {
+  ContractsCatalogReader,
   ContractsProgressRecorder,
   ContractsProgressRepository,
   ContractsRewardGranter,
@@ -20,6 +21,7 @@ import { getContractResetWindow } from "../../domain/rotation";
 import type { ContractCadence } from "../../domain/types";
 
 type ContractMasterDependencies = {
+  catalogReader: ContractsCatalogReader;
   runRepository: ContractsRunRepository;
   userCadenceStateRepository: ContractsUserCadenceStateRepository;
   rewardGranter: ContractsRewardGranter;
@@ -44,7 +46,17 @@ export const createRecordContractsProgressUseCase = (
     );
   }
 
-  const { runRepository, userCadenceStateRepository, rewardGranter, unitOfWork } = dependencies;
+  const { catalogReader, runRepository, userCadenceStateRepository, rewardGranter, unitOfWork } =
+    dependencies;
+
+  const getContractsPerWindow = (cadence: ContractCadence): number => {
+    const catalog = catalogReader.getCatalog();
+    if (!("panel" in catalog) || Array.isArray(catalog.daily) || Array.isArray(catalog.weekly)) {
+      throw new Error("Contract Master authored data is required for this operation.");
+    }
+
+    return Math.max(1, (cadence === "daily" ? catalog.daily : catalog.weekly).contractsPerWindow);
+  };
 
   const recordProgress: ContractsProgressRecorder["recordProgress"] = (event) => {
     const updates: ContractProgressUpdate[] = [];
@@ -80,7 +92,12 @@ export const createRecordContractsProgressUseCase = (
             userCadenceStateRepository.getState(event.userId, cadence, resetWindow) ??
             createEmptyContractCadenceState(event.userId, cadence, resetWindow);
           userCadenceStateRepository.saveState(
-            applyCompletionToCadenceState(state, update.run, event.occurredAt),
+            applyCompletionToCadenceState(
+              state,
+              update.run,
+              event.occurredAt,
+              getContractsPerWindow(cadence),
+            ),
           );
 
           const announcement = createContractCompletionAnnouncement({

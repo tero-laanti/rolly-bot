@@ -61,7 +61,9 @@ type ManagePrestigeDependencies = {
   progression: Pick<
     DiceProgressionRepository,
     | "awardAchievements"
+    | "clearDiceBan"
     | "getActiveDicePrestige"
+    | "getDiceBans"
     | "getDiceCount"
     | "getDicePrestige"
     | "setActiveDicePrestige"
@@ -76,6 +78,16 @@ export const createDicePrestigeUseCase = ({
   progression,
   unitOfWork,
 }: ManagePrestigeDependencies) => {
+  const pruneInvalidDiceBans = (userId: string, diceCount: number) => {
+    for (const [dieIndex, values] of progression.getDiceBans(userId).entries()) {
+      if (dieIndex <= diceCount || values.size < 1) {
+        continue;
+      }
+
+      progression.clearDiceBan(userId, dieIndex);
+    }
+  };
+
   const createDicePrestigeReply = (userId: string): DicePrestigeResult => {
     const state = getPrestigeState(progression, userId);
     return {
@@ -168,6 +180,7 @@ export const createDicePrestigeUseCase = ({
         userId: action.ownerId,
         prestige: action.prestige,
       });
+      pruneInvalidDiceBans(action.ownerId, progression.getDiceCount(action.ownerId));
 
       const state = getPrestigeState(progression, action.ownerId);
       return {
@@ -199,6 +212,7 @@ export const createDicePrestigeUseCase = ({
         prestige: nextPrestige,
         diceCount: 1,
       });
+      pruneInvalidDiceBans(action.ownerId, progression.getDiceCount(action.ownerId));
       analytics.resetDicePrestigeAnalyticsProgress(action.ownerId);
 
       const achievementId = getPrestigeAchievementId(nextPrestige);

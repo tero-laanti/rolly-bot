@@ -121,6 +121,7 @@ type ContractsCadenceInput = {
   label: string;
   chooserTitle: string;
   chooserDescription: string;
+  contractsPerWindow: number;
   difficulties: Record<"simple" | "serious" | "brutal", ContractsDifficultyInput>;
 };
 
@@ -145,79 +146,198 @@ const createCadenceInput = (
   simpleRewardPips: number,
   seriousRewardPips: number,
   brutalRewardPips: number,
-): ContractsCadenceInput => ({
-  label,
-  chooserTitle: `${label} Contracts`,
-  chooserDescription: `Choose a ${label.toLowerCase()} contract from one of three difficulties.`,
-  difficulties: {
-    simple: {
-      label: "Simple",
-      rewardPips: simpleRewardPips,
-      initialOffers: [
-        createContractOfferInput(
-          `${label.toLowerCase()}-simple-roll`,
-          `${label} Roll Routine`,
-          `Use /roll ${label === "Daily" ? 12 : 80} times.`,
-          "roll_count",
-          label === "Daily" ? 12 : 80,
-        ),
-      ],
-      refillOffers: [
-        createContractOfferInput(
-          `${label.toLowerCase()}-simple-casino`,
-          `${label} Casino Warmup`,
-          `Finish ${label === "Daily" ? 2 : 10} casino games.`,
-          "casino_game_count",
-          label === "Daily" ? 2 : 10,
-        ),
-      ],
+): ContractsCadenceInput => {
+  const isDaily = label === "Daily";
+
+  return {
+    label,
+    chooserTitle: `${label} Contracts`,
+    chooserDescription: `Choose a ${label.toLowerCase()} contract from one of three difficulties.`,
+    contractsPerWindow: isDaily ? 3 : 5,
+    difficulties: {
+      simple: {
+        label: "Simple",
+        rewardPips: simpleRewardPips,
+        initialOffers: [
+          createContractOfferInput(
+            `${label.toLowerCase()}-simple-roll`,
+            `${label} Roll Routine`,
+            `Use /roll ${isDaily ? 12 : 80} times.`,
+            "roll_count",
+            isDaily ? 12 : 80,
+          ),
+        ],
+        refillOffers: isDaily
+          ? [
+              createContractOfferInput(
+                `${label.toLowerCase()}-simple-casino`,
+                `${label} Casino Warmup`,
+                "Finish 2 casino games.",
+                "casino_game_count",
+                2,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-simple-world-boss`,
+                `${label} World Boss Watch`,
+                "Join 1 World Boss encounter.",
+                "world_boss_join_count",
+                1,
+              ),
+            ]
+          : [
+              createContractOfferInput(
+                `${label.toLowerCase()}-simple-casino`,
+                `${label} Casino Warmup`,
+                "Finish 10 casino games.",
+                "casino_game_count",
+                10,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-simple-world-boss`,
+                `${label} World Boss Watch`,
+                "Join 2 World Boss encounters.",
+                "world_boss_join_count",
+                2,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-simple-pvp`,
+                `${label} Duel Drills`,
+                "Win 3 PvP challenges.",
+                "pvp_win_count",
+                3,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-simple-roll-extended`,
+                `${label} Steady Rolling`,
+                "Use /roll 110 times.",
+                "roll_count",
+                110,
+              ),
+            ],
+      },
+      serious: {
+        label: "Serious",
+        rewardPips: seriousRewardPips,
+        initialOffers: [
+          createContractOfferInput(
+            `${label.toLowerCase()}-serious-pvp`,
+            `${label} Duel Duty`,
+            `Win ${isDaily ? 1 : 4} PvP challenge${isDaily ? "" : "s"}.`,
+            "pvp_win_count",
+            isDaily ? 1 : 4,
+          ),
+        ],
+        refillOffers: isDaily
+          ? [
+              createContractOfferInput(
+                `${label.toLowerCase()}-serious-world-boss`,
+                `${label} World Boss Detail`,
+                "Join 1 World Boss encounter.",
+                "world_boss_join_count",
+                1,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-serious-casino`,
+                `${label} Casino Push`,
+                "Finish 5 casino games.",
+                "casino_game_count",
+                5,
+              ),
+            ]
+          : [
+              createContractOfferInput(
+                `${label.toLowerCase()}-serious-world-boss`,
+                `${label} World Boss Detail`,
+                "Join 2 World Boss encounters.",
+                "world_boss_join_count",
+                2,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-serious-casino`,
+                `${label} Casino Push`,
+                "Finish 15 casino games.",
+                "casino_game_count",
+                15,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-serious-roll`,
+                `${label} Long Roll Patrol`,
+                "Use /roll 120 times.",
+                "roll_count",
+                120,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-serious-pvp-extended`,
+                `${label} Rival Sweep`,
+                "Win 5 PvP challenges.",
+                "pvp_win_count",
+                5,
+              ),
+            ],
+      },
+      brutal: {
+        label: "Brutal",
+        rewardPips: brutalRewardPips,
+        initialOffers: [
+          createContractOfferInput(
+            `${label.toLowerCase()}-brutal-roll`,
+            `${label} Marathon`,
+            `Use /roll ${isDaily ? 30 : 180} times.`,
+            "roll_count",
+            isDaily ? 30 : 180,
+          ),
+        ],
+        refillOffers: isDaily
+          ? [
+              createContractOfferInput(
+                `${label.toLowerCase()}-brutal-casino`,
+                `${label} High Stakes`,
+                "Finish 8 casino games.",
+                "casino_game_count",
+                8,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-brutal-world-boss`,
+                `${label} World Boss Vanguard`,
+                "Join 2 World Boss encounters.",
+                "world_boss_join_count",
+                2,
+              ),
+            ]
+          : [
+              createContractOfferInput(
+                `${label.toLowerCase()}-brutal-casino`,
+                `${label} High Stakes`,
+                "Finish 30 casino games.",
+                "casino_game_count",
+                30,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-brutal-world-boss`,
+                `${label} World Boss Vanguard`,
+                "Join 4 World Boss encounters.",
+                "world_boss_join_count",
+                4,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-brutal-pvp`,
+                `${label} Duel Sweep`,
+                "Win 8 PvP challenges.",
+                "pvp_win_count",
+                8,
+              ),
+              createContractOfferInput(
+                `${label.toLowerCase()}-brutal-roll-extended`,
+                `${label} Endless Marathon`,
+                "Use /roll 220 times.",
+                "roll_count",
+                220,
+              ),
+            ],
+      },
     },
-    serious: {
-      label: "Serious",
-      rewardPips: seriousRewardPips,
-      initialOffers: [
-        createContractOfferInput(
-          `${label.toLowerCase()}-serious-pvp`,
-          `${label} Duel Duty`,
-          `Win ${label === "Daily" ? 1 : 4} PvP challenge${label === "Daily" ? "" : "s"}.`,
-          "pvp_win_count",
-          label === "Daily" ? 1 : 4,
-        ),
-      ],
-      refillOffers: [
-        createContractOfferInput(
-          `${label.toLowerCase()}-serious-world-boss`,
-          `${label} World Boss Detail`,
-          `Join ${label === "Daily" ? 1 : 2} World Boss encounter${label === "Daily" ? "" : "s"}.`,
-          "world_boss_join_count",
-          label === "Daily" ? 1 : 2,
-        ),
-      ],
-    },
-    brutal: {
-      label: "Brutal",
-      rewardPips: brutalRewardPips,
-      initialOffers: [
-        createContractOfferInput(
-          `${label.toLowerCase()}-brutal-roll`,
-          `${label} Marathon`,
-          `Use /roll ${label === "Daily" ? 30 : 180} times.`,
-          "roll_count",
-          label === "Daily" ? 30 : 180,
-        ),
-      ],
-      refillOffers: [
-        createContractOfferInput(
-          `${label.toLowerCase()}-brutal-casino`,
-          `${label} High Stakes`,
-          `Finish ${label === "Daily" ? 8 : 30} casino games.`,
-          "casino_game_count",
-          label === "Daily" ? 8 : 30,
-        ),
-      ],
-    },
-  },
-});
+  };
+};
 
 const createContractsInput = (): ContractsInput => ({
   panel: {
@@ -225,7 +345,7 @@ const createContractsInput = (): ContractsInput => ({
     imageUrl: "https://example.com/rolly/contract-master.png",
     description: "Take on Daily or Weekly contracts. Each difficulty offers a stronger pip payout.",
     helperText:
-      "Finish your first contract in a cadence to unlock one more offer from the same difficulty.",
+      "Finish your first contract in a cadence to unlock more offers from the same difficulty.",
     dailyButtonLabel: "Daily Contracts",
     weeklyButtonLabel: "Weekly Contracts",
     askForContractButtonLabel: "Ask for a new contract",
@@ -947,6 +1067,8 @@ test("parseDiceContractsData accepts Contract Master panel metadata and difficul
 
   assert.equal(parsed.panel.title, "Contract Master");
   assert.equal(parsed.daily.label, "Daily");
+  assert.equal(parsed.daily.contractsPerWindow, 3);
+  assert.equal(parsed.weekly.contractsPerWindow, 5);
   assert.equal(parsed.daily.difficulties.simple.rewardPips, 12);
   assert.equal(parsed.daily.difficulties.brutal.initialOffers[0]?.reward.pips, 32);
   assert.equal(
@@ -1010,6 +1132,16 @@ test("parseDiceContractsData rejects empty refill pools", () => {
   assert.throws(
     () => parseDiceContractsData(input),
     /contracts\.daily\.difficulties\.simple\.refillOffers must include at least 1 offer/i,
+  );
+});
+
+test("parseDiceContractsData rejects cadence caps that exceed the authored refill pool", () => {
+  const input = createContractsInput();
+  input.daily.difficulties.simple.refillOffers = [input.daily.difficulties.simple.refillOffers[0]!];
+
+  assert.throws(
+    () => parseDiceContractsData(input),
+    /contracts\.daily\.difficulties\.simple\.refillOffers must include at least 2 offers to support contractsPerWindow=3/i,
   );
 });
 

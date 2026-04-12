@@ -30,6 +30,7 @@ const createCatalog = (): ContractCatalog => ({
     label: "Daily",
     chooserTitle: "Daily Contracts",
     chooserDescription: "Choose wisely.",
+    contractsPerWindow: 3,
     difficulties: {
       simple: {
         label: "Simple",
@@ -62,6 +63,15 @@ const createCatalog = (): ContractCatalog => ({
             cadence: "daily",
             difficulty: "simple",
             objective: { type: "roll_count", requiredCount: 7 },
+            rewardPips: 12,
+          },
+          {
+            id: "daily-simple-refill-2",
+            title: "Daily Simple Refill 2",
+            description: "Refill 2",
+            cadence: "daily",
+            difficulty: "simple",
+            objective: { type: "roll_count", requiredCount: 8 },
             rewardPips: 12,
           },
         ],
@@ -99,6 +109,15 @@ const createCatalog = (): ContractCatalog => ({
             objective: { type: "roll_count", requiredCount: 10 },
             rewardPips: 20,
           },
+          {
+            id: "daily-serious-refill-2",
+            title: "Daily Serious Refill 2",
+            description: "Refill 2",
+            cadence: "daily",
+            difficulty: "serious",
+            objective: { type: "roll_count", requiredCount: 11 },
+            rewardPips: 20,
+          },
         ],
       },
       brutal: {
@@ -134,6 +153,15 @@ const createCatalog = (): ContractCatalog => ({
             objective: { type: "roll_count", requiredCount: 14 },
             rewardPips: 32,
           },
+          {
+            id: "daily-brutal-refill-2",
+            title: "Daily Brutal Refill 2",
+            description: "Refill 2",
+            cadence: "daily",
+            difficulty: "brutal",
+            objective: { type: "roll_count", requiredCount: 15 },
+            rewardPips: 32,
+          },
         ],
       },
     },
@@ -142,6 +170,7 @@ const createCatalog = (): ContractCatalog => ({
     label: "Weekly",
     chooserTitle: "Weekly Contracts",
     chooserDescription: "Choose wisely.",
+    contractsPerWindow: 5,
     difficulties: {
       simple: {
         label: "Simple",
@@ -315,6 +344,59 @@ test("refill only unlocks for the completed first-run difficulty", () => {
     now: new Date("2026-03-28T11:00:00.000Z"),
   });
   assert.equal(refillAccepted.acceptedRun.acceptedVia, "refill");
+});
+
+test("daily cadence can accept a third same-difficulty contract when the cap is three", () => {
+  const { useCase, runs, states } = createHarness();
+  const now = new Date("2026-03-28T10:00:00.000Z");
+
+  const firstAccepted = useCase.acceptOffer({
+    userId: "user-1",
+    cadence: "daily",
+    difficulty: "simple",
+    now,
+  });
+  runs.set("user-1|daily|2026-03-28|1", {
+    ...firstAccepted.acceptedRun,
+    currentCount: firstAccepted.acceptedRun.requiredCount,
+    completedAt: new Date("2026-03-28T10:30:00.000Z"),
+    rewardGrantedAt: new Date("2026-03-28T10:30:05.000Z"),
+  });
+  states.set("user-1|daily|2026-03-28", {
+    ...createEmptyContractCadenceState("user-1", "daily", "2026-03-28"),
+    completionCount: 1,
+    refillAvailableDifficulty: "simple",
+    lastCompletedAt: new Date("2026-03-28T10:30:00.000Z"),
+  });
+
+  const secondAccepted = useCase.acceptOffer({
+    userId: "user-1",
+    cadence: "daily",
+    difficulty: "simple",
+    now: new Date("2026-03-28T11:00:00.000Z"),
+  });
+  runs.set("user-1|daily|2026-03-28|2", {
+    ...secondAccepted.acceptedRun,
+    currentCount: secondAccepted.acceptedRun.requiredCount,
+    completedAt: new Date("2026-03-28T11:30:00.000Z"),
+    rewardGrantedAt: new Date("2026-03-28T11:30:05.000Z"),
+  });
+  states.set("user-1|daily|2026-03-28", {
+    ...createEmptyContractCadenceState("user-1", "daily", "2026-03-28"),
+    completionCount: 2,
+    refillAvailableDifficulty: "simple",
+    lastCompletedAt: new Date("2026-03-28T11:30:00.000Z"),
+  });
+
+  const thirdAccepted = useCase.acceptOffer({
+    userId: "user-1",
+    cadence: "daily",
+    difficulty: "simple",
+    now: new Date("2026-03-28T12:00:00.000Z"),
+  });
+
+  assert.equal(thirdAccepted.acceptedRun.sequenceNumber, 3);
+  assert.equal(thirdAccepted.acceptedRun.acceptedVia, "refill");
 });
 
 test("reroll budget is spent exactly once per difficulty", () => {
