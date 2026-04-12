@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   formatBeginnerRollGraduationMessage,
+  handleBeginnerRollAfterRoll,
   hasBeginnerRollerAchievementAnnouncement,
   publishBeginnerRollGraduationMessage,
 } from "./beginner-roll-graduation";
@@ -45,6 +46,11 @@ test("publishes the beginner graduation message with a direct user mention", asy
     [];
 
   await publishBeginnerRollGraduationMessage({
+    client: {
+      channels: {
+        fetch: async () => null,
+      },
+    } as never,
     channel: {
       send: async (message: {
         content: string;
@@ -54,6 +60,7 @@ test("publishes the beginner graduation message with a direct user mention", asy
         return {} as never;
       },
     },
+    guildId: "guild-1",
     userId: "user-1",
   });
 
@@ -67,4 +74,67 @@ test("publishes the beginner graduation message with a direct user mention", asy
       },
     },
   ]);
+});
+
+test("handleBeginnerRollAfterRoll preserves the legacy handoff when onboarding config is absent", async () => {
+  const sent: Array<{ content: string; allowedMentions: { parse: string[]; users: string[] } }> =
+    [];
+
+  await handleBeginnerRollAfterRoll({
+    client: {
+      channels: {
+        fetch: async () => null,
+      },
+    } as never,
+    channel: {
+      send: async (message: {
+        content: string;
+        allowedMentions: { parse: string[]; users: string[] };
+      }) => {
+        sent.push(message);
+        return {} as never;
+      },
+    },
+    guildId: "guild-without-onboarding-config",
+    userId: "user-1",
+    wasBeginnerRollerAchievementAnnounced: true,
+  });
+
+  assert.deepEqual(sent, [
+    {
+      content:
+        "<@user-1> Congratulations, you've proven you know how to roll. Let's continue rolling in the general channels.",
+      allowedMentions: {
+        parse: [],
+        users: ["user-1"],
+      },
+    },
+  ]);
+});
+
+test("handleBeginnerRollAfterRoll stays silent without onboarding config when the achievement was not newly announced", async () => {
+  const sent: Array<{ content: string; allowedMentions: { parse: string[]; users: string[] } }> =
+    [];
+
+  await handleBeginnerRollAfterRoll({
+    client: {
+      channels: {
+        fetch: async () => null,
+      },
+    } as never,
+    channel: {
+      send: async (message: {
+        content: string;
+        allowedMentions: { parse: string[]; users: string[] };
+      }) => {
+        sent.push(message);
+        return {} as never;
+      },
+    },
+    guildId: "guild-without-onboarding-config",
+    userId: "user-1",
+    wasBeginnerRollerAchievementAnnounced: false,
+  });
+
+  assert.deepEqual(sent, []);
 });

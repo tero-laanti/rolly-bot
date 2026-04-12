@@ -1,4 +1,6 @@
 import type {
+  BeginnerOnboardingGuildData,
+  BeginnerOnboardingV1Data,
   DiceAchievementAnalyticsMetric,
   DiceAchievementData,
   DiceAchievementCategory,
@@ -127,6 +129,14 @@ const contractDifficulties = ["simple", "serious", "brutal"] as const;
 const minimumOffersPerDifficultyPool = 1;
 const introPostContentMaxLength = discordMessageCharacterLimit;
 const randomEventTemplateVariablePattern = /\$\{([a-zA-Z0-9_]+)\}/g;
+const onboardingUserMentionTemplateTokens = [
+  "${userMention}",
+  "{userMention}",
+  "<@user>",
+  "@user",
+] as const;
+const onboardingValidationUserMention = "<@12345678901234567890>";
+const discordSnowflakePattern = /^\d{17,20}$/;
 
 const isRecord = (value: unknown): value is UnknownRecord => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -229,6 +239,33 @@ const readStringArray = (value: unknown, label: string): string[] => {
   }
 
   return value.map((entry, index) => readNonEmptyString(entry, `${label}[${index}]`));
+};
+
+const validateOnboardingMessageLength = (value: string, label: string): void => {
+  let rendered = value;
+  for (const token of onboardingUserMentionTemplateTokens) {
+    rendered = rendered.replaceAll(token, onboardingValidationUserMention);
+  }
+
+  assertDiscordTextLength(
+    rendered,
+    `${label} as rendered in Discord`,
+    discordMessageCharacterLimit,
+  );
+};
+
+const validateOnboardingMessageTemplate = (value: string, label: string): void => {
+  if (!onboardingUserMentionTemplateTokens.some((token) => value.includes(token))) {
+    throw new Error(
+      `${label} must include one of ${onboardingUserMentionTemplateTokens.join(", ")}.`,
+    );
+  }
+};
+
+const validateDiscordSnowflake = (value: string, label: string): void => {
+  if (!discordSnowflakePattern.test(value)) {
+    throw new Error(`${label} must be a Discord snowflake string.`);
+  }
 };
 
 const assertArray = (value: unknown, label: string): unknown[] => {
@@ -2531,6 +2568,108 @@ export const parseIntroPostsV1Data = (value: unknown): IntroPostsV1Data => {
   }
 
   return { messages };
+};
+
+const parseBeginnerOnboardingGuildData = (
+  value: unknown,
+  label: string,
+): BeginnerOnboardingGuildData => {
+  const record = assertRecord(value, label);
+  const guildId = readNonEmptyString(record.guildId, `${label}.guildId`);
+  const beginnerChannelId = readNonEmptyString(
+    record.beginnerChannelId,
+    `${label}.beginnerChannelId`,
+  );
+  const joinMessage = readNonEmptyString(record.joinMessage, `${label}.joinMessage`);
+  const graduationChannelId = readOptionalNonEmptyString(
+    record.graduationChannelId,
+    `${label}.graduationChannelId`,
+  );
+  const graduationMessage = readOptionalNonEmptyString(
+    record.graduationMessage,
+    `${label}.graduationMessage`,
+  );
+  const graduationRoleId = readOptionalNonEmptyString(
+    record.graduationRoleId,
+    `${label}.graduationRoleId`,
+  );
+
+  validateDiscordSnowflake(guildId, `${label}.guildId`);
+  validateDiscordSnowflake(beginnerChannelId, `${label}.beginnerChannelId`);
+  if (graduationChannelId !== undefined) {
+    validateDiscordSnowflake(graduationChannelId, `${label}.graduationChannelId`);
+  }
+  if (graduationRoleId !== undefined) {
+    validateDiscordSnowflake(graduationRoleId, `${label}.graduationRoleId`);
+  }
+
+  if (joinMessage.length > introPostContentMaxLength) {
+    throw new Error(`${label}.joinMessage must be <= ${introPostContentMaxLength} characters.`);
+  }
+  validateOnboardingMessageTemplate(joinMessage, `${label}.joinMessage`);
+  validateOnboardingMessageLength(joinMessage, `${label}.joinMessage`);
+
+  if ((graduationChannelId === undefined) !== (graduationMessage === undefined)) {
+    throw new Error(
+      `${label}.graduationChannelId and ${label}.graduationMessage must either both be set or both be omitted.`,
+    );
+  }
+
+  if (graduationMessage !== undefined && graduationMessage.length > introPostContentMaxLength) {
+    throw new Error(
+      `${label}.graduationMessage must be <= ${introPostContentMaxLength} characters.`,
+    );
+  }
+
+  if (graduationMessage !== undefined) {
+    validateOnboardingMessageTemplate(graduationMessage, `${label}.graduationMessage`);
+    validateOnboardingMessageLength(graduationMessage, `${label}.graduationMessage`);
+  }
+
+  return {
+    guildId,
+    beginnerChannelId,
+    joinMessage,
+    graduationChannelId,
+    graduationMessage,
+    graduationRoleId,
+  };
+};
+
+export const parseBeginnerOnboardingV1Data = (value: unknown): BeginnerOnboardingV1Data => {
+  const parseGuilds = (entries: unknown[], label: string): BeginnerOnboardingV1Data => {
+    const guilds = entries.map((entry, index) =>
+      parseBeginnerOnboardingGuildData(entry, `${label}[${index}]`),
+    );
+
+    if (guilds.length < 1) {
+      throw new Error("beginnerOnboardingV1 must include at least one guild config.");
+    }
+
+    const seenGuildIds = new Set<string>();
+    for (const guild of guilds) {
+      if (seenGuildIds.has(guild.guildId)) {
+        throw new Error(`Duplicate beginner onboarding guild id: ${guild.guildId}`);
+      }
+
+      seenGuildIds.add(guild.guildId);
+    }
+
+    return { guilds };
+  };
+
+  if (Array.isArray(value)) {
+    return parseGuilds(value, "beginnerOnboardingV1");
+  }
+
+  const record = assertRecord(value, "beginnerOnboardingV1");
+  if (Array.isArray(record.guilds)) {
+    return parseGuilds(record.guilds, "beginnerOnboardingV1.guilds");
+  }
+
+  return {
+    guilds: [parseBeginnerOnboardingGuildData(record, "beginnerOnboardingV1")],
+  };
 };
 
 export const parseDiceItems = (value: unknown): DiceItemData[] => {

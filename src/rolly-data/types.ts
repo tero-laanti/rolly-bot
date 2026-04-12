@@ -424,6 +424,19 @@ export type IntroPostsV1Data = {
   messages: IntroPostMessageData[];
 };
 
+export type BeginnerOnboardingGuildData = {
+  guildId: string;
+  beginnerChannelId: string;
+  joinMessage: string;
+  graduationChannelId?: string;
+  graduationMessage?: string;
+  graduationRoleId?: string;
+};
+
+export type BeginnerOnboardingV1Data = {
+  guilds: BeginnerOnboardingGuildData[];
+};
+
 export type RollyDataSourceKind = "env" | "local" | "example";
 
 export type RollyDataSource = {
@@ -434,6 +447,7 @@ export type RollyDataSource = {
 export type LoadedRollyData = {
   source: RollyDataSource;
   achievements: DiceAchievementData[];
+  beginnerOnboardingV1: BeginnerOnboardingV1Data | null;
   casinoV1: DiceCasinoData;
   contracts: DiceContractsData | null;
   diceBalance: DiceBalanceData;

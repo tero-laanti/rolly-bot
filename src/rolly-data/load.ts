@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { describeRollyDataSource, getRollyDataFilePath, resolveRollyDataSource } from "./paths";
 import type {
+  BeginnerOnboardingV1Data,
   DiceAchievementData,
   DiceCasinoData,
   DiceBalanceData,
@@ -15,6 +16,7 @@ import type {
   RollyDataSource,
 } from "./types";
 import {
+  parseBeginnerOnboardingV1Data,
   parseDiceAchievements,
   parseDiceCasinoData,
   parseDiceBalance,
@@ -31,6 +33,7 @@ import {
 import type { RandomEventScenario } from "../dice/random-events/domain/content";
 
 const achievementsFileName = "achievements.json";
+const beginnerOnboardingV1FileName = "beginner-onboarding.v1.json";
 const casinoV1FileName = "casino.v1.json";
 const contractsV2FileName = "contracts.v2.json";
 const diceBalanceFileName = "dice-balance.json";
@@ -103,6 +106,15 @@ const loadContracts = (source: RollyDataSource): DiceContractsData | null => {
   return parseDiceContractsData(rawContracts);
 };
 
+const loadBeginnerOnboarding = (source: RollyDataSource): BeginnerOnboardingV1Data | null => {
+  const rawBeginnerOnboarding = readOptionalJsonFile(source, beginnerOnboardingV1FileName);
+  if (rawBeginnerOnboarding === null) {
+    return null;
+  }
+
+  return parseBeginnerOnboardingV1Data(rawBeginnerOnboarding);
+};
+
 const loadRollyData = (): LoadedRollyData => {
   const source = resolveRollyDataSource();
   const itemsV1 = parseDiceItems(readJsonFile(source, itemsV1FileName));
@@ -112,6 +124,7 @@ const loadRollyData = (): LoadedRollyData => {
   return {
     source,
     achievements: parseDiceAchievements(readJsonFile(source, achievementsFileName)),
+    beginnerOnboardingV1: loadBeginnerOnboarding(source),
     casinoV1: parseDiceCasinoData(readJsonFile(source, casinoV1FileName)),
     contracts: loadContracts(source),
     diceBalance: parseDiceBalance(readJsonFile(source, diceBalanceFileName)),
@@ -136,6 +149,10 @@ export const getRollyData = (): LoadedRollyData => {
 
 export const getDiceAchievementsData = (): DiceAchievementData[] => {
   return getRollyData().achievements;
+};
+
+export const getOptionalBeginnerOnboardingV1Data = (): BeginnerOnboardingV1Data | null => {
+  return getRollyData().beginnerOnboardingV1;
 };
 
 export const getDiceBalanceData = (): DiceBalanceData => {

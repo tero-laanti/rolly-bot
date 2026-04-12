@@ -17,6 +17,14 @@ export type DiscordRoleRewardGrant = {
   unlockText?: string;
 };
 
+export type DiscordGuildRoleGrantStatus =
+  | "granted"
+  | "already-had-role"
+  | "missing-guild"
+  | "missing-role"
+  | "missing-member"
+  | "failed";
+
 const unknownRoleErrorCode = 10011;
 const unknownMemberErrorCode = 10007;
 
@@ -33,6 +41,19 @@ const resolveRoleFromGuild = async (guild: Guild, roleId: string): Promise<Role 
     }
 
     throw error;
+  }
+};
+
+const resolveGuild = async (client: Client, guildId: string): Promise<Guild | null> => {
+  const cached = client.guilds.cache.get(guildId);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    return await client.guilds.fetch(guildId);
+  } catch {
+    return null;
   }
 };
 
@@ -122,4 +143,52 @@ export const grantDiscordRoleRewards = async ({
   }
 
   return grantedRewards;
+};
+
+export const grantDiscordRoleRewardInGuild = async ({
+  client,
+  guildId,
+  userId,
+  roleId,
+  logger = console,
+  logPrefix = "[roles]",
+}: {
+  client: Client;
+  guildId: string;
+  userId: string;
+  roleId: string;
+  logger?: RoleRewardsLogger;
+  logPrefix?: string;
+}): Promise<DiscordGuildRoleGrantStatus> => {
+  try {
+    const guild = await resolveGuild(client, guildId);
+    if (!guild) {
+      logger.warn?.(`${logPrefix} Failed to resolve guild ${guildId} for role reward ${roleId}.`);
+      return "missing-guild";
+    }
+
+    const role = await resolveRoleFromGuild(guild, roleId);
+    if (!role) {
+      logger.warn?.(`${logPrefix} Failed to resolve role reward ${roleId} in guild ${guildId}.`);
+      return "missing-role";
+    }
+
+    const member = await resolveMember(guild, userId);
+    if (!member) {
+      logger.warn?.(
+        `${logPrefix} Failed to resolve guild member ${userId} in guild ${guildId} for role reward ${roleId}.`,
+      );
+      return "missing-member";
+    }
+
+    if (member.roles.cache.has(role.id)) {
+      return "already-had-role";
+    }
+
+    await member.roles.add(role);
+    return "granted";
+  } catch (error) {
+    logger.warn?.(`${logPrefix} Failed to grant guild-scoped role reward.`, error);
+    return "failed";
+  }
 };

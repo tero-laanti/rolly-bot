@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  parseBeginnerOnboardingV1Data,
   parseDiceAchievements,
   parseDiceBalance,
   parseDiceContractsData,
@@ -1351,5 +1352,189 @@ test("parseIntroPostsV1Data rejects content above Discord's 2000-character limit
   assert.throws(
     () => parseIntroPostsV1Data({ messages: [{ content: "a".repeat(2_001) }] }),
     /introPostsV1\.messages\[0\]\.content must be <= 2000 characters/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data accepts valid onboarding data", () => {
+  const parsed = parseBeginnerOnboardingV1Data({
+    guildId: "123456789012345678",
+    beginnerChannelId: "123456789012345679",
+    joinMessage: "Hi <@user>, welcome to Rolly!",
+    graduationChannelId: "123456789012345680",
+    graduationMessage: "Everyone welcome <@user>, who just unlocked the general channels!",
+    graduationRoleId: "123456789012345681",
+  });
+
+  assert.deepEqual(parsed, {
+    guilds: [
+      {
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi <@user>, welcome to Rolly!",
+        graduationChannelId: "123456789012345680",
+        graduationMessage: "Everyone welcome <@user>, who just unlocked the general channels!",
+        graduationRoleId: "123456789012345681",
+      },
+    ],
+  });
+});
+
+test("parseBeginnerOnboardingV1Data accepts onboarding data without graduation broadcast", () => {
+  const parsed = parseBeginnerOnboardingV1Data({
+    guildId: "123456789012345678",
+    beginnerChannelId: "123456789012345679",
+    joinMessage: "Hi <@user>, welcome to Rolly!",
+  });
+
+  assert.deepEqual(parsed, {
+    guilds: [
+      {
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi <@user>, welcome to Rolly!",
+        graduationChannelId: undefined,
+        graduationMessage: undefined,
+        graduationRoleId: undefined,
+      },
+    ],
+  });
+});
+
+test("parseBeginnerOnboardingV1Data accepts multiple guild configs", () => {
+  const parsed = parseBeginnerOnboardingV1Data({
+    guilds: [
+      {
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi @user",
+      },
+      {
+        guildId: "223456789012345678",
+        beginnerChannelId: "223456789012345679",
+        joinMessage: "Hello @user",
+        graduationChannelId: "223456789012345680",
+        graduationMessage: "Welcome @user!",
+      },
+    ],
+  });
+
+  assert.equal(parsed.guilds.length, 2);
+  assert.equal(parsed.guilds[1]?.guildId, "223456789012345678");
+});
+
+test("parseBeginnerOnboardingV1Data rejects missing channel ids", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "123456789012345678",
+        joinMessage: "Hi @user",
+      }),
+    /beginnerOnboardingV1\.beginnerChannelId must be a string/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data rejects missing guild id", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi @user",
+      }),
+    /beginnerOnboardingV1\.guildId must be a string/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data rejects invalid Discord snowflakes", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "guild-1",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi @user",
+      }),
+    /beginnerOnboardingV1\.guildId must be a Discord snowflake string/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data rejects invalid graduation role snowflakes", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi @user",
+        graduationRoleId: "beginner-role",
+      }),
+    /beginnerOnboardingV1\.graduationRoleId must be a Discord snowflake string/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data rejects overlong messages", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "a".repeat(2_001),
+      }),
+    /beginnerOnboardingV1\.joinMessage must be <= 2000 characters/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data requires complete graduation broadcast config", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hi @user",
+        graduationChannelId: "123456789012345680",
+      }),
+    /graduationChannelId and beginnerOnboardingV1\.graduationMessage must either both be set or both be omitted/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data rejects messages that overflow after mention expansion", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: `${"a".repeat(1983)}@user`,
+      }),
+    /beginnerOnboardingV1\.joinMessage as rendered in Discord must be <= 2000 characters/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data requires mention template tokens", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guildId: "123456789012345678",
+        beginnerChannelId: "123456789012345679",
+        joinMessage: "Hello there",
+      }),
+    /beginnerOnboardingV1\.joinMessage must include one of/i,
+  );
+});
+
+test("parseBeginnerOnboardingV1Data rejects duplicate guild ids", () => {
+  assert.throws(
+    () =>
+      parseBeginnerOnboardingV1Data({
+        guilds: [
+          {
+            guildId: "123456789012345678",
+            beginnerChannelId: "123456789012345679",
+            joinMessage: "Hi @user",
+          },
+          {
+            guildId: "123456789012345678",
+            beginnerChannelId: "223456789012345679",
+            joinMessage: "Hello @user",
+          },
+        ],
+      }),
+    /Duplicate beginner onboarding guild id: 123456789012345678/i,
   );
 });
