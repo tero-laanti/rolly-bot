@@ -11,7 +11,7 @@ test("achievement pip rewards are granted only on first unlock", () => {
   const progression = createSqliteProgressionAchievementsRepository(db);
   const economy = createSqliteEconomyRepository(db);
 
-  const achievementIds = ["example-pair", "example-manual-prestige"];
+  const achievementIds = ["example-pair", "example-manual-achievement"];
   const first = progression.awardAchievements("user-1", achievementIds);
   const second = progression.awardAchievements("user-1", achievementIds);
 
@@ -34,9 +34,9 @@ test("achievement pip rewards respect Pip Magnet bonuses", () => {
 
   const newlyEarned = progression.awardAchievements("user-1", [
     "example-pair",
-    "example-manual-prestige",
+    "example-manual-achievement",
   ]);
 
-  assert.deepEqual(newlyEarned, ["example-pair", "example-manual-prestige"]);
+  assert.deepEqual(newlyEarned, ["example-pair", "example-manual-achievement"]);
   assert.equal(economy.getPips("user-1"), 27);
 });
