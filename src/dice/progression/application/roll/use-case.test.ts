@@ -121,6 +121,11 @@ test("roll dice unlocks peak-goblin when roll pass count reaches 2", () => {
         achievementIds: ["first-roll", "first-extra-die", "peak-goblin"],
       },
     ]);
+    assert.deepEqual(result.newlyEarnedAchievementIds, [
+      "first-roll",
+      "first-extra-die",
+      "peak-goblin",
+    ]);
   } finally {
     Math.random = originalRandom;
   }
