@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {
+  mysteriousDieSeedItemId,
+  seedSatchelItemId,
+} from "../../../inventory/domain/passive-items";
 import { getDiceBanStep, getDiceChargeStartMs } from "../../../progression/domain/game-rules";
 import { minuteMs } from "../../../../shared/time";
 import { createQueryDiceStatsUseCase } from "./use-case";
@@ -8,6 +12,8 @@ const createUseCase = (
   overrides: {
     analytics?: Partial<Parameters<typeof createQueryDiceStatsUseCase>[0]["analytics"]>;
     economy?: Partial<Parameters<typeof createQueryDiceStatsUseCase>[0]["economy"]>;
+    garden?: Partial<Parameters<typeof createQueryDiceStatsUseCase>[0]["garden"]>;
+    inventory?: Partial<Parameters<typeof createQueryDiceStatsUseCase>[0]["inventory"]>;
     itemEffects?: Partial<Parameters<typeof createQueryDiceStatsUseCase>[0]["itemEffects"]>;
     permanentBonuses?: Partial<
       Parameters<typeof createQueryDiceStatsUseCase>[0]["permanentBonuses"]
@@ -39,6 +45,19 @@ const createUseCase = (
         pips: 13,
       }),
       ...overrides.economy,
+    },
+    garden: {
+      getActiveGardenPlots: () => [],
+      getGardenAchievementStats: () => ({
+        plantedSeedCount: 0,
+        harvestedSeedCount: 0,
+        harvestedD12Count: 0,
+      }),
+      ...overrides.garden,
+    },
+    inventory: {
+      getInventoryQuantities: () => new Map(),
+      ...overrides.inventory,
     },
     itemEffects: {
       getItemDoubleRollStatus: () => ({
@@ -303,6 +322,75 @@ test("stats dashboard reports the next fame-based ban unlock at exact thresholds
       `Next unlock: \\*\\*${expectedNextUnlockAt} Fame \\(\\+${expectedRemainingFame}\\)\\*\\*`,
     ),
   );
+});
+
+test("stats dashboard shows garden stats when Seed Satchel is owned", () => {
+  const nowMs = Date.parse("2026-03-27T10:00:00.000Z");
+  const useCase = createUseCase({
+    garden: {
+      getActiveGardenPlots: () => [
+        {
+          userId: "user-garden",
+          slotIndex: 0,
+          seedItemId: mysteriousDieSeedItemId,
+          dieSides: 8,
+          plantedAt: "2026-03-27T09:00:00.000Z",
+          readyAt: "2026-03-27T10:43:00.000Z",
+          updatedAt: "2026-03-27T09:00:00.000Z",
+        },
+      ],
+      getGardenAchievementStats: () => ({
+        plantedSeedCount: 14,
+        harvestedSeedCount: 11,
+        harvestedD12Count: 1,
+      }),
+    },
+    inventory: {
+      getInventoryQuantities: () =>
+        new Map([
+          [seedSatchelItemId, 1],
+          [mysteriousDieSeedItemId, 2],
+        ]),
+    },
+  });
+
+  const result = useCase({
+    userId: "user-garden",
+    userMention: "<@user-garden>",
+    nowMs,
+  });
+
+  assert.match(result.content, /\*\*Garden\*\*/);
+  assert.match(result.content, /Seeds: \*\*2\*\* in satchel \| Harvested: \*\*11\*\*/);
+  assert.match(result.content, /Current plot: \*\*D8\*\* sapling, ready \*\*in 43m\*\*/);
+});
+
+test("stats dashboard shows an empty current plot when the garden is unlocked", () => {
+  const useCase = createUseCase({
+    garden: {
+      getGardenAchievementStats: () => ({
+        plantedSeedCount: 4,
+        harvestedSeedCount: 3,
+        harvestedD12Count: 0,
+      }),
+    },
+    inventory: {
+      getInventoryQuantities: () =>
+        new Map([
+          [seedSatchelItemId, 1],
+          [mysteriousDieSeedItemId, 0],
+        ]),
+    },
+  });
+
+  const result = useCase({
+    userId: "user-empty-garden",
+    userMention: "<@user-empty-garden>",
+    nowMs: Date.parse("2026-03-27T10:00:00.000Z"),
+  });
+
+  assert.match(result.content, /Seeds: \*\*0\*\* in satchel \| Harvested: \*\*3\*\*/);
+  assert.match(result.content, /Current plot: empty/);
 });
 
 test("stats dashboard keeps long ban summaries within Discord's message limit", () => {
