@@ -1,6 +1,8 @@
 import { getDiceBalanceData, getDicePvpData } from "../../../rolly-data/load";
 import { minuteMs } from "../../../shared/time";
 
+const maxDicePvpTier = 5;
+
 const getDicePrestigeSides = (): number[] => {
   return getDiceBalanceData().prestigeSides;
 };
@@ -22,7 +24,7 @@ export const getMaxDicePrestige = (): number => {
 };
 
 export const getMaxDicePvpTier = (): number => {
-  return getMaxDicePrestige();
+  return Math.min(getMaxDicePrestige(), maxDicePvpTier);
 };
 
 export const getDicePvpChallengeExpireMs = (): number => {
