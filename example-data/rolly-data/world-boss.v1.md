@@ -38,9 +38,6 @@ Player-facing copy uses `World Boss`, while internal identifiers remain `world-b
     "hpIncreasePerBossLevelPercent": 3,
     "levelHalfLifeLevels": 10,
     "maxBossLevel": 50
-  },
-  "participantStrength": {
-    "prestigeMultiplier": 1.5
   }
 }
 ```
@@ -84,8 +81,8 @@ Tiered reward alternative:
 - `baseHp` is the level 1 boss HP before level scaling.
 - `hpIncreasePerBossLevelPercent` is the compound HP increase applied for each boss level above 1.
 - Boss HP is calculated from boss level first, then multiplied by the joined-player strength total when the World Boss starts.
-- `participantStrength.prestigeMultiplier` scales each joined player by `multiplier ^ prestige`, using the player's active prestige when the World Boss starts.
-- With the default `1.5`, prestige strengths are `1`, `1.5`, `2.25`, `3.375`, and so on.
+- Joined-player strength is derived in code from the average total of five dice at the player's active prestige.
+- With the current prestige ladder, joined-player strengths are `1` at d6, `9/7` at d8, `11/7` at d10, and continue rising smoothly with die size.
 - With the default values, level 50 lands at roughly `4.26x` the HP of level 1.
 - `levelHalfLifeLevels` controls the low-heavy level roll. With the default `10`, a level 50 boss is half as likely as a level 40 boss, which is half as likely as a level 30 boss.
 - `maxBossLevel` caps the random boss level roll. With the default `50`, bosses roll from level 1 through level 50.

@@ -785,9 +785,6 @@ test("parseWorldBossData keeps legacy pipsByBossLevel rewards readable", () => {
       levelHalfLifeLevels: 10,
       maxBossLevel: 50,
     },
-    participantStrength: {
-      prestigeMultiplier: 1.5,
-    },
   });
 
   assert.ok("pipsByBossLevel" in worldBoss.reward);
@@ -795,7 +792,6 @@ test("parseWorldBossData keeps legacy pipsByBossLevel rewards readable", () => {
     { bossLevelAtLeast: 1, pips: 4 },
     { bossLevelAtLeast: 5, pips: 6 },
   ]);
-  assert.equal(worldBoss.participantStrength.prestigeMultiplier, 1.5);
 });
 
 test("parseWorldBossData accepts tiered World Boss roll-pass lengths", () => {
@@ -908,9 +904,6 @@ test("parseWorldBossData rejects boss names that overflow World Boss titles", ()
           hpIncreasePerBossLevelPercent: 3,
           levelHalfLifeLevels: 10,
           maxBossLevel: 50,
-        },
-        participantStrength: {
-          prestigeMultiplier: 1.5,
         },
       }),
     /active World Boss title must be <= 256 characters/i,
