@@ -31,13 +31,13 @@ Shared notes:
 
 Effect types:
 
-- `negative-effect-shield`: grants charges that block the next matching hostile effect. Current item behavior covers PvP and random events that consume the same shield effect.
+- `negative-effect-shield`: grants charges that block the next matching hostile effect. Lockouts are a special case: a shield charge shaves 1 hour off the lockout instead of fully negating it.
 - `garden-seed`: a consumable bought from `/shop` and planted from `/garden`. `outcomes` defines the weighted die results the seed can grow into.
 - `double-roll-uses`: the next `uses` `/roll` actions roll twice.
 - `double-roll-duration`: `/roll` rolls twice for the next `minutes`.
 - `trigger-random-group-event`: tries to spawn a random event immediately. If the runtime is disabled, unavailable, or already busy, the item is refunded.
 - `auto-roll-session`: reserves an automated rolling session. Only one active auto-roll session per user is allowed.
-- `cleanse-all-negative-effects`: clears negative temporary effects and any active PvP lockout. If nothing negative is active, use fails and the item is not consumed.
+- `cleanse-all-negative-effects`: clears negative temporary effects and shaves 1 hour off any active PvP lockout. If nothing negative is active, use fails and the item is not consumed.
 - `passive-garden-unlock`: unlocks `/garden` and grants `slotCount` planting slot(s) while owned.
 - `passive-extra-shield-on-umbrella`: adds `extraCharges` to each Bad Luck Umbrella use while owned.
 - `passive-pvp-loser-lockout-reduction`: reduces PvP loser lockout by `reductionPercent`, with a final floor of `minimumMinutes`.

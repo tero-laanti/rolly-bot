@@ -306,6 +306,70 @@ test("clean room kit grants a Bad Luck Umbrella charge when using Cleanse Salt",
   }
 });
 
+test("Cleanse Salt shaves one hour off an active lockout", async () => {
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const originalDateNow = Date.now;
+  Date.now = () => nowMs;
+
+  let nextLockoutUntil: string | null | undefined;
+
+  try {
+    const useDiceItem = createUseDiceItemUseCase({
+      inventory: {
+        consumeInventoryItem: () => ({
+          ok: true,
+          item: cleanseSaltItem,
+          remainingQuantity: 0,
+        }),
+        getInventoryQuantities: () => new Map(),
+        getInventoryQuantity: () => 1,
+        grantInventoryItem: () => 1,
+        recordItemUse: () => ({
+          shopPurchaseCount: 0,
+          itemUseCount: 1,
+          usedTriggerRandomGroupEvent: false,
+          usedAutoRollItem: false,
+          usedCleanseItem: true,
+        }),
+      },
+      itemEffects: {
+        ...createItemEffectsStub(),
+        clearAllNegativeTemporaryEffects: () => 0,
+      },
+      pvp: {
+        getActiveDiceLockout: () => nowMs + 3 * 60 * 60 * 1000,
+        setDicePvpEffects: ({ lockoutUntil }) => {
+          nextLockoutUntil = lockoutUntil;
+        },
+      },
+      progression: {
+        awardAchievements: () => [],
+      },
+      shopCatalog: {
+        getDiceShopItem: () => cleanseSaltItem,
+      },
+      unitOfWork: {
+        runInTransaction: (work) => work(),
+      },
+    });
+
+    const result = await useDiceItem({
+      userId: "user-1",
+      itemId: cleanseSaltItem.id,
+      reserveAutoRollSession: () => null,
+      triggerRandomGroupEvent: async () => ({ ok: false, reason: "disabled" }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(nextLockoutUntil, new Date(nowMs + 2 * 60 * 60 * 1000).toISOString());
+    if (result.ok) {
+      assert.match(result.statusMessage, /removed 1 hour from active lockout/);
+    }
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
 test("double-roll uses items cannot be consumed while another item double-roll buff is active", async () => {
   let consumeCalls = 0;
   const useDiceItem = createUseDiceItemUseCase({

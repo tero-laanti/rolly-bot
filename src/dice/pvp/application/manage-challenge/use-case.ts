@@ -646,6 +646,7 @@ const handleChallengeAccept = (
       winnerDoubleRollUntilMs,
       loserLockoutUntilMs: loserLockoutResult.lockoutUntilMs,
       loserBlockedByShield: loserLockoutResult.blockedByShield,
+      loserShieldReductionMs: loserLockoutResult.shieldReductionMs,
       winnerNewlyEarned,
       loserNewlyEarned,
     };
@@ -699,6 +700,7 @@ const handleChallengeAccept = (
       outcome.winnerDoubleRollUntilMs,
       outcome.loserLockoutUntilMs,
       outcome.loserBlockedByShield,
+      outcome.loserShieldReductionMs,
     ),
     true,
     mergeAchievementAnnouncements(
@@ -915,6 +917,7 @@ const buildWinResultContent = (
   winnerDoubleRollUntilMs: number,
   loserLockoutUntilMs: number | null,
   loserBlockedByShield: boolean,
+  loserShieldReductionMs?: number,
 ): string => {
   return [
     "Duel complete.",
@@ -928,7 +931,9 @@ const buildWinResultContent = (
       : []),
     loserBlockedByShield
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
-      : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
+      : loserShieldReductionMs && loserShieldReductionMs > 0
+        ? `<@${loserId}> had 1 hour shaved off the lockout by Bad Luck Umbrella and can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`
+        : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
     `<@${winnerId}> has double buff on /roll. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
   ]
     .filter((line) => line.length > 0)
