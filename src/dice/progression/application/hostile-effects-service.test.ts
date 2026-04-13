@@ -10,6 +10,7 @@ test("negative-effect shield shaves one hour off lockouts by default", () => {
       applyDiceTemporaryEffect: () => {
         throw new Error("applyDiceTemporaryEffect should not be called.");
       },
+      consumeEffectChargeById: () => true,
       consumeOldestEffectChargeByCode: () => true,
       getActiveDiceTemporaryEffects: () => [
         {
@@ -66,6 +67,7 @@ test("double-strength umbrella shield shaves two hours off lockouts", () => {
       applyDiceTemporaryEffect: () => {
         throw new Error("applyDiceTemporaryEffect should not be called.");
       },
+      consumeEffectChargeById: () => true,
       consumeOldestEffectChargeByCode: () => true,
       getActiveDiceTemporaryEffects: () => [
         {
@@ -120,8 +122,24 @@ test("negative-effect shield can still fully block short lockouts", () => {
       applyDiceTemporaryEffect: () => {
         throw new Error("applyDiceTemporaryEffect should not be called.");
       },
+      consumeEffectChargeById: () => true,
       consumeOldestEffectChargeByCode: () => true,
-      getActiveDiceTemporaryEffects: () => [],
+      getActiveDiceTemporaryEffects: () => [
+        {
+          id: "shield-1",
+          userId: "user-1",
+          effectCode: "negative-effect-shield",
+          kind: "positive",
+          source: "item:bad-luck-umbrella",
+          magnitude: 1,
+          remainingRolls: 1,
+          expiresAt: null,
+          consumeOnCommand: "none",
+          stackGroup: "negative-effect-shield",
+          createdAt: "2026-01-01T11:59:00.000Z",
+          updatedAt: "2026-01-01T11:59:00.000Z",
+        },
+      ],
     },
     pvp: {
       getActiveDiceLockout: () => null,
@@ -155,8 +173,24 @@ test("negative-effect shield marks lockout as blocked when reduction prevents an
       applyDiceTemporaryEffect: () => {
         throw new Error("applyDiceTemporaryEffect should not be called.");
       },
+      consumeEffectChargeById: () => true,
       consumeOldestEffectChargeByCode: () => true,
-      getActiveDiceTemporaryEffects: () => [],
+      getActiveDiceTemporaryEffects: () => [
+        {
+          id: "shield-1",
+          userId: "user-1",
+          effectCode: "negative-effect-shield",
+          kind: "positive",
+          source: "item:bad-luck-umbrella",
+          magnitude: 1,
+          remainingRolls: 1,
+          expiresAt: null,
+          consumeOnCommand: "none",
+          stackGroup: "negative-effect-shield",
+          createdAt: "2026-01-01T11:59:00.000Z",
+          updatedAt: "2026-01-01T11:59:00.000Z",
+        },
+      ],
     },
     pvp: {
       getActiveDiceLockout: () => nowMs + 2 * hourMs,
@@ -180,4 +214,70 @@ test("negative-effect shield marks lockout as blocked when reduction prevents an
   assert.equal(result.shieldReductionMs, hourMs);
   assert.equal(result.lockoutUntilMs, nowMs + 2 * hourMs);
   assert.equal(setCalled, false);
+});
+
+test("lockouts consume the strongest shield first", () => {
+  const consumedShieldIds: string[] = [];
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const service = createDiceHostileEffectsService({
+    progression: {
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called.");
+      },
+      consumeEffectChargeById: (_userId, effectId) => {
+        consumedShieldIds.push(effectId);
+        return true;
+      },
+      consumeOldestEffectChargeByCode: () => {
+        throw new Error("consumeOldestEffectChargeByCode should not be called for lockouts.");
+      },
+      getActiveDiceTemporaryEffects: () => [
+        {
+          id: "shield-clean-room",
+          userId: "user-1",
+          effectCode: "negative-effect-shield",
+          kind: "positive",
+          source: "item:cleanse-salt:passive-clean-room-kit",
+          magnitude: 1,
+          remainingRolls: 1,
+          expiresAt: null,
+          consumeOnCommand: "none",
+          stackGroup: "negative-effect-shield",
+          createdAt: "2026-01-01T11:58:00.000Z",
+          updatedAt: "2026-01-01T11:58:00.000Z",
+        },
+        {
+          id: "shield-umbrella-harness",
+          userId: "user-1",
+          effectCode: "negative-effect-shield",
+          kind: "positive",
+          source: "item:bad-luck-umbrella",
+          magnitude: 2,
+          remainingRolls: 1,
+          expiresAt: null,
+          consumeOnCommand: "none",
+          stackGroup: "negative-effect-shield",
+          createdAt: "2026-01-01T11:59:00.000Z",
+          updatedAt: "2026-01-01T11:59:00.000Z",
+        },
+      ],
+    },
+    pvp: {
+      getActiveDiceLockout: () => null,
+      setDicePvpEffects: () => undefined,
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = service.applyShieldableNegativeLockout({
+    userId: "user-1",
+    durationMs: 3 * hourMs,
+    nowMs,
+  });
+
+  assert.deepEqual(consumedShieldIds, ["shield-umbrella-harness"]);
+  assert.equal(result.shieldReductionMs, 2 * hourMs);
+  assert.equal(result.lockoutUntilMs, nowMs + hourMs);
 });
