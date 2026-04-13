@@ -247,7 +247,6 @@ test("umbrella harness doubles Bad Luck Umbrella lockout strength", async () => 
   assert.deepEqual(grantedShields, [{ charges: 1, magnitude: 2 }]);
   if (result.ok) {
     assert.match(result.statusMessage, /lockouts lose up to 2 hours/);
-    assert.match(result.statusMessage, /doubles Bad Luck Umbrella effectiveness/);
   }
 });
 

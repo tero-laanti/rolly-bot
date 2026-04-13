@@ -101,6 +101,7 @@ export const createSqliteProgressionTemporaryEffectsRepository = (
   | "clearAllDiceTemporaryEffects"
   | "clearNegativeDiceTemporaryEffects"
   | "consumeOldestEffectChargeByCode"
+  | "consumeEffectChargeById"
 > => {
   const purgeExpiredDiceTemporaryEffects = (nowMs: number = Date.now()): number => {
     const nowIso = new Date(nowMs).toISOString();
@@ -532,6 +533,45 @@ export const createSqliteProgressionTemporaryEffectsRepository = (
     return true;
   };
 
+  const consumeEffectChargeById = (
+    userId: string,
+    effectId: string,
+    nowMs: number = Date.now(),
+  ): boolean => {
+    const effect = getActiveDiceTemporaryEffects({
+      userId,
+      nowMs,
+    }).find(
+      (entry) =>
+        entry.id === effectId &&
+        typeof entry.remainingRolls === "number" &&
+        entry.remainingRolls > 0,
+    );
+
+    if (!effect || effect.remainingRolls === null) {
+      return false;
+    }
+
+    const nextRemainingRolls = effect.remainingRolls - 1;
+    if (nextRemainingRolls <= 0) {
+      db.prepare("DELETE FROM dice_temporary_effects WHERE id = ?").run(effect.id);
+    } else {
+      db.prepare(
+        `
+        UPDATE dice_temporary_effects
+        SET remaining_rolls = @remainingRolls, updated_at = @updatedAt
+        WHERE id = @id
+      `,
+      ).run({
+        id: effect.id,
+        remainingRolls: nextRemainingRolls,
+        updatedAt: new Date(nowMs).toISOString(),
+      });
+    }
+
+    return true;
+  };
+
   return {
     purgeExpiredDiceTemporaryEffects,
     getActiveDiceTemporaryEffects,
@@ -540,5 +580,6 @@ export const createSqliteProgressionTemporaryEffectsRepository = (
     clearAllDiceTemporaryEffects,
     clearNegativeDiceTemporaryEffects,
     consumeOldestEffectChargeByCode,
+    consumeEffectChargeById,
   };
 };
