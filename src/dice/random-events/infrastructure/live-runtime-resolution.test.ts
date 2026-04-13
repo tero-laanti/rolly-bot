@@ -524,6 +524,65 @@ test("shield-reduced lockouts report the reduction note", () => {
   assert.deepEqual(attempt.effectNotes, [
     "Bad Luck Umbrella reduced a negative event lockout by 1 hour.",
   ]);
+});
+
+test("shield-reduced lockouts report the boosted reduction note", () => {
+  const scenario: RandomEventScenario = {
+    id: "negative-lockout-boosted",
+    rarity: "common",
+    title: "Boosted Lockout Test",
+    prompt: "Storm clouds gather.",
+    claimLabel: "Push on",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "lockout",
+        resolution: "resolve-failure",
+        message: "The storm catches you.",
+        effects: [
+          {
+            type: "temporary-lockout",
+            durationMinutes: 180,
+          },
+        ],
+      },
+    ],
+  };
+  const selection = {
+    ...renderRandomEventScenario(scenario, {
+      random: () => 0,
+    }),
+    outcome: scenario.outcomes[0],
+    challengeOutcome: null,
+  };
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+  const attempt = resolveRandomEventAttempt({
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: nowMs + 60 * 60 * 1000,
+        shieldReductionMs: 2 * 60 * 60 * 1000,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
+    },
+    selection,
+    userId: "123",
+  });
+
+  assert.deepEqual(attempt.effectNotes, [
+    "Bad Luck Umbrella reduced a negative event lockout by 2 hours.",
+  ]);
   assert.deepEqual(attempt.appliedNegativeEffects, [
     {
       type: "temporary-lockout",
