@@ -2,7 +2,7 @@
   {
     "id": "bad-luck-umbrella",
     "name": "Bad Luck Umbrella",
-    "description": "Negates the next negative effect that would hit you from PvP, random events, or future hostile systems.",
+    "description": "Blocks the next negative effect that would hit you, but lockouts only lose 1 hour instead.",
     "pricePips": 8,
     "consumable": true,
     "effect": {
@@ -57,7 +57,7 @@
   {
     "id": "cleanse-salt",
     "name": "Cleanse Salt",
-    "description": "Removes all active negative effects and clears lockout.",
+    "description": "Removes all active negative effects and shaves 1 hour off lockout.",
     "pricePips": 15,
     "consumable": true,
     "effect": {

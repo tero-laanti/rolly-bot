@@ -1,4 +1,5 @@
 import type { UnitOfWork } from "../../../shared-kernel/application/unit-of-work";
+import { hourMs } from "../../../shared/time";
 import type { DicePvpRepository } from "../../pvp/application/ports";
 import type { DiceTemporaryEffect } from "../domain/temporary-effects";
 import type { DiceProgressionRepository } from "./ports";
@@ -7,6 +8,7 @@ export type ApplyShieldableNegativeLockoutResult = {
   blockedByShield: boolean;
   applied: boolean;
   lockoutUntilMs: number | null;
+  shieldReductionMs?: number;
 };
 
 export type ApplyShieldableNegativeRollPenaltyResult = {
@@ -65,18 +67,17 @@ export const createDiceHostileEffectsService = ({
   return {
     applyShieldableNegativeLockout: ({ userId, durationMs, nowMs = Date.now() }) =>
       unitOfWork.runInTransaction(() => {
-        if (progression.consumeOldestEffectChargeByCode(userId, "negative-effect-shield", nowMs)) {
-          return {
-            blockedByShield: true,
-            applied: false,
-            lockoutUntilMs: null,
-          };
-        }
-
+        const shieldConsumed = progression.consumeOldestEffectChargeByCode(
+          userId,
+          "negative-effect-shield",
+          nowMs,
+        );
         const existingLockoutUntil = pvp.getActiveDiceLockout(userId, nowMs);
-        const requestedLockoutUntil = nowMs + durationMs;
+        const shieldReductionMs = shieldConsumed ? Math.min(hourMs, durationMs) : 0;
+        const reducedDurationMs = Math.max(0, durationMs - shieldReductionMs);
+        const requestedLockoutUntil = nowMs + reducedDurationMs;
         const nextLockoutUntil = Math.max(existingLockoutUntil ?? 0, requestedLockoutUntil);
-        const applied = nextLockoutUntil > (existingLockoutUntil ?? 0);
+        const applied = reducedDurationMs > 0 && nextLockoutUntil > (existingLockoutUntil ?? 0);
 
         if (applied) {
           pvp.setDicePvpEffects({
@@ -86,9 +87,10 @@ export const createDiceHostileEffectsService = ({
         }
 
         return {
-          blockedByShield: false,
+          blockedByShield: shieldConsumed && reducedDurationMs === 0,
           applied,
-          lockoutUntilMs: nextLockoutUntil,
+          lockoutUntilMs: nextLockoutUntil > nowMs ? nextLockoutUntil : null,
+          shieldReductionMs: shieldReductionMs > 0 ? shieldReductionMs : undefined,
         };
       }),
     applyShieldableNegativeRollPenalty: ({

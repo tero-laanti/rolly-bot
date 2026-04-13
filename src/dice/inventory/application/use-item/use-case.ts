@@ -14,6 +14,7 @@ import {
   createAchievementAnnouncement,
   type AchievementAnnouncement,
 } from "../../../progression/application/achievement-announcements";
+import { hourMs } from "../../../../shared/time";
 import { getDiceItemAchievementIds } from "../achievement-rules";
 import { getBadLuckUmbrellaCharges, getCleanseSaltShieldCharges } from "../../domain/passive-items";
 
@@ -193,8 +194,8 @@ export const createUseDiceItemUseCase = ({
           remainingQuantity: consumed.remainingQuantity,
           statusMessage:
             grantedCharges > effect.charges
-              ? `${item.name} opened. The next ${grantedCharges} negative effects will be blocked.`
-              : `${item.name} opened. The next negative effect will be blocked.`,
+              ? `${item.name} opened. The next ${grantedCharges} negative effects will be blocked, but lockouts only lose 1 hour.`
+              : `${item.name} opened. The next negative effect will be blocked, but lockouts only lose 1 hour.`,
           achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
       });
@@ -286,12 +287,23 @@ export const createUseDiceItemUseCase = ({
       const ownedQuantities = inventory.getInventoryQuantities(userId);
       const bonusShieldCharges = getCleanseSaltShieldCharges(ownedQuantities);
       return unitOfWork.runInTransaction(() => {
+        const nowMs = Date.now();
         const clearedTemporaryEffects = itemEffects.clearAllNegativeTemporaryEffects(userId);
-        const hadActiveLockout = pvp.getActiveDiceLockout(userId) !== null;
+        const activeLockoutUntilMs = pvp.getActiveDiceLockout(userId, nowMs);
+        const hadActiveLockout = activeLockoutUntilMs !== null;
+        const reducedLockoutUntilMs =
+          activeLockoutUntilMs === null ? null : Math.max(nowMs, activeLockoutUntilMs - hourMs);
+        const lockoutWasFullyCleared =
+          activeLockoutUntilMs !== null &&
+          reducedLockoutUntilMs !== null &&
+          reducedLockoutUntilMs <= nowMs;
         if (hadActiveLockout) {
           pvp.setDicePvpEffects({
             userId,
-            lockoutUntil: null,
+            lockoutUntil:
+              reducedLockoutUntilMs !== null && reducedLockoutUntilMs > nowMs
+                ? new Date(reducedLockoutUntilMs).toISOString()
+                : null,
           });
         }
 
@@ -327,7 +339,9 @@ export const createUseDiceItemUseCase = ({
           );
         }
         if (hadActiveLockout) {
-          clearedParts.push("active lockout");
+          clearedParts.push(
+            lockoutWasFullyCleared ? "active lockout" : "1 hour from active lockout",
+          );
         }
 
         return {

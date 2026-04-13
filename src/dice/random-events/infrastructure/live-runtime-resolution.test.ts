@@ -473,6 +473,65 @@ test("shield-blocked negative outcomes report no applied negative effects", () =
   assert.deepEqual(attempt.effectNotes, ["Bad Luck Umbrella blocked a negative event effect."]);
 });
 
+test("shield-reduced lockouts report the reduction note", () => {
+  const scenario: RandomEventScenario = {
+    id: "reduced-lockout-test",
+    rarity: "common",
+    title: "Reduced Lockout Test",
+    prompt: "A storm rolls in.",
+    claimLabel: "Stand firm",
+    claimPolicy: "first-click",
+    claimWindowSeconds: 60,
+    outcomes: [
+      {
+        id: "lockout",
+        resolution: "resolve-failure",
+        message: "The storm should curse you.",
+        effects: [
+          {
+            type: "temporary-lockout",
+            durationMinutes: 120,
+          },
+        ],
+      },
+    ],
+  };
+  const selection = renderRandomEventScenario(scenario);
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+  const attempt = resolveRandomEventAttempt({
+    progression: {
+      getDiceSides: () => 6,
+      getDiceBans: () => new Map(),
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called in this test.");
+      },
+      getActiveDiceTemporaryEffects: () => [],
+    },
+    hostileEffects: {
+      applyShieldableNegativeLockout: () => ({
+        blockedByShield: false,
+        applied: true,
+        lockoutUntilMs: nowMs + 60 * 60 * 1000,
+        shieldReductionMs: 60 * 60 * 1000,
+      }),
+      applyShieldableNegativeRollPenalty: () => ({ blockedByShield: false, applied: true }),
+    },
+    selection,
+    userId: "123",
+  });
+
+  assert.deepEqual(attempt.effectNotes, [
+    "Bad Luck Umbrella reduced a negative event lockout by 1 hour.",
+  ]);
+  assert.deepEqual(attempt.appliedNegativeEffects, [
+    {
+      type: "temporary-lockout",
+      expiresAtMs: nowMs + 60 * 60 * 1000,
+    },
+  ]);
+});
+
 test("no-op negative outcomes do not report applied negative effects", () => {
   const scenario: RandomEventScenario = {
     id: "noop-negative-test",
