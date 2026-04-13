@@ -89,4 +89,5 @@ export type DiceProgressionRepository = {
   clearAllDiceTemporaryEffects: (userId: string) => number;
   clearNegativeDiceTemporaryEffects: (userId: string, nowMs?: number) => number;
   consumeOldestEffectChargeByCode: (userId: string, effectCode: string, nowMs?: number) => boolean;
+  consumeEffectChargeById: (userId: string, effectId: string, nowMs?: number) => boolean;
 };
