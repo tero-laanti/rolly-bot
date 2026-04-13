@@ -905,6 +905,16 @@ const buildDrawResultContent = (
     .join("\n");
 };
 
+const formatShieldReductionLabel = (shieldReductionMs: number): string => {
+  const wholeHours = shieldReductionMs / (60 * 60 * 1000);
+  if (Number.isInteger(wholeHours) && wholeHours >= 1) {
+    return `${wholeHours} hour${wholeHours === 1 ? "" : "s"}`;
+  }
+
+  const wholeMinutes = Math.round(shieldReductionMs / (60 * 1000));
+  return `${wholeMinutes} minute${wholeMinutes === 1 ? "" : "s"}`;
+};
+
 const buildWinResultContent = (
   challenge: DicePvpChallenge,
   challengerRoll: number,
@@ -932,7 +942,7 @@ const buildWinResultContent = (
     loserBlockedByShield
       ? `<@${loserId}> blocked the lockout with Bad Luck Umbrella.`
       : loserShieldReductionMs && loserShieldReductionMs > 0
-        ? `<@${loserId}> had 1 hour shaved off the lockout by Bad Luck Umbrella and can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`
+        ? `<@${loserId}> had ${formatShieldReductionLabel(loserShieldReductionMs)} shaved off the lockout by Bad Luck Umbrella and can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`
         : `<@${loserId}> can play again ${formatDiscordRelativeTime(loserLockoutUntilMs ?? Date.now())}.`,
     `<@${winnerId}> has double buff on /roll. Their dice rolls are now doubled until ${formatDiscordRelativeTime(winnerDoubleRollUntilMs)}.`,
   ]
