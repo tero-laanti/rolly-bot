@@ -76,3 +76,38 @@ test("negative-effect shield can still fully block short lockouts", () => {
   assert.equal(result.shieldReductionMs, 30 * 60 * 1000);
   assert.equal(setCalled, false);
 });
+
+test("negative-effect shield marks lockout as blocked when reduction prevents any extension", () => {
+  let setCalled = false;
+  const nowMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const service = createDiceHostileEffectsService({
+    progression: {
+      applyDiceTemporaryEffect: () => {
+        throw new Error("applyDiceTemporaryEffect should not be called.");
+      },
+      consumeOldestEffectChargeByCode: () => true,
+      getActiveDiceTemporaryEffects: () => [],
+    },
+    pvp: {
+      getActiveDiceLockout: () => nowMs + 2 * hourMs,
+      setDicePvpEffects: () => {
+        setCalled = true;
+      },
+    },
+    unitOfWork: {
+      runInTransaction: (work) => work(),
+    },
+  });
+
+  const result = service.applyShieldableNegativeLockout({
+    userId: "user-1",
+    durationMs: 3 * hourMs,
+    nowMs,
+  });
+
+  assert.equal(result.blockedByShield, true);
+  assert.equal(result.applied, false);
+  assert.equal(result.shieldReductionMs, hourMs);
+  assert.equal(result.lockoutUntilMs, nowMs + 2 * hourMs);
+  assert.equal(setCalled, false);
+});

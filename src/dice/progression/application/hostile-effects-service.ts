@@ -87,7 +87,7 @@ export const createDiceHostileEffectsService = ({
         }
 
         return {
-          blockedByShield: shieldConsumed && reducedDurationMs === 0,
+          blockedByShield: shieldConsumed && !applied,
           applied,
           lockoutUntilMs: nextLockoutUntil > nowMs ? nextLockoutUntil : null,
           shieldReductionMs: shieldReductionMs > 0 ? shieldReductionMs : undefined,
