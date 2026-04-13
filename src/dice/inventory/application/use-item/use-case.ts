@@ -198,7 +198,7 @@ export const createUseDiceItemUseCase = ({
           remainingQuantity: consumed.remainingQuantity,
           statusMessage:
             shieldMagnitude > 1
-              ? `${item.name} opened. The next negative effect will be blocked, and lockouts lose up to ${shieldMagnitude} hours because Umbrella Harness doubles ${item.name} effectiveness.`
+              ? `${item.name} opened. The next negative effect will be blocked, and lockouts lose up to ${shieldMagnitude} hours instead.`
               : `${item.name} opened. The next negative effect will be blocked, but lockouts only lose 1 hour.`,
           achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
