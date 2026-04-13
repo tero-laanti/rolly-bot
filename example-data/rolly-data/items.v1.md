@@ -39,7 +39,7 @@ Effect types:
 - `auto-roll-session`: reserves an automated rolling session. Only one active auto-roll session per user is allowed.
 - `cleanse-all-negative-effects`: clears negative temporary effects and shaves 1 hour off any active PvP lockout. If nothing negative is active, use fails and the item is not consumed.
 - `passive-garden-unlock`: unlocks `/garden` and grants `slotCount` planting slot(s) while owned.
-- `passive-extra-shield-on-umbrella`: adds `extraCharges` to each Bad Luck Umbrella use while owned.
+- `passive-extra-shield-on-umbrella`: each `extraCharges` point adds 1 hour of lockout-cutting strength to Bad Luck Umbrella. With the default `extraCharges: 1`, Umbrella Harness doubles Bad Luck Umbrella effectiveness from 1 hour to 2 hours against lockouts.
 - `passive-pvp-loser-lockout-reduction`: reduces PvP loser lockout by `reductionPercent`, with a final floor of `minimumMinutes`.
 - `passive-cleanse-grants-negative-effect-shield`: grants `charges` shield charge(s) whenever Cleanse Salt is used.
 - `passive-extra-ban-slot`: grants `extraSlots` additional ban slots per owned copy.
@@ -68,7 +68,7 @@ Passive upgrade example:
 {
   "id": "umbrella-harness",
   "name": "Umbrella Harness",
-  "description": "Passive upgrade: Bad Luck Umbrella grants +1 extra shield charge when used.",
+  "description": "Passive upgrade: doubles Bad Luck Umbrella effectiveness, so lockouts lose 2 hours instead of 1.",
   "pricePips": 250,
   "consumable": false,
   "effect": {

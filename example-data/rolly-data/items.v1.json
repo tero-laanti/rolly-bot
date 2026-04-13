@@ -137,7 +137,7 @@
   {
     "id": "umbrella-harness",
     "name": "Umbrella Harness",
-    "description": "Passive upgrade: Bad Luck Umbrella grants +1 extra shield charge when used.",
+    "description": "Passive upgrade: doubles Bad Luck Umbrella effectiveness, so lockouts lose 2 hours instead of 1.",
     "pricePips": 250,
     "consumable": false,
     "effect": {

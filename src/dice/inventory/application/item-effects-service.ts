@@ -10,7 +10,12 @@ export type DiceItemDoubleRollStatus = {
 export type DiceItemEffectsService = {
   getItemDoubleRollStatus: (userId: string, nowMs?: number) => DiceItemDoubleRollStatus;
   consumeOneDoubleRollUse: (userId: string, nowMs?: number) => boolean;
-  grantNegativeEffectShield: (input: { userId: string; source: string; charges?: number }) => void;
+  grantNegativeEffectShield: (input: {
+    userId: string;
+    source: string;
+    charges?: number;
+    magnitude?: number;
+  }) => void;
   grantDoubleRollUses: (input: { userId: string; source: string; uses: number }) => void;
   grantDoubleRollDuration: (input: {
     userId: string;
@@ -63,13 +68,13 @@ export const createDiceItemEffectsService = (
     },
     consumeOneDoubleRollUse: (userId, nowMs = Date.now()) =>
       progression.consumeOldestEffectChargeByCode(userId, "double-roll", nowMs),
-    grantNegativeEffectShield: ({ userId, source, charges = 1 }) => {
+    grantNegativeEffectShield: ({ userId, source, charges = 1, magnitude = 1 }) => {
       progression.applyDiceTemporaryEffect({
         userId,
         effectCode: "negative-effect-shield",
         kind: "positive",
         source,
-        magnitude: 1,
+        magnitude,
         remainingRolls: charges,
         consumeOnCommand: "none",
         stackMode: "stack",

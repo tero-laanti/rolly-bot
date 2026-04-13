@@ -16,7 +16,10 @@ import {
 } from "../../../progression/application/achievement-announcements";
 import { hourMs } from "../../../../shared/time";
 import { getDiceItemAchievementIds } from "../achievement-rules";
-import { getBadLuckUmbrellaCharges, getCleanseSaltShieldCharges } from "../../domain/passive-items";
+import {
+  getBadLuckUmbrellaShieldMagnitude,
+  getCleanseSaltShieldCharges,
+} from "../../domain/passive-items";
 
 export type ReserveAutoRollSession = (input: {
   userId: string;
@@ -166,7 +169,7 @@ export const createUseDiceItemUseCase = ({
     if (item.effect.type === "negative-effect-shield") {
       const effect = item.effect;
       const ownedQuantities = inventory.getInventoryQuantities(userId);
-      const grantedCharges = getBadLuckUmbrellaCharges(effect.charges, ownedQuantities);
+      const shieldMagnitude = getBadLuckUmbrellaShieldMagnitude(ownedQuantities);
       return unitOfWork.runInTransaction(() => {
         const consumed = inventory.consumeInventoryItem({ userId, itemId: item.id });
         if (!consumed.ok) {
@@ -179,7 +182,8 @@ export const createUseDiceItemUseCase = ({
         itemEffects.grantNegativeEffectShield({
           userId,
           source: `item:${item.id}`,
-          charges: grantedCharges,
+          charges: effect.charges,
+          magnitude: shieldMagnitude,
         });
         const { achievementAnnouncement } = recordDiceItemUseAchievements({
           inventory,
@@ -193,8 +197,8 @@ export const createUseDiceItemUseCase = ({
           item,
           remainingQuantity: consumed.remainingQuantity,
           statusMessage:
-            grantedCharges > effect.charges
-              ? `${item.name} opened. The next ${grantedCharges} negative effects will be blocked, but lockouts only lose 1 hour.`
+            shieldMagnitude > 1
+              ? `${item.name} opened. The next negative effect will be blocked, and lockouts lose up to ${shieldMagnitude} hours because Umbrella Harness doubles ${item.name} effectiveness.`
               : `${item.name} opened. The next negative effect will be blocked, but lockouts only lose 1 hour.`,
           achievementAnnouncements: achievementAnnouncement ? [achievementAnnouncement] : [],
         };
