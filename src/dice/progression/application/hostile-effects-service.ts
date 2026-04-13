@@ -59,7 +59,10 @@ export const createDiceHostileEffectsService = ({
 }: {
   progression: Pick<
     DiceProgressionRepository,
-    "applyDiceTemporaryEffect" | "consumeOldestEffectChargeByCode" | "getActiveDiceTemporaryEffects"
+    | "applyDiceTemporaryEffect"
+    | "consumeEffectChargeById"
+    | "consumeOldestEffectChargeByCode"
+    | "getActiveDiceTemporaryEffects"
   >;
   pvp: Pick<DicePvpRepository, "getActiveDiceLockout" | "setDicePvpEffects">;
   unitOfWork: UnitOfWork;
@@ -67,13 +70,28 @@ export const createDiceHostileEffectsService = ({
   return {
     applyShieldableNegativeLockout: ({ userId, durationMs, nowMs = Date.now() }) =>
       unitOfWork.runInTransaction(() => {
-        const shieldConsumed = progression.consumeOldestEffectChargeByCode(
-          userId,
-          "negative-effect-shield",
-          nowMs,
-        );
+        const shieldEffect =
+          progression
+            .getActiveDiceTemporaryEffects({
+              userId,
+              nowMs,
+            })
+            .filter(
+              (effect) =>
+                effect.effectCode === "negative-effect-shield" &&
+                effect.kind === "positive" &&
+                typeof effect.remainingRolls === "number" &&
+                effect.remainingRolls > 0,
+            )
+            .sort((left, right) => right.magnitude - left.magnitude)[0] ?? null;
+        const shieldConsumed = shieldEffect
+          ? progression.consumeEffectChargeById(userId, shieldEffect.id, nowMs)
+          : false;
         const existingLockoutUntil = pvp.getActiveDiceLockout(userId, nowMs);
-        const shieldReductionMs = shieldConsumed ? Math.min(hourMs, durationMs) : 0;
+        const shieldStrengthHours = Math.max(1, Math.floor(shieldEffect?.magnitude ?? 1));
+        const shieldReductionMs = shieldConsumed
+          ? Math.min(shieldStrengthHours * hourMs, durationMs)
+          : 0;
         const reducedDurationMs = Math.max(0, durationMs - shieldReductionMs);
         const requestedLockoutUntil = nowMs + reducedDurationMs;
         const nextLockoutUntil = Math.max(existingLockoutUntil ?? 0, requestedLockoutUntil);

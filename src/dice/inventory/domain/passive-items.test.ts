@@ -5,7 +5,7 @@ import { getDiceShopItem } from "./shop";
 import {
   applyPipRewardBonus,
   applyPvpLoserLockoutReduction,
-  getBadLuckUmbrellaCharges,
+  getBadLuckUmbrellaShieldMagnitude,
   getCleanseSaltShieldCharges,
   getDiceShopItemCurrentPricePips,
   getExtraBanSlots,
@@ -21,7 +21,7 @@ test("passive inventory bonuses apply umbrella, cleanse, and PvP lockout reducti
     ["padded-bracers", 1],
   ]);
 
-  assert.equal(getBadLuckUmbrellaCharges(1, ownedQuantities), 2);
+  assert.equal(getBadLuckUmbrellaShieldMagnitude(ownedQuantities), 2);
   assert.equal(getCleanseSaltShieldCharges(ownedQuantities), 1);
   assert.equal(applyPvpLoserLockoutReduction(60 * minuteMs, ownedQuantities), 51 * minuteMs);
 });
