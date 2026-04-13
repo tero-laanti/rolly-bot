@@ -103,16 +103,15 @@ export const itemRequiresOwnership = (
   return item.requiresItemId ? !hasOwnedItem(ownedQuantities, item.requiresItemId) : false;
 };
 
-export const getBadLuckUmbrellaCharges = (
-  baseCharges: number,
+export const getBadLuckUmbrellaShieldMagnitude = (
   ownedQuantities: ReadonlyMap<DiceShopItemId, number>,
 ): number => {
   if (!hasOwnedItem(ownedQuantities, umbrellaHarnessItemId)) {
-    return baseCharges;
+    return 1;
   }
 
   const effect = getPassiveItemEffect(umbrellaHarnessItemId, "passive-extra-shield-on-umbrella");
-  return baseCharges + (effect?.extraCharges ?? 0);
+  return Math.max(1, 1 + (effect?.extraCharges ?? 0));
 };
 
 export const getCleanseSaltShieldCharges = (

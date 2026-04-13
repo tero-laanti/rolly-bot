@@ -30,7 +30,7 @@ const cleanseSalt: DiceShopItem = {
 const umbrellaHarness: DiceShopItem = {
   id: "umbrella-harness",
   name: "Umbrella Harness",
-  description: "Adds one extra Bad Luck Umbrella charge.",
+  description: "Doubles Bad Luck Umbrella effectiveness, so lockouts lose 2 hours instead of 1.",
   pricePips: 25,
   consumable: false,
   effect: {

@@ -195,8 +195,8 @@ test("finalizing auto-roll item use records item-use progress inside a transacti
   assert.deepEqual(result.achievementAnnouncements, []);
 });
 
-test("umbrella harness adds one extra Bad Luck Umbrella charge", async () => {
-  const grantedCharges: number[] = [];
+test("umbrella harness doubles Bad Luck Umbrella lockout strength", async () => {
+  const grantedShields: Array<{ charges?: number; magnitude?: number }> = [];
   const useDiceItem = createUseDiceItemUseCase({
     inventory: {
       consumeInventoryItem: () => ({
@@ -217,8 +217,8 @@ test("umbrella harness adds one extra Bad Luck Umbrella charge", async () => {
     },
     itemEffects: {
       ...createItemEffectsStub(),
-      grantNegativeEffectShield: ({ charges = 1 }) => {
-        grantedCharges.push(charges);
+      grantNegativeEffectShield: ({ charges = 1, magnitude = 1 }) => {
+        grantedShields.push({ charges, magnitude });
       },
     },
     pvp: {
@@ -244,9 +244,10 @@ test("umbrella harness adds one extra Bad Luck Umbrella charge", async () => {
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(grantedCharges, [2]);
+  assert.deepEqual(grantedShields, [{ charges: 1, magnitude: 2 }]);
   if (result.ok) {
-    assert.match(result.statusMessage, /next 2 negative effects will be blocked/);
+    assert.match(result.statusMessage, /lockouts lose up to 2 hours/);
+    assert.match(result.statusMessage, /doubles Bad Luck Umbrella effectiveness/);
   }
 });
 
