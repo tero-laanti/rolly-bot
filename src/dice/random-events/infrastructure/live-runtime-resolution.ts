@@ -205,7 +205,10 @@ export const applyRandomEventEffectsToUser = (
       effectNotes.push("Bad Luck Umbrella blocked a negative event effect.");
     } else if (result.applied) {
       if (result.shieldReductionMs && result.shieldReductionMs > 0) {
-        effectNotes.push("Bad Luck Umbrella reduced a negative event lockout by 1 hour.");
+        const reducedHours = result.shieldReductionMs / (60 * 60 * 1000);
+        effectNotes.push(
+          `Bad Luck Umbrella reduced a negative event lockout by ${reducedHours} hour${reducedHours === 1 ? "" : "s"}.`,
+        );
       }
       appliedNegativeEffects.push({
         type: "temporary-lockout",
