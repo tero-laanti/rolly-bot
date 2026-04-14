@@ -215,3 +215,46 @@ test("contract master chooser groups each difficulty on its own row with player-
     }
   });
 });
+
+test("weekly cadence resolver keeps the authored 5-contract weekly cap", () => {
+  withEnv({ ROLLY_DATA_DIR: exampleRollyDataDir }, () => {
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+      const resolver = services.createSqliteContractsRotationResolver(db);
+
+      const view = resolver.resolveCadenceView({
+        userId: "player-1",
+        cadence: "weekly",
+        now: new Date("2026-03-28T11:00:00.000Z"),
+      });
+
+      assert.equal(view.contractsPerWindow, 5);
+      assert.equal(view.offers.length, 3);
+    } finally {
+      clearContractsModuleGraph();
+    }
+  });
+});
+
+test("active weekly rotation resolver exposes 5 contracts on the exported path", () => {
+  withEnv({ ROLLY_DATA_DIR: exampleRollyDataDir }, () => {
+    clearContractsModuleGraph();
+
+    try {
+      const services = moduleRequire("./services") as typeof import("./services");
+      const db = new Database(":memory:");
+      initializeDatabaseSchema(db);
+      const resolver = services.createSqliteContractsRotationResolver(db);
+
+      const rotation = resolver.resolveActiveRotation(new Date("2026-03-28T11:00:00.000Z"));
+
+      assert.equal(rotation.weekly.contracts.length, 5);
+    } finally {
+      clearContractsModuleGraph();
+    }
+  });
+});

@@ -314,13 +314,35 @@ export const createRandomEventsLiveRuntime = ({
     return expiresAtMs;
   };
 
-  const resetPhaseExpiry = (eventId: string): void => {
+  const resetPhaseExpiry = (
+    eventId: string,
+    options: { preserveRemainingBudget?: boolean } = {},
+  ): void => {
     const context = activeEventsById.get(eventId);
     if (!context) {
       return;
     }
 
-    schedulePhaseExpiry(eventId, context.baseDurationMs);
+    const nowMs = Date.now();
+    if (!options.preserveRemainingBudget) {
+      schedulePhaseExpiry(eventId, context.baseDurationMs);
+      return;
+    }
+
+    const cappedExpiresAtMs = getActiveRandomEventCappedCurrentPhaseExpiryMs(
+      context,
+      context.baseDurationMs,
+      nowMs,
+    );
+    if (cappedExpiresAtMs === null) {
+      syncActiveRandomEventCurrentPhaseExpiryMs(state, context, nowMs);
+      void handleNonWindowPhaseExpiry(eventId).catch((error) => {
+        logger.warn("[random-events] Failed to resolve exhausted staged event timeout.", error);
+      });
+      return;
+    }
+
+    schedulePhaseExpiry(eventId, Math.max(1, cappedExpiresAtMs - nowMs));
   };
 
   type RandomEventAchievementAttemptResolution = Pick<
@@ -1379,7 +1401,7 @@ export const createRandomEventsLiveRuntime = ({
       return;
     }
 
-    resetPhaseExpiry(eventId);
+    resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
     await refreshNonWindowPrompt(eventId);
   };
 
@@ -1452,7 +1474,7 @@ export const createRandomEventsLiveRuntime = ({
           return;
         }
 
-        resetPhaseExpiry(eventId);
+        resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
         await refreshNonWindowPrompt(eventId);
         return;
       }
@@ -1588,7 +1610,7 @@ export const createRandomEventsLiveRuntime = ({
         return "handled";
       }
 
-      resetPhaseExpiry(eventId);
+      resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
       await refreshNonWindowPrompt(eventId);
       return "handled";
     }
@@ -1711,7 +1733,7 @@ export const createRandomEventsLiveRuntime = ({
       }),
     );
     context.flowState.stageIndex += 1;
-    resetPhaseExpiry(eventId);
+    resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
 
     if (context.flowState.stageIndex >= flow.stages.length) {
       await cashOutPushYourLuck({

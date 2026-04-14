@@ -9,7 +9,7 @@ import type {
   ContractsRunRepository,
   ContractsUserCadenceStateRepository,
 } from "../ports";
-import { getContractResetWindow } from "../../domain/rotation";
+import { deterministicShuffle, getContractResetWindow } from "../../domain/rotation";
 import type { ContractCadence, ContractDefinition, ContractOffer } from "../../domain/types";
 
 type ContractMasterDependencies = {
@@ -36,6 +36,32 @@ const toDefinition = (offer: ContractOffer): ContractDefinition => ({
     pips: offer.rewardPips,
   },
 });
+
+const buildActiveRotationContracts = ({
+  cadence,
+  context,
+}: {
+  cadence: ContractCadence;
+  context: ReturnType<typeof buildContractCadenceContext>;
+}): ContractDefinition[] => {
+  const seen = new Set<string>();
+  const contracts = Object.values(context.cadenceCatalog.difficulties)
+    .flatMap((pool) => [...pool.initialOffers, ...pool.refillOffers])
+    .filter((offer) => {
+      if (seen.has(offer.id)) {
+        return false;
+      }
+
+      seen.add(offer.id);
+      return true;
+    })
+    .map(toDefinition);
+
+  return deterministicShuffle(contracts, `${cadence}-${context.resetWindow}`).slice(
+    0,
+    context.cadenceCatalog.contractsPerWindow,
+  );
+};
 
 export const createResolveContractCadenceViewUseCase = ({
   catalogReader,
@@ -71,14 +97,21 @@ export const createResolveContractCadenceViewUseCase = ({
 
   const resolveActiveRotation = (now: Date) => {
     const buildContracts = (cadence: ContractCadence) =>
-      resolveCadenceView({
-        userId: "__contracts-global-board__",
+      buildActiveRotationContracts({
         cadence,
-        now,
-      })
-        .offers.map((offer) => offer.offer)
-        .filter((offer): offer is ContractOffer => Boolean(offer))
-        .map(toDefinition);
+        context: buildContractCadenceContext(
+          {
+            catalogReader,
+            initialOfferRepository,
+            userCadenceStateRepository,
+            runRepository,
+            rerollUsageRepository,
+          },
+          "__contracts-global-board__",
+          cadence,
+          now,
+        ),
+      });
 
     return {
       daily: {
