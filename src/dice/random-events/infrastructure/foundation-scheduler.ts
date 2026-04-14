@@ -155,11 +155,24 @@ const isWithinQuietHours = (now: Date, config: RandomEventsFoundationConfig): bo
   return currentMinutes >= startMinutes || currentMinutes < endMinutes;
 };
 
-const getRandomCadenceDelayMs = (
+const getQuietHoursDurationMs = (config: RandomEventsFoundationConfig): number => {
+  const startMinutes = parseClockToMinutes(config.quietHours.start);
+  const endMinutes = parseClockToMinutes(config.quietHours.end);
+  if (startMinutes === null || endMinutes === null || startMinutes === endMinutes) {
+    return 0;
+  }
+
+  const quietMinutes =
+    startMinutes < endMinutes ? endMinutes - startMinutes : 24 * 60 - startMinutes + endMinutes;
+  return quietMinutes * 60 * 1000;
+};
+
+export const getRandomCadenceDelayMs = (
   config: RandomEventsFoundationConfig,
   random: () => number,
 ): number => {
-  const baselineIntervalMs = dayMs / Math.max(1, config.targetEventsPerDay);
+  const activeDayMs = Math.max(1, dayMs - getQuietHoursDurationMs(config));
+  const baselineIntervalMs = activeDayMs / Math.max(1, config.targetEventsPerDay);
   const jitterRangeMs = baselineIntervalMs * config.jitterRatio;
   const randomOffsetMs = (random() * 2 - 1) * jitterRangeMs;
   const randomizedDelayMs = baselineIntervalMs + randomOffsetMs;

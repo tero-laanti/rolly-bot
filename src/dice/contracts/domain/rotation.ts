@@ -8,7 +8,7 @@ import type {
 
 export const contractDifficulties: ContractDifficulty[] = ["simple", "serious", "brutal"];
 export const dailyActiveCount = 3;
-export const weeklyActiveCount = 2;
+export const weeklyActiveCount = 5;
 
 const formatDateKey = (date: Date): string => {
   const year = date.getUTCFullYear();

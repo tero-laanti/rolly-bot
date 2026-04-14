@@ -192,7 +192,7 @@ test("raids config rejects blank binding ids", () => {
   );
 });
 
-test("random events config uses the higher default target per day when unset", () => {
+test("random events config uses the higher default scheduler target when unset", () => {
   withEnv(
     {
       RANDOM_EVENTS_CHANNEL_ID: "channel-1",
@@ -201,7 +201,7 @@ test("random events config uses the higher default target per day when unset", (
     () => {
       const { randomEventsFoundationConfig } = loadConfig();
       assert.equal(randomEventsFoundationConfig.enabled, true);
-      assert.equal(randomEventsFoundationConfig.targetEventsPerDay, 15);
+      assert.equal(randomEventsFoundationConfig.targetEventsPerDay, 23);
     },
   );
 });

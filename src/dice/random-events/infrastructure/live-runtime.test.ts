@@ -653,6 +653,65 @@ test("stake offer prompts use live status copy before anyone declines", async ()
   );
 });
 
+test("stake offer claim refreshes the timer for the current phase", async () => {
+  const originalDateNow = Date.now;
+  let currentNowMs = 10_000;
+  Date.now = () => currentNowMs;
+
+  const scenario: RandomEventScenario = {
+    ...createBaseScenario(),
+    flow: {
+      type: "stake-offer",
+      stakePips: 5,
+      acceptLabel: "Take deal",
+      declineLabel: "Pass",
+      declineMessage: "The offer passes by.",
+    },
+    outcomes: [
+      {
+        id: "deal-win",
+        resolution: "resolve-success",
+        message: "The deal pays out.",
+        effects: [{ type: "currency", minAmount: 8, maxAmount: 8 }],
+      },
+    ],
+  };
+
+  try {
+    await withPatchedRuntime(
+      {
+        scenario,
+        flowState: {
+          type: "stake-offer",
+          ownerUserId: null,
+        },
+        baseDurationMs: 10_000,
+      },
+      async ({ runtime, db }) => {
+        const economy = createSqliteEconomyRepository(db as never);
+        economy.applyPipsDelta({ userId: "user-1", amount: 10 });
+
+        const result = await runtime.onTriggerOpportunity({ now: new Date(currentNowMs) });
+        assert.equal(result?.created, true);
+        assert.equal(runtime.getActiveEventsSnapshot()[0]?.expiresAt?.getTime(), 20_000);
+
+        currentNowMs = 19_500;
+        await runtime.handleButtonInteraction({
+          customId: "random-event:event-1:claim",
+          user: { id: "user-1" },
+          deferUpdate: async () => undefined,
+          reply: async () => undefined,
+          followUp: async () => undefined,
+        } as never);
+
+        assert.equal(runtime.getActiveEventsSnapshot()[0]?.expiresAt?.getTime(), 29_500);
+      },
+    );
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
 test("staged trigger results return the actual post-send expiry for scheduler state registration", async () => {
   const originalDateNow = Date.now;
   Date.now = () => 10_000;
@@ -715,6 +774,102 @@ test("staged trigger results return the actual post-send expiry for scheduler st
         });
 
         assert.equal(state.activeEventsById.get("event-1")?.expiresAtMs, 15_000);
+      },
+    );
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
+test("staged events keep the original total expiry budget when advancing phases", async () => {
+  const originalDateNow = Date.now;
+  let currentNowMs = 10_000;
+  Date.now = () => currentNowMs;
+
+  const scenario: RandomEventScenario = {
+    ...createBaseScenario(),
+    flow: {
+      type: "solo-ladder",
+      stages: [
+        {
+          id: "stage-one",
+          label: "Stage One",
+          prompt: "Climb the first ledge.",
+          actionLabel: "Climb",
+          rollChallenge: {
+            id: "climb-one",
+            mode: "single-step",
+            steps: [
+              {
+                id: "step-one",
+                label: "Roll 1+ on d2",
+                source: { type: "static-die", sides: 2 },
+                target: 1,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "You reach the next ledge.",
+          successEffects: [],
+          failureMessage: "You slip.",
+          failureEffects: [],
+        },
+        {
+          id: "stage-two",
+          label: "Stage Two",
+          prompt: "Finish the climb.",
+          actionLabel: "Finish",
+          rollChallenge: {
+            id: "climb-two",
+            mode: "single-step",
+            steps: [
+              {
+                id: "step-two",
+                label: "Roll 1+ on d2",
+                source: { type: "static-die", sides: 2 },
+                target: 1,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "You finish the climb.",
+          successEffects: [{ type: "currency", minAmount: 3, maxAmount: 3 }],
+          failureMessage: "You fall at the end.",
+          failureEffects: [],
+        },
+      ],
+    },
+  };
+
+  try {
+    await withPatchedRuntime(
+      {
+        scenario,
+        flowState: {
+          type: "solo-ladder",
+          ownerUserId: null,
+          stageIndex: 0,
+          resolvedLines: [],
+        },
+        baseDurationMs: 10_000,
+      },
+      async ({ runtime }) => {
+        const result = await runtime.onTriggerOpportunity({ now: new Date(currentNowMs) });
+        if (!result || !result.created) {
+          assert.fail("Expected staged trigger to create an event.");
+        }
+        assert.equal(result.expiresAt?.getTime(), 20_000);
+
+        currentNowMs = 12_000;
+        await runtime.handleButtonInteraction({
+          customId: "random-event:event-1:claim",
+          user: { id: "user-1" },
+          deferUpdate: async () => undefined,
+          reply: async () => undefined,
+          followUp: async () => undefined,
+        } as never);
+
+        assert.equal(runtime.getActiveEventsSnapshot()[0]?.expiresAt?.getTime(), 20_000);
       },
     );
   } finally {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildContractRotation,
   deterministicShuffle,
   findDeterministicOffer,
   getContractResetAt,
@@ -84,4 +85,31 @@ test("deterministic offer lookup returns null when no authored replacement remai
     new Set(["simple-a", "simple-b", "simple-c"]),
   );
   assert.equal(selected, null);
+});
+
+test("contract rotation exposes 3 daily and 5 weekly contracts", () => {
+  const now = new Date(Date.UTC(2026, 3, 14, 5, 0, 0));
+  const catalog = {
+    daily: Array.from({ length: 6 }, (_, index) => ({
+      id: `daily-${index + 1}`,
+      title: `Daily ${index + 1}`,
+      description: `Daily ${index + 1}`,
+      cadence: "daily" as const,
+      objective: { type: "roll_count" as const, requiredCount: index + 1 },
+      reward: { pips: 10 + index, fame: 0 },
+    })),
+    weekly: Array.from({ length: 7 }, (_, index) => ({
+      id: `weekly-${index + 1}`,
+      title: `Weekly ${index + 1}`,
+      description: `Weekly ${index + 1}`,
+      cadence: "weekly" as const,
+      objective: { type: "roll_count" as const, requiredCount: index + 1 },
+      reward: { pips: 20 + index, fame: 0 },
+    })),
+  };
+
+  const rotation = buildContractRotation(catalog, now);
+
+  assert.equal(rotation.daily.contracts.length, 3);
+  assert.equal(rotation.weekly.contracts.length, 5);
 });

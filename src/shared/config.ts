@@ -214,8 +214,10 @@ const resolveFeatureActivation = ({
 };
 
 const defaultRandomEventsConfig = {
-  targetEventsPerDay: 15,
-  minGapMinutes: 45,
+  // Scheduler target across active (non-quiet) hours in a typical day.
+  // Runtime gates can still reduce the number of events that actually appear.
+  targetEventsPerDay: 23,
+  minGapMinutes: 30,
   maxActiveEvents: 1,
   retryDelaySeconds: 5 * 60,
   jitterRatio: 0.35,
