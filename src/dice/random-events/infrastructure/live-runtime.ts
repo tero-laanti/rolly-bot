@@ -314,35 +314,50 @@ export const createRandomEventsLiveRuntime = ({
     return expiresAtMs;
   };
 
-  const resetPhaseExpiry = (
-    eventId: string,
-    options: { preserveRemainingBudget?: boolean } = {},
-  ): void => {
+  const refreshPhaseExpiryFromNow = (eventId: string): "scheduled" | "missing" => {
     const context = activeEventsById.get(eventId);
     if (!context) {
-      return;
+      return "missing";
+    }
+
+    schedulePhaseExpiry(eventId, context.baseDurationMs);
+    return "scheduled";
+  };
+
+  const advancePhaseWithinRemainingBudget = (
+    eventId: string,
+  ): "scheduled" | "exhausted" | "missing" => {
+    const context = activeEventsById.get(eventId);
+    if (!context) {
+      return "missing";
     }
 
     const nowMs = Date.now();
-    if (!options.preserveRemainingBudget) {
-      schedulePhaseExpiry(eventId, context.baseDurationMs);
-      return;
-    }
-
     const cappedExpiresAtMs = getActiveRandomEventCappedCurrentPhaseExpiryMs(
       context,
       context.baseDurationMs,
       nowMs,
     );
     if (cappedExpiresAtMs === null) {
+      clearPhaseTimer(context);
       syncActiveRandomEventCurrentPhaseExpiryMs(state, context, nowMs);
-      void handleNonWindowPhaseExpiry(eventId).catch((error) => {
-        logger.warn("[random-events] Failed to resolve exhausted staged event timeout.", error);
-      });
-      return;
+      return "exhausted";
     }
 
     schedulePhaseExpiry(eventId, Math.max(1, cappedExpiresAtMs - nowMs));
+    return "scheduled";
+  };
+
+  const continueOrResolveExhaustedPhase = async (eventId: string): Promise<void> => {
+    const expiryReset = advancePhaseWithinRemainingBudget(eventId);
+    if (expiryReset === "scheduled") {
+      await refreshNonWindowPrompt(eventId);
+      return;
+    }
+
+    if (expiryReset === "exhausted") {
+      await handleNonWindowPhaseExpiry(eventId);
+    }
   };
 
   type RandomEventAchievementAttemptResolution = Pick<
@@ -1401,8 +1416,7 @@ export const createRandomEventsLiveRuntime = ({
       return;
     }
 
-    resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
-    await refreshNonWindowPrompt(eventId);
+    await continueOrResolveExhaustedPhase(eventId);
   };
 
   const handleNonWindowPhaseExpiry = async (eventId: string): Promise<void> => {
@@ -1474,8 +1488,7 @@ export const createRandomEventsLiveRuntime = ({
           return;
         }
 
-        resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
-        await refreshNonWindowPrompt(eventId);
+        await continueOrResolveExhaustedPhase(eventId);
         return;
       }
 
@@ -1610,8 +1623,7 @@ export const createRandomEventsLiveRuntime = ({
         return "handled";
       }
 
-      resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
-      await refreshNonWindowPrompt(eventId);
+      await continueOrResolveExhaustedPhase(eventId);
       return "handled";
     }
 
@@ -1733,8 +1745,6 @@ export const createRandomEventsLiveRuntime = ({
       }),
     );
     context.flowState.stageIndex += 1;
-    resetPhaseExpiry(eventId, { preserveRemainingBudget: true });
-
     if (context.flowState.stageIndex >= flow.stages.length) {
       await cashOutPushYourLuck({
         eventId,
@@ -1744,7 +1754,7 @@ export const createRandomEventsLiveRuntime = ({
       return "handled";
     }
 
-    await refreshNonWindowPrompt(eventId);
+    await continueOrResolveExhaustedPhase(eventId);
     return "handled";
   };
 
@@ -1830,7 +1840,7 @@ export const createRandomEventsLiveRuntime = ({
             hadKeepOpenFailureBeforeSuccess: false,
           },
         ]);
-        resetPhaseExpiry(eventId);
+        refreshPhaseExpiryFromNow(eventId);
         await refreshNonWindowPrompt(eventId);
         return "handled";
       }
@@ -1845,7 +1855,7 @@ export const createRandomEventsLiveRuntime = ({
       return "handled";
     }
 
-    resetPhaseExpiry(eventId);
+    refreshPhaseExpiryFromNow(eventId);
     await refreshNonWindowPrompt(eventId);
     return "handled";
   };
@@ -1876,7 +1886,7 @@ export const createRandomEventsLiveRuntime = ({
       }
 
       context.flowState.ownerUserId = userId;
-      resetPhaseExpiry(eventId);
+      refreshPhaseExpiryFromNow(eventId);
       await refreshNonWindowPrompt(eventId);
       return "handled";
     }

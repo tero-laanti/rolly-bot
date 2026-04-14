@@ -847,7 +847,7 @@ test("staged events keep the original total expiry budget when advancing phases"
         scenario,
         flowState: {
           type: "solo-ladder",
-          ownerUserId: null,
+          ownerUserId: "user-1",
           stageIndex: 0,
           resolvedLines: [],
         },
@@ -862,7 +862,7 @@ test("staged events keep the original total expiry budget when advancing phases"
 
         currentNowMs = 12_000;
         await runtime.handleButtonInteraction({
-          customId: "random-event:event-1:claim",
+          customId: "random-event:event-1:continue",
           user: { id: "user-1" },
           deferUpdate: async () => undefined,
           reply: async () => undefined,
@@ -870,6 +870,108 @@ test("staged events keep the original total expiry budget when advancing phases"
         } as never);
 
         assert.equal(runtime.getActiveEventsSnapshot()[0]?.expiresAt?.getTime(), 20_000);
+      },
+    );
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
+test("exhausted staged events resolve immediately instead of refreshing the next stage prompt", async () => {
+  const originalDateNow = Date.now;
+  let currentNowMs = 10_000;
+
+  Date.now = () => currentNowMs;
+
+  const secondStageChallenge = {
+    id: "climb-two",
+    mode: "single-step" as const,
+    steps: [
+      {
+        id: "step-two",
+        label: "Roll 1+ on d2",
+        source: { type: "static-die" as const, sides: 2 },
+        target: 1,
+        comparator: "gte" as const,
+      },
+    ],
+  };
+
+  const scenario: RandomEventScenario = {
+    ...createBaseScenario(),
+    flow: {
+      type: "solo-ladder",
+      stages: [
+        {
+          id: "stage-one",
+          label: "Stage One",
+          prompt: "Climb the first ledge.",
+          actionLabel: "Climb",
+          rollChallenge: {
+            id: "climb-one",
+            mode: "single-step",
+            steps: [
+              {
+                id: "step-one",
+                label: "Roll 1+ on d2",
+                source: { type: "static-die", sides: 2 },
+                target: 1,
+                comparator: "gte",
+              },
+            ],
+          },
+          successMessage: "You reach the next ledge.",
+          successEffects: [],
+          failureMessage: "You slip.",
+          failureEffects: [],
+        },
+        {
+          id: "stage-two",
+          label: "Stage Two",
+          prompt: "Finish the climb.",
+          actionLabel: "Finish",
+          rollChallenge: secondStageChallenge,
+          successMessage: "You finish the climb.",
+          successEffects: [{ type: "currency", minAmount: 3, maxAmount: 3 }],
+          failureMessage: "You fall at the end.",
+          failureEffects: [],
+        },
+      ],
+    },
+  };
+
+  try {
+    await withPatchedRuntime(
+      {
+        scenario,
+        flowState: {
+          type: "solo-ladder",
+          ownerUserId: "user-1",
+          stageIndex: 0,
+          resolvedLines: [],
+        },
+        baseDurationMs: 10_000,
+      },
+      async ({ runtime, messageEdits }) => {
+        const result = await runtime.onTriggerOpportunity({ now: new Date(currentNowMs) });
+        if (!result || !result.created) {
+          assert.fail("Expected staged trigger to create an event.");
+        }
+
+        currentNowMs = 20_001;
+        await runtime.handleButtonInteraction({
+          customId: "random-event:event-1:continue",
+          user: { id: "user-1" },
+          deferUpdate: async () => undefined,
+          reply: async () => undefined,
+          followUp: async () => undefined,
+        } as never);
+
+        assert.equal(runtime.getActiveEventsSnapshot().length, 0);
+        assert.equal(messageEdits.length, 2);
+        assert.ok(Array.isArray((messageEdits[0] as { components?: unknown[] }).components));
+        assert.ok(((messageEdits[0] as { components?: unknown[] }).components ?? []).length > 0);
+        assert.deepEqual((messageEdits[1] as { components?: unknown[] }).components, []);
       },
     );
   } finally {
