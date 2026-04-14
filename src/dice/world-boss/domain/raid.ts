@@ -29,25 +29,50 @@ const clampBossLevel = (value: number): number => {
   return Math.max(1, Math.min(maxBossLevel, Math.round(value)));
 };
 
-const getBossLevelWeightRatio = (): number => {
-  const { levelHalfLifeLevels } = getWorldBossBalance().bossBalance;
+const getBossLevelWeightRatio = (levelHalfLifeLevels: number): number => {
   return Math.pow(0.5, 1 / levelHalfLifeLevels);
 };
 
-export const rollWorldBossLevel = (random: () => number = Math.random): number => {
+const getWorldBossExtraAttendees = (attendeeCount: number): number => {
+  return Math.max(0, Math.floor(attendeeCount) - 1);
+};
+
+const getWorldBossMinimumLevelForAttendeeCount = (attendeeCount: number): number => {
+  return clampBossLevel(1 + getWorldBossExtraAttendees(attendeeCount) * 2);
+};
+
+const getWorldBossLevelHalfLifeLevelsForAttendeeCount = (attendeeCount: number): number => {
+  const { levelHalfLifeLevels } = getWorldBossBalance().bossBalance;
+  return levelHalfLifeLevels + getWorldBossExtraAttendees(attendeeCount);
+};
+
+export const rollWorldBossLevel = (
+  random: () => number = Math.random,
+  options: { minimumLevel?: number; levelHalfLifeLevels?: number } = {},
+): number => {
   const { maxBossLevel } = getWorldBossBalance().bossBalance;
   if (maxBossLevel <= 1) {
     return 1;
   }
 
-  const weightRatio = getBossLevelWeightRatio();
+  const minimumLevel = clampBossLevel(options.minimumLevel ?? 1);
+  const levelHalfLifeLevels = Math.max(
+    1,
+    options.levelHalfLifeLevels ?? getWorldBossBalance().bossBalance.levelHalfLifeLevels,
+  );
+  if (minimumLevel >= maxBossLevel) {
+    return maxBossLevel;
+  }
+
+  const weightRatio = getBossLevelWeightRatio(levelHalfLifeLevels);
+  const levelCount = maxBossLevel - minimumLevel + 1;
   const totalWeight =
-    weightRatio === 1 ? maxBossLevel : (1 - weightRatio ** maxBossLevel) / (1 - weightRatio);
+    weightRatio === 1 ? levelCount : (1 - weightRatio ** levelCount) / (1 - weightRatio);
   const target = Math.min(Math.max(0, random()), 0.999999999999) * totalWeight;
   let cumulativeWeight = 0;
 
-  for (let level = 1; level <= maxBossLevel; level += 1) {
-    cumulativeWeight += weightRatio ** (level - 1);
+  for (let level = minimumLevel; level <= maxBossLevel; level += 1) {
+    cumulativeWeight += weightRatio ** (level - minimumLevel);
     if (target < cumulativeWeight) {
       return level;
     }
@@ -178,11 +203,16 @@ export const describeAppliedWorldBossReward = (
 export const createWorldBoss = ({
   random = Math.random,
   raiderStrength = 1,
+  attendeeCount = 1,
 }: {
   random?: () => number;
   raiderStrength?: number;
+  attendeeCount?: number;
 } = {}): WorldBossDefinition => {
-  const level = rollWorldBossLevel(random);
+  const level = rollWorldBossLevel(random, {
+    minimumLevel: getWorldBossMinimumLevelForAttendeeCount(attendeeCount),
+    levelHalfLifeLevels: getWorldBossLevelHalfLifeLevelsForAttendeeCount(attendeeCount),
+  });
   const reward = getDefaultWorldBossReward(level);
 
   return {

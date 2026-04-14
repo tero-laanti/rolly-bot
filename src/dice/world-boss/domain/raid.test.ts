@@ -11,6 +11,7 @@ import {
   createWorldBoss,
   describeAppliedWorldBossReward,
   getDefaultWorldBossReward,
+  rollWorldBossLevel,
 } from "./raid";
 
 const moduleRequire = createRequire(__filename);
@@ -44,6 +45,29 @@ test("world boss pip reward formula stays flat through level 5 and scales from l
   assert.equal(getDefaultWorldBossReward(5).pips, 5);
   assert.equal(getDefaultWorldBossReward(6).pips, 6);
   assert.equal(getDefaultWorldBossReward(35).pips, 35);
+});
+
+test("world boss default roll-pass reward scales higher with the upgraded live tuning", () => {
+  assert.deepEqual(getDefaultWorldBossReward(1), {
+    pips: 5,
+    rollPassMultiplier: 4,
+    rollPassRolls: 2,
+  });
+  assert.deepEqual(getDefaultWorldBossReward(12), {
+    pips: 12,
+    rollPassMultiplier: 24,
+    rollPassRolls: 4,
+  });
+  assert.deepEqual(getDefaultWorldBossReward(20), {
+    pips: 20,
+    rollPassMultiplier: 40,
+    rollPassRolls: 4,
+  });
+  assert.deepEqual(getDefaultWorldBossReward(100), {
+    pips: 100,
+    rollPassMultiplier: 200,
+    rollPassRolls: 20,
+  });
 });
 
 test("world boss reward tables support tiered roll-pass lengths", () => {
@@ -174,15 +198,37 @@ test("world boss hp scales by summed player strength without a cap", () => {
   );
 });
 
-test("world boss level roll is low-heavy and capped at level 50", () => {
+test("world boss attendee count raises the minimum level from one through five players", () => {
+  const minimumLevels = [1, 2, 3, 4, 5].map(
+    (attendeeCount) => createWorldBoss({ attendeeCount, random: () => 0 }).level,
+  );
+
+  assert.deepEqual(minimumLevels, [1, 3, 5, 7, 9]);
+});
+
+test("world boss attendee count makes the level roll less front-loaded", () => {
+  const soloLevel = rollWorldBossLevel(() => 0.75, {
+    minimumLevel: 1,
+    levelHalfLifeLevels: 10,
+  });
+  const groupLevel = rollWorldBossLevel(() => 0.75, {
+    minimumLevel: 1,
+    levelHalfLifeLevels: 14,
+  });
+
+  assert.ok(groupLevel > soloLevel);
+});
+
+test("world boss level roll honors attendee scaling and caps at level 100", () => {
   const levelOneBoss = createWorldBoss({
     random: () => 0,
   });
-  const levelFiftyBoss = createWorldBoss({
+  const levelHundredBoss = createWorldBoss({
     random: () => 0.999999,
   });
   const scaledBoss = createWorldBoss({
     random: () => 0,
+    attendeeCount: 3,
     raiderStrength:
       calculateWorldBossParticipantStrength(0) +
       calculateWorldBossParticipantStrength(1) +
@@ -191,9 +237,10 @@ test("world boss level roll is low-heavy and capped at level 50", () => {
 
   assert.equal(levelOneBoss.level, 1);
   assert.equal(levelOneBoss.maxHp, 120);
-  assert.equal(levelFiftyBoss.level, 50);
-  assert.equal(levelFiftyBoss.maxHp, 511);
-  assert.equal(scaledBoss.maxHp, 463);
+  assert.equal(levelHundredBoss.level, 100);
+  assert.equal(levelHundredBoss.maxHp, 2239);
+  assert.equal(scaledBoss.level, 5);
+  assert.equal(scaledBoss.maxHp, 521);
 });
 
 test("applied world boss reward summaries reflect permanent pip bonus outcomes", () => {
@@ -201,10 +248,10 @@ test("applied world boss reward summaries reflect permanent pip bonus outcomes",
 
   assert.equal(
     describeAppliedWorldBossReward(reward, [12, 12]),
-    "12 pips and x12 roll buff for the next 2 /rolls per eligible player",
+    "12 pips and x24 roll buff for the next 4 /rolls per eligible player",
   );
   assert.equal(
     describeAppliedWorldBossReward(reward, [12, 14]),
-    "12-14 pips, based on permanent bonuses and x12 roll buff for the next 2 /rolls per eligible player",
+    "12-14 pips, based on permanent bonuses and x24 roll buff for the next 4 /rolls per eligible player",
   );
 });

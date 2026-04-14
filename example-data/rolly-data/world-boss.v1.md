@@ -21,12 +21,21 @@ Player-facing copy uses `World Boss`, while internal identifiers remain `world-b
       "flatPipsThroughBossLevel": 5
     },
     "rollPassBuff": {
-      "multiplierPerBossLevel": 1,
-      "minimumMultiplier": 2,
-      "maximumMultiplier": 20,
-      "rollsPerBossLevelDivisor": 10,
-      "minimumRolls": 1,
-      "maximumRolls": 5
+      "multiplierPerBossLevel": 2,
+      "minimumMultiplier": 4,
+      "maximumMultiplier": 500,
+      "rollsByBossLevel": [
+        { "bossLevelAtLeast": 1, "rolls": 2 },
+        { "bossLevelAtLeast": 11, "rolls": 4 },
+        { "bossLevelAtLeast": 21, "rolls": 6 },
+        { "bossLevelAtLeast": 31, "rolls": 8 },
+        { "bossLevelAtLeast": 41, "rolls": 10 },
+        { "bossLevelAtLeast": 51, "rolls": 12 },
+        { "bossLevelAtLeast": 61, "rolls": 14 },
+        { "bossLevelAtLeast": 71, "rolls": 16 },
+        { "bossLevelAtLeast": 81, "rolls": 18 },
+        { "bossLevelAtLeast": 91, "rolls": 20 }
+      ]
     }
   },
   "bossNames": {
@@ -37,7 +46,7 @@ Player-facing copy uses `World Boss`, while internal identifiers remain `world-b
     "baseHp": 120,
     "hpIncreasePerBossLevelPercent": 3,
     "levelHalfLifeLevels": 10,
-    "maxBossLevel": 50
+    "maxBossLevel": 100
   }
 }
 ```
@@ -82,7 +91,8 @@ Tiered reward alternative:
 - `hpIncreasePerBossLevelPercent` is the compound HP increase applied for each boss level above 1.
 - Boss HP is calculated from boss level first, then multiplied by the joined-player strength total when the World Boss starts.
 - Joined-player strength is derived in code from the average total of five dice at the player's active prestige.
+- Joined-player count also shifts the World Boss level roll in code: every extra attendee raises the minimum boss level by `2` and raises the effective `levelHalfLifeLevels` by `1`.
 - With the current prestige ladder, joined-player strengths are `1` at d6, `9/7` at d8, `11/7` at d10, and continue rising smoothly with die size.
 - With the default values, level 50 lands at roughly `4.26x` the HP of level 1.
-- `levelHalfLifeLevels` controls the low-heavy level roll. With the default `10`, a level 50 boss is half as likely as a level 40 boss, which is half as likely as a level 30 boss.
-- `maxBossLevel` caps the random boss level roll. With the default `50`, bosses roll from level 1 through level 50.
+- `levelHalfLifeLevels` controls the low-heavy level roll. With the default `10`, a solo level 100 boss is half as likely as a level 90 boss, which is half as likely as a level 80 boss. Extra attendees increase that half-life by `1` each.
+- `maxBossLevel` caps the random boss level roll. With the default `100`, bosses roll from level 1 through level 100.
