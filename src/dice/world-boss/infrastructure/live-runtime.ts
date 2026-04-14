@@ -1364,6 +1364,7 @@ export const createWorldBossLiveRuntime = ({
       );
     }, 0);
     const bossDefinition = createWorldBoss({
+      attendeeCount: participantIds.length,
       raiderStrength: totalParticipantStrength,
     });
 

@@ -5,12 +5,51 @@
       "flatPipsThroughBossLevel": 5
     },
     "rollPassBuff": {
-      "multiplierPerBossLevel": 1,
-      "minimumMultiplier": 2,
-      "maximumMultiplier": 50,
-      "rollsPerBossLevelDivisor": 10,
-      "minimumRolls": 1,
-      "maximumRolls": 5
+      "multiplierPerBossLevel": 2,
+      "minimumMultiplier": 4,
+      "maximumMultiplier": 500,
+      "rollsByBossLevel": [
+        {
+          "bossLevelAtLeast": 1,
+          "rolls": 2
+        },
+        {
+          "bossLevelAtLeast": 11,
+          "rolls": 4
+        },
+        {
+          "bossLevelAtLeast": 21,
+          "rolls": 6
+        },
+        {
+          "bossLevelAtLeast": 31,
+          "rolls": 8
+        },
+        {
+          "bossLevelAtLeast": 41,
+          "rolls": 10
+        },
+        {
+          "bossLevelAtLeast": 51,
+          "rolls": 12
+        },
+        {
+          "bossLevelAtLeast": 61,
+          "rolls": 14
+        },
+        {
+          "bossLevelAtLeast": 71,
+          "rolls": 16
+        },
+        {
+          "bossLevelAtLeast": 81,
+          "rolls": 18
+        },
+        {
+          "bossLevelAtLeast": 91,
+          "rolls": 20
+        }
+      ]
     }
   },
   "bossNames": {
@@ -21,6 +60,6 @@
     "baseHp": 120,
     "hpIncreasePerBossLevelPercent": 3,
     "levelHalfLifeLevels": 10,
-    "maxBossLevel": 50
+    "maxBossLevel": 100
   }
 }
