@@ -2,8 +2,6 @@
 
 Rolly is a Discord dice game bot built around a persistent loop: roll, grow your dice, prestige, pick up items, duel other players, and react to live server events without leaving Discord.
 
-Come see it in action in a Discord server: https://discord.gg/rugRU7gAq9
-
 ## Why Rolly
 
 - `/roll` is the core loop: matching rolls drive progression, achievements, Fame, Pips, bans, and temporary effects.
